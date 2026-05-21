@@ -1,7 +1,9 @@
-import { useEffect, useRef } from "react";
-import { X, TerminalSquare, FileText, Image as ImageIcon, FileType2, FileCode, AlertTriangle } from "lucide-react";
+import { useEffect, useRef, type ReactNode } from "react";
+import { X, TerminalSquare, AlertTriangle } from "lucide-react";
 
 import { Icon } from "@/components/ui/Icon";
+import { FileIcon } from "@/components/file-explorer/FileIcon";
+import { CLI_BRAND_ICONS } from "@/components/icons/brand";
 import { cn } from "@/lib/cn";
 import type { CliTool } from "@/features/terminal/cli-registry";
 import type { Tab } from "./types";
@@ -23,22 +25,32 @@ interface TabBarProps {
   trailing?: React.ReactNode;
 }
 
-function iconForTab(tab: Tab) {
-  switch (tab.kind) {
-    case "terminal":
-      return TerminalSquare;
-    case "cli":
-      return TerminalSquare;
-    case "markdown":
-      return FileText;
-    case "image":
-      return ImageIcon;
-    case "pdf":
-      return FileType2;
-    case "editor":
-    default:
-      return FileCode;
+// Tab icons mirror the source of the tab:
+//   - CLI tabs → brand mark (Claude / Codex / OpenCode / …) so the active agent
+//     is recognizable at a glance.
+//   - File tabs → same FileIcon the explorer uses, keyed on the file extension,
+//     so the tab bar visually matches the sidebar entry.
+//   - Terminal tabs → generic terminal mark.
+function renderTabIcon(tab: Tab, active: boolean): ReactNode {
+  const tone = active ? "text-ink" : "text-muted-soft";
+
+  if (tab.kind === "terminal") {
+    return <Icon icon={TerminalSquare} size={13} className={tone} />;
   }
+  if (tab.kind === "cli") {
+    const BrandIcon = CLI_BRAND_ICONS[tab.cliId];
+    if (BrandIcon) {
+      return (
+        <span className="inline-flex h-[13px] w-[13px] shrink-0 items-center justify-center">
+          <BrandIcon size={13} />
+        </span>
+      );
+    }
+    return <Icon icon={TerminalSquare} size={13} className={tone} />;
+  }
+  return (
+    <FileIcon isDir={false} filename={tab.path} size={13} className={tone} />
+  );
 }
 
 /* Width reserved on the right of the scroll area for the absolutely-positioned
@@ -182,7 +194,6 @@ export function TabBar({
       >
         {tabs.map((tab) => {
           const active = tab.id === activeTabId;
-          const TabIcon = iconForTab(tab);
           const isDangerous = tab.kind === "cli" && tab.cliId === "claude-code";
           const isFileTab =
             tab.kind === "editor" ||
@@ -227,11 +238,7 @@ export function TabBar({
                 )}
                 aria-current={active ? "page" : undefined}
               >
-                <Icon
-                  icon={TabIcon}
-                  size={13}
-                  className={cn(active ? "text-ink" : "text-muted-soft")}
-                />
+                {renderTabIcon(tab, active)}
                 <span className="flex-1 truncate text-left font-mono text-[12px] tracking-tight">
                   {tab.title}
                 </span>
