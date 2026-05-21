@@ -16,6 +16,7 @@ interface TabsState {
   byProject: Record<string, TabsBucket>;
   openTab: (projectKey: string, tab: Tab, setActive?: boolean) => void;
   closeTab: (projectKey: string, tabId: string) => void;
+  closeMany: (projectKey: string, tabIds: string[]) => void;
   setActiveTab: (projectKey: string, tabId: string) => void;
   updateTab: (projectKey: string, tabId: string, patch: Partial<Tab>) => void;
   getBucket: (projectKey: string) => TabsBucket;
@@ -52,6 +53,33 @@ export const useTabsStore = create<TabsState>((set, get) => ({
         const idx = cur.tabs.findIndex((t) => t.id === tabId);
         const fallback = nextTabs[idx] ?? nextTabs[idx - 1] ?? nextTabs[nextTabs.length - 1] ?? null;
         activeTabId = fallback?.id ?? null;
+      }
+      return {
+        byProject: {
+          ...state.byProject,
+          [projectKey]: { tabs: nextTabs, activeTabId },
+        },
+      };
+    }),
+  closeMany: (projectKey, tabIds) =>
+    set((state) => {
+      const cur = state.byProject[projectKey];
+      if (!cur || tabIds.length === 0) return state;
+      const killSet = new Set(tabIds);
+      const nextTabs = cur.tabs.filter((t) => !killSet.has(t.id));
+      let activeTabId = cur.activeTabId;
+      if (activeTabId && killSet.has(activeTabId)) {
+        // Pick the nearest surviving tab — search forward from the dead tab's
+        // original position, then backward; fallback to last remaining.
+        const oldIdx = cur.tabs.findIndex((t) => t.id === activeTabId);
+        const forward = cur.tabs
+          .slice(oldIdx + 1)
+          .find((t) => !killSet.has(t.id));
+        const backward = cur.tabs
+          .slice(0, oldIdx)
+          .reverse()
+          .find((t) => !killSet.has(t.id));
+        activeTabId = forward?.id ?? backward?.id ?? nextTabs[0]?.id ?? null;
       }
       return {
         byProject: {

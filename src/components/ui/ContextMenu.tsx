@@ -15,7 +15,11 @@ export function ContextMenuContent({
     <RCM.Portal>
       <RCM.Content
         className={cn(
-          "z-50 min-w-[180px] rounded-md border border-hairline bg-surface-card p-[5px] text-[13px] text-ink",
+          "z-50 min-w-[200px] rounded-md border border-hairline bg-surface-card p-[5px] text-[13px] text-ink",
+          // Tight floating elevation — Linear/Raycast aesthetic, denser than
+          // Tailwind's shadow-lg. Layered to read at any background luminance.
+          "shadow-[0_12px_30px_-12px_rgba(15,14,11,0.28),0_2px_4px_-2px_rgba(15,14,11,0.08)]",
+          "dark:shadow-[0_14px_36px_-12px_rgba(0,0,0,0.7),0_2px_6px_-2px_rgba(0,0,0,0.4)]",
           "data-[state=open]:animate-slide-up data-[state=closed]:animate-fade-in",
           className,
         )}
@@ -50,9 +54,10 @@ export function ContextMenuItem({
         onSelect?.();
       }}
       className={cn(
-        "flex w-full cursor-default items-center justify-between gap-[12px] rounded-sm px-[10px] py-[6px] outline-none",
-        "data-[highlighted]:bg-surface-strong/55 data-[disabled]:opacity-40 data-[disabled]:cursor-not-allowed",
-        destructive && "text-danger data-[highlighted]:text-danger",
+        "flex w-full cursor-pointer items-center justify-between gap-[12px] rounded-sm px-[10px] py-[6px] outline-none",
+        "data-[highlighted]:bg-surface-strong/70 data-[highlighted]:text-ink",
+        "data-[disabled]:cursor-not-allowed data-[disabled]:opacity-40",
+        destructive && "text-danger data-[highlighted]:text-danger data-[highlighted]:bg-danger/10",
       )}
     >
       <span className="flex min-w-0 items-center gap-[10px]">{children}</span>
@@ -82,8 +87,8 @@ export function ContextMenuSub({
     <RCM.Sub>
       <RCM.SubTrigger
         className={cn(
-          "flex w-full cursor-default items-center justify-between gap-[12px] rounded-sm px-[10px] py-[6px] outline-none",
-          "data-[highlighted]:bg-surface-strong/55 data-[state=open]:bg-surface-strong/55",
+          "flex w-full cursor-pointer items-center justify-between gap-[12px] rounded-sm px-[10px] py-[6px] outline-none",
+          "data-[highlighted]:bg-surface-strong/70 data-[state=open]:bg-surface-strong/70 data-[highlighted]:text-ink",
         )}
       >
         <span className="flex min-w-0 items-center gap-[10px]">{trigger}</span>

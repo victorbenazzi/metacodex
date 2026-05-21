@@ -3,13 +3,23 @@ import { X, TerminalSquare, FileText, Image as ImageIcon, FileType2, FileCode, A
 
 import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/cn";
+import type { CliTool } from "@/features/terminal/cli-registry";
 import type { Tab } from "./types";
+import { TabContextMenu } from "./TabContextMenu";
+import { NewTabContextMenu } from "./NewTabMenu";
 
 interface TabBarProps {
   tabs: Tab[];
   activeTabId: string | null;
   onSelect: (id: string) => void;
   onClose: (id: string) => void;
+  onCloseOthers: (keepId: string) => void;
+  onCloseAll: () => void;
+  onCopyTabPath: (id: string) => void;
+  onRevealTabInFinder: (id: string) => void;
+  onCopyTabCwd: (id: string) => void;
+  onNewTerminal: () => void;
+  onLaunchCli: (cli: CliTool) => void;
   trailing?: React.ReactNode;
 }
 
@@ -37,7 +47,20 @@ function iconForTab(tab: Tab) {
    literals below — keep them in sync. */
 const TRAILING_PX = 44;
 
-export function TabBar({ tabs, activeTabId, onSelect, onClose, trailing }: TabBarProps) {
+export function TabBar({
+  tabs,
+  activeTabId,
+  onSelect,
+  onClose,
+  onCloseOthers,
+  onCloseAll,
+  onCopyTabPath,
+  onRevealTabInFinder,
+  onCopyTabCwd,
+  onNewTerminal,
+  onLaunchCli,
+  trailing,
+}: TabBarProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const thumbRef = useRef<HTMLDivElement | null>(null);
 
@@ -139,6 +162,7 @@ export function TabBar({ tabs, activeTabId, onSelect, onClose, trailing }: TabBa
   }, [activeTabId, tabs.length, trailing]);
 
   return (
+    <NewTabContextMenu onNewTerminal={onNewTerminal} onLaunchCli={onLaunchCli}>
     <div
       className="relative z-20 h-[30px] border-b border-hairline bg-canvas-soft"
       data-tauri-drag-region
@@ -160,61 +184,90 @@ export function TabBar({ tabs, activeTabId, onSelect, onClose, trailing }: TabBa
           const active = tab.id === activeTabId;
           const TabIcon = iconForTab(tab);
           const isDangerous = tab.kind === "cli" && tab.cliId === "claude-code";
+          const isFileTab =
+            tab.kind === "editor" ||
+            tab.kind === "markdown" ||
+            tab.kind === "image" ||
+            tab.kind === "pdf";
+          const isProcessTab = tab.kind === "terminal" || tab.kind === "cli";
           return (
-            <button
+            <TabContextMenu
               key={tab.id}
-              type="button"
-              data-tab-id={tab.id}
-              onClick={() => onSelect(tab.id)}
-              onAuxClick={(e) => {
-                if (e.button === 1) onClose(tab.id);
-              }}
-              className={cn(
-                "group relative flex h-[30px] min-w-[140px] max-w-[220px] shrink-0 items-center gap-[8px] border-r border-hairline px-[10px]",
-                "transition-colors duration-100",
-                active
-                  ? "bg-canvas text-ink"
-                  : "bg-canvas-soft text-muted hover:bg-surface-strong/40 hover:text-body",
-              )}
-              aria-current={active ? "page" : undefined}
+              tab={tab}
+              totalTabs={tabs.length}
+              isActive={active}
+              onSelect={() => onSelect(tab.id)}
+              onClose={() => onClose(tab.id)}
+              onCloseOthers={() => onCloseOthers(tab.id)}
+              onCloseAll={onCloseAll}
+              onCopyPath={isFileTab ? () => onCopyTabPath(tab.id) : undefined}
+              onRevealInFinder={
+                isFileTab ? () => onRevealTabInFinder(tab.id) : undefined
+              }
+              onCopyCwd={isProcessTab ? () => onCopyTabCwd(tab.id) : undefined}
             >
-              <Icon
-                icon={TabIcon}
-                size={13}
-                className={cn(active ? "text-ink" : "text-muted-soft")}
-              />
-              <span className="flex-1 truncate text-left font-mono text-[12px] tracking-tight">
-                {tab.title}
-              </span>
-              {isDangerous ? (
-                <Icon
-                  icon={AlertTriangle}
-                  size={11}
-                  className="text-warn"
-                  aria-label="Dangerous flag enabled"
-                />
-              ) : null}
-              {tab.dirty ? (
-                <span className="h-[6px] w-[6px] rounded-full bg-ink" aria-label="Unsaved changes" />
-              ) : null}
-              <span
-                role="button"
-                tabIndex={-1}
-                onClick={(e) => {
+              <button
+                type="button"
+                data-tab-id={tab.id}
+                onClick={() => onSelect(tab.id)}
+                onAuxClick={(e) => {
+                  if (e.button === 1) onClose(tab.id);
+                }}
+                onContextMenu={(e) => {
+                  // Stop the right-click from bubbling to the outer bar menu so
+                  // only the per-tab TabContextMenu opens here.
                   e.stopPropagation();
-                  onClose(tab.id);
                 }}
                 className={cn(
-                  "ml-auto inline-flex h-[18px] w-[18px] items-center justify-center rounded-xs text-muted opacity-0 transition-all duration-100",
-                  "hover:bg-surface-strong/80 hover:text-ink group-hover:opacity-100",
-                  active && "opacity-60",
+                  "group relative flex h-[30px] min-w-[140px] max-w-[220px] shrink-0 items-center gap-[8px] border-r border-hairline px-[10px]",
+                  "transition-colors duration-100",
+                  active
+                    ? "bg-canvas text-ink"
+                    : "bg-canvas-soft text-muted hover:bg-surface-strong/40 hover:text-body",
                 )}
-                aria-label="Close tab"
+                aria-current={active ? "page" : undefined}
               >
-                <Icon icon={X} size={11} />
-              </span>
-              {active ? <span className="tab-indicator" /> : null}
-            </button>
+                <Icon
+                  icon={TabIcon}
+                  size={13}
+                  className={cn(active ? "text-ink" : "text-muted-soft")}
+                />
+                <span className="flex-1 truncate text-left font-mono text-[12px] tracking-tight">
+                  {tab.title}
+                </span>
+                {isDangerous ? (
+                  <Icon
+                    icon={AlertTriangle}
+                    size={11}
+                    className="text-warn"
+                    aria-label="Dangerous flag enabled"
+                  />
+                ) : null}
+                {tab.dirty ? (
+                  <span
+                    className="h-[6px] w-[6px] rounded-full bg-ink"
+                    aria-label="Unsaved changes"
+                  />
+                ) : null}
+                <span
+                  role="button"
+                  tabIndex={-1}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onClose(tab.id);
+                  }}
+                  className={cn(
+                    "ml-auto inline-flex h-[18px] w-[18px] items-center justify-center rounded-xs text-muted opacity-0 transition-all duration-100",
+                    "hover:bg-surface-strong/80 hover:text-ink group-hover:opacity-100",
+                    active && "opacity-60",
+                  )}
+                  aria-label="Close tab"
+                >
+                  <Icon icon={X} size={11} />
+                </span>
+                {active ? <span className="tab-indicator" /> : null}
+              </button>
+            </TabContextMenu>
           );
         })}
       </div>
@@ -244,5 +297,6 @@ export function TabBar({ tabs, activeTabId, onSelect, onClose, trailing }: TabBa
         style={{ width: 0, backgroundColor: "var(--scrollbar-tab-thumb)", opacity: 0 }}
       />
     </div>
+    </NewTabContextMenu>
   );
 }

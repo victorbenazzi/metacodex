@@ -24,6 +24,27 @@ import { watcherApi } from "@/features/filesystem/watcher.service";
 import { useGitStore } from "@/features/git/git.store";
 import { EV, listenTo, type FsChangedPayload } from "@/lib/events";
 import { dirname } from "@/lib/path";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { CMD, invoke } from "@/lib/ipc";
+
+type PendingClose = {
+  ids: string[];
+  mode: "single" | "others" | "all";
+  terminals: number;
+  agents: number;
+  /** When mode === "single", the affected tab (for personalized copy). */
+  singleTab?: Tab;
+};
+
+function processSummary(tabs: Tab[]): { terminals: number; agents: number } {
+  let terminals = 0;
+  let agents = 0;
+  for (const t of tabs) {
+    if (t.kind === "terminal") terminals += 1;
+    else if (t.kind === "cli") agents += 1;
+  }
+  return { terminals, agents };
+}
 
 const EMPTY_BUCKET = { tabs: [], activeTabId: null } as {
   tabs: [];
@@ -66,7 +87,10 @@ export function AppShell() {
   const bucket = useTabsStore((s) => s.byProject[projectKey]) ?? EMPTY_BUCKET;
   const openTab = useTabsStore((s) => s.openTab);
   const closeTab = useTabsStore((s) => s.closeTab);
+  const closeMany = useTabsStore((s) => s.closeMany);
   const setActiveTab = useTabsStore((s) => s.setActiveTab);
+
+  const [pendingClose, setPendingClose] = useState<PendingClose | null>(null);
 
   const activeCwd = useMemo(
     () => project?.path ?? homeDirPath ?? "/",
@@ -247,14 +271,81 @@ export function AppShell() {
     [openTab, projectKey, project, activeCwd],
   );
 
-  const handleCloseTab = useCallback(
-    (tabId: string) => closeTab(projectKey, tabId),
-    [closeTab, projectKey],
+  const requestClose = useCallback(
+    (mode: PendingClose["mode"], targets: Tab[], singleTab?: Tab) => {
+      const ids = targets.map((t) => t.id);
+      if (ids.length === 0) return;
+      const { terminals, agents } = processSummary(targets);
+      if (terminals === 0 && agents === 0) {
+        closeMany(projectKey, ids);
+        return;
+      }
+      setPendingClose({ ids, mode, terminals, agents, singleTab });
+    },
+    [closeMany, projectKey],
   );
+
+  const handleCloseTab = useCallback(
+    (tabId: string) => {
+      const target = bucket.tabs.find((t) => t.id === tabId);
+      if (!target) return;
+      if (target.kind === "terminal" || target.kind === "cli") {
+        requestClose("single", [target], target);
+      } else {
+        closeTab(projectKey, tabId);
+      }
+    },
+    [bucket.tabs, closeTab, projectKey, requestClose],
+  );
+
+  const handleCloseOthers = useCallback(
+    (keepId: string) => {
+      const targets = bucket.tabs.filter((t) => t.id !== keepId);
+      requestClose("others", targets);
+    },
+    [bucket.tabs, requestClose],
+  );
+
+  const handleCloseAll = useCallback(() => {
+    requestClose("all", bucket.tabs);
+  }, [bucket.tabs, requestClose]);
 
   const handleSelectTab = useCallback(
     (tabId: string) => setActiveTab(projectKey, tabId),
     [setActiveTab, projectKey],
+  );
+
+  const handleCopyTabPath = useCallback(
+    (tabId: string) => {
+      const tab = bucket.tabs.find((t) => t.id === tabId);
+      if (!tab || !("path" in tab) || !tab.path) return;
+      navigator.clipboard.writeText(tab.path).catch((err) => {
+        console.warn("[clipboard] copy path failed", err);
+      });
+    },
+    [bucket.tabs],
+  );
+
+  const handleRevealTabInFinder = useCallback(
+    (tabId: string) => {
+      const tab = bucket.tabs.find((t) => t.id === tabId);
+      if (!tab || !("path" in tab) || !tab.path) return;
+      invoke(CMD.revealInFinder, { path: tab.path }).catch((err) => {
+        console.warn("[reveal_in_finder] failed", err);
+      });
+    },
+    [bucket.tabs],
+  );
+
+  const handleCopyTabCwd = useCallback(
+    (tabId: string) => {
+      const tab = bucket.tabs.find((t) => t.id === tabId);
+      if (!tab || !("cwd" in tab) || !tab.cwd) return;
+      navigator.clipboard.writeText(tab.cwd).catch((err) => {
+        console.warn("[clipboard] copy cwd failed", err);
+      });
+    },
+    [bucket.tabs],
   );
 
   const handleOpenFile = useCallback(
@@ -329,10 +420,106 @@ export function AppShell() {
         activeTabId={bucket.activeTabId}
         onSelectTab={handleSelectTab}
         onCloseTab={handleCloseTab}
+        onCloseOthers={handleCloseOthers}
+        onCloseAll={handleCloseAll}
+        onCopyTabPath={handleCopyTabPath}
+        onRevealTabInFinder={handleRevealTabInFinder}
+        onCopyTabCwd={handleCopyTabCwd}
         onNewTerminal={handleNewTerminal}
         onLaunchCli={handleLaunchCli}
         onOpenFolder={handleOpenFolder}
       />
+
+      <CloseTabsConfirm
+        state={pendingClose}
+        onCancel={() => setPendingClose(null)}
+        onConfirm={() => {
+          if (!pendingClose) return;
+          closeMany(projectKey, pendingClose.ids);
+          setPendingClose(null);
+        }}
+      />
     </div>
   );
+}
+
+interface CloseTabsConfirmProps {
+  state: PendingClose | null;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+function CloseTabsConfirm({ state, onConfirm, onCancel }: CloseTabsConfirmProps) {
+  const open = state !== null;
+  const copy = state ? confirmCopyFor(state) : null;
+
+  return (
+    <ConfirmDialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) onCancel();
+      }}
+      tone="destructive"
+      title={copy?.title ?? ""}
+      description={copy?.description}
+      details={copy?.details}
+      confirmLabel={copy?.confirm ?? "Encerrar"}
+      cancelLabel="Cancelar"
+      onConfirm={onConfirm}
+    />
+  );
+}
+
+function confirmCopyFor(s: PendingClose): {
+  title: string;
+  description: string;
+  details?: React.ReactNode;
+  confirm: string;
+} {
+  if (s.mode === "single" && s.singleTab) {
+    const t = s.singleTab;
+    if (t.kind === "cli") {
+      return {
+        title: `Encerrar ${t.title}?`,
+        description:
+          "A sessão do agente está ativa. Qualquer resposta em andamento será descartada.",
+        details:
+          "cwd" in t && t.cwd ? (
+            <span className="font-mono text-[11px] text-muted-soft">
+              {t.cwd}
+            </span>
+          ) : null,
+        confirm: "Encerrar agente",
+      };
+    }
+    return {
+      title: "Encerrar este terminal?",
+      description:
+        "A sessão está ativa. O processo em execução será interrompido e o histórico desta aba será perdido.",
+      details:
+        "cwd" in t && t.cwd ? (
+          <span className="font-mono text-[11px] text-muted-soft">
+            {t.cwd}
+          </span>
+        ) : null,
+      confirm: "Encerrar terminal",
+    };
+  }
+
+  const parts: string[] = [];
+  if (s.terminals === 1) parts.push("1 terminal");
+  else if (s.terminals > 1) parts.push(`${s.terminals} terminais`);
+  if (s.agents === 1) parts.push("1 agente");
+  else if (s.agents > 1) parts.push(`${s.agents} agentes`);
+  const inventory = parts.join(" e ");
+  const verb =
+    s.terminals + s.agents === 1 ? "será interrompido" : "serão interrompidos";
+
+  const title =
+    s.mode === "all" ? "Fechar todas as abas?" : "Fechar as outras abas?";
+  return {
+    title,
+    description: `${inventory} ${verb}. Processos em execução serão encerrados e respostas em andamento, descartadas.`,
+    confirm: "Fechar todas",
+  };
 }

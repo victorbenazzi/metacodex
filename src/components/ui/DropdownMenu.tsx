@@ -61,9 +61,10 @@ export function DropdownItem({
       }}
       disabled={disabled}
       className={cn(
-        "flex w-full cursor-default items-center justify-between gap-[12px] rounded-sm px-[10px] py-[7px] outline-none",
-        "data-[highlighted]:bg-surface-strong/55 data-[disabled]:opacity-40 data-[disabled]:cursor-not-allowed",
-        destructive && "text-danger data-[highlighted]:text-danger",
+        "flex w-full cursor-pointer items-center justify-between gap-[12px] rounded-sm px-[10px] py-[7px] outline-none",
+        "data-[highlighted]:bg-surface-strong/70 data-[highlighted]:text-ink",
+        "data-[disabled]:cursor-not-allowed data-[disabled]:opacity-40",
+        destructive && "text-danger data-[highlighted]:text-danger data-[highlighted]:bg-danger/10",
         className,
       )}
     >

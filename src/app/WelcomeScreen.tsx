@@ -24,12 +24,34 @@ export function WelcomeScreen({ onOpenFolder, onOpenTerminal }: WelcomeScreenPro
       <div className="relative z-10 mx-auto flex w-full max-w-[760px] flex-col px-[40px] pt-[88px]">
         <span className="editorial-caps">Welcome</span>
 
-        <h1
-          className="mt-[18px] font-display tracking-[-0.02em] text-ink"
-          style={{ fontSize: "clamp(56px, 7vw, 88px)", lineHeight: 1.02, fontWeight: 500 }}
-        >
-          metacodex
-        </h1>
+        <div className="mt-[18px] flex items-center gap-[20px]">
+          <img
+            src="/black-metacodex-icon.png"
+            alt=""
+            draggable={false}
+            className="select-none dark:hidden"
+            style={{
+              width: "clamp(48px, 6vw, 76px)",
+              height: "clamp(48px, 6vw, 76px)",
+            }}
+          />
+          <img
+            src="/white-metacodex-icon.png"
+            alt=""
+            draggable={false}
+            className="hidden select-none dark:block"
+            style={{
+              width: "clamp(48px, 6vw, 76px)",
+              height: "clamp(48px, 6vw, 76px)",
+            }}
+          />
+          <h1
+            className="font-display tracking-[-0.02em] text-ink"
+            style={{ fontSize: "clamp(56px, 7vw, 88px)", lineHeight: 1.02, fontWeight: 500 }}
+          >
+            metacodex
+          </h1>
+        </div>
 
         <p className="mt-[12px] max-w-[520px] font-display text-[18px] italic leading-[1.5] text-body">
           A quiet, local-first workspace for code &mdash; with a real native terminal and your favourite AI
