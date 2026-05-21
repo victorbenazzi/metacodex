@@ -310,7 +310,7 @@ export function AppShell() {
   }, [handleNewTerminal, handleOpenFolder, closeActiveTab, switchProject]);
 
   return (
-    <div className="grid h-screen w-screen grid-rows-[36px_1fr] grid-cols-[56px_248px_minmax(0,1fr)] bg-canvas text-ink">
+    <div className="grid h-screen w-screen grid-rows-[36px_minmax(0,1fr)] grid-cols-[56px_248px_minmax(0,1fr)] bg-canvas text-ink">
       <TitleBar workspaceName={project?.name} className="col-span-3" />
 
       <MiniProjectSidebar onOpenFolder={handleOpenFolder} />

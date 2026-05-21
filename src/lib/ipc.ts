@@ -21,8 +21,10 @@ export const CMD = {
   renameProject: "rename_project",
   updateProjectMeta: "update_project_meta",
   listProjects: "list_projects",
+  reorderProjects: "reorder_projects",
   setActiveProject: "set_active_project",
   getActiveProjectId: "get_active_project_id",
+  detectProjectFavicons: "detect_project_favicons",
   revealInFinder: "reveal_in_finder",
   openFolderDialog: "open_folder_dialog",
 

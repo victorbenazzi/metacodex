@@ -23,7 +23,7 @@ export function ExplorerPanel({
 }: ExplorerPanelProps) {
   return (
     <nav
-      className="flex h-full w-full flex-col border-r border-hairline bg-canvas"
+      className="flex h-full w-full flex-col overflow-hidden border-r border-hairline bg-canvas"
       aria-label="File explorer"
     >
       {hasProject && projectId && projectPath ? (

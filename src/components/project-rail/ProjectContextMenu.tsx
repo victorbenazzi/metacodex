@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import * as RCM from "@radix-ui/react-context-menu";
-import { Pencil, Trash2, Paintbrush, FolderOpen } from "lucide-react";
+import { Pencil, Trash2, Paintbrush, FolderOpen, Shapes, Image as ImageIcon } from "lucide-react";
 
 import { CMD, invoke } from "@/lib/ipc";
 import {
@@ -13,7 +13,23 @@ import {
 } from "@/components/ui/ContextMenu";
 import { Icon } from "@/components/ui/Icon";
 import { useProjectsStore } from "@/features/projects/project.store";
-import { PROJECT_PALETTE, PROJECT_ICONS, type Project } from "@/features/projects/project.types";
+import { useThemeStore } from "@/features/theme/theme.store";
+import {
+  tileBackground,
+  tileIconColor,
+} from "@/features/projects/color";
+import {
+  PROJECT_PALETTE,
+  PROJECT_ICONS,
+  type Project,
+} from "@/features/projects/project.types";
+import {
+  faviconApi,
+  toFaviconIcon,
+  type FaviconCandidate,
+} from "@/features/projects/favicon.service";
+import { useFaviconDataUri } from "@/features/projects/useFaviconDataUri";
+import { cn } from "@/lib/cn";
 
 interface ProjectContextMenuProps {
   project: Project;
@@ -29,6 +45,24 @@ export function ProjectContextMenu({
   onRequestRemove,
 }: ProjectContextMenuProps) {
   const updateMeta = useProjectsStore((s) => s.updateMeta);
+  const [favicons, setFavicons] = useState<FaviconCandidate[]>([]);
+
+  // Detect favicons whenever the project changes. Errors are silent — a
+  // missing favicon is a normal state and we just show no extra section.
+  useEffect(() => {
+    let cancelled = false;
+    faviconApi
+      .detect(project.id)
+      .then((res) => {
+        if (!cancelled) setFavicons(res);
+      })
+      .catch(() => {
+        if (!cancelled) setFavicons([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [project.id, project.path]);
 
   const revealInFinder = async () => {
     try {
@@ -59,16 +93,21 @@ export function ProjectContextMenu({
             <>
               <Icon icon={Paintbrush} size={12} className="text-muted" />
               <span>Color</span>
+              <span
+                aria-hidden
+                className="ml-[6px] inline-block h-[10px] w-[10px] rounded-full border border-hairline"
+                style={{ backgroundColor: project.color }}
+              />
             </>
           }
         >
-          <div className="grid grid-cols-4 gap-[6px] p-[8px]">
-            {PROJECT_PALETTE.map((c) => (
+          <div className="grid grid-cols-4 gap-[8px] p-[10px]">
+            {PROJECT_PALETTE.map((entry) => (
               <SwatchButton
-                key={c}
-                color={c}
-                selected={project.color === c}
-                onClick={() => updateMeta(project.id, { color: c })}
+                key={entry.hex}
+                color={entry.hex}
+                selected={project.color === entry.hex}
+                onClick={() => updateMeta(project.id, { color: entry.hex })}
               />
             ))}
           </div>
@@ -77,20 +116,46 @@ export function ProjectContextMenu({
         <ContextMenuSub
           trigger={
             <>
-              <Icon icon={Pencil} size={12} className="text-muted" />
+              <Icon icon={Shapes} size={12} className="text-muted" />
               <span>Icon</span>
             </>
           }
         >
-          <div className="grid max-h-[260px] grid-cols-4 gap-[2px] overflow-y-auto p-[6px]">
-            {PROJECT_ICONS.map((name) => (
-              <IconChoice
-                key={name}
-                name={name}
-                selected={project.icon === name}
-                onClick={() => updateMeta(project.id, { icon: name })}
-              />
-            ))}
+          <div className="max-h-[300px] overflow-y-auto p-[8px]">
+            {favicons.length > 0 ? (
+              <>
+                <div className="editorial-caps flex items-center gap-[6px] px-[2px] pb-[6px] text-muted">
+                  <Icon icon={ImageIcon} size={10} />
+                  From this project
+                </div>
+                <div className="grid grid-cols-5 gap-[6px]">
+                  {favicons.map((c) => {
+                    const value = toFaviconIcon(c.path);
+                    return (
+                      <FaviconChoice
+                        key={c.path}
+                        candidate={c}
+                        color={project.color}
+                        selected={project.icon === value}
+                        onClick={() => updateMeta(project.id, { icon: value })}
+                      />
+                    );
+                  })}
+                </div>
+                <div className="my-[8px] h-px bg-hairline-soft" />
+              </>
+            ) : null}
+            <div className="grid grid-cols-5 gap-[6px]">
+              {PROJECT_ICONS.map((name) => (
+                <IconChoice
+                  key={name}
+                  name={name}
+                  color={project.color}
+                  selected={project.icon === name}
+                  onClick={() => updateMeta(project.id, { icon: name })}
+                />
+              ))}
+            </div>
           </div>
         </ContextMenuSub>
 
@@ -114,54 +179,70 @@ function SwatchButton({
   selected: boolean;
   onClick: () => void;
 }) {
+  const theme = useThemeStore((s) => s.effective);
   return (
     <button
       type="button"
       onClick={onClick}
       aria-label={`Use color ${color}`}
       aria-pressed={selected}
-      className="relative h-[26px] w-[26px] rounded-sm border border-hairline transition-transform hover:scale-105"
-      style={{ backgroundColor: color }}
+      className="relative inline-flex h-[28px] w-[28px] items-center justify-center rounded-md transition-transform hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[3px]"
+      style={{
+        backgroundColor: tileBackground(color, {
+          theme,
+          active: selected,
+          hover: false,
+        }),
+        boxShadow: selected
+          ? `0 0 0 2px var(--surface-card), 0 0 0 4px ${color}`
+          : "inset 0 0 0 1px var(--hairline)",
+      }}
     >
-      {selected ? (
-        <span className="absolute inset-[3px] rounded-xs border-2 border-on-primary" />
-      ) : null}
+      <span
+        aria-hidden
+        className="h-[14px] w-[14px] rounded-full"
+        style={{ backgroundColor: color }}
+      />
     </button>
   );
 }
 
 function IconChoice({
   name,
+  color,
   selected,
   onClick,
 }: {
   name: string;
+  color: string;
   selected: boolean;
   onClick: () => void;
 }) {
+  const theme = useThemeStore((s) => s.effective);
   return (
     <LazyIcon
       name={name}
       selected={selected}
       onClick={onClick}
-      className={
-        selected
-          ? "bg-surface-strong/80 text-ink"
-          : "text-body hover:bg-surface-strong/40 hover:text-ink"
-      }
+      iconColor={tileIconColor(color, theme)}
+      ringColor={color}
+      tintBg={tileBackground(color, { theme, active: selected, hover: false })}
     />
   );
 }
 
-// Tiny wrapper to lazily resolve a lucide icon by name so we don't import every icon eagerly.
 function LazyIcon({
   name,
-  className,
+  iconColor,
+  tintBg,
+  ringColor,
   selected,
   onClick,
 }: {
   name: string;
-  className: string;
+  iconColor: string;
+  tintBg: string;
+  ringColor: string;
   selected: boolean;
   onClick: () => void;
 }) {
@@ -183,9 +264,67 @@ function LazyIcon({
       onClick={onClick}
       aria-label={`Use icon ${name}`}
       aria-pressed={selected}
-      className={`flex h-[28px] w-[28px] items-center justify-center rounded-sm transition-colors ${className}`}
+      className={cn(
+        "flex h-[30px] w-[30px] items-center justify-center rounded-sm transition-colors",
+        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[2px]",
+        !selected && "hover:bg-surface-strong/40",
+      )}
+      style={{
+        backgroundColor: selected ? tintBg : "transparent",
+        boxShadow: selected ? `0 0 0 1.5px ${ringColor}` : undefined,
+      }}
     >
-      {Comp ? <Comp size={14} strokeWidth={1.6} /> : <span className="h-[14px] w-[14px]" />}
+      {Comp ? (
+        <Comp
+          size={14}
+          strokeWidth={1.7}
+          color={selected ? iconColor : "var(--body)"}
+        />
+      ) : (
+        <span className="h-[14px] w-[14px]" />
+      )}
+    </button>
+  );
+}
+
+function FaviconChoice({
+  candidate,
+  color,
+  selected,
+  onClick,
+}: {
+  candidate: FaviconCandidate;
+  color: string;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  const uri = useFaviconDataUri(candidate.path);
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={`Use favicon ${candidate.relPath}`}
+      aria-pressed={selected}
+      title={candidate.relPath}
+      className={cn(
+        "flex h-[30px] w-[30px] items-center justify-center rounded-sm transition-colors",
+        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[2px]",
+        !selected && "hover:bg-surface-strong/40",
+      )}
+      style={{
+        boxShadow: selected ? `0 0 0 1.5px ${color}` : undefined,
+      }}
+    >
+      {uri ? (
+        <img
+          src={uri}
+          alt=""
+          draggable={false}
+          className="h-[18px] w-[18px] object-contain"
+        />
+      ) : (
+        <span className="h-[18px] w-[18px] animate-pulse rounded-xs bg-surface-strong/60" />
+      )}
     </button>
   );
 }

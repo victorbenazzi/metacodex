@@ -21,6 +21,9 @@ export const projectsApi = {
   list(): Promise<Project[]> {
     return invoke<Project[]>(CMD.listProjects);
   },
+  reorder(orderedIds: string[]): Promise<Project[]> {
+    return invoke<Project[]>(CMD.reorderProjects, { orderedIds });
+  },
   setActive(id: string): Promise<void> {
     return invoke<void>(CMD.setActiveProject, { id });
   },

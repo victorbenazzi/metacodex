@@ -13,6 +13,7 @@ interface ProjectsState {
   remove: (id: string) => Promise<void>;
   rename: (id: string, name: string) => Promise<Project>;
   updateMeta: (id: string, patch: { color?: string; icon?: string }) => Promise<Project>;
+  reorder: (orderedIds: string[]) => Promise<void>;
   setActive: (id: string) => Promise<void>;
   clearActive: () => void;
 
@@ -67,6 +68,29 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
     const updated = await projectsApi.updateMeta(id, patch);
     set({ projects: get().projects.map((p) => (p.id === id ? updated : p)) });
     return updated;
+  },
+
+  reorder: async (orderedIds) => {
+    // Optimistic local reorder so the rail snaps instantly while the IPC round-trips.
+    const cur = get().projects;
+    const byId = new Map(cur.map((p) => [p.id, p] as const));
+    const next: Project[] = [];
+    for (const id of orderedIds) {
+      const p = byId.get(id);
+      if (p) next.push(p);
+    }
+    if (next.length !== cur.length) {
+      // Mismatch — abort the local reorder; backend would reject anyway.
+      return;
+    }
+    set({ projects: next });
+    try {
+      const persisted = await projectsApi.reorder(orderedIds);
+      set({ projects: persisted });
+    } catch (err) {
+      console.error("[projects] reorder failed, rolling back", err);
+      set({ projects: cur });
+    }
   },
 
   setActive: async (id) => {

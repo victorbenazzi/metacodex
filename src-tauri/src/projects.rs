@@ -45,8 +45,20 @@ impl ProjectsCache {
 }
 
 /// Read the persisted projects (and active id) from disk and warm the cache.
+/// Also runs a one-shot color migration so projects created against a prior
+/// palette pick up the current swatch for their hue.
 pub fn hydrate(app: &AppHandle) -> AppResult<()> {
-    let projects = load_projects(app)?;
+    let mut projects = load_projects(app)?;
+    let mut mutated = false;
+    for p in projects.iter_mut() {
+        if let Some(migrated) = migrate_color(&p.color) {
+            p.color = migrated;
+            mutated = true;
+        }
+    }
+    if mutated {
+        save_projects(app, &projects)?;
+    }
     let cache = app.state::<Arc<ProjectsCache>>();
     cache.replace(projects);
     Ok(())
@@ -95,9 +107,57 @@ fn new_id() -> String {
     Uuid::new_v4().to_string().replace('-', "").chars().take(12).collect()
 }
 
-const PALETTE: [&str; 8] = [
-    "#7c7666", "#8a6f4c", "#6f7a6a", "#7a6470", "#5f6e7a", "#806a5a", "#6a6b6f", "#73716a",
+/// Canonical (light-theme) hex for each accent. Must match the `hex` column
+/// of `PROJECT_PALETTE` in `src/features/projects/project.types.ts`.
+const PALETTE: [&str; 12] = [
+    "#8a7d63", // stone
+    "#a85040", // terracotta
+    "#b87420", // amber
+    "#828c3f", // olive
+    "#4a9070", // sage
+    "#2e7892", // ocean
+    "#4658a8", // indigo
+    "#7a52a8", // lavender
+    "#a3548b", // mauve
+    "#bb4565", // rose
+    "#6a6e75", // cool gray
+    "#5d5c46", // deep olive
 ];
+
+/// Map every retired palette entry to its closest counterpart in the current
+/// one. Returns Some(new_hex) only when migration is needed.
+fn migrate_color(current: &str) -> Option<String> {
+    let lower = current.to_lowercase();
+    // (old hex, new canonical hex)
+    const MIGRATIONS: &[(&str, &str)] = &[
+        // First-ever palette (8 muted tones)
+        ("#7c7666", "#8a7d63"), // stone -> stone
+        ("#8a6f4c", "#a85040"), // brown -> terracotta
+        ("#6f7a6a", "#4a9070"), // muted sage -> sage
+        ("#7a6470", "#7a52a8"), // muted plum -> lavender
+        ("#5f6e7a", "#2e7892"), // muted slate -> ocean
+        ("#806a5a", "#b87420"), // muted warm -> amber
+        ("#6a6b6f", "#6a6e75"), // cool gray -> cool gray
+        ("#73716a", "#5d5c46"), // taupe -> deep olive
+        // Second palette (12 entries, slightly desaturated)
+        ("#9b5d4b", "#a85040"),
+        ("#b07a3a", "#b87420"),
+        ("#7d8a48", "#828c3f"),
+        ("#4e8a6c", "#4a9070"),
+        ("#3f7c93", "#2e7892"),
+        ("#566ca8", "#4658a8"),
+        ("#7d5fa5", "#7a52a8"),
+        ("#a05c87", "#a3548b"),
+        ("#c0556b", "#bb4565"),
+        ("#5c5c50", "#5d5c46"),
+    ];
+    for (old, new) in MIGRATIONS {
+        if lower == *old {
+            return Some((*new).to_string());
+        }
+    }
+    None
+}
 
 fn assign_color(existing: &[Project]) -> String {
     PALETTE[existing.len() % PALETTE.len()].to_string()
@@ -215,6 +275,34 @@ pub fn update_meta(
 
 pub fn list(app: &AppHandle) -> AppResult<Vec<Project>> {
     load_projects(app)
+}
+
+/// Persist a new order for the project rail. `ordered_ids` must contain every
+/// existing project id exactly once — any mismatch is rejected so the cache
+/// can't get out of sync with the persisted set.
+pub fn reorder(app: &AppHandle, ordered_ids: Vec<String>) -> AppResult<Vec<Project>> {
+    let projects = load_projects(app)?;
+
+    if ordered_ids.len() != projects.len() {
+        return Err(AppError::Other(format!(
+            "reorder: expected {} ids, got {}",
+            projects.len(),
+            ordered_ids.len()
+        )));
+    }
+
+    let mut reordered: Vec<Project> = Vec::with_capacity(projects.len());
+    for id in &ordered_ids {
+        let found = projects
+            .iter()
+            .find(|p| &p.id == id)
+            .ok_or_else(|| AppError::NotFound(format!("project {id}")))?;
+        reordered.push(found.clone());
+    }
+
+    save_projects(app, &reordered)?;
+    app.state::<Arc<ProjectsCache>>().replace(reordered.clone());
+    Ok(reordered)
 }
 
 pub fn set_active(app: &AppHandle, id: &str) -> AppResult<()> {

@@ -30,7 +30,7 @@ export function FileExplorer({ projectId, rootPath, rootName, onOpenFile }: File
   const rootChildren = bucket?.children[rootPath];
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full min-h-0 flex-col">
       <header className="flex h-[30px] shrink-0 items-center justify-between gap-[6px] border-b border-hairline-soft px-[12px]">
         <span className="editorial-caps truncate" title={rootPath}>
           {rootName}

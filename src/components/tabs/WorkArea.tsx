@@ -26,7 +26,7 @@ export function WorkArea({
 }: WorkAreaProps) {
   if (tabs.length === 0) {
     return (
-      <section className="relative flex h-full w-full flex-col bg-canvas">
+      <section className="relative flex h-full w-full flex-col overflow-hidden bg-canvas">
         <div
           data-tauri-drag-region
           className="flex h-[30px] shrink-0 items-center justify-end border-b border-hairline px-[10px]"
@@ -41,7 +41,7 @@ export function WorkArea({
   }
 
   return (
-    <section className="relative flex h-full w-full flex-col bg-canvas">
+    <section className="relative flex h-full w-full flex-col overflow-hidden bg-canvas">
       <TabBar
         tabs={tabs}
         activeTabId={activeTabId}
