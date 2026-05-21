@@ -53,9 +53,13 @@ export function useXterm(): UseXtermResult {
   useEffect(() => {
     if (!containerRef.current) return;
     const term = new Terminal({
-      fontFamily: '"JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace',
+      fontFamily:
+        '"JetBrainsMono Nerd Font Mono", "JetBrainsMono NFM", "SF Mono", ui-monospace, Menlo, monospace',
       fontSize: 13,
-      lineHeight: 1.35,
+      // Must be 1.0 so box-drawing characters (─│╭╮╰╯) connect across cells —
+      // anything larger creates vertical gaps that break TUI rendering
+      // (Claude Code, Codex, etc.).
+      lineHeight: 1.0,
       letterSpacing: 0,
       cursorBlink: true,
       cursorStyle: "bar",
@@ -74,8 +78,10 @@ export function useXterm(): UseXtermResult {
     // Canvas renderer must be attached AFTER open() in xterm.js v5.5 — but
     // the open() itself can crash if it tries to fit/sync before a renderer
     // is installed. We defer the canvas attach + the first fit to the next
-    // animation frame so xterm has finished its internal init.
-    requestAnimationFrame(() => {
+    // animation frame so xterm has finished its internal init. We also wait
+    // for the Nerd Font to finish loading first, otherwise the canvas would
+    // measure cell width using a fallback font and lock in the wrong metrics.
+    const installRenderer = () => {
       try {
         term.loadAddon(new CanvasAddon());
       } catch (err) {
@@ -86,7 +92,11 @@ export function useXterm(): UseXtermResult {
       } catch {
         // ignore — ResizeObserver in TerminalTab will retry once sized
       }
-    });
+    };
+    const fontPromise = (document as any).fonts
+      ? (document as any).fonts.load('13px "JetBrainsMono Nerd Font Mono"')
+      : Promise.resolve();
+    fontPromise.finally(() => requestAnimationFrame(installRenderer));
     termRef.current = term;
     fitRef.current = fit;
 

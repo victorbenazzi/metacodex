@@ -1,0 +1,37 @@
+/* Bundled monospace stack — JetBrainsMono Nerd Font Mono.
+   Includes Powerline + Nerd Font icon glyphs (Private Use Area) that vanilla
+   JetBrains Mono lacks, so TUIs (Claude Code, Codex, opencode, starship) render
+   their status-bar icons instead of tofu boxes.
+   Licensed under SIL OFL 1.1 — see src/assets/fonts/LICENSE. */
+
+@font-face {
+  font-family: "JetBrainsMono Nerd Font Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url("../assets/fonts/JetBrainsMonoNerdFontMono-Regular.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "JetBrainsMono Nerd Font Mono";
+  font-style: normal;
+  font-weight: 700;
+  font-display: block;
+  src: url("../assets/fonts/JetBrainsMonoNerdFontMono-Bold.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "JetBrainsMono Nerd Font Mono";
+  font-style: italic;
+  font-weight: 400;
+  font-display: block;
+  src: url("../assets/fonts/JetBrainsMonoNerdFontMono-Italic.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "JetBrainsMono Nerd Font Mono";
+  font-style: italic;
+  font-weight: 700;
+  font-display: block;
+  src: url("../assets/fonts/JetBrainsMonoNerdFontMono-BoldItalic.woff2") format("woff2");
+}

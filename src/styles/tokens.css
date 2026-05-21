@@ -63,7 +63,7 @@
 
   /* Fonts */
   --font-sans: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace;
+  --font-mono: "JetBrainsMono Nerd Font Mono", "JetBrainsMono NFM", "SF Mono", ui-monospace, Menlo, monospace;
   --font-display: "Fraunces", "Iowan Old Style", "Apple Garamond", "Times New Roman", serif;
 
   /* Motion */

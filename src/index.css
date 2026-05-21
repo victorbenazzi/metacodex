@@ -1,6 +1,7 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&display=swap");
 
 @import "@xterm/xterm/css/xterm.css";
+@import "./styles/fonts.css";
 @import "./styles/tokens.css";
 @import "./styles/scrollbar.css";
 @import "./styles/xterm.css";
