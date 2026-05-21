@@ -1,0 +1,110 @@
+import { useCallback, useEffect, useState } from "react";
+
+import { TerminalTab } from "./TerminalTab";
+import { CliMissingPanel } from "./CliMissingPanel";
+import { cliApi } from "@/features/terminal/cli.service";
+import { cliById, type CliTool } from "@/features/terminal/cli-registry";
+import { useTabsStore, WORKSPACE_NULL } from "@/components/tabs/tabsStore";
+import { newId } from "@/lib/idGen";
+
+interface CliTabComponentProps {
+  tabId: string;
+  cwd: string;
+  projectId: string | null;
+  cliId: string;
+  launchCommand: string;
+  label: string;
+}
+
+type Status = "detecting" | "missing" | "ready";
+
+export function CliTabComponent({
+  tabId,
+  cwd,
+  projectId,
+  cliId,
+  launchCommand,
+  label,
+}: CliTabComponentProps) {
+  const [status, setStatus] = useState<Status>("detecting");
+  const openTab = useTabsStore((s) => s.openTab);
+  const cli: CliTool | undefined = cliById(cliId);
+
+  const detect = useCallback(async () => {
+    if (!cli) {
+      setStatus("missing");
+      return;
+    }
+    if (cli.needsConfig) {
+      setStatus("missing");
+      return;
+    }
+    try {
+      setStatus("detecting");
+      const result = await cliApi.detect(cli.command);
+      setStatus(result.installed ? "ready" : "missing");
+    } catch (err) {
+      console.warn("[cli] detect failed", err);
+      setStatus("missing");
+    }
+  }, [cli]);
+
+  useEffect(() => {
+    void detect();
+  }, [detect]);
+
+  const openInstallInTerminal = useCallback(
+    (installCommand: string) => {
+      const projectKey = projectId ?? WORKSPACE_NULL;
+      openTab(projectKey, {
+        id: `t-${newId(10)}`,
+        kind: "terminal",
+        title: `install ${cli?.label ?? "cli"}`.slice(0, 30),
+        projectId,
+        cwd,
+        prefillCommand: installCommand,
+      });
+    },
+    [cwd, openTab, projectId, cli],
+  );
+
+  if (!cli || status === "missing") {
+    if (!cli) {
+      // Unknown cli id — render a small generic missing panel by faking a CliTool
+      return (
+        <div className="flex h-full items-center justify-center p-[32px]">
+          <p className="text-[13px] text-danger">
+            Unknown CLI id: <code className="font-mono">{cliId}</code>
+          </p>
+        </div>
+      );
+    }
+    return (
+      <CliMissingPanel
+        cli={cli}
+        onRetry={detect}
+        onOpenInTerminal={openInstallInTerminal}
+      />
+    );
+  }
+
+  if (status === "detecting") {
+    return (
+      <div className="flex h-full items-center justify-center bg-canvas">
+        <p className="font-mono text-[11px] text-muted-soft">detecting {cli.label}…</p>
+      </div>
+    );
+  }
+
+  // ready — mount the real terminal
+  return (
+    <TerminalTab
+      tabId={tabId}
+      cwd={cwd}
+      projectId={projectId}
+      label={label}
+      cliLaunchCommand={launchCommand}
+      cliToolId={cliId}
+    />
+  );
+}

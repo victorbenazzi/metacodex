@@ -1,0 +1,44 @@
+/* Custom thin scrollbar — invisible until hovered/scrolled. */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--hairline-strong) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: transparent;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  border-radius: 9999px;
+  transition: background-color var(--dur-base) var(--ease-out);
+}
+*:hover::-webkit-scrollbar-thumb,
+*:focus-within::-webkit-scrollbar-thumb {
+  background-color: var(--hairline-strong);
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--muted-soft);
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Tab strip — native scrollbar is fully suppressed (macOS overlay scrollbars
+   would otherwise hide on idle, defeating the persistent-indicator design).
+   The actual indicator is a manually-rendered 1px thumb in TabBar.tsx,
+   colored with --scrollbar-tab-thumb. */
+.tab-scroll {
+  scrollbar-width: none;
+}
+.tab-scroll::-webkit-scrollbar {
+  display: none;
+}

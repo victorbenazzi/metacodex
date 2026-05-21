@@ -1,0 +1,50 @@
+[package]
+name = "metacodex"
+version = "0.0.1"
+description = "metacodex — premium local-first developer workspace"
+authors = ["Victor"]
+edition = "2021"
+
+[lib]
+name = "metacodex_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-store = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+tauri-plugin-os = "2"
+tauri-plugin-clipboard-manager = "2"
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+tokio = { version = "1", features = ["full"] }
+portable-pty = "0.8"
+parking_lot = "0.12"
+uuid = { version = "1", features = ["v4", "serde"] }
+base64 = "0.22"
+which = "6"
+chrono = { version = "0.4", features = ["serde"] }
+dirs = "5"
+notify = "6"
+notify-debouncer-mini = "0.4"
+ignore = "0.4"
+grep-searcher = "0.1"
+grep-regex = "0.1"
+grep-matcher = "0.1"
+git2 = { version = "0.18", default-features = false, features = ["vendored-libgit2"] }
+
+[profile.dev]
+incremental = true
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true

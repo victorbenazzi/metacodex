@@ -1,0 +1,153 @@
+/*
+ * metacodex design tokens
+ *
+ * Warm-cream light canvas / warm near-black dark canvas.
+ * Hairline borders only. 14px base. Editorial typography.
+ * Tokens drive everything — never hardcode colors in components.
+ */
+
+:root {
+  /* Surfaces — light (default) */
+  --canvas: #f7f7f4;
+  --canvas-soft: #fafaf7;
+  --surface-card: #ffffff;
+  --surface-strong: #e6e5e0;
+
+  /* Hairlines */
+  --hairline: #e6e5e0;
+  --hairline-soft: #efeee8;
+  --hairline-strong: #cfcdc4;
+
+  /* High-contrast scrollbar thumb for the tab strip — visible at 1px against
+     the canvas-soft background. Light theme: near-black; dark theme: near-white. */
+  --scrollbar-tab-thumb: rgba(0, 0, 0, 0.9);
+
+  /* Ink */
+  --ink: #26251e;
+  --body: #5a5852;
+  --muted: #807d72;
+  --muted-soft: #a09c92;
+
+  /* Brand-as-ink (we use ink as the brand) */
+  --primary: #26251e;
+  --primary-active: #000000;
+  --on-primary: #ffffff;
+
+  /* Semantic */
+  --success: #1f8a65;
+  --danger: #cf2d56;
+  --warn: #b9722a;
+
+  /* Radius */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-pill: 9999px;
+
+  /* Spacing scale (4 / 8 / 12 / 16 / 20 / 24 / 32) */
+  --space-xxs: 4px;
+  --space-xs: 8px;
+  --space-sm: 12px;
+  --space-base: 16px;
+  --space-md: 20px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+
+  /* Type scale */
+  --fs-ui: 14px;
+  --fs-caption: 12px;
+  --fs-mono: 13px;
+  --fs-display: 44px;
+
+  /* Fonts */
+  --font-sans: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace;
+  --font-display: "Fraunces", "Iowan Old Style", "Apple Garamond", "Times New Roman", serif;
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in: cubic-bezier(0.6, 0, 0.7, 0.3);
+  --dur-fast: 120ms;
+  --dur-base: 180ms;
+  --dur-slow: 280ms;
+
+  /* Layout */
+  --rail-w: 56px;
+  --explorer-w: 248px;
+  --title-bar-h: 36px;
+
+  /* Terminal palette (warm, neutral ANSI) */
+  --term-bg: var(--canvas);
+  --term-fg: var(--ink);
+  --term-cursor: var(--ink);
+  --term-selection: rgba(38, 37, 30, 0.18);
+  --term-black: #26251e;
+  --term-red: #c43a5b;
+  --term-green: #2c8064;
+  --term-yellow: #a86b2a;
+  --term-blue: #4c6f8a;
+  --term-magenta: #8a4f73;
+  --term-cyan: #3b7a78;
+  --term-white: #c8c5ba;
+  --term-bright-black: #5a5852;
+  --term-bright-red: #cf2d56;
+  --term-bright-green: #1f8a65;
+  --term-bright-yellow: #b9722a;
+  --term-bright-blue: #5a86a7;
+  --term-bright-magenta: #a3678f;
+  --term-bright-cyan: #4f8e8c;
+  --term-bright-white: #f7f7f4;
+}
+
+[data-theme="dark"] {
+  /* Surfaces — dark */
+  --canvas: #11110f;
+  --canvas-soft: #171714;
+  --surface-card: #1d1c18;
+  --surface-strong: #2a2924;
+
+  /* Hairlines */
+  --hairline: #2c2b26;
+  --hairline-soft: #232220;
+  --hairline-strong: #44423a;
+
+  --scrollbar-tab-thumb: rgba(255, 255, 255, 0.9);
+
+  /* Ink */
+  --ink: #f7f7f4;
+  --body: #c8c5ba;
+  --muted: #969287;
+  --muted-soft: #68645c;
+
+  --primary: #f7f7f4;
+  --primary-active: #ffffff;
+  --on-primary: #11110f;
+
+  --success: #4ec99a;
+  --danger: #ff5a7d;
+  --warn: #e3a35a;
+
+  /* Terminal palette dark */
+  --term-bg: var(--canvas);
+  --term-fg: var(--ink);
+  --term-cursor: var(--ink);
+  --term-selection: rgba(247, 247, 244, 0.18);
+  --term-black: #2a2924;
+  --term-red: #d9627d;
+  --term-green: #4ec99a;
+  --term-yellow: #e3a35a;
+  --term-blue: #88a8c2;
+  --term-magenta: #c08fab;
+  --term-cyan: #75b3b0;
+  --term-white: #c8c5ba;
+  --term-bright-black: #5a5852;
+  --term-bright-red: #ff7c93;
+  --term-bright-green: #6fd9af;
+  --term-bright-yellow: #f0b870;
+  --term-bright-blue: #a3c1d6;
+  --term-bright-magenta: #d3a6c0;
+  --term-bright-cyan: #8cc4c1;
+  --term-bright-white: #f7f7f4;
+}

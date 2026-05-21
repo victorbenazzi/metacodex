@@ -1,0 +1,84 @@
+import * as RDM from "@radix-ui/react-dropdown-menu";
+import { cn } from "@/lib/cn";
+import type React from "react";
+
+export const DropdownRoot = RDM.Root;
+export const DropdownTrigger = RDM.Trigger;
+export const DropdownPortal = RDM.Portal;
+
+export function DropdownContent({
+  children,
+  align = "start",
+  sideOffset = 6,
+  className,
+}: {
+  children: React.ReactNode;
+  align?: "start" | "center" | "end";
+  sideOffset?: number;
+  className?: string;
+}) {
+  return (
+    <RDM.Portal>
+      <RDM.Content
+        align={align}
+        sideOffset={sideOffset}
+        className={cn(
+          "z-50 min-w-[220px] rounded-md border border-hairline bg-surface-card p-[5px]",
+          "text-[13px] text-ink",
+          "data-[state=open]:animate-slide-up data-[state=closed]:animate-fade-in",
+          className,
+        )}
+      >
+        {children}
+      </RDM.Content>
+    </RDM.Portal>
+  );
+}
+
+export function DropdownItem({
+  children,
+  onSelect,
+  disabled,
+  trailing,
+  destructive,
+  className,
+}: {
+  children: React.ReactNode;
+  onSelect?: () => void;
+  disabled?: boolean;
+  trailing?: React.ReactNode;
+  destructive?: boolean;
+  className?: string;
+}) {
+  return (
+    <RDM.Item
+      onSelect={(e) => {
+        if (disabled) {
+          e.preventDefault();
+          return;
+        }
+        onSelect?.();
+      }}
+      disabled={disabled}
+      className={cn(
+        "flex w-full cursor-default items-center justify-between gap-[12px] rounded-sm px-[10px] py-[7px] outline-none",
+        "data-[highlighted]:bg-surface-strong/55 data-[disabled]:opacity-40 data-[disabled]:cursor-not-allowed",
+        destructive && "text-danger data-[highlighted]:text-danger",
+        className,
+      )}
+    >
+      <span className="flex min-w-0 items-center gap-[10px] truncate">{children}</span>
+      {trailing ? <span className="shrink-0 text-muted">{trailing}</span> : null}
+    </RDM.Item>
+  );
+}
+
+export function DropdownSeparator() {
+  return <RDM.Separator className="my-[5px] h-px bg-hairline-soft" />;
+}
+
+export function DropdownLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <RDM.Label className="px-[10px] pb-[4px] pt-[6px] editorial-caps">{children}</RDM.Label>
+  );
+}

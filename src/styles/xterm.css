@@ -1,0 +1,30 @@
+/* xterm.js layout — let the terminal fill its container cleanly. */
+
+.xterm {
+  height: 100%;
+  width: 100%;
+  padding: 8px 10px 0 12px;
+  box-sizing: border-box;
+  background-color: var(--term-bg);
+}
+
+.xterm .xterm-viewport {
+  background-color: var(--term-bg) !important;
+}
+
+.xterm .xterm-screen {
+  background-color: var(--term-bg);
+}
+
+.xterm-helpers {
+  font-family: var(--font-mono);
+}
+
+.xterm-rows {
+  font-family: var(--font-mono);
+  font-variant-ligatures: none;
+}
+
+.xterm-cursor-bar {
+  animation: none !important;
+}
