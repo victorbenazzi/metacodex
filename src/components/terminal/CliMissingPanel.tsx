@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Copy, ExternalLink, Terminal, RefreshCw, AlertTriangle, Wrench } from "lucide-react";
 import { writeText as writeClipboard } from "@tauri-apps/plugin-clipboard-manager";
+import { useTranslation, Trans } from "react-i18next";
 
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
@@ -15,6 +16,7 @@ interface CliMissingPanelProps {
 }
 
 export function CliMissingPanel({ cli, onRetry, onOpenInTerminal }: CliMissingPanelProps) {
+  const { t } = useTranslation();
   const needsConfig = !!cli.needsConfig;
 
   return (
@@ -22,18 +24,18 @@ export function CliMissingPanel({ cli, onRetry, onOpenInTerminal }: CliMissingPa
       <div className="mx-auto flex w-full max-w-[640px] flex-col gap-[20px] px-[32px] pt-[56px]">
         <div className="flex items-center gap-[10px]">
           <span className="editorial-caps">
-            {needsConfig ? "needs config" : "not installed"}
+            {needsConfig ? t("cli.needsConfig") : t("terminal.notInstalled")}
           </span>
           {cli.dangerLevel === "dangerous" && (
             <Badge tone="warn">
               <Icon icon={AlertTriangle} size={10} strokeWidth={2} />
-              dangerous
+              {t("cli.dangerous")}
             </Badge>
           )}
           {needsConfig && (
             <Badge tone="muted">
               <Icon icon={Wrench} size={10} />
-              configure
+              {t("terminal.configure")}
             </Badge>
           )}
         </div>
@@ -50,8 +52,8 @@ export function CliMissingPanel({ cli, onRetry, onOpenInTerminal }: CliMissingPa
         {needsConfig ? (
           <div className="rounded-sm border border-hairline-soft bg-canvas-soft px-[16px] py-[14px]">
             <p className="text-[13px] text-body">
-              <span className="font-medium text-ink">Pi CLI is not configured yet.</span> Add the install command
-              and executable name in the metacodex CLI registry.
+              <span className="font-medium text-ink">{t("terminal.piNotConfigured")}</span>
+              {t("terminal.piNotConfiguredBody")}
             </p>
             <p className="mt-[6px] font-mono text-[11px] text-muted-soft">
               metacodex.store.json · cliRegistryOverrides
@@ -59,11 +61,11 @@ export function CliMissingPanel({ cli, onRetry, onOpenInTerminal }: CliMissingPa
           </div>
         ) : (
           <div className="flex flex-col gap-[10px]">
-            <p className="editorial-caps">install command</p>
+            <p className="editorial-caps">{t("terminal.installCommand")}</p>
             <InstallBlock command={cli.installCommand} />
             {cli.altInstallCommand ? (
               <>
-                <p className="mt-[6px] editorial-caps">or via npm</p>
+                <p className="mt-[6px] editorial-caps">{t("terminal.orViaNpm")}</p>
                 <InstallBlock command={cli.altInstallCommand} secondary />
               </>
             ) : null}
@@ -78,12 +80,12 @@ export function CliMissingPanel({ cli, onRetry, onOpenInTerminal }: CliMissingPa
               onClick={() => onOpenInTerminal(cli.installCommand)}
             >
               <Icon icon={Terminal} size={13} className="text-on-primary" />
-              Open in terminal
+              {t("terminal.openInTerminal")}
             </Button>
           ) : null}
           <Button variant="outline" size="md" onClick={onRetry}>
             <Icon icon={RefreshCw} size={12} />
-            Retry detection
+            {t("terminal.retryDetection")}
           </Button>
           {cli.docsUrl ? (
             <a
@@ -96,14 +98,17 @@ export function CliMissingPanel({ cli, onRetry, onOpenInTerminal }: CliMissingPa
               )}
             >
               <Icon icon={ExternalLink} size={12} />
-              Docs
+              {t("common.docs")}
             </a>
           ) : null}
         </div>
 
         <p className="mt-auto pb-[24px] pt-[28px] font-mono text-[11px] text-muted-soft">
-          metacodex looks for <span className="text-ink">{cli.command}</span> on your $PATH via{" "}
-          <span className="text-ink">{cli.detectCommand}</span>.
+          <Trans
+            i18nKey="terminal.lookup"
+            values={{ command: cli.command, detect: cli.detectCommand }}
+            components={[<span className="text-ink" />, <span className="text-ink" />]}
+          />
         </p>
       </div>
     </div>
@@ -111,6 +116,7 @@ export function CliMissingPanel({ cli, onRetry, onOpenInTerminal }: CliMissingPa
 }
 
 function InstallBlock({ command, secondary }: { command: string; secondary?: boolean }) {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
 
   const copy = async () => {
@@ -141,10 +147,10 @@ function InstallBlock({ command, secondary }: { command: string; secondary?: boo
           "inline-flex h-[22px] items-center gap-[4px] rounded-xs border border-hairline-soft px-[8px] text-[11px] text-muted",
           "hover:bg-surface-strong/55 hover:text-ink",
         )}
-        aria-label="Copy install command"
+        aria-label={t("terminal.copyInstall")}
       >
         <Icon icon={Copy} size={11} />
-        {copied ? "copied" : "copy"}
+        {copied ? t("common.copied") : t("common.copy")}
       </button>
     </div>
   );

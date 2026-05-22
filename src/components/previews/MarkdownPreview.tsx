@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Pencil, Eye } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { fsApi } from "@/features/filesystem/filesystem.service";
 import { useTabsStore, WORKSPACE_NULL } from "@/components/tabs/tabsStore";
+import { EditorTab } from "@/components/editor/EditorTab";
 import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/cn";
 
@@ -16,11 +18,15 @@ interface MarkdownPreviewProps {
 }
 
 export function MarkdownPreview({ tabId, path, projectId, mode }: MarkdownPreviewProps) {
+  const { t } = useTranslation();
   const [content, setContent] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const updateTab = useTabsStore((s) => s.updateTab);
 
+  // Read the file for the rendered preview. Re-runs whenever we flip back to
+  // preview so edits saved from the source editor are reflected on disk read.
   useEffect(() => {
+    if (mode !== "preview") return;
     let cancelled = false;
     setContent(null);
     setError(null);
@@ -35,7 +41,7 @@ export function MarkdownPreview({ tabId, path, projectId, mode }: MarkdownPrevie
     return () => {
       cancelled = true;
     };
-  }, [path]);
+  }, [path, mode]);
 
   const toggleMode = () => {
     updateTab(projectId ?? WORKSPACE_NULL, tabId, {
@@ -49,7 +55,7 @@ export function MarkdownPreview({ tabId, path, projectId, mode }: MarkdownPrevie
         data-tauri-drag-region
         className="flex h-[34px] shrink-0 items-center justify-between border-b border-hairline-soft px-[14px]"
       >
-        <span className="editorial-caps truncate">markdown · {mode}</span>
+        <span aria-hidden className="flex-1" />
         <button
           type="button"
           onClick={toggleMode}
@@ -59,30 +65,44 @@ export function MarkdownPreview({ tabId, path, projectId, mode }: MarkdownPrevie
           )}
         >
           <Icon icon={mode === "preview" ? Pencil : Eye} size={11} />
-          {mode === "preview" ? "Edit source" : "Show preview"}
+          {mode === "preview" ? t("editor.editSource") : t("editor.showPreview")}
         </button>
       </header>
 
-      <div className="flex-1 overflow-y-auto">
-        {error ? (
-          <div className="px-[24px] py-[20px]">
-            <p className="editorial-caps text-danger">could not read</p>
-            <p className="mt-[4px] font-mono text-[12px] text-body">{error}</p>
+      <div className="relative flex-1 overflow-hidden">
+        {/*
+          The source editor stays mounted (just hidden in preview) so unsaved
+          edits and undo history survive mode toggles. It's a real CodeMirror
+          instance via EditorTab — Cmd+S saves, dirty state is tracked.
+        */}
+        <div
+          className="absolute inset-0"
+          style={{ display: mode === "source" ? "block" : "none" }}
+        >
+          <EditorTab tabId={tabId} path={path} projectId={projectId} />
+        </div>
+
+        {mode === "preview" ? (
+          <div className="absolute inset-0 overflow-y-auto">
+            {error ? (
+              <div className="px-[24px] py-[20px]">
+                <p className="editorial-caps text-danger">{t("editor.couldNotRead")}</p>
+                <p className="mt-[4px] font-mono text-[12px] text-body">{error}</p>
+              </div>
+            ) : content === null ? (
+              <p className="px-[24px] py-[20px] font-mono text-[11px] text-muted-soft">
+                {t("common.loading")}
+              </p>
+            ) : (
+              <article
+                className="prose prose-neutral mx-auto max-w-[720px] px-[28px] py-[28px] text-[14px] leading-[1.65] text-body"
+                style={{ fontFamily: "var(--font-sans)" }}
+              >
+                <MarkdownBody source={content} />
+              </article>
+            )}
           </div>
-        ) : content === null ? (
-          <p className="px-[24px] py-[20px] font-mono text-[11px] text-muted-soft">loading…</p>
-        ) : mode === "source" ? (
-          <pre className="whitespace-pre-wrap break-words px-[20px] py-[18px] font-mono text-[12px] leading-[1.55] text-body">
-            {content}
-          </pre>
-        ) : (
-          <article
-            className="prose prose-neutral mx-auto max-w-[720px] px-[28px] py-[28px] text-[14px] leading-[1.65] text-body"
-            style={{ fontFamily: "var(--font-sans)" }}
-          >
-            <MarkdownBody source={content} />
-          </article>
-        )}
+        ) : null}
       </div>
     </div>
   );

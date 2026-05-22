@@ -1,5 +1,6 @@
 import type { ComponentType, ReactNode } from "react";
 import { Plus, AlertTriangle, Settings2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import {
   DropdownContent,
@@ -20,7 +21,6 @@ import {
 import { Icon } from "@/components/ui/Icon";
 import { Kbd } from "@/components/ui/Kbd";
 import { Tooltip } from "@/components/ui/Tooltip";
-import { Badge } from "@/components/ui/Badge";
 import { CLI_BRAND_ICONS } from "@/components/icons/brand";
 import { DEFAULT_CLI_REGISTRY, type CliTool } from "@/features/terminal/cli-registry";
 import { cn } from "@/lib/cn";
@@ -40,20 +40,29 @@ interface MenuComponents {
     onSelect?: () => void;
     trailing?: ReactNode;
     children: ReactNode;
+    className?: string;
   }>;
   Separator: ComponentType;
   Label: ComponentType<{ children: ReactNode }>;
 }
 
 function NewTabBody({ actions, C }: { actions: NewTabActions; C: MenuComponents }) {
+  const { t } = useTranslation();
+  // Roomier rows + a more legible highlight (full-opacity surface, not the
+  // shared menu default of /70, which reads as almost no hover at this density).
+  const itemClass = "py-[9px] data-[highlighted]:bg-surface-strong";
   return (
     <>
-      <C.Item onSelect={actions.onNewTerminal} trailing={<Kbd keys={["Mod", "T"]} />}>
-        <span className="font-medium">New Terminal</span>
+      <C.Item
+        onSelect={actions.onNewTerminal}
+        trailing={<Kbd keys={["Mod", "T"]} />}
+        className={itemClass}
+      >
+        <span className="font-medium">{t("tabs.newTerminal")}</span>
       </C.Item>
 
       <C.Separator />
-      <C.Label>AI CLIs</C.Label>
+      <C.Label>{t("tabs.aiClis")}</C.Label>
 
       {DEFAULT_CLI_REGISTRY.map((cli) => {
         const BrandIcon = CLI_BRAND_ICONS[cli.id];
@@ -61,14 +70,14 @@ function NewTabBody({ actions, C }: { actions: NewTabActions; C: MenuComponents 
           <C.Item
             key={cli.id}
             onSelect={() => actions.onLaunchCli(cli)}
+            className={itemClass}
             trailing={
-              cli.dangerLevel === "dangerous" ? (
-                <Badge tone="warn" className="gap-[3px]">
-                  <Icon icon={AlertTriangle} size={10} strokeWidth={2} />
-                  dangerous
-                </Badge>
-              ) : cli.needsConfig ? (
-                <Badge tone="muted">needs config</Badge>
+              cli.needsConfig ? (
+                <Tooltip content={t("cli.needsConfigTooltip")} side="top">
+                  <span className="inline-flex items-center justify-center text-muted">
+                    <Icon icon={AlertTriangle} size={13} strokeWidth={2} />
+                  </span>
+                </Tooltip>
               ) : null
             }
           >
@@ -77,10 +86,7 @@ function NewTabBody({ actions, C }: { actions: NewTabActions; C: MenuComponents 
                 <BrandIcon size={16} />
               </span>
             ) : null}
-            <span className="flex flex-col items-start gap-[1px]">
-              <span className="font-medium">{cli.label}</span>
-              <span className="font-mono text-[10px] text-muted">{cli.command}</span>
-            </span>
+            <span className="font-medium">{cli.label}</span>
           </C.Item>
         );
       })}
@@ -88,9 +94,9 @@ function NewTabBody({ actions, C }: { actions: NewTabActions; C: MenuComponents 
       {actions.onEditRegistry && (
         <>
           <C.Separator />
-          <C.Item onSelect={actions.onEditRegistry}>
+          <C.Item onSelect={actions.onEditRegistry} className={itemClass}>
             <Icon icon={Settings2} size={12} className="text-muted" />
-            <span>Edit CLI registry&hellip;</span>
+            <span>{t("tabs.editRegistry")}</span>
           </C.Item>
         </>
       )}
@@ -111,9 +117,10 @@ const CONTEXT_COMPONENTS: MenuComponents = {
 };
 
 export function NewTabMenu({ onNewTerminal, onLaunchCli, onEditRegistry }: NewTabActions) {
+  const { t } = useTranslation();
   return (
     <DropdownRoot>
-      <Tooltip content="New tab" shortcut={<Kbd keys={["Mod", "T"]} />} side="bottom">
+      <Tooltip content={t("tabs.newTab")} shortcut={<Kbd keys={["Mod", "T"]} />} side="bottom">
         <DropdownTrigger asChild>
           <button
             type="button"
@@ -122,7 +129,7 @@ export function NewTabMenu({ onNewTerminal, onLaunchCli, onEditRegistry }: NewTa
               "hover:bg-surface-strong/55 hover:text-ink transition-colors",
               "focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink",
             )}
-            aria-label="New tab"
+            aria-label={t("tabs.newTab")}
           >
             <Icon icon={Plus} size={12} />
           </button>

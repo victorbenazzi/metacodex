@@ -1,16 +1,11 @@
 use chrono::Utc;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
 use std::sync::Arc;
 use tauri::{AppHandle, Manager};
-use tauri_plugin_store::StoreExt;
 
+use crate::config_paths;
 use crate::error::{AppError, AppResult};
-
-const STORE_FILE: &str = "metacodex.store.json";
-const KEY_PROJECTS: &str = "projects";
-const KEY_ACTIVE: &str = "lastActiveProjectId";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -24,7 +19,18 @@ pub struct Project {
     pub last_opened_at: String,
 }
 
-/// In-memory cache of the project list, kept in sync with the persisted store.
+/// On-disk shape of `~/.metacodex/state/projects.json`: the registry plus the
+/// last-active id co-located in one document (so they stay atomic together).
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct ProjectsFile {
+    #[serde(default)]
+    projects: Vec<Project>,
+    #[serde(default)]
+    last_active_project_id: Option<String>,
+}
+
+/// In-memory cache of the project list, kept in sync with the persisted file.
 /// Used by other modules (e.g. fs commands) to validate path containment without
 /// re-reading the JSON file on every request.
 #[derive(Default)]
@@ -44,60 +50,33 @@ impl ProjectsCache {
     }
 }
 
+fn load_file() -> AppResult<ProjectsFile> {
+    let path = config_paths::projects_file()?;
+    config_paths::read_json::<ProjectsFile>(&path)
+}
+
+fn save_file(file: &ProjectsFile) -> AppResult<()> {
+    let path = config_paths::projects_file()?;
+    config_paths::write_json_atomic(&path, file)
+}
+
 /// Read the persisted projects (and active id) from disk and warm the cache.
 /// Also runs a one-shot color migration so projects created against a prior
 /// palette pick up the current swatch for their hue.
 pub fn hydrate(app: &AppHandle) -> AppResult<()> {
-    let mut projects = load_projects(app)?;
+    let mut file = load_file()?;
     let mut mutated = false;
-    for p in projects.iter_mut() {
+    for p in file.projects.iter_mut() {
         if let Some(migrated) = migrate_color(&p.color) {
             p.color = migrated;
             mutated = true;
         }
     }
     if mutated {
-        save_projects(app, &projects)?;
+        save_file(&file)?;
     }
     let cache = app.state::<Arc<ProjectsCache>>();
-    cache.replace(projects);
-    Ok(())
-}
-
-fn load_projects(app: &AppHandle) -> AppResult<Vec<Project>> {
-    let store = app
-        .store(STORE_FILE)
-        .map_err(|e| AppError::Store(format!("open store: {e}")))?;
-    let raw = store.get(KEY_PROJECTS).unwrap_or(Value::Null);
-    if raw.is_null() {
-        return Ok(Vec::new());
-    }
-    serde_json::from_value::<Vec<Project>>(raw)
-        .map_err(|e| AppError::Store(format!("parse projects: {e}")))
-}
-
-fn save_projects(app: &AppHandle, projects: &[Project]) -> AppResult<()> {
-    let store = app
-        .store(STORE_FILE)
-        .map_err(|e| AppError::Store(format!("open store: {e}")))?;
-    store.set(KEY_PROJECTS, json!(projects));
-    store
-        .save()
-        .map_err(|e| AppError::Store(format!("save store: {e}")))?;
-    Ok(())
-}
-
-fn save_active(app: &AppHandle, id: Option<&str>) -> AppResult<()> {
-    let store = app
-        .store(STORE_FILE)
-        .map_err(|e| AppError::Store(format!("open store: {e}")))?;
-    match id {
-        Some(s) => store.set(KEY_ACTIVE, json!(s)),
-        None => store.set(KEY_ACTIVE, Value::Null),
-    }
-    store
-        .save()
-        .map_err(|e| AppError::Store(format!("save store: {e}")))?;
+    cache.replace(file.projects);
     Ok(())
 }
 
@@ -181,20 +160,21 @@ pub fn add(app: &AppHandle, path: String) -> AppResult<Project> {
         return Err(AppError::NotFound(format!("not a directory: {path}")));
     }
 
-    let mut projects = load_projects(app)?;
-    if let Some(existing) = projects.iter().find(|p| p.path == path) {
+    let mut file = load_file()?;
+    if let Some(existing) = file.projects.iter().find(|p| p.path == path) {
         // Refresh last_opened_at and return the existing entry — opening the same
         // folder twice should not create duplicates.
         let id = existing.id.clone();
         let now = Utc::now().to_rfc3339();
-        for p in projects.iter_mut() {
+        for p in file.projects.iter_mut() {
             if p.id == id {
                 p.last_opened_at = now.clone();
             }
         }
-        save_projects(app, &projects)?;
-        app.state::<Arc<ProjectsCache>>().replace(projects.clone());
-        return Ok(projects.into_iter().find(|p| p.id == id).unwrap());
+        save_file(&file)?;
+        app.state::<Arc<ProjectsCache>>()
+            .replace(file.projects.clone());
+        return Ok(file.projects.into_iter().find(|p| p.id == id).unwrap());
     }
 
     let now = Utc::now().to_rfc3339();
@@ -202,36 +182,30 @@ pub fn add(app: &AppHandle, path: String) -> AppResult<Project> {
         id: new_id(),
         name: basename(&path),
         path: path.clone(),
-        color: assign_color(&projects),
+        color: assign_color(&file.projects),
         icon: "Folder".into(),
         created_at: now.clone(),
         last_opened_at: now,
     };
-    projects.push(project.clone());
-    save_projects(app, &projects)?;
-    app.state::<Arc<ProjectsCache>>().replace(projects);
+    file.projects.push(project.clone());
+    save_file(&file)?;
+    app.state::<Arc<ProjectsCache>>().replace(file.projects);
     Ok(project)
 }
 
 pub fn remove(app: &AppHandle, id: &str) -> AppResult<()> {
-    let mut projects = load_projects(app)?;
-    let initial = projects.len();
-    projects.retain(|p| p.id != id);
-    if projects.len() == initial {
+    let mut file = load_file()?;
+    let initial = file.projects.len();
+    file.projects.retain(|p| p.id != id);
+    if file.projects.len() == initial {
         return Err(AppError::NotFound(format!("project {id}")));
     }
-    save_projects(app, &projects)?;
-    app.state::<Arc<ProjectsCache>>().replace(projects);
-
-    // If the removed project was active, clear it.
-    let store = app
-        .store(STORE_FILE)
-        .map_err(|e| AppError::Store(format!("open store: {e}")))?;
-    if let Some(Value::String(active)) = store.get(KEY_ACTIVE) {
-        if active == id {
-            save_active(app, None)?;
-        }
+    // If the removed project was active, clear it (same file, one atomic write).
+    if file.last_active_project_id.as_deref() == Some(id) {
+        file.last_active_project_id = None;
     }
+    save_file(&file)?;
+    app.state::<Arc<ProjectsCache>>().replace(file.projects);
     Ok(())
 }
 
@@ -240,15 +214,17 @@ pub fn rename(app: &AppHandle, id: &str, name: String) -> AppResult<Project> {
     if trimmed.is_empty() {
         return Err(AppError::Other("name cannot be empty".into()));
     }
-    let mut projects = load_projects(app)?;
-    let found_idx = projects
+    let mut file = load_file()?;
+    let found_idx = file
+        .projects
         .iter()
         .position(|p| p.id == id)
         .ok_or_else(|| AppError::NotFound(format!("project {id}")))?;
-    projects[found_idx].name = trimmed;
-    save_projects(app, &projects)?;
-    app.state::<Arc<ProjectsCache>>().replace(projects.clone());
-    Ok(projects.into_iter().nth(found_idx).unwrap())
+    file.projects[found_idx].name = trimmed;
+    save_file(&file)?;
+    app.state::<Arc<ProjectsCache>>()
+        .replace(file.projects.clone());
+    Ok(file.projects.into_iter().nth(found_idx).unwrap())
 }
 
 pub fn update_meta(
@@ -257,73 +233,72 @@ pub fn update_meta(
     color: Option<String>,
     icon: Option<String>,
 ) -> AppResult<Project> {
-    let mut projects = load_projects(app)?;
-    let found_idx = projects
+    let mut file = load_file()?;
+    let found_idx = file
+        .projects
         .iter()
         .position(|p| p.id == id)
         .ok_or_else(|| AppError::NotFound(format!("project {id}")))?;
     if let Some(c) = color {
-        projects[found_idx].color = c;
+        file.projects[found_idx].color = c;
     }
     if let Some(i) = icon {
-        projects[found_idx].icon = i;
+        file.projects[found_idx].icon = i;
     }
-    save_projects(app, &projects)?;
-    app.state::<Arc<ProjectsCache>>().replace(projects.clone());
-    Ok(projects.into_iter().nth(found_idx).unwrap())
+    save_file(&file)?;
+    app.state::<Arc<ProjectsCache>>()
+        .replace(file.projects.clone());
+    Ok(file.projects.into_iter().nth(found_idx).unwrap())
 }
 
-pub fn list(app: &AppHandle) -> AppResult<Vec<Project>> {
-    load_projects(app)
+pub fn list() -> AppResult<Vec<Project>> {
+    Ok(load_file()?.projects)
 }
 
 /// Persist a new order for the project rail. `ordered_ids` must contain every
 /// existing project id exactly once — any mismatch is rejected so the cache
 /// can't get out of sync with the persisted set.
 pub fn reorder(app: &AppHandle, ordered_ids: Vec<String>) -> AppResult<Vec<Project>> {
-    let projects = load_projects(app)?;
+    let mut file = load_file()?;
 
-    if ordered_ids.len() != projects.len() {
+    if ordered_ids.len() != file.projects.len() {
         return Err(AppError::Other(format!(
             "reorder: expected {} ids, got {}",
-            projects.len(),
+            file.projects.len(),
             ordered_ids.len()
         )));
     }
 
-    let mut reordered: Vec<Project> = Vec::with_capacity(projects.len());
+    let mut reordered: Vec<Project> = Vec::with_capacity(file.projects.len());
     for id in &ordered_ids {
-        let found = projects
+        let found = file
+            .projects
             .iter()
             .find(|p| &p.id == id)
             .ok_or_else(|| AppError::NotFound(format!("project {id}")))?;
         reordered.push(found.clone());
     }
 
-    save_projects(app, &reordered)?;
+    file.projects = reordered.clone();
+    save_file(&file)?;
     app.state::<Arc<ProjectsCache>>().replace(reordered.clone());
     Ok(reordered)
 }
 
 pub fn set_active(app: &AppHandle, id: &str) -> AppResult<()> {
-    let mut projects = load_projects(app)?;
-    let found_idx = projects
+    let mut file = load_file()?;
+    let found_idx = file
+        .projects
         .iter()
         .position(|p| p.id == id)
         .ok_or_else(|| AppError::NotFound(format!("project {id}")))?;
-    projects[found_idx].last_opened_at = Utc::now().to_rfc3339();
-    save_projects(app, &projects)?;
-    app.state::<Arc<ProjectsCache>>().replace(projects);
-    save_active(app, Some(id))?;
+    file.projects[found_idx].last_opened_at = Utc::now().to_rfc3339();
+    file.last_active_project_id = Some(id.to_string());
+    save_file(&file)?;
+    app.state::<Arc<ProjectsCache>>().replace(file.projects);
     Ok(())
 }
 
-pub fn get_active_id(app: &AppHandle) -> AppResult<Option<String>> {
-    let store = app
-        .store(STORE_FILE)
-        .map_err(|e| AppError::Store(format!("open store: {e}")))?;
-    Ok(match store.get(KEY_ACTIVE) {
-        Some(Value::String(s)) => Some(s),
-        _ => None,
-    })
+pub fn get_active_id() -> AppResult<Option<String>> {
+    Ok(load_file()?.last_active_project_id)
 }

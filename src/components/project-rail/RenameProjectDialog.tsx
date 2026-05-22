@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { DialogContent, DialogRoot } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Button";
@@ -12,6 +13,7 @@ interface RenameProjectDialogProps {
 }
 
 export function RenameProjectDialog({ project, open, onOpenChange }: RenameProjectDialogProps) {
+  const { t } = useTranslation();
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -46,16 +48,16 @@ export function RenameProjectDialog({ project, open, onOpenChange }: RenameProje
   return (
     <DialogRoot open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        title="Rename project"
-        description="Renames the project inside metacodex. The folder on disk is not affected."
+        title={t("projectRail.rename.title")}
+        description={t("projectRail.rename.description")}
         width={420}
         footer={
           <>
             <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button variant="primary" size="sm" disabled={!canSubmit} onClick={submit}>
-              {busy ? "Saving…" : "Save"}
+              {busy ? t("common.saving") : t("common.save")}
             </Button>
           </>
         }
@@ -68,7 +70,7 @@ export function RenameProjectDialog({ project, open, onOpenChange }: RenameProje
           className="space-y-[10px]"
         >
           <label className="editorial-caps block" htmlFor="project-name-input">
-            Project name
+            {t("projectRail.rename.label")}
           </label>
           <input
             id="project-name-input"

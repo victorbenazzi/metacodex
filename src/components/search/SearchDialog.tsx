@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as RD from "@radix-ui/react-dialog";
 import { Search, X, CaseSensitive, Regex, WholeWord } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/cn";
@@ -8,12 +9,14 @@ import { useSearchUiStore, usePendingGotoStore } from "@/features/search/search.
 import { searchApi } from "@/features/search/search.service";
 import type { SearchResults } from "@/features/search/search.types";
 import { useProjectsStore } from "@/features/projects/project.store";
+import { useSettingsDataStore } from "@/features/settings/settings.data.store";
 import { useTabsStore } from "@/components/tabs/tabsStore";
 import { basename } from "@/lib/path";
 import { ext } from "@/lib/path";
 import type { Tab } from "@/components/tabs/types";
 
 export function SearchDialog() {
+  const { t } = useTranslation();
   const open = useSearchUiStore((s) => s.open);
   const setOpen = useSearchUiStore((s) => s.setOpen);
   const project = useProjectsStore((s) => s.projects.find((p) => p.id === s.activeProjectId));
@@ -35,6 +38,9 @@ export function SearchDialog() {
       return;
     }
     let cancelled = false;
+    // Read imperatively so changing it doesn't re-arm this effect while typing.
+    const searchDebounceMs =
+      useSettingsDataStore.getState().settings.performance.searchDebounceMs;
     const handle = setTimeout(async () => {
       setBusy(true);
       setErr(null);
@@ -51,7 +57,7 @@ export function SearchDialog() {
       } finally {
         if (!cancelled) setBusy(false);
       }
-    }, 150);
+    }, searchDebounceMs);
     return () => {
       cancelled = true;
       clearTimeout(handle);
@@ -94,8 +100,8 @@ export function SearchDialog() {
       <RD.Portal>
         <RD.Overlay
           className={cn(
-            "fixed inset-0 z-[100] bg-[rgba(38,37,30,0.32)] backdrop-blur-[3px]",
-            "data-[state=open]:animate-fade-in",
+            "fixed inset-0 z-[100] bg-[rgba(38,37,30,0.32)]",
+            "data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out",
           )}
         />
         <RD.Content
@@ -103,41 +109,41 @@ export function SearchDialog() {
           className={cn(
             "fixed left-1/2 top-[12vh] z-[101] -translate-x-1/2",
             "max-h-[72vh] w-[min(720px,92vw)] overflow-hidden rounded-lg border border-hairline bg-surface-card",
-            "data-[state=open]:animate-slide-up",
+            "data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out",
           )}
         >
-          <RD.Title className="sr-only">Search in project</RD.Title>
+          <RD.Title className="sr-only">{t("search.title")}</RD.Title>
 
           <header className="flex items-center gap-[10px] border-b border-hairline-soft px-[14px] py-[10px]">
             <Icon icon={Search} size={13} className="text-muted" />
             <SearchInput
               query={query}
               setQuery={setQuery}
-              placeholder={project ? `Search in ${project.name}` : "No project open"}
+              placeholder={project ? t("search.placeholder", { name: project.name }) : t("search.noProjectOpen")}
               disabled={!project}
             />
             <ToggleButton
               icon={CaseSensitive}
               active={caseSensitive}
               onClick={() => setCaseSensitive((v) => !v)}
-              label="Match case"
+              label={t("search.matchCase")}
             />
             <ToggleButton
               icon={WholeWord}
               active={wholeWord}
               onClick={() => setWholeWord((v) => !v)}
-              label="Whole word"
+              label={t("search.wholeWord")}
             />
             <ToggleButton
               icon={Regex}
               active={regex}
               onClick={() => setRegex((v) => !v)}
-              label="Regex"
+              label={t("search.regex")}
             />
             <RD.Close asChild>
               <button
                 type="button"
-                aria-label="Close search"
+                aria-label={t("search.close")}
                 className="inline-flex h-[22px] w-[22px] items-center justify-center rounded-xs text-muted hover:bg-surface-strong/55 hover:text-ink"
               >
                 <Icon icon={X} size={12} />
@@ -148,20 +154,20 @@ export function SearchDialog() {
           <div className="max-h-[60vh] overflow-y-auto px-[6px] py-[6px]">
             {!project ? (
               <p className="px-[14px] py-[14px] text-[12px] text-muted">
-                Open a project to search inside it.
+                {t("search.openToSearch")}
               </p>
             ) : err ? (
               <p className="px-[14px] py-[14px] text-[12px] text-danger">{err}</p>
             ) : busy && !results ? (
-              <p className="px-[14px] py-[14px] font-mono text-[11px] text-muted-soft">searching…</p>
+              <p className="px-[14px] py-[14px] font-mono text-[11px] text-muted-soft">{t("common.searching")}</p>
             ) : !results ? (
               query.trim() ? null : (
                 <p className="px-[14px] py-[14px] text-[12px] text-muted">
-                  Type to search file contents in the current project.
+                  {t("search.typeToSearch")}
                 </p>
               )
             ) : results.totalMatches === 0 ? (
-              <p className="px-[14px] py-[14px] text-[12px] text-muted">No matches.</p>
+              <p className="px-[14px] py-[14px] text-[12px] text-muted">{t("search.noMatches")}</p>
             ) : (
               <ResultsList
                 results={results}
@@ -174,8 +180,8 @@ export function SearchDialog() {
           {results ? (
             <footer className="flex items-center justify-between border-t border-hairline-soft px-[14px] py-[8px] font-mono text-[11px] text-muted-soft">
               <span>
-                {results.totalMatches} matches · {results.files.length} files
-                {results.truncated ? " · truncated" : ""}
+                {t("search.summary", { matches: results.totalMatches, files: results.files.length })}
+                {results.truncated ? t("search.truncated") : ""}
               </span>
               <span>{results.elapsedMs} ms</span>
             </footer>

@@ -3,6 +3,7 @@ pub mod filesystem;
 pub mod git;
 pub mod projects;
 pub mod search;
+pub mod settings;
 pub mod terminal;
 pub mod watcher;
 pub mod workspace;

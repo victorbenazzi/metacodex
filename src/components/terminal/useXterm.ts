@@ -5,6 +5,7 @@ import { WebLinksAddon } from "@xterm/addon-web-links";
 import { CanvasAddon } from "@xterm/addon-canvas";
 
 import { useThemeStore } from "@/features/theme/theme.store";
+import { useSettingsDataStore } from "@/features/settings/settings.data.store";
 
 /** Read a CSS variable from :root / [data-theme]. */
 function readVar(name: string): string {
@@ -48,23 +49,33 @@ export function useXterm(): UseXtermResult {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
+  // Skip the first run of each live-apply effect below: the terminal is created
+  // with the current settings via getState(), so the initial pass is a no-op we
+  // don't want (an early fit() could race the deferred canvas-renderer init).
+  const firstTypoRun = useRef(true);
+  const firstCursorRun = useRef(true);
+  const firstScrollbackRun = useRef(true);
   const themeEffective = useThemeStore((s) => s.effective);
+  const termFontFamily = useSettingsDataStore((s) => s.settings.terminal.fontFamily);
+  const termFontSize = useSettingsDataStore((s) => s.settings.terminal.fontSize);
+  const termCursorStyle = useSettingsDataStore((s) => s.settings.terminal.cursorStyle);
+  const termScrollback = useSettingsDataStore((s) => s.settings.terminal.scrollback);
 
   useEffect(() => {
     if (!containerRef.current) return;
+    const initialTerm = useSettingsDataStore.getState().settings.terminal;
     const term = new Terminal({
-      fontFamily:
-        '"JetBrainsMono Nerd Font Mono", "JetBrainsMono NFM", "SF Mono", ui-monospace, Menlo, monospace',
-      fontSize: 13,
+      fontFamily: initialTerm.fontFamily,
+      fontSize: initialTerm.fontSize,
       // Must be 1.0 so box-drawing characters (─│╭╮╰╯) connect across cells —
       // anything larger creates vertical gaps that break TUI rendering
-      // (Claude Code, Codex, etc.).
+      // (Claude Code, Codex, etc.). Intentionally NOT user-configurable.
       lineHeight: 1.0,
       letterSpacing: 0,
       cursorBlink: true,
-      cursorStyle: "bar",
+      cursorStyle: initialTerm.cursorStyle,
       cursorWidth: 1,
-      scrollback: 10_000,
+      scrollback: initialTerm.scrollback,
       allowProposedApi: true,
       smoothScrollDuration: 0,
       cols: 100,
@@ -88,13 +99,16 @@ export function useXterm(): UseXtermResult {
         console.warn("[term] CanvasAddon load failed; using DOM renderer", err);
       }
       try {
-        fit.fit();
+        // Only fit when actually visible — fitting a 0×0 (hidden) container
+        // clamps cols to ~2 and would mangle a TUI; ResizeObserver re-fits on show.
+        if (containerRef.current?.clientWidth) fit.fit();
       } catch {
         // ignore — ResizeObserver in TerminalTab will retry once sized
       }
     };
-    const fontPromise = (document as any).fonts
-      ? (document as any).fonts.load('13px "JetBrainsMono Nerd Font Mono"')
+    const fontsApi = (document as any).fonts;
+    const fontPromise = fontsApi
+      ? fontsApi.load(`${initialTerm.fontSize}px ${initialTerm.fontFamily}`).catch(() => undefined)
       : Promise.resolve();
     fontPromise.finally(() => requestAnimationFrame(installRenderer));
     termRef.current = term;
@@ -114,6 +128,53 @@ export function useXterm(): UseXtermResult {
     if (!termRef.current) return;
     termRef.current.options.theme = buildTerminalTheme();
   }, [themeEffective]);
+
+  // Live-apply terminal typography. Font size/family change cell metrics, so we
+  // refit — and load the family first so the canvas renderer measures the right
+  // glyph width.
+  useEffect(() => {
+    if (firstTypoRun.current) {
+      firstTypoRun.current = false;
+      return;
+    }
+    const term = termRef.current;
+    const fit = fitRef.current;
+    if (!term) return;
+    term.options.fontSize = termFontSize;
+    term.options.fontFamily = termFontFamily;
+    const refit = () => {
+      try {
+        if (containerRef.current?.clientWidth) fit?.fit();
+      } catch {
+        // ResizeObserver in TerminalTab will retry once sized
+      }
+    };
+    const fontsApi = (document as any).fonts;
+    if (fontsApi) {
+      fontsApi.load(`${termFontSize}px ${termFontFamily}`).then(refit).catch(refit);
+    } else {
+      refit();
+    }
+  }, [termFontSize, termFontFamily]);
+
+  // Cursor style — pure visual, no refit.
+  useEffect(() => {
+    if (firstCursorRun.current) {
+      firstCursorRun.current = false;
+      return;
+    }
+    if (termRef.current) termRef.current.options.cursorStyle = termCursorStyle;
+  }, [termCursorStyle]);
+
+  // Scrollback — grows live; shrinking only fully applies to new terminals
+  // (xterm keeps already-buffered lines until they scroll out).
+  useEffect(() => {
+    if (firstScrollbackRun.current) {
+      firstScrollbackRun.current = false;
+      return;
+    }
+    if (termRef.current) termRef.current.options.scrollback = termScrollback;
+  }, [termScrollback]);
 
   return { containerRef, termRef, fitRef };
 }

@@ -1,5 +1,6 @@
 import { type ReactNode } from "react";
 import { AlertTriangle } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/Button";
 import { DialogContent, DialogRoot } from "@/components/ui/Dialog";
@@ -22,6 +23,12 @@ interface ConfirmDialogProps {
   pending?: boolean;
   /** Optional icon override (defaults to AlertTriangle for destructive/warning). */
   icon?: ReactNode;
+  /** Optional opt-out checkbox shown below the description (e.g. "don't ask again in this session"). */
+  skipOption?: {
+    label: string;
+    checked: boolean;
+    onChange: (next: boolean) => void;
+  };
 }
 
 export function ConfirmDialog({
@@ -30,13 +37,15 @@ export function ConfirmDialog({
   title,
   description,
   details,
-  confirmLabel = "Confirmar",
-  cancelLabel = "Cancelar",
+  confirmLabel,
+  cancelLabel,
   tone = "neutral",
   onConfirm,
   pending = false,
   icon,
+  skipOption,
 }: ConfirmDialogProps) {
+  const { t } = useTranslation();
   const showIcon = tone !== "neutral" || icon !== undefined;
   const iconNode =
     icon ??
@@ -59,7 +68,7 @@ export function ConfirmDialog({
               onClick={() => onOpenChange(false)}
               disabled={pending}
             >
-              {cancelLabel}
+              {cancelLabel ?? t("common.cancel")}
             </Button>
             <Button
               variant="primary"
@@ -76,7 +85,7 @@ export function ConfirmDialog({
                   "bg-warn text-on-primary hover:bg-warn/85 focus-visible:outline-warn",
               )}
             >
-              {confirmLabel}
+              {confirmLabel ?? t("common.confirm")}
             </Button>
           </>
         }
@@ -103,6 +112,22 @@ export function ConfirmDialog({
             ) : null}
             {details ? (
               <div className="text-[12px] text-muted">{details}</div>
+            ) : null}
+            {skipOption ? (
+              <label
+                className={cn(
+                  "mt-[4px] flex cursor-pointer items-center gap-[8px] text-[12px] text-muted",
+                  "select-none hover:text-body",
+                )}
+              >
+                <input
+                  type="checkbox"
+                  checked={skipOption.checked}
+                  onChange={(e) => skipOption.onChange(e.target.checked)}
+                  className="h-[13px] w-[13px] accent-accent"
+                />
+                <span>{skipOption.label}</span>
+              </label>
             ) : null}
           </div>
         </div>

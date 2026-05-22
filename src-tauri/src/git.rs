@@ -101,3 +101,39 @@ fn status_code(s: Status) -> &'static str {
     }
     ""
 }
+
+/// Return the committed (HEAD) contents of `path` as text, or `None` when the
+/// file is untracked, the path is outside a repo, there are no commits yet, or
+/// the blob isn't valid text. Used to diff an open buffer against HEAD for the
+/// editor's change gutter — read-only, never mutates anything.
+pub fn file_head_content(path: &str) -> AppResult<Option<String>> {
+    let p = Path::new(path);
+    let repo = match Repository::discover(p) {
+        Ok(r) => r,
+        Err(_) => return Ok(None),
+    };
+    let workdir = match repo.workdir() {
+        Some(w) => w.to_path_buf(),
+        None => return Ok(None),
+    };
+    let rel = match p.strip_prefix(&workdir) {
+        Ok(r) => r,
+        Err(_) => return Ok(None),
+    };
+    let tree = match repo.head().and_then(|h| h.peel_to_commit()).and_then(|c| c.tree()) {
+        Ok(t) => t,
+        Err(_) => return Ok(None), // unborn branch / no commits
+    };
+    let entry = match tree.get_path(rel) {
+        Ok(e) => e,
+        Err(_) => return Ok(None), // not tracked at HEAD (new file)
+    };
+    let obj = match entry.to_object(&repo) {
+        Ok(o) => o,
+        Err(_) => return Ok(None),
+    };
+    match obj.as_blob() {
+        Some(blob) => Ok(Some(String::from_utf8_lossy(blob.content()).into_owned())),
+        None => Ok(None), // a tree, not a file
+    }
+}

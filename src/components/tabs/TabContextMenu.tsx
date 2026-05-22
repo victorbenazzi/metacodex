@@ -8,6 +8,7 @@ import {
   Square,
   CornerDownLeft,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import {
   ContextMenuContent,
@@ -46,6 +47,7 @@ export function TabContextMenu({
   onSelect,
   children,
 }: TabContextMenuProps) {
+  const { t } = useTranslation();
   const isProcess = tab.kind === "terminal" || tab.kind === "cli";
   const isFile =
     tab.kind === "editor" ||
@@ -68,18 +70,18 @@ export function TabContextMenu({
           trailing={isActive ? <Kbd keys={["Mod", "W"]} /> : null}
         >
           <Icon icon={X} size={12} className="text-muted" />
-          Fechar
+          {t("tabs.close")}
         </ContextMenuItem>
 
         {totalTabs > 1 ? (
           <>
             <ContextMenuItem onSelect={onCloseOthers}>
               <Icon icon={Square} size={12} className="text-muted" />
-              Fechar outras
+              {t("tabs.closeOthers")}
             </ContextMenuItem>
             <ContextMenuItem onSelect={onCloseAll}>
               <Icon icon={XSquare} size={12} className="text-muted" />
-              Fechar todas
+              {t("tabs.closeAll")}
             </ContextMenuItem>
           </>
         ) : null}
@@ -90,13 +92,13 @@ export function TabContextMenu({
             {onCopyPath ? (
               <ContextMenuItem onSelect={onCopyPath}>
                 <Icon icon={Copy} size={12} className="text-muted" />
-                Copiar caminho
+                {t("tabs.copyPath")}
               </ContextMenuItem>
             ) : null}
             {onRevealInFinder ? (
               <ContextMenuItem onSelect={onRevealInFinder}>
                 <Icon icon={FolderOpen} size={12} className="text-muted" />
-                Revelar no Finder
+                {t("tabs.revealInFinder")}
               </ContextMenuItem>
             ) : null}
           </>
@@ -107,7 +109,7 @@ export function TabContextMenu({
             <ContextMenuSeparator />
             <ContextMenuItem onSelect={onCopyCwd}>
               <Icon icon={CornerDownLeft} size={12} className="text-muted" />
-              Copiar diretório
+              {t("tabs.copyCwd")}
             </ContextMenuItem>
           </>
         ) : null}

@@ -67,13 +67,18 @@ export default {
         xl: "var(--space-xl)",
       },
       keyframes: {
+        // Unified popup motion — pure opacity, no transform. Every overlay,
+        // dialog, menu, dropdown, palette and tooltip shares this single pair.
+        // Opacity-only is deliberate: a transform here would override the
+        // -translate-x/-translate-y centering on modal content (which made
+        // dialogs animate off-center and snap into place).
         "fade-in": {
-          "0%": { opacity: "0" },
-          "100%": { opacity: "1" },
+          from: { opacity: "0" },
+          to: { opacity: "1" },
         },
-        "slide-up": {
-          "0%": { opacity: "0", transform: "translateY(4px)" },
-          "100%": { opacity: "1", transform: "translateY(0)" },
+        "fade-out": {
+          from: { opacity: "1" },
+          to: { opacity: "0" },
         },
         shimmer: {
           "0%": { backgroundPosition: "-200% 0" },
@@ -81,8 +86,12 @@ export default {
         },
       },
       animation: {
-        "fade-in": "fade-in 180ms ease-out",
-        "slide-up": "slide-up 200ms cubic-bezier(0.2, 0.8, 0.2, 1)",
+        // Enter decelerates in (ease-out); exit accelerates out (ease-in) and
+        // is shorter so dismissals feel instant. `forwards` holds opacity:0 on
+        // exit until Radix unmounts, preventing a 1-frame flash-back to visible.
+        // Durations/easings are tokens — see --dur-enter/--dur-exit in tokens.css.
+        "fade-in": "fade-in var(--dur-enter) var(--ease-out)",
+        "fade-out": "fade-out var(--dur-exit) var(--ease-in) forwards",
       },
     },
   },

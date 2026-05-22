@@ -13,6 +13,7 @@ use crate::util::paths;
 
 const DEFAULT_TEXT_LIMIT: u64 = 25 * 1024 * 1024; // 25 MiB
 const DEFAULT_BYTES_LIMIT: u64 = 50 * 1024 * 1024; // 50 MiB
+const ICON_IMAGE_LIMIT: u64 = 16 * 1024 * 1024; // 16 MiB — user-picked project icon
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -181,6 +182,287 @@ pub fn read_file_bytes(
     })
 }
 
+/// Read an image the user explicitly picked (via the native file dialog) to use
+/// as a project icon, returning it base64-encoded for the frontend to downscale.
+///
+/// SECURITY: unlike every other fs command here, this deliberately does NOT call
+/// `require_within_roots`. A chosen icon almost always lives outside the
+/// registered project roots, and the native OS file dialog is the user's consent
+/// boundary. The exception is kept narrow: extension allowlist + size cap.
+pub fn read_icon_image(path: &str) -> AppResult<BytesFile> {
+    const ICON_EXTS: &[&str] = &["png", "jpg", "jpeg", "gif", "webp", "svg", "ico", "bmp"];
+    let ext_ok = Path::new(path)
+        .extension()
+        .and_then(|s| s.to_str())
+        .map(|s| s.to_lowercase())
+        .map(|e| ICON_EXTS.contains(&e.as_str()))
+        .unwrap_or(false);
+    if !ext_ok {
+        return Err(AppError::Other(format!(
+            "unsupported icon image type: {path:?}"
+        )));
+    }
+    let meta = Path::new(path)
+        .metadata()
+        .map_err(|e| io_error("read_icon_image", e))?;
+    if meta.len() > ICON_IMAGE_LIMIT {
+        return Err(AppError::Other(format!(
+            "icon image too large: {} bytes (max {ICON_IMAGE_LIMIT})",
+            meta.len()
+        )));
+    }
+    let bytes = fs::read(path).map_err(|e| io_error("read_icon_image", e))?;
+    Ok(BytesFile {
+        b64: STANDARD.encode(&bytes),
+        mime: guess_mime(path),
+        truncated: false,
+        size: meta.len(),
+    })
+}
+
+/// Permanently delete a file or directory (recursive for directories).
+///
+/// Safety:
+///  - target must sit within a registered project root
+///  - refuses to delete a project root itself (a normalized exact match)
+///  - refuses symlinks at the top level (so we never traverse outside the sandbox)
+pub fn delete_path(app: &AppHandle, path: &str) -> AppResult<()> {
+    require_within_roots(app, path)?;
+
+    let target = Path::new(path);
+    let normalized = paths::normalize(target);
+
+    // Refuse to nuke a project root.
+    let cache = app.state::<Arc<ProjectsCache>>();
+    let roots = cache.project_roots();
+    if roots
+        .iter()
+        .any(|r| paths::normalize(Path::new(r)) == normalized)
+    {
+        return Err(AppError::PathNotAllowed(format!(
+            "refusing to delete project root: {path}"
+        )));
+    }
+
+    let meta = target
+        .symlink_metadata()
+        .map_err(|e| io_error("delete: stat", e))?;
+
+    if meta.file_type().is_symlink() {
+        // Treat symlinks themselves as files — never follow.
+        fs::remove_file(target).map_err(|e| io_error("delete: remove_file (symlink)", e))?;
+    } else if meta.is_dir() {
+        fs::remove_dir_all(target).map_err(|e| io_error("delete: remove_dir_all", e))?;
+    } else {
+        fs::remove_file(target).map_err(|e| io_error("delete: remove_file", e))?;
+    }
+    Ok(())
+}
+
+/// Rename within the same parent directory. `new_name` is a basename, not a path.
+///
+/// Safety:
+///  - `from` must sit within a registered project root
+///  - `new_name` cannot contain path separators, cannot be `.` / `..`, cannot be empty
+///  - destination must not already exist (prevents accidental clobber)
+///  - refuses to rename a project root itself
+pub fn rename_path(app: &AppHandle, from: &str, new_name: &str) -> AppResult<String> {
+    require_within_roots(app, from)?;
+
+    if new_name.is_empty()
+        || new_name == "."
+        || new_name == ".."
+        || new_name.contains('/')
+        || new_name.contains('\\')
+        || new_name.contains('\0')
+    {
+        return Err(AppError::Other(format!(
+            "invalid name: {new_name:?} (must be a non-empty basename without separators)"
+        )));
+    }
+
+    let from_path = Path::new(from);
+    let normalized_from = paths::normalize(from_path);
+
+    let cache = app.state::<Arc<ProjectsCache>>();
+    let roots = cache.project_roots();
+    if roots
+        .iter()
+        .any(|r| paths::normalize(Path::new(r)) == normalized_from)
+    {
+        return Err(AppError::PathNotAllowed(format!(
+            "refusing to rename project root: {from}"
+        )));
+    }
+
+    let parent = from_path.parent().ok_or_else(|| {
+        AppError::Other(format!("cannot rename top-level path without parent: {from}"))
+    })?;
+    let to_path = parent.join(new_name);
+
+    // The new path must still sit inside a project root (it will, by construction,
+    // but the check guards against bugs / odd `new_name` inputs that slip the
+    // earlier validation).
+    let to_str = to_path.to_string_lossy().to_string();
+    require_within_roots(app, &to_str)?;
+
+    if to_path.symlink_metadata().is_ok() {
+        return Err(AppError::Other(format!(
+            "destination already exists: {to_str}"
+        )));
+    }
+
+    fs::rename(from_path, &to_path).map_err(|e| io_error("rename", e))?;
+    Ok(to_str)
+}
+
+/// Validate a user-supplied name component used for create/rename.
+/// Allows nested segments (`a/b/c`) for create, but rejects traversal and
+/// absolute/empty inputs.
+fn validate_relative_name(name: &str, allow_nested: bool) -> AppResult<()> {
+    if name.is_empty() || name == "." || name == ".." {
+        return Err(AppError::Other(format!("invalid name: {name:?}")));
+    }
+    if name.contains('\0') || name.starts_with('/') || name.starts_with('\\') {
+        return Err(AppError::Other(format!("invalid name: {name:?}")));
+    }
+    if !allow_nested && (name.contains('/') || name.contains('\\')) {
+        return Err(AppError::Other(format!(
+            "invalid name (no separators allowed): {name:?}"
+        )));
+    }
+    // Reject any `..` traversal segment even in nested mode.
+    for seg in name.split(['/', '\\']) {
+        if seg == ".." || seg == "." {
+            return Err(AppError::Other(format!(
+                "invalid name (traversal not allowed): {name:?}"
+            )));
+        }
+    }
+    Ok(())
+}
+
+/// Create an empty file `name` inside `parent`. `name` may be nested
+/// (`sub/dir/file.txt`) — intermediate directories are created. Refuses to
+/// overwrite an existing path. Returns the new absolute path.
+pub fn create_file(app: &AppHandle, parent: &str, name: &str) -> AppResult<String> {
+    require_within_roots(app, parent)?;
+    validate_relative_name(name, true)?;
+
+    let target = Path::new(parent).join(name);
+    let target_str = target.to_string_lossy().to_string();
+    require_within_roots(app, &target_str)?;
+
+    if target.symlink_metadata().is_ok() {
+        return Err(AppError::Other(format!(
+            "already exists: {target_str}"
+        )));
+    }
+    if let Some(dir) = target.parent() {
+        fs::create_dir_all(dir).map_err(|e| io_error("create_file: mkdir parents", e))?;
+    }
+    // Create exclusively so a race can't clobber an existing file.
+    use std::fs::OpenOptions;
+    OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&target)
+        .map_err(|e| io_error("create_file", e))?;
+    Ok(target_str)
+}
+
+/// Create directory `name` inside `parent`. `name` may be nested.
+/// Refuses if the leaf directory already exists. Returns the new absolute path.
+pub fn create_dir(app: &AppHandle, parent: &str, name: &str) -> AppResult<String> {
+    require_within_roots(app, parent)?;
+    validate_relative_name(name, true)?;
+
+    let target = Path::new(parent).join(name);
+    let target_str = target.to_string_lossy().to_string();
+    require_within_roots(app, &target_str)?;
+
+    if target.symlink_metadata().is_ok() {
+        return Err(AppError::Other(format!(
+            "already exists: {target_str}"
+        )));
+    }
+    fs::create_dir_all(&target).map_err(|e| io_error("create_dir", e))?;
+    Ok(target_str)
+}
+
+/// Move `from` into directory `to_dir`, preserving the basename.
+/// Returns the new absolute path.
+///
+/// Safety:
+///  - both `from` and the destination must sit within registered roots
+///  - refuses to move a project root
+///  - refuses to move a directory into itself or one of its own descendants
+///  - refuses a no-op (already inside `to_dir`)
+///  - refuses if the destination path already exists
+pub fn move_path(app: &AppHandle, from: &str, to_dir: &str) -> AppResult<String> {
+    require_within_roots(app, from)?;
+    require_within_roots(app, to_dir)?;
+
+    let from_path = Path::new(from);
+    let normalized_from = paths::normalize(from_path);
+
+    let cache = app.state::<Arc<ProjectsCache>>();
+    let roots = cache.project_roots();
+    if roots
+        .iter()
+        .any(|r| paths::normalize(Path::new(r)) == normalized_from)
+    {
+        return Err(AppError::PathNotAllowed(format!(
+            "refusing to move project root: {from}"
+        )));
+    }
+
+    let base = from_path
+        .file_name()
+        .ok_or_else(|| AppError::Other(format!("cannot move path without a name: {from}")))?;
+    let to_dir_path = Path::new(to_dir);
+    let normalized_to_dir = paths::normalize(to_dir_path);
+
+    // No-op: already directly inside the target dir.
+    if normalized_from.parent() == Some(normalized_to_dir.as_path()) {
+        return Err(AppError::Other(
+            "item is already in the destination folder".into(),
+        ));
+    }
+    // Circular: moving a directory into itself or a descendant.
+    if normalized_to_dir == normalized_from
+        || normalized_to_dir.starts_with(&normalized_from)
+    {
+        return Err(AppError::Other(
+            "cannot move a folder into itself or its own subfolder".into(),
+        ));
+    }
+
+    let dest = to_dir_path.join(base);
+    let dest_str = dest.to_string_lossy().to_string();
+    require_within_roots(app, &dest_str)?;
+
+    if dest.symlink_metadata().is_ok() {
+        return Err(AppError::Other(format!(
+            "destination already exists: {dest_str}"
+        )));
+    }
+
+    // The destination dir must actually be a directory.
+    match to_dir_path.symlink_metadata() {
+        Ok(m) if m.is_dir() => {}
+        Ok(_) => {
+            return Err(AppError::Other(format!(
+                "destination is not a folder: {to_dir}"
+            )))
+        }
+        Err(e) => return Err(io_error("move: stat dest dir", e)),
+    }
+
+    fs::rename(from_path, &dest).map_err(|e| io_error("move", e))?;
+    Ok(dest_str)
+}
+
 /// Atomic write: write to <path>.tmp, then rename over the target.
 pub fn write_file_text(app: &AppHandle, path: &str, content: &str) -> AppResult<()> {
     require_within_roots(app, path)?;
@@ -210,6 +492,8 @@ fn guess_mime(path: &str) -> Option<String> {
             "gif" => "image/gif",
             "webp" => "image/webp",
             "svg" => "image/svg+xml",
+            "ico" => "image/x-icon",
+            "bmp" => "image/bmp",
             "pdf" => "application/pdf",
             "md" | "markdown" => "text/markdown",
             "json" => "application/json",

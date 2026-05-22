@@ -41,14 +41,27 @@ State is split into **Zustand stores per feature** (`src/features/<feature>/<fea
 
 - `projects.store` — list + active id (hydrated from Rust on mount).
 - `tabs` store (`src/components/tabs/tabsStore.ts`) — `byProject: Record<projectKey, { tabs, activeTabId }>`. Use `WORKSPACE_NULL` as the bucket key when no project is active (Day-1 users can open terminal tabs before adding any project).
-- `explorer`, `git`, `editor`, `search`, `theme`, `settings` — each own their slice; never reach across stores inside a component, derive in `AppShell` or selectors.
+- `explorer`, `git`, `editor`, `search`, `theme`, `settings` (dialog open/close), `settings.data` (user preferences — see Persistence), `keybindings` (rebindable shortcuts) — each own their slice; never reach across stores inside a component, derive in `AppShell` or selectors.
 - Tabs are **keyed by project**: switching the active project swaps the entire visible tab bucket — terminals/CLIs from project A stay alive in memory but aren't shown while project B is active.
 
-### Workspace persistence
+### Persistence (`~/.metacodex/`)
 
-`AppShell.tsx` saves a `WorkspaceState` (open tabs + active tab + expanded explorer paths) to the Tauri store, debounced 350ms, per project. **Terminals and CLI tabs are intentionally NOT persisted** — see the comment in `src-tauri/src/commands/workspace.rs`: shells aren't auto-respawned on app start. Only `editor | markdown | image | pdf` round-trip through `SerializedTab`.
+All persistence lives in a `~/.metacodex/` dot-folder in the user's home (NOT `~/Library/Application Support`; `tauri-plugin-store` was removed). Rust writes plain, pretty-printed, hand-editable JSON directly via `src-tauri/src/config_paths.rs` (atomic tmp→rename; carries a `// SECURITY:` carve-out from `ensure_within_roots` since these files sit outside project roots). Config (user-editable) is split from state (app-managed):
 
-`hydratedWorkspaces: Set<string>` in `AppShell` tracks which project buckets have already loaded — without this guard, the save effect would clobber the persisted state with an empty bucket on the first render after a project switch.
+```
+~/.metacodex/
+├── settings.json        # user prefs (theme, language, fonts, terminal, debounces)
+├── keybindings.json     # shortcut overrides (only what differs from defaults)
+└── state/
+    ├── projects.json     # registry + lastActiveProjectId
+    └── workspace/{id}.json  # per-project: open tabs, active tab, expanded paths
+```
+
+`config_paths::ensure_dirs()` runs in `lib.rs` setup **before** `projects::hydrate`. The settings/keybindings commands pass an opaque `serde_json::Value` — the frontend owns the schema + validation, so adding a pref needs no Rust recompile.
+
+`AppShell.tsx` saves a `WorkspaceState` per project, debounced (the delay is the `workspaceSaveDebounceMs` setting, default 350). **Terminals and CLI tabs are intentionally NOT persisted** — see the comment in `src-tauri/src/commands/workspace.rs`: shells aren't auto-respawned on app start. Only `editor | markdown | image | pdf` round-trip through `SerializedTab`. `hydratedWorkspaces: Set<string>` in `AppShell` guards against clobbering persisted state with an empty bucket on the first render after a project switch.
+
+User preferences hydrate into `src/features/settings/settings.data.store.ts` (`AppSettings` + `DEFAULT_SETTINGS` + clamping `mergeSettings`); it persists debounced and is the single source of truth for tunables (editor/terminal fonts, scrollback, cursor, sticky headers, debounces). **Do NOT expose terminal `lineHeight` or the file-read size limits as settings** (breakage risk — see the xterm lineHeight rule below).
 
 ### PTY model
 
@@ -79,16 +92,16 @@ One `notify_debouncer_mini::Debouncer` per project root, lifecycle owned by `Wat
 
 - **Tokens drive everything.** Never hardcode colors in components. Tailwind `colors: { canvas, ink, hairline, ... }` map to CSS variables in `src/styles/tokens.css`. Light/dark switches via `data-theme` on `<html>`.
 - The xterm theme is built from the same CSS vars (`--term-*`) and re-applied on theme change.
-- Dark/light follows `prefers-color-scheme` by default; user can override via Settings (`Cmd+,`). Stored in `localStorage` (key `metacodex:theme`).
+- Dark/light follows `prefers-color-scheme` by default; user can override via Settings (`Cmd+,`). The choice persists to `~/.metacodex/settings.json` (the durable source of truth); `localStorage` (`metacodex:theme`) is kept only as a synchronous first-paint cache to avoid a theme flash on boot. `theme.store.ts` stays unaware of settings — `settings.data.store` subscribes to it one-way (no import cycle).
 
 ## Conventions to follow
 
 - **MVP safety rule: NO file or folder deletion / rename.** The spec explicitly excludes these mutation paths from MVP — don't add `rm`/`mv` commands or UI even if the file browser tempts you to. (Rename for *projects* is fine — that just edits the registry, not the disk.)
-- **Atomic writes** for files: write to `<path>.<ext>.metacodex.tmp`, then `rename`. See `fs_ops::write_file_text`.
+- **Atomic writes** for files: write to `<path>.<ext>.metacodex.tmp`, then `rename`. See `fs_ops::write_file_text` (project files, roots-checked) and `config_paths::write_json_atomic` (`~/.metacodex` config, app-derived paths).
 - **Path aliases**: `@/*` → `src/*` (Vite + tsconfig). Imports inside `src/` should use `@/...` not relative `../../`.
 - **IDs**: `nanoid` on the frontend (via `src/lib/idGen.ts` `newId(n)`); UUIDv4 on the Rust side for PTY session ids.
 - **Strict TS**: `noUnusedLocals` + `noUnusedParameters` are on. Prefix intentionally-unused parameters with `_`.
-- **Runtime keyboard handlers** are attached in `AppShell` via `window.__metacodex = { ... }` and consumed by `KeyboardShortcuts.tsx`. To add a new shortcut, attach a handler on `__metacodex` from `AppShell` and read it in `KeyboardShortcuts`.
+- **Keyboard shortcuts** are rebindable. Declare the command in `src/features/keybindings/commands.ts` (id + default binding + i18n key), then route its id to a side effect in `KeyboardShortcuts.tsx`'s `dispatchCommand` — which calls either a handler on `window.__metacodex` (attached by `AppShell`) or a store. `KeyboardShortcuts` resolves events through `useKeybindingsStore` (no hardcoded key checks); user overrides persist to `keybindings.json`. Editor-scoped shortcuts stay in CodeMirror's keymap (`EditorTab.tsx`), not the global registry.
 - **Tauri capabilities** live in `src-tauri/capabilities/default.json`. New plugin permissions must be added there or the IPC silently rejects.
 - **`pnpm-lock.yaml` is committed** — keep it in sync; don't introduce `npm install`/`yarn add`.
 
@@ -100,5 +113,8 @@ One `notify_debouncer_mini::Debouncer` per project root, lifecycle owned by `Wat
 | Change app shell layout | `src/app/AppShell.tsx` (grid template lives there) |
 | Add a new tab kind | `src/components/tabs/types.ts` (discriminated union) → `TabContent.tsx` (renderer) → `AppShell.handleOpenFile` (routing) |
 | Add a new CLI to the launcher | `src/features/terminal/cli-registry.ts::DEFAULT_CLI_REGISTRY` |
+| Add/change a user setting | `src/features/settings/settings.types.ts` (`AppSettings` + `DEFAULT_SETTINGS`) → wire its consumer → control in `SettingsDialog.tsx` + i18n keys (both locales) |
+| Add/rebind a keyboard shortcut | `src/features/keybindings/commands.ts` (registry) → dispatch in `KeyboardShortcuts.tsx` |
+| Where config + state persist | `~/.metacodex/` via `src-tauri/src/config_paths.rs` |
 | Tweak design tokens | `src/styles/tokens.css` (light + dark blocks) → `tailwind.config.js` if exposing a new token to Tailwind classes |
 | Tauri app config (window, identifier, bundle) | `src-tauri/tauri.conf.json` |

@@ -14,7 +14,10 @@ import type { Tab } from "@/components/tabs/types";
 import { newId } from "@/lib/idGen";
 import { ext } from "@/lib/path";
 import { cliLaunchString, type CliTool } from "@/features/terminal/cli-registry";
+import { basename } from "@/lib/path";
 import { useProjectsStore } from "@/features/projects/project.store";
+import { useSettingsDataStore } from "@/features/settings/settings.data.store";
+import { useKeybindingsStore } from "@/features/keybindings/keybindings.store";
 import { useExplorerStore } from "@/features/explorer/explorer.store";
 import {
   workspaceApi,
@@ -22,10 +25,16 @@ import {
 } from "@/features/projects/workspace.service";
 import { watcherApi } from "@/features/filesystem/watcher.service";
 import { useGitStore } from "@/features/git/git.store";
+import { useTerminalStore } from "@/features/terminal/terminal.store";
+import { ptyApi } from "@/features/terminal/terminal.service";
+import { utf8ToBase64 } from "@/lib/base64";
+import { useEditorReconcile } from "@/features/editor/useEditorReconcile";
 import { EV, listenTo, type FsChangedPayload } from "@/lib/events";
 import { dirname } from "@/lib/path";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { CMD, invoke } from "@/lib/ipc";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 
 type PendingClose = {
   ids: string[];
@@ -35,6 +44,12 @@ type PendingClose = {
   /** When mode === "single", the affected tab (for personalized copy). */
   singleTab?: Tab;
 };
+
+interface PendingDelete {
+  path: string;
+  name: string;
+  isDir: boolean;
+}
 
 function processSummary(tabs: Tab[]): { terminals: number; agents: number } {
   let terminals = 0;
@@ -52,6 +67,7 @@ const EMPTY_BUCKET = { tabs: [], activeTabId: null } as {
 };
 
 export function AppShell() {
+  const { t } = useTranslation();
   const [homeDirPath, setHomeDirPath] = useState<string | null>(null);
 
   // Projects store
@@ -62,6 +78,12 @@ export function AppShell() {
   const addProject = useProjectsStore((s) => s.add);
   const setActive = useProjectsStore((s) => s.setActive);
 
+  const settingsHydrated = useSettingsDataStore((s) => s.hydrated);
+  const hydrateSettings = useSettingsDataStore((s) => s.hydrate);
+
+  const keybindingsHydrated = useKeybindingsStore((s) => s.hydrated);
+  const hydrateKeybindings = useKeybindingsStore((s) => s.hydrate);
+
   const project = useMemo(
     () => projects.find((p) => p.id === activeProjectId) ?? null,
     [projects, activeProjectId],
@@ -70,6 +92,19 @@ export function AppShell() {
   useEffect(() => {
     if (!hydrated) hydrate();
   }, [hydrated, hydrate]);
+
+  // Hydrate user settings from ~/.metacodex/settings.json once at startup.
+  useEffect(() => {
+    if (!settingsHydrated) hydrateSettings();
+  }, [settingsHydrated, hydrateSettings]);
+
+  // Hydrate custom keybindings from ~/.metacodex/keybindings.json once at startup.
+  useEffect(() => {
+    if (!keybindingsHydrated) hydrateKeybindings();
+  }, [keybindingsHydrated, hydrateKeybindings]);
+
+  // Keep open editor buffers in sync with files agents edit from terminal tabs.
+  useEditorReconcile();
 
   useEffect(() => {
     (async () => {
@@ -91,6 +126,13 @@ export function AppShell() {
   const setActiveTab = useTabsStore((s) => s.setActiveTab);
 
   const [pendingClose, setPendingClose] = useState<PendingClose | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
+  const [skipDeleteInSession, setSkipDeleteInSession] = useState(false);
+  // Mirror skipDeleteInSession in a ref so the latest value is visible to the
+  // checkbox handler that lives inside the dialog (which closes the dialog
+  // before re-rendering the confirm callback in some flows).
+  const skipDeleteRef = useRef(false);
+  skipDeleteRef.current = skipDeleteInSession;
 
   const activeCwd = useMemo(
     () => project?.path ?? homeDirPath ?? "/",
@@ -203,6 +245,9 @@ export function AppShell() {
   useEffect(() => {
     if (!project) return;
     if (!hydratedWorkspaces.current.has(project.id)) return;
+    // Read the debounce imperatively so changing it doesn't re-arm this effect.
+    const saveDebounceMs =
+      useSettingsDataStore.getState().settings.performance.workspaceSaveDebounceMs;
     const handle = setTimeout(() => {
       const cur = useTabsStore.getState().byProject[project.id];
       const explorerBucket = useExplorerStore.getState().byProject[project.id];
@@ -225,7 +270,7 @@ export function AppShell() {
           expandedPaths,
         })
         .catch((err) => console.warn("[workspace] save failed", err));
-    }, 350);
+    }, saveDebounceMs);
     return () => clearTimeout(handle);
   }, [project, bucket.tabs, bucket.activeTabId]);
 
@@ -235,7 +280,7 @@ export function AppShell() {
       const selected = await openDialog({
         directory: true,
         multiple: false,
-        title: "Open folder",
+        title: t("appShell.openFolderTitle"),
       });
       if (typeof selected === "string" && selected.length > 0) {
         await addProject(selected);
@@ -243,7 +288,7 @@ export function AppShell() {
     } catch (err) {
       console.error("openDialog failed", err);
     }
-  }, [addProject]);
+  }, [addProject, t]);
 
   const handleNewTerminal = useCallback(() => {
     openTab(projectKey, {
@@ -254,6 +299,40 @@ export function AppShell() {
       cwd: activeCwd,
     });
   }, [openTab, projectKey, project, activeCwd]);
+
+  // Send text (an editor selection) to the terminal: the last-focused terminal
+  // in this project, falling back to any running one, else open a new terminal
+  // pre-filled with the text (no trailing Enter — the user reviews and submits).
+  const sendToTerminal = useCallback(
+    (text: string) => {
+      const payload = text.replace(/\s+$/, "");
+      if (!payload) return;
+      const store = useTerminalStore.getState();
+      let sid = store.getLastFocused(projectKey);
+      let session = sid ? store.getById(sid) : undefined;
+      if (!session || session.status !== "running") {
+        const candidate = Object.values(store.sessions).find(
+          (s) => s.status === "running" && (s.projectId ?? WORKSPACE_NULL) === projectKey,
+        );
+        sid = candidate?.id;
+        session = candidate;
+      }
+      if (sid && session && session.status === "running") {
+        void ptyApi.write(sid, utf8ToBase64(payload)).catch(() => undefined);
+        if (session.tabId) setActiveTab(projectKey, session.tabId); // reveal it
+      } else {
+        openTab(projectKey, {
+          id: `t-${newId(10)}`,
+          kind: "terminal",
+          title: project ? project.name : "terminal",
+          projectId: project?.id ?? null,
+          cwd: activeCwd,
+          prefillCommand: payload,
+        });
+      }
+    },
+    [openTab, setActiveTab, projectKey, project, activeCwd],
+  );
 
   const handleLaunchCli = useCallback(
     (cli: CliTool) => {
@@ -348,6 +427,96 @@ export function AppShell() {
     [bucket.tabs],
   );
 
+  const performDelete = useCallback(
+    async (target: PendingDelete) => {
+      if (!project) return;
+      try {
+        await useExplorerStore.getState().deleteNode(project.id, target.path);
+        useTabsStore.getState().closeForRemovedPath(project.id, target.path);
+      } catch (err) {
+        console.warn("[explorer] delete failed", err);
+        window.alert(
+          t("appShell.deleteFailed", {
+            error: err instanceof Error ? err.message : String(err),
+          }),
+        );
+      }
+    },
+    [project, t],
+  );
+
+  const handleRequestDelete = useCallback(
+    (path: string, name: string, isDir: boolean) => {
+      if (skipDeleteRef.current) {
+        void performDelete({ path, name, isDir });
+        return;
+      }
+      setPendingDelete({ path, name, isDir });
+    },
+    [performDelete],
+  );
+
+  const handleRename = useCallback(
+    async (path: string, newName: string, _isDir: boolean): Promise<string> => {
+      if (!project) throw new Error("no active project");
+      const newPath = await useExplorerStore
+        .getState()
+        .renameNode(project.id, path, newName);
+      useTabsStore.getState().remapForRename(project.id, path, newPath);
+      return newPath;
+    },
+    [project],
+  );
+
+  const handleMove = useCallback(
+    async (from: string, toDir: string): Promise<void> => {
+      if (!project) return;
+      try {
+        const newPath = await useExplorerStore
+          .getState()
+          .moveNode(project.id, from, toDir);
+        useTabsStore.getState().remapForRename(project.id, from, newPath);
+      } catch (err) {
+        console.warn("[explorer] move failed", err);
+        window.alert(
+          t("appShell.moveFailed", {
+            error: err instanceof Error ? err.message : String(err),
+          }),
+        );
+      }
+    },
+    [project, t],
+  );
+
+  const handleOpenInTerminal = useCallback(
+    (path: string, name: string) => {
+      openTab(projectKey, {
+        id: `t-${newId(10)}`,
+        kind: "terminal",
+        title: name || basename(path),
+        projectId: project?.id ?? null,
+        cwd: path,
+      });
+    },
+    [openTab, projectKey, project],
+  );
+
+  const handleLaunchCliInPath = useCallback(
+    (cli: CliTool, path: string, name: string) => {
+      const launchCommand = cliLaunchString(cli);
+      openTab(projectKey, {
+        id: `c-${newId(10)}`,
+        kind: "cli",
+        title: `${cli.label} · ${name || basename(path)}`,
+        projectId: project?.id ?? null,
+        cwd: path,
+        cliId: cli.id,
+        launchCommand,
+      });
+    },
+    [openTab, projectKey, project],
+  );
+
   const handleOpenFile = useCallback(
     (path: string, name: string) => {
       if (!project) return;
@@ -394,11 +563,20 @@ export function AppShell() {
       openFolder: handleOpenFolder,
       closeActiveTab,
       switchProject,
+      openFile: handleOpenFile,
+      sendToTerminal,
     };
     return () => {
       delete (window as any).__metacodex;
     };
-  }, [handleNewTerminal, handleOpenFolder, closeActiveTab, switchProject]);
+  }, [
+    handleNewTerminal,
+    handleOpenFolder,
+    closeActiveTab,
+    switchProject,
+    handleOpenFile,
+    sendToTerminal,
+  ]);
 
   return (
     <div className="grid h-screen w-screen grid-rows-[36px_minmax(0,1fr)] grid-cols-[56px_248px_minmax(0,1fr)] bg-canvas text-ink">
@@ -413,9 +591,15 @@ export function AppShell() {
         projectPath={project?.path}
         onOpenFolder={handleOpenFolder}
         onOpenFile={handleOpenFile}
+        onRequestDelete={handleRequestDelete}
+        onRename={handleRename}
+        onOpenInTerminal={handleOpenInTerminal}
+        onLaunchCliInPath={handleLaunchCliInPath}
+        onMove={handleMove}
       />
 
       <WorkArea
+        project={project}
         tabs={bucket.tabs}
         activeTabId={bucket.activeTabId}
         onSelectTab={handleSelectTab}
@@ -439,6 +623,19 @@ export function AppShell() {
           setPendingClose(null);
         }}
       />
+
+      <DeleteNodeConfirm
+        state={pendingDelete}
+        skipChecked={skipDeleteInSession}
+        onSkipChange={setSkipDeleteInSession}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => {
+          if (!pendingDelete) return;
+          const target = pendingDelete;
+          setPendingDelete(null);
+          void performDelete(target);
+        }}
+      />
     </div>
   );
 }
@@ -450,8 +647,9 @@ interface CloseTabsConfirmProps {
 }
 
 function CloseTabsConfirm({ state, onConfirm, onCancel }: CloseTabsConfirmProps) {
+  const { t } = useTranslation();
   const open = state !== null;
-  const copy = state ? confirmCopyFor(state) : null;
+  const copy = state ? confirmCopyFor(state, t) : null;
 
   return (
     <ConfirmDialog
@@ -463,63 +661,113 @@ function CloseTabsConfirm({ state, onConfirm, onCancel }: CloseTabsConfirmProps)
       title={copy?.title ?? ""}
       description={copy?.description}
       details={copy?.details}
-      confirmLabel={copy?.confirm ?? "Encerrar"}
-      cancelLabel="Cancelar"
+      confirmLabel={copy?.confirm ?? t("appShell.closeFallbackConfirm")}
+      cancelLabel={t("common.cancel")}
       onConfirm={onConfirm}
     />
   );
 }
 
-function confirmCopyFor(s: PendingClose): {
+interface DeleteNodeConfirmProps {
+  state: PendingDelete | null;
+  skipChecked: boolean;
+  onSkipChange: (next: boolean) => void;
+  onCancel: () => void;
+  onConfirm: () => void;
+}
+
+function DeleteNodeConfirm({
+  state,
+  skipChecked,
+  onSkipChange,
+  onCancel,
+  onConfirm,
+}: DeleteNodeConfirmProps) {
+  const { t } = useTranslation();
+  const open = state !== null;
+  const isDir = state?.isDir ?? false;
+  const title = state
+    ? isDir
+      ? t("appShell.deleteFolderTitle", { name: state.name })
+      : t("appShell.deleteFileTitle", { name: state.name })
+    : "";
+  const description = state
+    ? isDir
+      ? t("appShell.deleteFolderDescription")
+      : t("appShell.deleteFileDescription")
+    : "";
+  return (
+    <ConfirmDialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) onCancel();
+      }}
+      tone="destructive"
+      title={title}
+      description={description}
+      details={
+        state ? (
+          <span className="font-mono text-[11px] text-muted-soft">
+            {state.path}
+          </span>
+        ) : null
+      }
+      confirmLabel={isDir ? t("appShell.deleteConfirmFolder") : t("appShell.deleteConfirmFile")}
+      cancelLabel={t("common.cancel")}
+      onConfirm={onConfirm}
+      skipOption={{
+        label: t("appShell.deleteSkip"),
+        checked: skipChecked,
+        onChange: onSkipChange,
+      }}
+    />
+  );
+}
+
+function confirmCopyFor(
+  s: PendingClose,
+  t: TFunction,
+): {
   title: string;
   description: string;
   details?: React.ReactNode;
   confirm: string;
 } {
   if (s.mode === "single" && s.singleTab) {
-    const t = s.singleTab;
-    if (t.kind === "cli") {
+    const tab = s.singleTab;
+    const details =
+      "cwd" in tab && tab.cwd ? (
+        <span className="font-mono text-[11px] text-muted-soft">{tab.cwd}</span>
+      ) : null;
+    if (tab.kind === "cli") {
       return {
-        title: `Encerrar ${t.title}?`,
-        description:
-          "A sessão do agente está ativa. Qualquer resposta em andamento será descartada.",
-        details:
-          "cwd" in t && t.cwd ? (
-            <span className="font-mono text-[11px] text-muted-soft">
-              {t.cwd}
-            </span>
-          ) : null,
-        confirm: "Encerrar agente",
+        title: t("appShell.closeAgentTitle", { title: tab.title }),
+        description: t("appShell.closeAgentDescription"),
+        details,
+        confirm: t("appShell.closeAgentConfirm"),
       };
     }
     return {
-      title: "Encerrar este terminal?",
-      description:
-        "A sessão está ativa. O processo em execução será interrompido e o histórico desta aba será perdido.",
-      details:
-        "cwd" in t && t.cwd ? (
-          <span className="font-mono text-[11px] text-muted-soft">
-            {t.cwd}
-          </span>
-        ) : null,
-      confirm: "Encerrar terminal",
+      title: t("appShell.closeTerminalTitle"),
+      description: t("appShell.closeTerminalDescription"),
+      details,
+      confirm: t("appShell.closeTerminalConfirm"),
     };
   }
 
   const parts: string[] = [];
-  if (s.terminals === 1) parts.push("1 terminal");
-  else if (s.terminals > 1) parts.push(`${s.terminals} terminais`);
-  if (s.agents === 1) parts.push("1 agente");
-  else if (s.agents > 1) parts.push(`${s.agents} agentes`);
-  const inventory = parts.join(" e ");
-  const verb =
-    s.terminals + s.agents === 1 ? "será interrompido" : "serão interrompidos";
+  if (s.terminals > 0) parts.push(t("appShell.terminalCount", { count: s.terminals }));
+  if (s.agents > 0) parts.push(t("appShell.agentCount", { count: s.agents }));
+  const inventory = parts.join(t("appShell.and"));
 
   const title =
-    s.mode === "all" ? "Fechar todas as abas?" : "Fechar as outras abas?";
+    s.mode === "all" ? t("appShell.closeAllTitle") : t("appShell.closeOthersTitle");
   return {
     title,
-    description: `${inventory} ${verb}. Processos em execução serão encerrados e respostas em andamento, descartadas.`,
-    confirm: "Fechar todas",
+    description: t("appShell.closeManyDescription", {
+      inventory,
+      count: s.terminals + s.agents,
+    }),
+    confirm: t("appShell.closeManyConfirm"),
   };
 }

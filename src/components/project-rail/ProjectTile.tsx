@@ -1,5 +1,6 @@
 import { forwardRef, useMemo, useState, type ButtonHTMLAttributes } from "react";
 import * as Lucide from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { Tooltip } from "@/components/ui/Tooltip";
 import { cn } from "@/lib/cn";
@@ -9,11 +10,7 @@ import {
   tileIconColor,
   tileMarkerColor,
 } from "@/features/projects/color";
-import {
-  faviconPath,
-  isFaviconIcon,
-} from "@/features/projects/favicon.service";
-import { useFaviconDataUri } from "@/features/projects/useFaviconDataUri";
+import { isCustomIcon } from "@/features/projects/customIcon.service";
 import { useThemeStore } from "@/features/theme/theme.store";
 import type { Project } from "@/features/projects/project.types";
 
@@ -46,18 +43,17 @@ export const ProjectTile = forwardRef<HTMLButtonElement, ProjectTileProps>(funct
   },
   ref,
 ) {
+  const { t } = useTranslation();
   const theme = useThemeStore((s) => s.effective);
   const [hover, setHover] = useState(false);
 
-  const usesFavicon = isFaviconIcon(project.icon);
-  const favPath = useMemo(() => faviconPath(project.icon), [project.icon]);
-  const faviconUri = useFaviconDataUri(usesFavicon ? favPath : null);
+  const usesCustom = isCustomIcon(project.icon);
   const FallbackIcon = useMemo(
-    () => (usesFavicon ? Lucide.Folder : getLucideIcon(project.icon)),
-    [project.icon, usesFavicon],
+    () => (usesCustom ? Lucide.Folder : getLucideIcon(project.icon)),
+    [project.icon, usesCustom],
   );
 
-  const bg = usesFavicon
+  const bg = usesCustom
     ? tileBackgroundFavicon(project.color, { theme, active, hover })
     : tileBackground(project.color, { theme, active, hover });
   const iconColor = tileIconColor(project.color, theme);
@@ -85,7 +81,7 @@ export const ProjectTile = forwardRef<HTMLButtonElement, ProjectTileProps>(funct
           setHover(false);
           onMouseLeave?.(e);
         }}
-        aria-label={`Switch to ${project.name}`}
+        aria-label={t("projectRail.switchTo", { name: project.name })}
         aria-current={active ? "true" : undefined}
         className={cn(
           "relative inline-flex h-[36px] w-[36px] items-center justify-center rounded-md border transition-[background-color,border-color,opacity] duration-150 ease-out",
@@ -101,12 +97,12 @@ export const ProjectTile = forwardRef<HTMLButtonElement, ProjectTileProps>(funct
         }}
         {...rest}
       >
-        {usesFavicon && faviconUri ? (
+        {usesCustom ? (
           <img
-            src={faviconUri}
+            src={project.icon}
             alt=""
             draggable={false}
-            className="h-[20px] w-[20px] object-contain"
+            className="h-[18px] w-[18px] object-contain"
           />
         ) : (
           <FallbackIcon

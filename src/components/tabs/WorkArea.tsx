@@ -3,7 +3,9 @@ import { TabBar } from "./TabBar";
 import { TabContent } from "./TabContent";
 import { NewTabContextMenu, NewTabMenu } from "./NewTabMenu";
 import { WelcomeScreen } from "@/app/WelcomeScreen";
+import { ProjectEmptyState } from "@/app/ProjectEmptyState";
 import type { CliTool } from "@/features/terminal/cli-registry";
+import type { Project } from "@/features/projects/project.types";
 
 interface WorkAreaProps {
   tabs: Tab[];
@@ -18,6 +20,7 @@ interface WorkAreaProps {
   onNewTerminal: () => void;
   onLaunchCli: (cli: CliTool) => void;
   onOpenFolder: () => void;
+  project: Project | null;
 }
 
 export function WorkArea({
@@ -33,6 +36,7 @@ export function WorkArea({
   onNewTerminal,
   onLaunchCli,
   onOpenFolder,
+  project,
 }: WorkAreaProps) {
   if (tabs.length === 0) {
     return (
@@ -46,7 +50,15 @@ export function WorkArea({
           </div>
         </NewTabContextMenu>
         <div className="flex-1 overflow-hidden">
-          <WelcomeScreen onOpenFolder={onOpenFolder} onOpenTerminal={onNewTerminal} />
+          {project ? (
+            <ProjectEmptyState
+              project={project}
+              onNewTerminal={onNewTerminal}
+              onLaunchCli={onLaunchCli}
+            />
+          ) : (
+            <WelcomeScreen onOpenFolder={onOpenFolder} onOpenTerminal={onNewTerminal} />
+          )}
         </div>
       </section>
     );

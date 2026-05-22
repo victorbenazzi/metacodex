@@ -75,7 +75,7 @@ export const DEFAULT_CLI_REGISTRY: CliTool[] = [
     detectCommand: "command -v pi",
     installCommand: "",
     description:
-      "Inflection Pi terminal client. Official install command not yet confirmed — configure in CLI registry.",
+      "Inflection Pi terminal client. Official install command not yet confirmed, configure in CLI registry.",
     needsConfig: true,
   },
 ];

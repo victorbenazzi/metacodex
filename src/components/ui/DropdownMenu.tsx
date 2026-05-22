@@ -25,7 +25,7 @@ export function DropdownContent({
         className={cn(
           "z-50 min-w-[220px] rounded-md border border-hairline bg-surface-card p-[5px]",
           "text-[13px] text-ink",
-          "data-[state=open]:animate-slide-up data-[state=closed]:animate-fade-in",
+          "data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out",
           className,
         )}
       >

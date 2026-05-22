@@ -1,5 +1,6 @@
 import * as RD from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/cn";
@@ -24,12 +25,13 @@ export function DialogContent({
   width = 380,
   onCloseAutoFocus,
 }: DialogContentProps) {
+  const { t } = useTranslation();
   return (
     <RD.Portal>
       <RD.Overlay
         className={cn(
-          "fixed inset-0 z-[100] bg-[rgba(38,37,30,0.32)] backdrop-blur-[2px]",
-          "data-[state=open]:animate-fade-in",
+          "fixed inset-0 z-[100] bg-[rgba(38,37,30,0.32)]",
+          "data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out",
         )}
       />
       <RD.Content
@@ -38,7 +40,7 @@ export function DialogContent({
         className={cn(
           "fixed left-1/2 top-1/2 z-[101] -translate-x-1/2 -translate-y-1/2",
           "rounded-md border border-hairline bg-surface-card",
-          "data-[state=open]:animate-slide-up",
+          "data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out",
         )}
       >
         {title || description ? (
@@ -67,7 +69,7 @@ export function DialogContent({
         <RD.Close asChild>
           <button
             type="button"
-            aria-label="Close dialog"
+            aria-label={t("common.closeDialog")}
             className="absolute right-[10px] top-[10px] inline-flex h-[22px] w-[22px] items-center justify-center rounded-xs text-muted hover:bg-surface-strong/55 hover:text-ink"
           >
             <Icon icon={X} size={12} />

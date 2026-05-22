@@ -1,80 +1,73 @@
 import { useEffect } from "react";
-import { isMac } from "@/lib/platform";
+
+import { useKeybindingsStore } from "@/features/keybindings/keybindings.store";
+import type { ResolvedCommand } from "@/features/keybindings/types";
 import { useSettingsStore } from "@/features/settings/settings.store";
 import { useSearchUiStore } from "@/features/search/search.store";
+import { useCommandPaletteStore } from "@/features/command-palette/command-palette.store";
+
+interface MetacodexApi {
+  newTerminal?: () => void;
+  openFolder?: () => void;
+  closeActiveTab?: () => void;
+  switchProject?: (n: number) => void;
+}
 
 /**
- * Global keyboard shortcuts. Reads runtime handlers off `window.__metacodex` set
- * by AppShell. Cmd+T (new terminal), Cmd+O (open folder), Cmd+W (close active),
- * Cmd+1..9 (switch project), Cmd+S (save active editor — handled inline by the
- * editor itself, but we let it bubble here as a no-op so the default browser
- * action doesn't fire).
+ * Route a resolved command to its side effect. Implementations stay on
+ * `window.__metacodex` (set by AppShell) or the relevant feature stores — this
+ * function only dispatches, keeping the keybindings registry side-effect-free.
+ */
+function dispatchCommand(cmd: ResolvedCommand) {
+  const api = (window as any).__metacodex as MetacodexApi | undefined;
+  switch (cmd.id) {
+    case "terminal.new":
+      api?.newTerminal?.();
+      break;
+    case "folder.open":
+      api?.openFolder?.();
+      break;
+    case "tab.close":
+      api?.closeActiveTab?.();
+      break;
+    case "project.switch":
+      if (cmd.arg) api?.switchProject?.(cmd.arg);
+      break;
+    case "settings.open":
+      useSettingsStore.getState().setOpen(true);
+      break;
+    case "search.inProject":
+      useSearchUiStore.getState().setOpen(true);
+      break;
+    case "palette.commands":
+      useCommandPaletteStore.getState().openCommands();
+      break;
+    case "palette.files":
+      useCommandPaletteStore.getState().openFiles();
+      break;
+    case "file.save":
+      // passive — never reached (returned before dispatch), here for exhaustiveness
+      break;
+  }
+}
+
+/**
+ * Global keyboard shortcuts, resolved through the user-customizable keybindings
+ * store. Cmd+S is `passive`: we never preventDefault it, so CodeMirror's own
+ * Mod-s binding wins when an editor is focused (and nothing fires otherwise).
  */
 export function KeyboardShortcuts() {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      const mod = isMac ? e.metaKey : e.ctrlKey;
-      if (!mod) return;
-
-      const api = (window as any).__metacodex as
-        | {
-            newTerminal?: () => void;
-            openFolder?: () => void;
-            closeActiveTab?: () => void;
-            switchProject?: (n: number) => void;
-          }
-        | undefined;
-      if (!api) return;
-
-      const k = e.key;
-
-      // Cmd+T → new terminal
-      if (!e.repeat && (k === "t" || k === "T")) {
-        e.preventDefault();
-        api.newTerminal?.();
-        return;
-      }
-
-      // Cmd+O → open folder
-      if (!e.repeat && (k === "o" || k === "O")) {
-        e.preventDefault();
-        api.openFolder?.();
-        return;
-      }
-
-      // Cmd+W → close active tab
-      if (!e.repeat && (k === "w" || k === "W")) {
-        e.preventDefault();
-        api.closeActiveTab?.();
-        return;
-      }
-
-      // Cmd+1..9 → switch to Nth project
-      if (!e.repeat && /^[1-9]$/.test(k)) {
-        e.preventDefault();
-        api.switchProject?.(parseInt(k, 10));
-        return;
-      }
-
-      // Cmd+, → open Settings (macOS convention)
-      if (!e.repeat && k === ",") {
-        e.preventDefault();
-        useSettingsStore.getState().setOpen(true);
-        return;
-      }
-
-      // Cmd+Shift+F → search across files
-      if (!e.repeat && e.shiftKey && (k === "f" || k === "F")) {
-        e.preventDefault();
-        useSearchUiStore.getState().setOpen(true);
-        return;
-      }
-
-      // Cmd+S → swallow if not handled by CodeMirror (prevents browser Save Page)
-      if (!e.repeat && (k === "s" || k === "S")) {
-        // Don't preventDefault — CodeMirror has its own Mod-s binding when
-        // focused. If nothing handled it (no editor focused), this is a no-op.
-      }
+      if (e.repeat) return;
+      const kb = useKeybindingsStore.getState();
+      // While a Settings chip is capturing a new combo, don't dispatch globally.
+      if (kb.captureActive) return;
+      const cmd = kb.resolve(e);
+      if (!cmd) return;
+      if (cmd.passive) return;
+      e.preventDefault();
+      dispatchCommand(cmd);
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);

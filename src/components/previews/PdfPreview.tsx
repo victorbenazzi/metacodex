@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { fsApi } from "@/features/filesystem/filesystem.service";
 import { base64ToUint8Array } from "@/lib/base64";
@@ -23,6 +24,7 @@ interface PdfPreviewProps {
 }
 
 export function PdfPreview({ path }: PdfPreviewProps) {
+  const { t } = useTranslation();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [page, setPage] = useState(1);
   const [pageCount, setPageCount] = useState(0);
@@ -89,14 +91,14 @@ export function PdfPreview({ path }: PdfPreviewProps) {
         data-tauri-drag-region
         className="flex h-[34px] shrink-0 items-center justify-between border-b border-hairline-soft px-[14px]"
       >
-        <span className="editorial-caps truncate">pdf · {basename(path)}</span>
+        <span className="editorial-caps truncate">{t("editor.pdfLabel", { name: basename(path) })}</span>
         <div className="flex items-center gap-[6px]">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page <= 1}
-            aria-label="Previous page"
+            aria-label={t("editor.previousPage")}
           >
             <Icon icon={ChevronLeft} size={13} />
           </Button>
@@ -108,7 +110,7 @@ export function PdfPreview({ path }: PdfPreviewProps) {
             size="icon"
             onClick={() => setPage((p) => Math.min(pageCount || p, p + 1))}
             disabled={page >= pageCount}
-            aria-label="Next page"
+            aria-label={t("editor.nextPage")}
           >
             <Icon icon={ChevronRight} size={13} />
           </Button>

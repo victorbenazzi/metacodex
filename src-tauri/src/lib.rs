@@ -1,4 +1,5 @@
 pub mod commands;
+pub mod config_paths;
 pub mod error;
 pub mod events;
 pub mod fs_ops;
@@ -19,7 +20,6 @@ use watcher::WatcherManager;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_os::init())
@@ -29,7 +29,11 @@ pub fn run() {
             app.manage(pty_mgr);
             app.manage(Arc::new(ProjectsCache::default()));
             app.manage(Arc::new(WatcherManager::new(app.handle().clone())));
-            // Hydrate the in-memory project cache from the persisted store.
+            // Ensure the ~/.metacodex tree exists before anything reads from it.
+            if let Err(e) = config_paths::ensure_dirs() {
+                eprintln!("[metacodex] config_paths::ensure_dirs failed: {e}");
+            }
+            // Hydrate the in-memory project cache from the persisted state.
             if let Err(e) = projects::hydrate(app.handle()) {
                 eprintln!("[metacodex] projects::hydrate failed: {e}");
             }
@@ -50,19 +54,30 @@ pub fn run() {
             commands::projects::reorder_projects,
             commands::projects::set_active_project,
             commands::projects::get_active_project_id,
-            commands::projects::detect_project_favicons,
             commands::projects::reveal_in_finder,
             commands::filesystem::read_dir,
             commands::filesystem::stat,
             commands::filesystem::read_file_text,
             commands::filesystem::read_file_bytes,
+            commands::filesystem::read_icon_image,
             commands::filesystem::write_file_text,
+            commands::filesystem::delete_path,
+            commands::filesystem::rename_path,
+            commands::filesystem::create_file,
+            commands::filesystem::create_dir,
+            commands::filesystem::move_path,
             commands::workspace::save_workspace_state,
             commands::workspace::load_workspace_state,
+            commands::settings::read_settings,
+            commands::settings::write_settings,
+            commands::settings::read_keybindings,
+            commands::settings::write_keybindings,
             commands::watcher::watcher_watch,
             commands::watcher::watcher_unwatch,
             commands::search::search_in_project,
+            commands::search::list_files,
             commands::git::git_status,
+            commands::git::git_file_head_content,
         ])
         .run(tauri::generate_context!())
         .expect("metacodex failed to start");

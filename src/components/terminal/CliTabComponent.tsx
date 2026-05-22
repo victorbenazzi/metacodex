@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation, Trans } from "react-i18next";
 
 import { TerminalTab } from "./TerminalTab";
 import { CliMissingPanel } from "./CliMissingPanel";
@@ -26,6 +27,7 @@ export function CliTabComponent({
   launchCommand,
   label,
 }: CliTabComponentProps) {
+  const { t } = useTranslation();
   const [status, setStatus] = useState<Status>("detecting");
   const openTab = useTabsStore((s) => s.openTab);
   const cli: CliTool | undefined = cliById(cliId);
@@ -74,7 +76,7 @@ export function CliTabComponent({
       return (
         <div className="flex h-full items-center justify-center p-[32px]">
           <p className="text-[13px] text-danger">
-            Unknown CLI id: <code className="font-mono">{cliId}</code>
+            <Trans i18nKey="terminal.unknownCli" values={{ id: cliId }} components={[<code className="font-mono" />]} />
           </p>
         </div>
       );
@@ -91,7 +93,7 @@ export function CliTabComponent({
   if (status === "detecting") {
     return (
       <div className="flex h-full items-center justify-center bg-canvas">
-        <p className="font-mono text-[11px] text-muted-soft">detecting {cli.label}…</p>
+        <p className="font-mono text-[11px] text-muted-soft">{t("terminal.detecting", { label: cli.label })}</p>
       </div>
     );
   }

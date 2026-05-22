@@ -1,16 +1,17 @@
 import { FolderSearch } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/cn";
 import { FileExplorer } from "./FileExplorer";
+import type { TreeNodeActions } from "./TreeNode";
 
-interface ExplorerPanelProps {
+interface ExplorerPanelProps extends TreeNodeActions {
   hasProject: boolean;
   projectId?: string;
   projectName?: string;
   projectPath?: string;
   onOpenFolder: () => void;
-  onOpenFile: (path: string, name: string) => void;
 }
 
 export function ExplorerPanel({
@@ -20,11 +21,17 @@ export function ExplorerPanel({
   projectPath,
   onOpenFolder,
   onOpenFile,
+  onRequestDelete,
+  onRename,
+  onOpenInTerminal,
+  onLaunchCliInPath,
+  onMove,
 }: ExplorerPanelProps) {
+  const { t } = useTranslation();
   return (
     <nav
       className="flex h-full w-full flex-col overflow-hidden border-r border-hairline bg-canvas"
-      aria-label="File explorer"
+      aria-label={t("explorer.ariaLabel")}
     >
       {hasProject && projectId && projectPath ? (
         <FileExplorer
@@ -32,11 +39,16 @@ export function ExplorerPanel({
           rootPath={projectPath}
           rootName={projectName ?? ""}
           onOpenFile={onOpenFile}
+          onRequestDelete={onRequestDelete}
+          onRename={onRename}
+          onOpenInTerminal={onOpenInTerminal}
+          onLaunchCliInPath={onLaunchCliInPath}
+          onMove={onMove}
         />
       ) : (
         <>
           <header className="flex h-[30px] shrink-0 items-center justify-between border-b border-hairline-soft px-[14px]">
-            <span className="editorial-caps">Explorer</span>
+            <span className="editorial-caps">{t("explorer.title")}</span>
           </header>
           <ExplorerEmpty onOpenFolder={onOpenFolder} />
         </>
@@ -46,16 +58,16 @@ export function ExplorerPanel({
 }
 
 function ExplorerEmpty({ onOpenFolder }: { onOpenFolder: () => void }) {
+  const { t } = useTranslation();
   return (
     <div className="flex flex-1 flex-col items-start gap-[12px] px-[16px] pt-[20px]">
       <div className="flex h-[28px] w-[28px] items-center justify-center rounded-sm border border-hairline text-muted">
         <Icon icon={FolderSearch} size={14} />
       </div>
       <div className="space-y-[4px]">
-        <p className="text-[13px] font-medium text-ink">No project open</p>
+        <p className="text-[13px] font-medium text-ink">{t("explorer.noProject")}</p>
         <p className="text-[12px] leading-[1.5] text-muted">
-          Open a local folder to browse files. Your folders stay on disk &mdash; metacodex only stores
-          workspace metadata.
+          {t("explorer.noProjectBody")}
         </p>
       </div>
       <button
@@ -66,7 +78,7 @@ function ExplorerEmpty({ onOpenFolder }: { onOpenFolder: () => void }) {
           "hover:bg-surface-strong/40 transition-colors",
         )}
       >
-        Open Folder
+        {t("explorer.openFolder")}
       </button>
     </div>
   );

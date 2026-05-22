@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { fsApi } from "@/features/filesystem/filesystem.service";
 import { basename } from "@/lib/path";
 
@@ -7,6 +8,7 @@ interface ImagePreviewProps {
 }
 
 export function ImagePreview({ path }: ImagePreviewProps) {
+  const { t } = useTranslation();
   const [dataUrl, setDataUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [size, setSize] = useState<number>(0);
@@ -37,7 +39,7 @@ export function ImagePreview({ path }: ImagePreviewProps) {
         data-tauri-drag-region
         className="flex h-[34px] shrink-0 items-center border-b border-hairline-soft px-[14px]"
       >
-        <span className="editorial-caps">image</span>
+        <span className="editorial-caps">{t("editor.image")}</span>
       </header>
       <div className="flex flex-1 items-center justify-center overflow-auto p-[24px]">
         {error ? (
@@ -55,7 +57,7 @@ export function ImagePreview({ path }: ImagePreviewProps) {
             </p>
           </div>
         ) : (
-          <p className="font-mono text-[11px] text-muted-soft">loading…</p>
+          <p className="font-mono text-[11px] text-muted-soft">{t("common.loading")}</p>
         )}
       </div>
     </div>

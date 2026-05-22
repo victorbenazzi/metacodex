@@ -1,5 +1,6 @@
 import { useState, type DragEvent } from "react";
 import { FolderPlus, Settings, Trash2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { Icon } from "@/components/ui/Icon";
 import { Tooltip } from "@/components/ui/Tooltip";
@@ -28,6 +29,7 @@ interface DropTarget {
 }
 
 export function MiniProjectSidebar({ onOpenFolder }: MiniProjectSidebarProps) {
+  const { t } = useTranslation();
   const projects = useProjectsStore((s) => s.projects);
   const activeProjectId = useProjectsStore((s) => s.activeProjectId);
   const setActive = useProjectsStore((s) => s.setActive);
@@ -115,7 +117,7 @@ export function MiniProjectSidebar({ onOpenFolder }: MiniProjectSidebarProps) {
     <>
       <aside
         className="relative flex h-full w-full flex-col items-center overflow-hidden border-r border-hairline bg-canvas-soft"
-        aria-label="Project rail"
+        aria-label={t("projectRail.ariaLabel")}
       >
         <div
           className="flex flex-1 flex-col items-center gap-[8px] overflow-y-auto overflow-x-hidden px-[8px] py-[14px]"
@@ -166,7 +168,7 @@ export function MiniProjectSidebar({ onOpenFolder }: MiniProjectSidebarProps) {
         </div>
 
         <div className="flex w-full shrink-0 flex-col items-center gap-[6px] border-t border-hairline-soft py-[10px]">
-          <Tooltip content="Open folder" shortcut={<Kbd keys={["Mod", "O"]} />} side="right">
+          <Tooltip content={t("projectRail.openFolder")} shortcut={<Kbd keys={["Mod", "O"]} />} side="right">
             <button
               type="button"
               onClick={onOpenFolder}
@@ -175,13 +177,13 @@ export function MiniProjectSidebar({ onOpenFolder }: MiniProjectSidebarProps) {
                 "text-muted hover:bg-surface-strong/55 hover:text-ink transition-colors",
                 "focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[2px]",
               )}
-              aria-label="Open folder"
+              aria-label={t("projectRail.openFolder")}
             >
               <Icon icon={FolderPlus} size={15} />
             </button>
           </Tooltip>
 
-          <Tooltip content="Settings" shortcut={<Kbd keys={["Mod", ","]} />} side="right">
+          <Tooltip content={t("projectRail.settings")} shortcut={<Kbd keys={["Mod", ","]} />} side="right">
             <button
               type="button"
               onClick={() => setSettingsOpen(true)}
@@ -190,7 +192,7 @@ export function MiniProjectSidebar({ onOpenFolder }: MiniProjectSidebarProps) {
                 "text-muted hover:bg-surface-strong/55 hover:text-ink transition-colors",
                 "focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[2px]",
               )}
-              aria-label="Open settings"
+              aria-label={t("projectRail.openSettings")}
             >
               <Icon icon={Settings} size={14} />
             </button>
@@ -212,33 +214,33 @@ export function MiniProjectSidebar({ onOpenFolder }: MiniProjectSidebarProps) {
       >
         {removeTarget && (
           <DialogContent
-            title="Remove project from metacodex?"
-            description="This only removes the project from your workspace. The folder on disk is not affected."
+            title={t("projectRail.removeTitle")}
+            description={t("projectRail.removeDescription")}
             width={420}
             footer={
               <>
                 <Button variant="outline" size="sm" onClick={() => setRemoveTarget(null)}>
-                  Cancel
+                  {t("common.cancel")}
                 </Button>
                 <Button
                   variant="primary"
                   size="sm"
                   onClick={async () => {
-                    const t = removeTarget;
+                    const target = removeTarget;
                     setRemoveTarget(null);
-                    await remove(t.id);
+                    await remove(target.id);
                   }}
                   className="bg-danger text-on-primary hover:bg-danger/85"
                 >
                   <Icon icon={Trash2} size={12} className="text-on-primary" />
-                  Remove
+                  {t("common.remove")}
                 </Button>
               </>
             }
           >
             <div className="space-y-[8px]">
               <p className="text-[13px] text-body">
-                <span className="font-medium text-ink">{removeTarget.name}</span> will be removed from the rail.
+                <span className="font-medium text-ink">{removeTarget.name}</span>{t("projectRail.removeBodySuffix")}
               </p>
               <p className="font-mono text-[11px] text-muted-soft">{removeTarget.path}</p>
             </div>

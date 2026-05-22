@@ -52,6 +52,36 @@ pub struct SearchResults {
     pub elapsed_ms: u64,
 }
 
+/// List files under `root` as absolute paths, respecting .gitignore and hidden
+/// rules, capped at `max`. Powers the command palette's go-to-file. Read-only.
+pub fn list_files(root: &str, max: usize) -> AppResult<Vec<String>> {
+    let limit = max.max(1);
+    let mut out: Vec<String> = Vec::new();
+    let walker = WalkBuilder::new(root)
+        .hidden(true)
+        .git_ignore(true)
+        .git_exclude(true)
+        .git_global(true)
+        .require_git(false)
+        .ignore(true)
+        .build();
+    for entry in walker {
+        let entry = match entry {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
+        match entry.file_type() {
+            Some(ft) if ft.is_file() => {}
+            _ => continue,
+        }
+        out.push(entry.path().to_string_lossy().into_owned());
+        if out.len() >= limit {
+            break;
+        }
+    }
+    Ok(out)
+}
+
 pub fn search(root: &str, query: &str, options: SearchOptions) -> AppResult<SearchResults> {
     let started = std::time::Instant::now();
     if query.is_empty() {

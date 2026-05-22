@@ -7,6 +7,8 @@ export type TerminalStatus =
 
 export interface TerminalSession {
   id: string;
+  /** The tab hosting this session — used to reveal it (e.g. after sending text). */
+  tabId?: string;
   projectId: string | null;
   cwd: string;
   kind: TerminalKind;

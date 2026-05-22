@@ -1,7 +1,9 @@
 import { ArrowUpRight, FolderOpen, TerminalSquare } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { Icon } from "@/components/ui/Icon";
 import { Kbd } from "@/components/ui/Kbd";
+import { BackgroundGrain } from "@/components/ui/BackgroundGrain";
 import { cn } from "@/lib/cn";
 
 interface WelcomeScreenProps {
@@ -17,12 +19,13 @@ interface WelcomeScreenProps {
  * Hairlines only, no shadows, lots of negative space.
  */
 export function WelcomeScreen({ onOpenFolder, onOpenTerminal }: WelcomeScreenProps) {
+  const { t } = useTranslation();
   return (
     <div className="relative flex h-full w-full overflow-hidden bg-canvas">
       <BackgroundGrain />
 
       <div className="relative z-10 mx-auto flex w-full max-w-[760px] flex-col px-[40px] pt-[88px]">
-        <span className="editorial-caps">Welcome</span>
+        <span className="editorial-caps">{t("welcome.eyebrow")}</span>
 
         <div className="mt-[18px] flex items-center gap-[20px]">
           <img
@@ -54,28 +57,26 @@ export function WelcomeScreen({ onOpenFolder, onOpenTerminal }: WelcomeScreenPro
         </div>
 
         <p className="mt-[12px] max-w-[520px] font-display text-[18px] italic leading-[1.5] text-body">
-          A quiet, local-first workspace for code &mdash; with a real native terminal and your favourite AI
-          coding CLIs one keystroke away.
+          {t("welcome.tagline")}
         </p>
 
         <div className="mt-[36px] flex items-center gap-[10px]">
           <PrimaryAction onClick={onOpenFolder}>
             <Icon icon={FolderOpen} size={14} className="text-on-primary" />
-            <span>Open folder</span>
+            <span>{t("welcome.openFolder")}</span>
             <Kbd keys={["Mod", "O"]} className="ml-[6px] text-on-primary/70" />
           </PrimaryAction>
 
           <SecondaryAction onClick={onOpenTerminal}>
             <Icon icon={TerminalSquare} size={14} />
-            <span>Open terminal</span>
+            <span>{t("welcome.openTerminal")}</span>
             <Kbd keys={["Mod", "T"]} className="ml-[6px]" />
           </SecondaryAction>
         </div>
 
-        <div className="mt-[64px] grid max-w-[640px] grid-cols-3 gap-[1px] overflow-hidden rounded-sm border border-hairline bg-hairline">
-          <PrincipleCard label="Local first" body="Projects stay on disk. metacodex only stores workspace metadata." />
-          <PrincipleCard label="Real PTY" body="Same shell as Terminal.app — Claude Code, Codex, OpenCode, Antigravity." />
-          <PrincipleCard label="Editorial calm" body="Hairlines, warm canvas, no shadows. Reads like a refined print spread." />
+        <div className="mt-[64px] grid max-w-[640px] grid-cols-2 gap-[1px] overflow-hidden rounded-sm border border-hairline bg-hairline">
+          <PrincipleCard label={t("welcome.localFirstLabel")} body={t("welcome.localFirstBody")} />
+          <PrincipleCard label={t("welcome.realPtyLabel")} body={t("welcome.realPtyBody")} />
         </div>
 
         <FooterMeta />
@@ -144,26 +145,4 @@ function getPlatformLabel(): string {
   if (/Win/.test(navigator.userAgent)) return "Windows";
   if (/Linux/.test(navigator.userAgent)) return "Linux";
   return "desktop";
-}
-
-function BackgroundGrain() {
-  // Subtle paper texture via two radial gradients + tiny noise SVG.
-  return (
-    <div
-      aria-hidden
-      className="pointer-events-none absolute inset-0 z-0"
-      style={{
-        background:
-          "radial-gradient(900px 600px at 18% 12%, rgba(38,37,30,0.04), transparent 60%), radial-gradient(900px 600px at 82% 88%, rgba(38,37,30,0.025), transparent 60%)",
-      }}
-    >
-      <svg className="h-full w-full opacity-[0.035]" xmlns="http://www.w3.org/2000/svg">
-        <filter id="grain">
-          <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch" />
-          <feColorMatrix type="saturate" values="0" />
-        </filter>
-        <rect width="100%" height="100%" filter="url(#grain)" />
-      </svg>
-    </div>
-  );
 }

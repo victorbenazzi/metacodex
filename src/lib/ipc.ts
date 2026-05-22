@@ -24,7 +24,6 @@ export const CMD = {
   reorderProjects: "reorder_projects",
   setActiveProject: "set_active_project",
   getActiveProjectId: "get_active_project_id",
-  detectProjectFavicons: "detect_project_favicons",
   revealInFinder: "reveal_in_finder",
   openFolderDialog: "open_folder_dialog",
 
@@ -33,11 +32,23 @@ export const CMD = {
   readFileText: "read_file_text",
   writeFileText: "write_file_text",
   readFileBytes: "read_file_bytes",
+  readIconImage: "read_icon_image",
   stat: "stat",
+  deletePath: "delete_path",
+  renamePath: "rename_path",
+  createFile: "create_file",
+  createDir: "create_dir",
+  movePath: "move_path",
 
   // workspace
   saveWorkspaceState: "save_workspace_state",
   loadWorkspaceState: "load_workspace_state",
+
+  // settings / keybindings (persisted to ~/.metacodex)
+  readSettings: "read_settings",
+  writeSettings: "write_settings",
+  readKeybindings: "read_keybindings",
+  writeKeybindings: "write_keybindings",
 
   // watcher
   watcherWatch: "watcher_watch",
@@ -45,9 +56,11 @@ export const CMD = {
 
   // search
   searchInProject: "search_in_project",
+  listFiles: "list_files",
 
   // git
   gitStatus: "git_status",
+  gitFileHeadContent: "git_file_head_content",
 } as const;
 
 export type CmdName = (typeof CMD)[keyof typeof CMD];

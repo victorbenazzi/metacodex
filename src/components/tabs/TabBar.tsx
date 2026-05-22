@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode } from "react";
-import { X, TerminalSquare, AlertTriangle } from "lucide-react";
+import { X, TerminalSquare } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { Icon } from "@/components/ui/Icon";
 import { FileIcon } from "@/components/file-explorer/FileIcon";
@@ -73,6 +74,7 @@ export function TabBar({
   onLaunchCli,
   trailing,
 }: TabBarProps) {
+  const { t } = useTranslation();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const thumbRef = useRef<HTMLDivElement | null>(null);
 
@@ -194,7 +196,6 @@ export function TabBar({
       >
         {tabs.map((tab) => {
           const active = tab.id === activeTabId;
-          const isDangerous = tab.kind === "cli" && tab.cliId === "claude-code";
           const isFileTab =
             tab.kind === "editor" ||
             tab.kind === "markdown" ||
@@ -242,18 +243,10 @@ export function TabBar({
                 <span className="flex-1 truncate text-left font-mono text-[12px] tracking-tight">
                   {tab.title}
                 </span>
-                {isDangerous ? (
-                  <Icon
-                    icon={AlertTriangle}
-                    size={11}
-                    className="text-warn"
-                    aria-label="Dangerous flag enabled"
-                  />
-                ) : null}
                 {tab.dirty ? (
                   <span
                     className="h-[6px] w-[6px] rounded-full bg-ink"
-                    aria-label="Unsaved changes"
+                    aria-label={t("tabs.unsavedChanges")}
                   />
                 ) : null}
                 <span
@@ -268,7 +261,7 @@ export function TabBar({
                     "hover:bg-surface-strong/80 hover:text-ink group-hover:opacity-100",
                     active && "opacity-60",
                   )}
-                  aria-label="Close tab"
+                  aria-label={t("tabs.closeTab")}
                 >
                   <Icon icon={X} size={11} />
                 </span>

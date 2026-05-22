@@ -12,7 +12,12 @@ function v(name: string, fallback: string): string {
   return val || fallback;
 }
 
-export function buildEditorTheme() {
+export interface EditorTypography {
+  fontSize: number;
+  fontFamily: string;
+}
+
+export function buildEditorTheme({ fontSize, fontFamily }: EditorTypography) {
   const ink = v("--ink", "#26251e");
   const body = v("--body", "#5a5852");
   const muted = v("--muted", "#807d72");
@@ -26,9 +31,10 @@ export function buildEditorTheme() {
       "&": {
         color: ink,
         backgroundColor: canvas,
-        fontFamily: 'var(--font-mono)',
-        fontSize: "13px",
+        fontFamily,
+        fontSize: `${fontSize}px`,
         height: "100%",
+        position: "relative", // anchor for the sticky-scroll overlay
       },
       ".cm-content": {
         caretColor: ink,
@@ -67,9 +73,94 @@ export function buildEditorTheme() {
         color: ink,
       },
       ".cm-searchMatch": { backgroundColor: "rgba(184, 134, 30, 0.25)" },
+      ".cm-searchMatch.cm-searchMatch-selected": {
+        backgroundColor: "rgba(184, 134, 30, 0.45)",
+      },
+      ".cm-trailingSpace": { backgroundColor: "rgba(207, 45, 86, 0.12)" },
+      // Sticky scroll overlay (see stickyScroll.ts).
+      ".cm-stickyScroll": {
+        position: "absolute",
+        top: "0",
+        right: "0",
+        zIndex: "5",
+        backgroundColor: v("--surface-card", "#fff"),
+        borderBottom: `1px solid ${hairline}`,
+        boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+        overflow: "hidden",
+      },
+      ".cm-stickyScroll-row": {
+        padding: "0 8px 0 16px",
+        fontFamily,
+        fontSize: `${fontSize}px`,
+        lineHeight: "1.5",
+        color: ink,
+        whiteSpace: "pre",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        cursor: "pointer",
+      },
+      ".cm-stickyScroll-row:hover": {
+        backgroundColor: v("--surface-strong", "#e6e5e0") + "55",
+      },
       ".cm-foldPlaceholder": {
         backgroundColor: "transparent",
         color: muted,
+      },
+      // Git change gutter — thin coloured bars vs HEAD (see gitGutter.ts).
+      ".cm-gitGutter": { width: "4px", paddingLeft: "1px" },
+      ".cm-gitGutter .cm-gutterElement": {
+        display: "flex",
+        alignItems: "stretch",
+        justifyContent: "center",
+      },
+      ".mcx-diff-bar": { width: "3px", borderRadius: "1px" },
+      ".mcx-diff-added": { backgroundColor: "var(--diff-add)" },
+      ".mcx-diff-modified": { backgroundColor: "var(--diff-modify)" },
+      ".mcx-diff-deleted": {
+        backgroundColor: "var(--diff-remove)",
+        height: "3px",
+        alignSelf: "flex-start",
+        borderRadius: "0 0 2px 2px",
+      },
+      // Find & replace panel — styled to match the app tokens instead of the
+      // CodeMirror default chrome.
+      ".cm-panels": {
+        backgroundColor: v("--surface-card", "#fff"),
+        color: ink,
+      },
+      ".cm-panels.cm-panels-top": { borderBottom: `1px solid ${hairline}` },
+      ".cm-panels.cm-panels-bottom": { borderTop: `1px solid ${hairline}` },
+      ".cm-search": {
+        padding: "7px 10px",
+        fontFamily: "var(--font-sans)",
+        fontSize: "12px",
+      },
+      ".cm-search .cm-textfield": {
+        backgroundColor: canvas,
+        color: ink,
+        border: `1px solid ${hairline}`,
+        borderRadius: "4px",
+        padding: "2px 6px",
+        fontSize: "12px",
+      },
+      ".cm-search .cm-button": {
+        backgroundColor: "transparent",
+        backgroundImage: "none",
+        color: body,
+        border: `1px solid ${hairline}`,
+        borderRadius: "4px",
+        padding: "2px 8px",
+        fontSize: "11px",
+        cursor: "pointer",
+      },
+      ".cm-search .cm-button:hover": {
+        backgroundColor: v("--surface-strong", "#e6e5e0") + "80",
+      },
+      ".cm-search label": { fontSize: "11px", color: muted },
+      ".cm-panel.cm-search [name=close]": {
+        color: muted,
+        cursor: "pointer",
+        fontSize: "16px",
       },
     },
     { dark: false },

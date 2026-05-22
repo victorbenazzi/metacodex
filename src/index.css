@@ -93,3 +93,17 @@
     cursor: default;
   }
 }
+
+/* Honor the OS "reduce motion" setting — collapse every animation/transition to
+   near-instant. Top-level (unlayered) + !important so it overrides Tailwind's
+   utility layer regardless of source order. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

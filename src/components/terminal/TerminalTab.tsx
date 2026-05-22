@@ -2,11 +2,14 @@ import { useEffect, useRef } from "react";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 
 import { useXterm } from "./useXterm";
+import i18n from "@/features/i18n/config";
 import { ptyApi } from "@/features/terminal/terminal.service";
 import { useTerminalStore } from "@/features/terminal/terminal.store";
 import type { PtySpawnSpec } from "@/features/terminal/terminal.types";
 import { EV, listenTo, type PtyDataPayload, type PtyExitPayload } from "@/lib/events";
 import { base64ToUint8Array, utf8ToBase64 } from "@/lib/base64";
+import { WORKSPACE_NULL } from "@/components/tabs/tabsStore";
+import { createFileLinkProvider } from "./terminalLinks";
 
 interface TerminalTabProps {
   tabId: string;
@@ -42,6 +45,20 @@ export function TerminalTab({
   const registerSession = useTerminalStore((s) => s.register);
   const setStatus = useTerminalStore((s) => s.setStatus);
   const removeSession = useTerminalStore((s) => s.remove);
+  const setLastFocused = useTerminalStore((s) => s.setLastFocused);
+
+  // Track focus so the editor's "send selection to terminal" knows which
+  // terminal to target (the last one the user interacted with in this project).
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const onFocusIn = () => {
+      const sid = sessionIdRef.current;
+      if (sid) setLastFocused(projectId ?? WORKSPACE_NULL, sid);
+    };
+    el.addEventListener("focusin", onFocusIn);
+    return () => el.removeEventListener("focusin", onFocusIn);
+  }, [projectId, setLastFocused, containerRef]);
 
   useEffect(() => {
     let cancelled = false;
@@ -51,6 +68,9 @@ export function TerminalTab({
     const term = termRef.current;
     const fit = fitRef.current;
     if (!term || !fit) return;
+
+    // Make `file:line` references in output clickable → open in the editor.
+    const linkProvider = term.registerLinkProvider(createFileLinkProvider(term, cwd));
 
     // Pre-register a placeholder session so UI can show "starting"
     const localKind = cliLaunchCommand ? "cli" : "shell";
@@ -62,7 +82,9 @@ export function TerminalTab({
       await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
       await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
       try {
-        fit.fit();
+        // Skip if hidden (e.g. user switched tabs during those frames) — fitting
+        // a 0×0 container clamps cols to ~2; the ResizeObserver re-fits on show.
+        if (containerRef.current?.clientWidth) fit.fit();
       } catch {
         // ignore — observer below will retry
       }
@@ -89,6 +111,7 @@ export function TerminalTab({
         sessionIdRef.current = sessionId;
         registerSession({
           id: sessionId,
+          tabId,
           projectId,
           cwd,
           kind: localKind,
@@ -120,7 +143,7 @@ export function TerminalTab({
         });
         unlistenExit = await listenTo<PtyExitPayload>(EV.ptyExit, (e) => {
           if (e.payload.session_id !== sessionId) return;
-          term.writeln("\r\n\x1b[2m[process exited]\x1b[0m");
+          term.writeln(`\r\n\x1b[2m${i18n.t("terminal.processExited")}\x1b[0m`);
           setStatus(sessionId, "exited", e.payload.exit_code);
         });
 
@@ -157,7 +180,11 @@ export function TerminalTab({
     if (container) {
       ro = new ResizeObserver(() => {
         const f = fitRef.current;
-        if (!f) return;
+        // Don't fit while the tab is hidden (display:none → 0×0). FitAddon would
+        // clamp to its minimum cols (~2) and resize the PTY to that, mangling
+        // TUIs like Claude Code into one-char-per-line. The observer fires again
+        // with real dimensions when the tab is shown, which re-fits correctly.
+        if (!f || !container.clientWidth || !container.clientHeight) return;
         try {
           f.fit();
         } catch {
@@ -170,6 +197,7 @@ export function TerminalTab({
     return () => {
       cancelled = true;
       ro?.disconnect();
+      linkProvider.dispose();
       unlistenData?.();
       unlistenExit?.();
       const sid = sessionIdRef.current;

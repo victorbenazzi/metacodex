@@ -38,6 +38,11 @@
   --danger: #cf2d56;
   --warn: #b9722a;
 
+  /* Diff / git change gutter */
+  --diff-add: #3a9b76;
+  --diff-modify: #4c6f8a;
+  --diff-remove: #cf2d56;
+
   /* Radius */
   --radius-xs: 4px;
   --radius-sm: 6px;
@@ -72,6 +77,11 @@
   --dur-fast: 120ms;
   --dur-base: 180ms;
   --dur-slow: 280ms;
+  /* Unified popup motion (dialogs, menus, palette, tooltips). Exit is ~70% of
+     enter — "exit faster than enter" — so dismissals feel instant. Pure-opacity
+     fade only; never animate transform here or it fights the modal centering. */
+  --dur-enter: 150ms;
+  --dur-exit: 105ms;
 
   /* Layout */
   --rail-w: 56px;
@@ -128,6 +138,11 @@
   --success: #4ec99a;
   --danger: #ff5a7d;
   --warn: #e3a35a;
+
+  /* Diff / git change gutter */
+  --diff-add: #4ec99a;
+  --diff-modify: #88a8c2;
+  --diff-remove: #ff5a7d;
 
   /* Terminal palette dark */
   --term-bg: var(--canvas);

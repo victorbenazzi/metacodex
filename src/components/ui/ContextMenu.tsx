@@ -20,7 +20,7 @@ export function ContextMenuContent({
           // Tailwind's shadow-lg. Layered to read at any background luminance.
           "shadow-[0_12px_30px_-12px_rgba(15,14,11,0.28),0_2px_4px_-2px_rgba(15,14,11,0.08)]",
           "dark:shadow-[0_14px_36px_-12px_rgba(0,0,0,0.7),0_2px_6px_-2px_rgba(0,0,0,0.4)]",
-          "data-[state=open]:animate-slide-up data-[state=closed]:animate-fade-in",
+          "data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out",
           className,
         )}
       >
@@ -36,12 +36,14 @@ export function ContextMenuItem({
   destructive,
   trailing,
   disabled,
+  className,
 }: {
   children: React.ReactNode;
   onSelect?: () => void;
   destructive?: boolean;
   trailing?: React.ReactNode;
   disabled?: boolean;
+  className?: string;
 }) {
   return (
     <RCM.Item
@@ -58,6 +60,7 @@ export function ContextMenuItem({
         "data-[highlighted]:bg-surface-strong/70 data-[highlighted]:text-ink",
         "data-[disabled]:cursor-not-allowed data-[disabled]:opacity-40",
         destructive && "text-danger data-[highlighted]:text-danger data-[highlighted]:bg-danger/10",
+        className,
       )}
     >
       <span className="flex min-w-0 items-center gap-[10px]">{children}</span>
@@ -98,7 +101,7 @@ export function ContextMenuSub({
         <RCM.SubContent
           className={cn(
             "z-50 min-w-[180px] rounded-md border border-hairline bg-surface-card p-[5px] text-[13px] text-ink",
-            "data-[state=open]:animate-slide-up data-[state=closed]:animate-fade-in",
+            "data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out",
           )}
         >
           {children}

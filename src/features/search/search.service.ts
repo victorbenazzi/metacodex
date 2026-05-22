@@ -14,4 +14,8 @@ export const searchApi = {
       },
     });
   },
+  /** Flat list of project files (absolute paths) for go-to-file. */
+  listFiles(root: string, max?: number): Promise<string[]> {
+    return invoke<string[]>(CMD.listFiles, { root, max });
+  },
 };

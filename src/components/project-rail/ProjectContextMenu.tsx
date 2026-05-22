@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import * as RCM from "@radix-ui/react-context-menu";
-import { Pencil, Trash2, Paintbrush, FolderOpen, Shapes, Image as ImageIcon } from "lucide-react";
+import { Pencil, Trash2, Paintbrush, FolderOpen, Shapes, ImagePlus, ImageOff } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { CMD, invoke } from "@/lib/ipc";
 import {
@@ -23,12 +24,7 @@ import {
   PROJECT_ICONS,
   type Project,
 } from "@/features/projects/project.types";
-import {
-  faviconApi,
-  toFaviconIcon,
-  type FaviconCandidate,
-} from "@/features/projects/favicon.service";
-import { useFaviconDataUri } from "@/features/projects/useFaviconDataUri";
+import { isCustomIcon, pickProjectIcon } from "@/features/projects/customIcon.service";
 import { cn } from "@/lib/cn";
 
 interface ProjectContextMenuProps {
@@ -44,25 +40,18 @@ export function ProjectContextMenu({
   onRequestRename,
   onRequestRemove,
 }: ProjectContextMenuProps) {
+  const { t } = useTranslation();
   const updateMeta = useProjectsStore((s) => s.updateMeta);
-  const [favicons, setFavicons] = useState<FaviconCandidate[]>([]);
+  const hasCustomIcon = isCustomIcon(project.icon);
 
-  // Detect favicons whenever the project changes. Errors are silent — a
-  // missing favicon is a normal state and we just show no extra section.
-  useEffect(() => {
-    let cancelled = false;
-    faviconApi
-      .detect(project.id)
-      .then((res) => {
-        if (!cancelled) setFavicons(res);
-      })
-      .catch(() => {
-        if (!cancelled) setFavicons([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [project.id, project.path]);
+  const handlePickIcon = async () => {
+    try {
+      const uri = await pickProjectIcon(project.path);
+      if (uri) await updateMeta(project.id, { icon: uri });
+    } catch (e) {
+      console.warn("pick project icon failed", e);
+    }
+  };
 
   const revealInFinder = async () => {
     try {
@@ -79,11 +68,11 @@ export function ProjectContextMenu({
         <ContextMenuLabel>{project.name}</ContextMenuLabel>
         <ContextMenuItem onSelect={onRequestRename}>
           <Icon icon={Pencil} size={12} className="text-muted" />
-          Rename in metacodex…
+          {t("projectRail.menu.rename")}
         </ContextMenuItem>
         <ContextMenuItem onSelect={revealInFinder}>
           <Icon icon={FolderOpen} size={12} className="text-muted" />
-          Reveal in Finder
+          {t("projectRail.menu.revealInFinder")}
         </ContextMenuItem>
 
         <ContextMenuSeparator />
@@ -92,7 +81,7 @@ export function ProjectContextMenu({
           trigger={
             <>
               <Icon icon={Paintbrush} size={12} className="text-muted" />
-              <span>Color</span>
+              <span>{t("projectRail.menu.color")}</span>
               <span
                 aria-hidden
                 className="ml-[6px] inline-block h-[10px] w-[10px] rounded-full border border-hairline"
@@ -117,45 +106,51 @@ export function ProjectContextMenu({
           trigger={
             <>
               <Icon icon={Shapes} size={12} className="text-muted" />
-              <span>Icon</span>
+              <span>{t("projectRail.menu.icon")}</span>
             </>
           }
         >
-          <div className="max-h-[300px] overflow-y-auto p-[8px]">
-            {favicons.length > 0 ? (
-              <>
-                <div className="editorial-caps flex items-center gap-[6px] px-[2px] pb-[6px] text-muted">
-                  <Icon icon={ImageIcon} size={10} />
-                  From this project
-                </div>
-                <div className="grid grid-cols-5 gap-[6px]">
-                  {favicons.map((c) => {
-                    const value = toFaviconIcon(c.path);
-                    return (
-                      <FaviconChoice
-                        key={c.path}
-                        candidate={c}
-                        color={project.color}
-                        selected={project.icon === value}
-                        onClick={() => updateMeta(project.id, { icon: value })}
-                      />
-                    );
-                  })}
-                </div>
-                <div className="my-[8px] h-px bg-hairline-soft" />
-              </>
-            ) : null}
+          <div className="max-h-[320px] w-[236px] overflow-y-auto p-[8px]">
             <div className="grid grid-cols-5 gap-[6px]">
               {PROJECT_ICONS.map((name) => (
                 <IconChoice
                   key={name}
                   name={name}
                   color={project.color}
-                  selected={project.icon === name}
+                  selected={!hasCustomIcon && project.icon === name}
                   onClick={() => updateMeta(project.id, { icon: name })}
                 />
               ))}
             </div>
+
+            <div className="my-[8px] h-px bg-hairline-soft" />
+
+            <div className="flex items-center gap-[8px] px-[2px]">
+              <CustomImageButton
+                imageUri={hasCustomIcon ? project.icon : null}
+                ringColor={project.color}
+                onClick={handlePickIcon}
+              />
+              <div className="min-w-0 flex-1 leading-tight">
+                <div className="text-[11px] font-medium text-body">
+                  {hasCustomIcon ? t("projectRail.menu.changeImage") : t("projectRail.menu.chooseFromComputer")}
+                </div>
+                <div className="text-[10px] text-muted">
+                  {t("projectRail.menu.imageHint")}
+                </div>
+              </div>
+            </div>
+
+            {hasCustomIcon ? (
+              <button
+                type="button"
+                onClick={() => updateMeta(project.id, { icon: "Folder" })}
+                className="mt-[8px] flex w-full items-center gap-[6px] rounded-sm px-[6px] py-[5px] text-[11px] text-muted transition-colors hover:bg-surface-strong/40 hover:text-body focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[-1px]"
+              >
+                <Icon icon={ImageOff} size={12} />
+                {t("projectRail.menu.removeImage")}
+              </button>
+            ) : null}
           </div>
         </ContextMenuSub>
 
@@ -163,7 +158,7 @@ export function ProjectContextMenu({
 
         <ContextMenuItem destructive onSelect={onRequestRemove}>
           <Icon icon={Trash2} size={12} />
-          Remove from metacodex
+          {t("projectRail.menu.removeFromApp")}
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenuRoot>
@@ -179,12 +174,13 @@ function SwatchButton({
   selected: boolean;
   onClick: () => void;
 }) {
+  const { t } = useTranslation();
   const theme = useThemeStore((s) => s.effective);
   return (
     <button
       type="button"
       onClick={onClick}
-      aria-label={`Use color ${color}`}
+      aria-label={t("projectRail.menu.useColor", { color })}
       aria-pressed={selected}
       className="relative inline-flex h-[28px] w-[28px] items-center justify-center rounded-md transition-transform hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[3px]"
       style={{
@@ -246,6 +242,7 @@ function LazyIcon({
   selected: boolean;
   onClick: () => void;
 }) {
+  const { t } = useTranslation();
   const [Comp, setComp] = useState<any>(null);
   useEffect(() => {
     let cancelled = false;
@@ -262,7 +259,7 @@ function LazyIcon({
     <button
       type="button"
       onClick={onClick}
-      aria-label={`Use icon ${name}`}
+      aria-label={t("projectRail.menu.useIcon", { name })}
       aria-pressed={selected}
       className={cn(
         "flex h-[30px] w-[30px] items-center justify-center rounded-sm transition-colors",
@@ -287,43 +284,38 @@ function LazyIcon({
   );
 }
 
-function FaviconChoice({
-  candidate,
-  color,
-  selected,
+/**
+ * The 1:1 "choose an image" button. Empty state: a dashed tile with an
+ * ImagePlus glyph. Active state: the chosen image thumbnail (object-cover) with
+ * an accent ring matching the project color — same selection language as the
+ * preset icon tiles.
+ */
+function CustomImageButton({
+  imageUri,
+  ringColor,
   onClick,
 }: {
-  candidate: FaviconCandidate;
-  color: string;
-  selected: boolean;
+  imageUri: string | null;
+  ringColor: string;
   onClick: () => void;
 }) {
-  const uri = useFaviconDataUri(candidate.path);
+  const { t } = useTranslation();
   return (
     <button
       type="button"
       onClick={onClick}
-      aria-label={`Use favicon ${candidate.relPath}`}
-      aria-pressed={selected}
-      title={candidate.relPath}
+      aria-label={imageUri ? t("projectRail.menu.changeProjectImage") : t("projectRail.menu.chooseImage")}
       className={cn(
-        "flex h-[30px] w-[30px] items-center justify-center rounded-sm transition-colors",
+        "flex h-[30px] w-[30px] shrink-0 items-center justify-center overflow-hidden rounded-sm transition-colors",
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[2px]",
-        !selected && "hover:bg-surface-strong/40",
+        !imageUri && "border border-dashed border-hairline-strong hover:bg-surface-strong/40",
       )}
-      style={{
-        boxShadow: selected ? `0 0 0 1.5px ${color}` : undefined,
-      }}
+      style={imageUri ? { boxShadow: `0 0 0 1.5px ${ringColor}` } : undefined}
     >
-      {uri ? (
-        <img
-          src={uri}
-          alt=""
-          draggable={false}
-          className="h-[18px] w-[18px] object-contain"
-        />
+      {imageUri ? (
+        <img src={imageUri} alt="" draggable={false} className="h-full w-full object-contain p-[3px]" />
       ) : (
-        <span className="h-[18px] w-[18px] animate-pulse rounded-xs bg-surface-strong/60" />
+        <Icon icon={ImagePlus} size={14} className="text-muted" />
       )}
     </button>
   );

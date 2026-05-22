@@ -35,3 +35,37 @@ export async function languageFor(ext: string): Promise<Extension | null> {
     return null;
   }
 }
+
+/** Display labels for the status bar. Covers mapped languages plus a few common
+ * extensions that don't have syntax highlighting wired yet. */
+const LABELS: Record<string, string> = {
+  ts: "TypeScript",
+  tsx: "TypeScript JSX",
+  js: "JavaScript",
+  jsx: "JavaScript JSX",
+  mjs: "JavaScript",
+  cjs: "JavaScript",
+  json: "JSON",
+  md: "Markdown",
+  mdx: "MDX",
+  markdown: "Markdown",
+  html: "HTML",
+  htm: "HTML",
+  css: "CSS",
+  scss: "SCSS",
+  py: "Python",
+  rs: "Rust",
+  toml: "TOML",
+  yaml: "YAML",
+  yml: "YAML",
+  sh: "Shell",
+  bash: "Shell",
+  txt: "Texto",
+};
+
+/** Human-readable language label for the status bar. */
+export function languageLabel(ext: string): string {
+  const e = ext.toLowerCase();
+  if (LABELS[e]) return LABELS[e];
+  return e ? e.toUpperCase() : "Texto";
+}
