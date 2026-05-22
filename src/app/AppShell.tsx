@@ -6,6 +6,7 @@ import { MiniProjectSidebar } from "@/components/project-rail/MiniProjectSidebar
 import { ExplorerPanel } from "@/components/file-explorer/ExplorerPanel";
 import { WorkArea } from "@/components/tabs/WorkArea";
 import { TitleBar } from "@/app/TitleBar";
+import { SourceControlPanel } from "@/components/source-control/SourceControlPanel";
 import {
   useTabsStore,
   WORKSPACE_NULL,
@@ -25,6 +26,7 @@ import {
 } from "@/features/projects/workspace.service";
 import { watcherApi } from "@/features/filesystem/watcher.service";
 import { useGitStore } from "@/features/git/git.store";
+import { useSourceControlStore } from "@/features/source-control/sourceControl.store";
 import { useTerminalStore } from "@/features/terminal/terminal.store";
 import { ptyApi } from "@/features/terminal/terminal.service";
 import { utf8ToBase64 } from "@/lib/base64";
@@ -32,6 +34,7 @@ import { useEditorReconcile } from "@/features/editor/useEditorReconcile";
 import { EV, listenTo, type FsChangedPayload } from "@/lib/events";
 import { dirname } from "@/lib/path";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { cn } from "@/lib/cn";
 import { CMD, invoke } from "@/lib/ipc";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
@@ -140,6 +143,8 @@ export function AppShell() {
   );
 
   const refreshGit = useGitStore((s) => s.refresh);
+  const panelOpen = useSourceControlStore((s) => s.open);
+  const setPanelOpen = useSourceControlStore((s) => s.setOpen);
 
   // -- File watcher per project ------------------------------------------------
   // When the active project changes, ask Rust to watch its root. Stop on unmount.
@@ -544,6 +549,21 @@ export function AppShell() {
     [openTab, projectKey, project],
   );
 
+  const handleOpenDiff = useCallback(
+    (path: string, status: string) => {
+      if (!project) return;
+      openTab(projectKey, {
+        id: `diff-${path}`,
+        kind: "diff",
+        title: basename(path),
+        projectId: project.id,
+        path,
+        status,
+      });
+    },
+    [openTab, projectKey, project],
+  );
+
   const closeActiveTab = useCallback(() => {
     if (!bucket.activeTabId) return;
     closeTab(projectKey, bucket.activeTabId);
@@ -579,8 +599,15 @@ export function AppShell() {
   ]);
 
   return (
-    <div className="grid h-screen w-screen grid-rows-[36px_minmax(0,1fr)] grid-cols-[56px_248px_minmax(0,1fr)] bg-canvas text-ink">
-      <TitleBar workspaceName={project?.name} className="col-span-3" />
+    <div
+      className={cn(
+        "grid h-screen w-screen grid-rows-[36px_minmax(0,1fr)] bg-canvas text-ink",
+        panelOpen
+          ? "grid-cols-[56px_248px_minmax(0,1fr)_340px]"
+          : "grid-cols-[56px_248px_minmax(0,1fr)]",
+      )}
+    >
+      <TitleBar workspaceName={project?.name} className="col-span-full" />
 
       <MiniProjectSidebar onOpenFolder={handleOpenFolder} />
 
@@ -613,6 +640,23 @@ export function AppShell() {
         onLaunchCli={handleLaunchCli}
         onOpenFolder={handleOpenFolder}
       />
+
+      {panelOpen ? (
+        project ? (
+          <SourceControlPanel
+            projectId={project.id}
+            projectPath={project.path}
+            onOpenDiff={handleOpenDiff}
+            onClose={() => setPanelOpen(false)}
+          />
+        ) : (
+          <aside className="flex h-full min-h-0 flex-col items-center justify-center border-l border-hairline bg-canvas px-[24px] text-center">
+            <p className="font-mono text-[12px] text-muted">
+              {t("sourceControl.noProject")}
+            </p>
+          </aside>
+        )
+      ) : null}
 
       <CloseTabsConfirm
         state={pendingClose}

@@ -1,5 +1,5 @@
 import { useEffect, useRef, type ReactNode } from "react";
-import { X, TerminalSquare } from "lucide-react";
+import { X, TerminalSquare, GitCompare } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Icon } from "@/components/ui/Icon";
@@ -48,6 +48,9 @@ function renderTabIcon(tab: Tab, active: boolean): ReactNode {
       );
     }
     return <Icon icon={TerminalSquare} size={13} className={tone} />;
+  }
+  if (tab.kind === "diff") {
+    return <Icon icon={GitCompare} size={13} className={tone} />;
   }
   return (
     <FileIcon isDir={false} filename={tab.path} size={13} className={tone} />

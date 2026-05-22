@@ -55,6 +55,7 @@ pub fn run() {
             commands::projects::set_active_project,
             commands::projects::get_active_project_id,
             commands::projects::reveal_in_finder,
+            commands::system::open_external_url,
             commands::filesystem::read_dir,
             commands::filesystem::stat,
             commands::filesystem::read_file_text,

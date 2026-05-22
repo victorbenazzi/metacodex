@@ -1,6 +1,7 @@
 import { TerminalTab } from "@/components/terminal/TerminalTab";
 import { CliTabComponent } from "@/components/terminal/CliTabComponent";
 import { EditorTab } from "@/components/editor/EditorTab";
+import { DiffTab } from "@/components/editor/DiffTab";
 import { MarkdownPreview } from "@/components/previews/MarkdownPreview";
 import { ImagePreview } from "@/components/previews/ImagePreview";
 import { PdfPreview } from "@/components/previews/PdfPreview";
@@ -40,6 +41,14 @@ function renderTab(tab: Tab) {
           tabId={tab.id}
           path={tab.path}
           projectId={tab.projectId ?? ""}
+        />
+      );
+    case "diff":
+      return (
+        <DiffTab
+          path={tab.path}
+          projectId={tab.projectId ?? ""}
+          status={tab.status}
         />
       );
     case "markdown":

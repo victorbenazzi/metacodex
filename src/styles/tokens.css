@@ -43,6 +43,12 @@
   --diff-modify: #4c6f8a;
   --diff-remove: #cf2d56;
 
+  /* Diff view (side-by-side) line + token surfaces */
+  --diff-add-line: rgba(58, 155, 118, 0.10);
+  --diff-add-text: rgba(58, 155, 118, 0.26);
+  --diff-remove-line: rgba(207, 45, 86, 0.09);
+  --diff-remove-text: rgba(207, 45, 86, 0.24);
+
   /* Radius */
   --radius-xs: 4px;
   --radius-sm: 6px;
@@ -143,6 +149,12 @@
   --diff-add: #4ec99a;
   --diff-modify: #88a8c2;
   --diff-remove: #ff5a7d;
+
+  /* Diff view (side-by-side) line + token surfaces */
+  --diff-add-line: rgba(78, 201, 154, 0.13);
+  --diff-add-text: rgba(78, 201, 154, 0.26);
+  --diff-remove-line: rgba(255, 90, 125, 0.13);
+  --diff-remove-text: rgba(255, 90, 125, 0.26);
 
   /* Terminal palette dark */
   --term-bg: var(--canvas);

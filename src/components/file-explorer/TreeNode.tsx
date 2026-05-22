@@ -19,12 +19,18 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/ContextMenu";
 import { Icon } from "@/components/ui/Icon";
+import { Tooltip } from "@/components/ui/Tooltip";
 import {
   useExplorerStore,
   type ChildrenState,
   type CreateKind,
 } from "@/features/explorer/explorer.store";
 import { useGitStore } from "@/features/git/git.store";
+import {
+  gitColorForBadge,
+  gitColorForName,
+  gitStatusLabelKey,
+} from "@/features/git/gitStatus";
 import { DEFAULT_CLI_REGISTRY, type CliTool } from "@/features/terminal/cli-registry";
 import { cn } from "@/lib/cn";
 import { CMD, invoke } from "@/lib/ipc";
@@ -216,7 +222,19 @@ export const TreeNode = memo(function TreeNode({
           <span className="ml-auto flex items-center gap-[6px] pr-[8px]">
             {entry.isSymlink ? <span className="text-[10px] text-muted-soft">↗</span> : null}
             {gitStatus ? (
-              <span className={cn("font-mono text-[10px]", gitColorForBadge(gitStatus))}>{gitStatus}</span>
+              <Tooltip content={t(gitStatusLabelKey(gitStatus))} side="left">
+                <span
+                  className={cn(
+                    "inline-flex h-[14px] min-w-[12px] items-center justify-center font-mono text-[10px] leading-none",
+                    gitColorForBadge(gitStatus),
+                  )}
+                  // Hovering only this glyph reveals the status meaning — the
+                  // surrounding row stays a plain click target.
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {gitStatus}
+                </span>
+              </Tooltip>
             ) : null}
           </span>
         </button>
@@ -578,23 +596,4 @@ function TreeChildren({
       </div>
     </>
   );
-}
-
-function gitColorForName(status?: string): string {
-  if (!status) return "text-ink/85";
-  if (status === "M" || status === "T") return "text-warn";
-  if (status === "A") return "text-success";
-  if (status === "?") return "text-success/85";
-  if (status === "D") return "text-danger/85";
-  if (status === "!") return "text-danger";
-  return "text-ink/85";
-}
-
-function gitColorForBadge(status: string): string {
-  if (status === "M" || status === "T") return "text-warn";
-  if (status === "A") return "text-success";
-  if (status === "?") return "text-success/70";
-  if (status === "D") return "text-danger/85";
-  if (status === "!") return "text-danger";
-  return "text-muted";
 }

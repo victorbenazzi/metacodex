@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import * as RD from "@radix-ui/react-dialog";
 import { useTranslation, Trans } from "react-i18next";
 import {
+  ArrowUpRight,
   Sliders,
   Palette,
   FileCode,
@@ -23,6 +24,7 @@ import { Kbd } from "@/components/ui/Kbd";
 import { Select, type SelectOption } from "@/components/ui/Select";
 import { NumberStepper } from "@/components/ui/NumberStepper";
 import { cn } from "@/lib/cn";
+import { CMD, invoke } from "@/lib/ipc";
 import { useThemeStore, type ThemeMode } from "@/features/theme/theme.store";
 import { SUPPORTED_LANGUAGES } from "@/features/i18n/config";
 import { DEFAULT_CLI_REGISTRY } from "@/features/terminal/cli-registry";
@@ -647,6 +649,11 @@ function CliRegistryPane() {
 
 function AboutPane() {
   const { t } = useTranslation();
+  const openAuthorSite = () => {
+    invoke(CMD.openExternalUrl, {
+      url: "https://www.victorbenazzi.com.br/?utm_source=metacodex&utm_medium=app&utm_campaign=about",
+    }).catch((err) => console.warn("[open_external_url] failed", err));
+  };
   return (
     <div>
       <PaneHeader title={t("settings.about.title")} />
@@ -673,6 +680,24 @@ function AboutPane() {
           </span>
         </li>
       </ul>
+      <p className="mt-[18px] font-mono text-[11px] text-muted">
+        {t("settings.about.author")}{" "}
+        <button
+          type="button"
+          onClick={openAuthorSite}
+          title="victorbenazzi.com.br"
+          className="group inline-flex items-center gap-[3px] rounded-[3px] text-ink transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[2px]"
+        >
+          <span className="underline decoration-1 decoration-hairline underline-offset-[3px] transition-colors duration-150 group-hover:decoration-muted">
+            Victor Benazzi
+          </span>
+          <Icon
+            icon={ArrowUpRight}
+            size={10}
+            className="opacity-60 transition-transform duration-150 group-hover:-translate-y-px group-hover:translate-x-px"
+          />
+        </button>
+      </p>
     </div>
   );
 }

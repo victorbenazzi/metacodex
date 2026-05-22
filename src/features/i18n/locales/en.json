@@ -136,7 +136,8 @@
       "tagline": "A quiet, local-first workspace for code, with a real native terminal and your favourite AI coding CLIs one keystroke away.",
       "version": "version",
       "platform": "platform",
-      "stack": "stack"
+      "stack": "stack",
+      "author": "crafted by"
     }
   },
   "cli": {
@@ -312,5 +313,31 @@
     "pdfLabel": "pdf · {{name}}",
     "previousPage": "Previous page",
     "nextPage": "Next page"
+  },
+  "git": {
+    "status": {
+      "modified": "Modified",
+      "added": "Added (staged)",
+      "untracked": "Untracked",
+      "deleted": "Deleted",
+      "renamed": "Renamed",
+      "typechange": "Type changed",
+      "copied": "Copied",
+      "conflicted": "Conflicted",
+      "unknown": "Changed"
+    }
+  },
+  "sourceControl": {
+    "toggle": "Source Control",
+    "title": "Source Control",
+    "refresh": "Refresh",
+    "close": "Close panel",
+    "empty": "No changes",
+    "noProject": "Open a project to see its changes."
+  },
+  "diff": {
+    "comparedWithHead": "compared with HEAD",
+    "identical": "No changes against HEAD.",
+    "failed": "Could not load diff: {{error}}"
   }
 }

@@ -136,7 +136,8 @@
       "tagline": "Um espaço de trabalho silencioso e local-first para código, com um terminal nativo de verdade e suas CLIs de IA favoritas a um atalho de distância.",
       "version": "versão",
       "platform": "plataforma",
-      "stack": "stack"
+      "stack": "stack",
+      "author": "feito por"
     }
   },
   "cli": {
@@ -312,5 +313,31 @@
     "pdfLabel": "pdf · {{name}}",
     "previousPage": "Página anterior",
     "nextPage": "Próxima página"
+  },
+  "git": {
+    "status": {
+      "modified": "Modificado",
+      "added": "Adicionado (staged)",
+      "untracked": "Não rastreado",
+      "deleted": "Excluído",
+      "renamed": "Renomeado",
+      "typechange": "Tipo alterado",
+      "copied": "Copiado",
+      "conflicted": "Em conflito",
+      "unknown": "Alterado"
+    }
+  },
+  "sourceControl": {
+    "toggle": "Controle de versão",
+    "title": "Controle de versão",
+    "refresh": "Atualizar",
+    "close": "Fechar painel",
+    "empty": "Nenhuma alteração",
+    "noProject": "Abra um projeto para ver as alterações."
+  },
+  "diff": {
+    "comparedWithHead": "comparado com HEAD",
+    "identical": "Sem alterações em relação ao HEAD.",
+    "failed": "Não foi possível carregar o diff: {{error}}"
   }
 }

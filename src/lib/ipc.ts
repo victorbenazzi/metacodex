@@ -27,6 +27,9 @@ export const CMD = {
   revealInFinder: "reveal_in_finder",
   openFolderDialog: "open_folder_dialog",
 
+  // system
+  openExternalUrl: "open_external_url",
+
   // filesystem
   readDir: "read_dir",
   readFileText: "read_file_text",

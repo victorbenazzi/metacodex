@@ -1,4 +1,4 @@
-import { ArrowUpRight, FolderOpen, TerminalSquare } from "lucide-react";
+import { FolderOpen, TerminalSquare } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Icon } from "@/components/ui/Icon";
@@ -129,20 +129,7 @@ function FooterMeta() {
     <footer className="mt-auto flex flex-wrap items-center gap-x-[14px] gap-y-[4px] pb-[28px] pt-[40px] font-mono text-[11px] text-muted-soft">
       <span>v0.0.1</span>
       <span aria-hidden>·</span>
-      <span>{getPlatformLabel()}</span>
-      <span aria-hidden>·</span>
-      <span className="inline-flex items-center gap-[4px]">
-        anthropic · openai · sst · google
-        <Icon icon={ArrowUpRight} size={10} className="opacity-60" />
-      </span>
+      <span>alpha</span>
     </footer>
   );
-}
-
-function getPlatformLabel(): string {
-  if (typeof navigator === "undefined") return "desktop";
-  if (/Mac/.test(navigator.userAgent)) return "macOS";
-  if (/Win/.test(navigator.userAgent)) return "Windows";
-  if (/Linux/.test(navigator.userAgent)) return "Linux";
-  return "desktop";
 }
