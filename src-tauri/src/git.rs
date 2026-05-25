@@ -1,10 +1,12 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use git2::{Repository, Status, StatusOptions};
+use git2::{DiffOptions, Patch, Repository, Status, StatusOptions};
 use serde::Serialize;
 
 use crate::error::AppResult;
+
+const DIFF_STATS_MAX_BLOB_BYTES: i64 = 2 * 1024 * 1024;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -14,6 +16,23 @@ pub struct GitInfo {
     pub behind: usize,
     /// Absolute path → single-char status code: "M"|"A"|"D"|"R"|"?"|"C"|"!"
     pub statuses: HashMap<String, String>,
+    pub stats: GitStats,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitStats {
+    pub additions: usize,
+    pub deletions: usize,
+    /// Absolute path → diff line counts against HEAD.
+    pub files: HashMap<String, GitFileStats>,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitFileStats {
+    pub additions: usize,
+    pub deletions: usize,
 }
 
 pub fn git_info(root: &str) -> AppResult<Option<GitInfo>> {
@@ -68,12 +87,64 @@ pub fn git_info(root: &str) -> AppResult<Option<GitInfo>> {
         }
     }
 
+    let stats = diff_stats(&repo, &workdir);
+
     Ok(Some(GitInfo {
         branch,
         ahead,
         behind,
         statuses: statuses_map,
+        stats,
     }))
+}
+
+fn diff_stats(repo: &Repository, workdir: &Path) -> GitStats {
+    let tree = repo
+        .head()
+        .and_then(|h| h.peel_to_commit())
+        .and_then(|c| c.tree())
+        .ok();
+
+    let mut opts = DiffOptions::new();
+    opts.include_untracked(true)
+        .recurse_untracked_dirs(true)
+        .show_untracked_content(true)
+        .max_size(DIFF_STATS_MAX_BLOB_BYTES);
+
+    let diff = match repo.diff_tree_to_workdir_with_index(tree.as_ref(), Some(&mut opts)) {
+        Ok(diff) => diff,
+        Err(_) => return GitStats::default(),
+    };
+
+    let mut stats = GitStats::default();
+    for (idx, delta) in diff.deltas().enumerate() {
+        let rel = delta
+            .new_file()
+            .path()
+            .or_else(|| delta.old_file().path());
+        let Some(rel) = rel else {
+            continue;
+        };
+        let Ok(Some(patch)) = Patch::from_diff(&diff, idx) else {
+            continue;
+        };
+        let Ok((_, additions, deletions)) = patch.line_stats() else {
+            continue;
+        };
+
+        let abs = workdir.join(rel).to_string_lossy().into_owned();
+        stats.additions += additions;
+        stats.deletions += deletions;
+        stats.files.insert(
+            abs,
+            GitFileStats {
+                additions,
+                deletions,
+            },
+        );
+    }
+
+    stats
 }
 
 fn status_code(s: Status) -> &'static str {

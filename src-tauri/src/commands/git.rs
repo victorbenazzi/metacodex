@@ -8,7 +8,17 @@ use crate::projects::ProjectsCache;
 use crate::util::paths;
 
 #[tauri::command]
-pub async fn git_status(root: String) -> AppResult<Option<GitInfo>> {
+pub async fn git_status(app: AppHandle, root: String) -> AppResult<Option<GitInfo>> {
+    {
+        let cache = app.state::<Arc<ProjectsCache>>();
+        let roots = cache.project_roots();
+        if roots.is_empty() {
+            return Err(AppError::PathNotAllowed(
+                "no project roots registered yet".into(),
+            ));
+        }
+        paths::ensure_within_roots(&root, &roots)?;
+    }
     tokio::task::spawn_blocking(move || git_info(&root))
         .await
         .map_err(|e| AppError::Other(format!("join: {e}")))?
