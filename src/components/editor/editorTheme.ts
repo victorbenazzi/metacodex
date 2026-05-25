@@ -4,7 +4,10 @@ import { tags as t } from "@lezer/highlight";
 
 /**
  * Editor theme built on CSS variables. We pull computed values at construction
- * time so the theme picks up the current light/dark palette.
+ * time so the theme picks up whichever palette `applyTheme()` last installed.
+ * Chrome reads the design-system tokens (--ink, --canvas, --hairline, …);
+ * syntax reads the dedicated --syntax-* tokens so swapping themes can recolor
+ * code without touching the rest of the UI.
  */
 function v(name: string, fallback: string): string {
   if (typeof document === "undefined") return fallback;
@@ -24,7 +27,7 @@ export function buildEditorTheme({ fontSize, fontFamily }: EditorTypography) {
   const mutedSoft = v("--muted-soft", "#a09c92");
   const canvas = v("--canvas", "#f7f7f4");
   const hairline = v("--hairline", "#e6e5e0");
-  const selection = v("--term-selection", "rgba(38,37,30,0.18)");
+  const selection = v("--selection", "rgba(38,37,30,0.22)");
 
   const theme = EditorView.theme(
     {
@@ -166,22 +169,39 @@ export function buildEditorTheme({ fontSize, fontFamily }: EditorTypography) {
     { dark: false },
   );
 
+  // Syntax tokens read from --syntax-* with the chrome palette as fallback —
+  // so themes that don't bother to override a given slot stay legible.
+  const sx = (name: string, fallback: string) => v(`--syntax-${name}`, fallback);
+
   const highlight = HighlightStyle.define([
-    { tag: [t.comment, t.lineComment, t.blockComment, t.docComment], color: mutedSoft, fontStyle: "italic" },
-    { tag: [t.keyword, t.controlKeyword, t.modifier, t.operatorKeyword], color: ink, fontWeight: "600" },
-    { tag: [t.string, t.special(t.string)], color: v("--warn", "#b9722a") },
-    { tag: [t.number, t.bool, t.null], color: v("--success", "#1f8a65") },
-    { tag: [t.regexp, t.escape], color: v("--warn", "#b9722a") },
-    { tag: [t.function(t.variableName), t.function(t.propertyName)], color: ink },
-    { tag: [t.variableName, t.propertyName], color: body },
-    { tag: [t.typeName, t.className, t.namespace], color: ink, fontWeight: "500" },
-    { tag: [t.tagName, t.angleBracket], color: v("--danger", "#cf2d56") },
-    { tag: [t.attributeName], color: muted },
-    { tag: [t.heading], color: ink, fontWeight: "600" },
-    { tag: [t.link, t.url], color: v("--warn", "#b9722a"), textDecoration: "underline" },
-    { tag: [t.strong], fontWeight: "600" },
-    { tag: [t.emphasis], fontStyle: "italic" },
-    { tag: [t.punctuation, t.bracket, t.brace, t.paren], color: muted },
+    { tag: [t.comment, t.lineComment, t.blockComment], color: sx("comment", mutedSoft), fontStyle: "italic" },
+    { tag: t.docComment, color: sx("doc-comment", mutedSoft), fontStyle: "italic" },
+    { tag: [t.keyword, t.modifier, t.self], color: sx("keyword", ink), fontWeight: "600" },
+    { tag: [t.controlKeyword, t.operatorKeyword], color: sx("control-keyword", ink), fontWeight: "600" },
+    { tag: t.operator, color: sx("operator", muted) },
+    { tag: [t.string, t.special(t.string)], color: sx("string", "#b9722a") },
+    { tag: t.regexp, color: sx("regex", "#b9722a") },
+    { tag: t.escape, color: sx("escape", "#b9722a") },
+    { tag: [t.number, t.integer, t.float], color: sx("number", "#1f8a65") },
+    { tag: [t.bool, t.null], color: sx("bool", "#1f8a65") },
+    { tag: t.atom, color: sx("atom", "#1f8a65") },
+    { tag: [t.function(t.variableName), t.function(t.propertyName)], color: sx("function", ink) },
+    { tag: t.propertyName, color: sx("property-name", body) },
+    { tag: [t.variableName], color: sx("variable", body) },
+    { tag: t.definition(t.variableName), color: sx("definition", ink) },
+    { tag: [t.typeName], color: sx("type", ink), fontWeight: "500" },
+    { tag: [t.className], color: sx("class-name", ink), fontWeight: "500" },
+    { tag: t.namespace, color: sx("namespace", ink) },
+    { tag: [t.tagName, t.angleBracket], color: sx("tag", "#cf2d56") },
+    { tag: t.attributeName, color: sx("attribute-name", muted) },
+    { tag: t.attributeValue, color: sx("attribute-value", "#b9722a") },
+    { tag: [t.punctuation, t.separator], color: sx("punctuation", muted) },
+    { tag: [t.bracket, t.brace, t.paren, t.squareBracket], color: sx("bracket", muted) },
+    { tag: t.heading, color: sx("heading", ink), fontWeight: "600" },
+    { tag: [t.link, t.url], color: sx("link", "#b9722a"), textDecoration: "underline" },
+    { tag: t.strong, fontWeight: "600" },
+    { tag: t.emphasis, fontStyle: "italic" },
+    { tag: t.invalid, color: sx("invalid", "#cf2d56") },
   ]);
 
   return [theme, syntaxHighlighting(highlight)];

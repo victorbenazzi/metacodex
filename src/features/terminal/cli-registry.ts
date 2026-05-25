@@ -1,5 +1,14 @@
 export type CliDangerLevel = "normal" | "dangerous";
 
+/**
+ * Grouping in the launcher menu:
+ * - "coding"     → flat list under the "Coding Agents" header (Claude Code, Codex, …)
+ * - "autonomous" → nested under a collapsible "Autonomous Agents" header (Hermes, OpenClaw)
+ *
+ * Missing/undefined defaults to "coding" so older entries stay where they are.
+ */
+export type CliCategory = "coding" | "autonomous";
+
 export interface CliTool {
   id: string;
   label: string;
@@ -18,6 +27,7 @@ export interface CliTool {
   dangerLevel?: CliDangerLevel;
   /** Marks CLIs whose install/launch command is not officially confirmed yet. */
   needsConfig?: boolean;
+  category?: CliCategory;
 }
 
 /**
@@ -78,6 +88,30 @@ export const DEFAULT_CLI_REGISTRY: CliTool[] = [
       "Inflection Pi terminal client. Official install command not yet confirmed, configure in CLI registry.",
     needsConfig: true,
   },
+  {
+    id: "hermes",
+    label: "Hermes",
+    command: "hermes",
+    args: [],
+    detectCommand: "command -v hermes",
+    installCommand:
+      "curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash",
+    docsUrl: "https://github.com/NousResearch/hermes-agent",
+    description: "NousResearch's autonomous research agent.",
+    category: "autonomous",
+  },
+  {
+    id: "openclaw",
+    label: "OpenClaw",
+    command: "openclaw",
+    args: [],
+    detectCommand: "command -v openclaw",
+    installCommand: "npm i -g openclaw",
+    altInstallCommand: "curl -fsSL https://openclaw.ai/install.sh | bash",
+    docsUrl: "https://openclaw.ai",
+    description: "Open-source autonomous agent reachable via chat apps.",
+    category: "autonomous",
+  },
 ];
 
 export function cliById(id: string, registry: CliTool[] = DEFAULT_CLI_REGISTRY): CliTool | undefined {
@@ -88,4 +122,18 @@ export function cliById(id: string, registry: CliTool[] = DEFAULT_CLI_REGISTRY):
 export function cliLaunchString(cli: CliTool): string {
   if (!cli.args.length) return cli.command;
   return [cli.command, ...cli.args].join(" ");
+}
+
+/** Default category for a CLI ("coding" when omitted). */
+export function cliCategory(cli: CliTool): CliCategory {
+  return cli.category ?? "coding";
+}
+
+/**
+ * Returns true when the agent should be visible in the launcher menu.
+ * Defaults to `true` for any cli id missing from the map — new agents added to
+ * the registry are visible by default; users opt them out via Settings → Interface.
+ */
+export function isAgentEnabled(cliId: string, enabledAgents: Record<string, boolean>): boolean {
+  return enabledAgents[cliId] ?? true;
 }

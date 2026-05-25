@@ -15,6 +15,7 @@ import type { Tab } from "@/components/tabs/types";
 import { newId } from "@/lib/idGen";
 import { ext } from "@/lib/path";
 import { cliLaunchString, type CliTool } from "@/features/terminal/cli-registry";
+import { preloadCliDetections } from "@/features/terminal/cli-detection";
 import { basename } from "@/lib/path";
 import { useProjectsStore } from "@/features/projects/project.store";
 import { useSettingsDataStore } from "@/features/settings/settings.data.store";
@@ -105,6 +106,13 @@ export function AppShell() {
   useEffect(() => {
     if (!keybindingsHydrated) hydrateKeybindings();
   }, [keybindingsHydrated, hydrateKeybindings]);
+
+  // Warm the CLI-detection cache at boot. Each probe shells out through a
+  // login shell which is slow on macOS; doing it eagerly here means the
+  // launcher menu opens with results already resolved.
+  useEffect(() => {
+    preloadCliDetections();
+  }, []);
 
   // Keep open editor buffers in sync with files agents edit from terminal tabs.
   useEditorReconcile();

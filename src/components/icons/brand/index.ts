@@ -3,11 +3,21 @@ import type { ComponentType } from "react";
 import { AntigravityIcon } from "./AntigravityIcon";
 import { ClaudeCodeIcon } from "./ClaudeCodeIcon";
 import { CodexIcon } from "./CodexIcon";
+import { HermesIcon } from "./HermesIcon";
+import { OpenClawIcon } from "./OpenClawIcon";
 import { OpenCodeIcon } from "./OpenCodeIcon";
 import { PiIcon } from "./PiIcon";
 import type { BrandIconProps } from "./types";
 
-export { AntigravityIcon, ClaudeCodeIcon, CodexIcon, OpenCodeIcon, PiIcon };
+export {
+  AntigravityIcon,
+  ClaudeCodeIcon,
+  CodexIcon,
+  HermesIcon,
+  OpenClawIcon,
+  OpenCodeIcon,
+  PiIcon,
+};
 export type { BrandIconProps };
 
 // Map keyed by CliTool.id (see src/features/terminal/cli-registry.ts) so any
@@ -19,4 +29,6 @@ export const CLI_BRAND_ICONS: Record<string, ComponentType<BrandIconProps>> = {
   opencode: OpenCodeIcon,
   "antigravity-cli": AntigravityIcon,
   "pi-cli": PiIcon,
+  hermes: HermesIcon,
+  openclaw: OpenClawIcon,
 };

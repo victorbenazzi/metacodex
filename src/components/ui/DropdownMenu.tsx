@@ -42,6 +42,7 @@ export function DropdownItem({
   trailing,
   destructive,
   className,
+  keepOpenOnSelect,
 }: {
   children: React.ReactNode;
   onSelect?: () => void;
@@ -49,6 +50,8 @@ export function DropdownItem({
   trailing?: React.ReactNode;
   destructive?: boolean;
   className?: string;
+  /** Stay open after selection — for in-menu toggles like collapsible headers. */
+  keepOpenOnSelect?: boolean;
 }) {
   return (
     <RDM.Item
@@ -57,6 +60,7 @@ export function DropdownItem({
           e.preventDefault();
           return;
         }
+        if (keepOpenOnSelect) e.preventDefault();
         onSelect?.();
       }}
       disabled={disabled}

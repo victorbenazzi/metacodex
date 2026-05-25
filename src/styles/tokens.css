@@ -49,6 +49,12 @@
   --diff-remove-line: rgba(207, 45, 86, 0.09);
   --diff-remove-text: rgba(207, 45, 86, 0.24);
 
+  /* Editor selection — must keep ~AA contrast with every syntax token, so we
+     darken the canvas (light theme) rather than tint it with an accent. Themes
+     override --selection via applyTheme(); these defaults catch the boot
+     window before a theme is applied. */
+  --selection: rgba(38, 37, 30, 0.22);
+
   /* Radius */
   --radius-xs: 4px;
   --radius-sm: 6px;
@@ -115,6 +121,38 @@
   --term-bright-magenta: #a3678f;
   --term-bright-cyan: #4f8e8c;
   --term-bright-white: #f7f7f4;
+
+  /* Syntax palette (used by editor + Shiki for markdown). Defaults below
+     preserve the original Solar Cream highlighting; themes override these via
+     applyTheme(). */
+  --syntax-keyword: #26251e;
+  --syntax-control-keyword: #26251e;
+  --syntax-operator: #807d72;
+  --syntax-string: #b9722a;
+  --syntax-regex: #b9722a;
+  --syntax-escape: #b9722a;
+  --syntax-number: #1f8a65;
+  --syntax-bool: #1f8a65;
+  --syntax-atom: #1f8a65;
+  --syntax-comment: #a09c92;
+  --syntax-doc-comment: #a09c92;
+  --syntax-function: #26251e;
+  --syntax-method: #26251e;
+  --syntax-property-name: #5a5852;
+  --syntax-variable: #5a5852;
+  --syntax-parameter: #5a5852;
+  --syntax-definition: #26251e;
+  --syntax-type: #26251e;
+  --syntax-class-name: #26251e;
+  --syntax-namespace: #26251e;
+  --syntax-tag: #cf2d56;
+  --syntax-attribute-name: #807d72;
+  --syntax-attribute-value: #b9722a;
+  --syntax-punctuation: #807d72;
+  --syntax-bracket: #807d72;
+  --syntax-link: #b9722a;
+  --syntax-heading: #26251e;
+  --syntax-invalid: #cf2d56;
 }
 
 [data-theme="dark"] {
@@ -156,6 +194,12 @@
   --diff-remove-line: rgba(255, 90, 125, 0.13);
   --diff-remove-text: rgba(255, 90, 125, 0.26);
 
+  /* Opaque + darker than every syntax token so selected text stays legible.
+     The previous fallback `--term-selection rgba(247,247,244,0.18)` was a
+     white overlay on dark canvas — produced a pale lavender that crushed
+     contrast against mid-tone tokens. */
+  --selection: #3a3833;
+
   /* Terminal palette dark */
   --term-bg: var(--canvas);
   --term-fg: var(--ink);
@@ -177,4 +221,34 @@
   --term-bright-magenta: #d3a6c0;
   --term-bright-cyan: #8cc4c1;
   --term-bright-white: #f7f7f4;
+
+  /* Syntax palette — Mono Slate defaults (overridden by applyTheme()). */
+  --syntax-keyword: #f7f7f4;
+  --syntax-control-keyword: #f7f7f4;
+  --syntax-operator: #969287;
+  --syntax-string: #e3a35a;
+  --syntax-regex: #e3a35a;
+  --syntax-escape: #e3a35a;
+  --syntax-number: #4ec99a;
+  --syntax-bool: #4ec99a;
+  --syntax-atom: #4ec99a;
+  --syntax-comment: #68645c;
+  --syntax-doc-comment: #68645c;
+  --syntax-function: #f7f7f4;
+  --syntax-method: #f7f7f4;
+  --syntax-property-name: #c8c5ba;
+  --syntax-variable: #c8c5ba;
+  --syntax-parameter: #c8c5ba;
+  --syntax-definition: #f7f7f4;
+  --syntax-type: #f7f7f4;
+  --syntax-class-name: #f7f7f4;
+  --syntax-namespace: #f7f7f4;
+  --syntax-tag: #ff5a7d;
+  --syntax-attribute-name: #969287;
+  --syntax-attribute-value: #e3a35a;
+  --syntax-punctuation: #969287;
+  --syntax-bracket: #969287;
+  --syntax-link: #e3a35a;
+  --syntax-heading: #f7f7f4;
+  --syntax-invalid: #ff5a7d;
 }

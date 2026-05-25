@@ -47,7 +47,7 @@ export function DiffTab({ path, projectId, status }: DiffTabProps) {
   const { t } = useTranslation();
   const hostRef = useRef<HTMLDivElement | null>(null);
   const mergeRef = useRef<MergeView | null>(null);
-  const themeEffective = useThemeStore((s) => s.effective);
+  const themeId = useThemeStore((s) => s.theme.id);
   const editorFontSize = useSettingsDataStore((s) => s.settings.editor.fontSize);
   const editorFontFamily = useSettingsDataStore((s) => s.settings.editor.fontFamily);
   const gitInfo = useGitStore((s) => (projectId ? s.byProject[projectId] : undefined));
@@ -128,7 +128,7 @@ export function DiffTab({ path, projectId, status }: DiffTabProps) {
       mergeRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [path, themeEffective, editorFontSize, editorFontFamily]);
+  }, [path, themeId, editorFontSize, editorFontFamily]);
 
   // When this project's git state moves (commit, checkout, an agent editing the
   // file from a terminal), refresh both sides in place — no teardown, so the

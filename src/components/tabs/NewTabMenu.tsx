@@ -1,5 +1,5 @@
 import type { ComponentType, ReactNode } from "react";
-import { Plus, AlertTriangle, Loader2, Settings2 } from "lucide-react";
+import { Plus, AlertTriangle, ChevronDown, ChevronRight, Loader2, Settings2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -22,12 +22,18 @@ import { Icon } from "@/components/ui/Icon";
 import { Kbd } from "@/components/ui/Kbd";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { CLI_BRAND_ICONS } from "@/components/icons/brand";
-import { DEFAULT_CLI_REGISTRY, type CliTool } from "@/features/terminal/cli-registry";
+import {
+  DEFAULT_CLI_REGISTRY,
+  cliCategory,
+  isAgentEnabled,
+  type CliTool,
+} from "@/features/terminal/cli-registry";
 import {
   cliDetectionFor,
   useCliDetections,
   type CliDetectionStatus,
 } from "@/features/terminal/cli-detection";
+import { useSettingsDataStore } from "@/features/settings/settings.data.store";
 import { cn } from "@/lib/cn";
 
 interface NewTabActions {
@@ -46,6 +52,7 @@ interface MenuComponents {
     trailing?: ReactNode;
     children: ReactNode;
     className?: string;
+    keepOpenOnSelect?: boolean;
   }>;
   Separator: ComponentType;
   Label: ComponentType<{ children: ReactNode }>;
@@ -54,9 +61,39 @@ interface MenuComponents {
 export function NewTabBody({ actions, C }: { actions: NewTabActions; C: MenuComponents }) {
   const { t } = useTranslation();
   const detections = useCliDetections();
+  const enabledAgents = useSettingsDataStore((s) => s.settings.interface.enabledAgents);
+  const autonomousExpanded = useSettingsDataStore(
+    (s) => s.settings.interface.autonomousAgentsExpanded,
+  );
+  const updateSettings = useSettingsDataStore((s) => s.update);
   // Roomier rows + a more legible highlight (full-opacity surface, not the
   // shared menu default of /70, which reads as almost no hover at this density).
   const itemClass = "py-[9px] data-[highlighted]:bg-surface-strong";
+
+  const visible = DEFAULT_CLI_REGISTRY.filter((cli) => isAgentEnabled(cli.id, enabledAgents));
+  const codingAgents = visible.filter((cli) => cliCategory(cli) === "coding");
+  const autonomousAgents = visible.filter((cli) => cliCategory(cli) === "autonomous");
+
+  const renderAgent = (cli: CliTool) => {
+    const BrandIcon = CLI_BRAND_ICONS[cli.id];
+    const detection = cliDetectionFor(cli, detections);
+    return (
+      <C.Item
+        key={cli.id}
+        onSelect={() => actions.onLaunchCli(cli)}
+        className={itemClass}
+        trailing={<CliInstallHint status={detection.status} />}
+      >
+        {BrandIcon ? (
+          <span className="flex h-[20px] w-[20px] shrink-0 items-center justify-center">
+            <BrandIcon size={16} />
+          </span>
+        ) : null}
+        <span className="font-medium">{cli.label}</span>
+      </C.Item>
+    );
+  };
+
   return (
     <>
       <C.Item
@@ -67,28 +104,38 @@ export function NewTabBody({ actions, C }: { actions: NewTabActions; C: MenuComp
         <span className="font-medium">{t("tabs.newTerminal")}</span>
       </C.Item>
 
-      <C.Separator />
-      <C.Label>{t("tabs.aiClis")}</C.Label>
+      {codingAgents.length > 0 && (
+        <>
+          <C.Separator />
+          <C.Label>{t("tabs.codingAgents")}</C.Label>
+          {codingAgents.map(renderAgent)}
+        </>
+      )}
 
-      {DEFAULT_CLI_REGISTRY.map((cli) => {
-        const BrandIcon = CLI_BRAND_ICONS[cli.id];
-        const detection = cliDetectionFor(cli, detections);
-        return (
+      {autonomousAgents.length > 0 && (
+        <>
+          <C.Separator />
           <C.Item
-            key={cli.id}
-            onSelect={() => actions.onLaunchCli(cli)}
-            className={itemClass}
-            trailing={<CliInstallHint status={detection.status} />}
+            keepOpenOnSelect
+            onSelect={() =>
+              updateSettings("interface", { autonomousAgentsExpanded: !autonomousExpanded })
+            }
+            className={cn(itemClass, "uppercase tracking-[0.08em]")}
+            trailing={
+              <Icon
+                icon={autonomousExpanded ? ChevronDown : ChevronRight}
+                size={12}
+                className="text-muted"
+              />
+            }
           >
-            {BrandIcon ? (
-              <span className="flex h-[20px] w-[20px] shrink-0 items-center justify-center">
-                <BrandIcon size={16} />
-              </span>
-            ) : null}
-            <span className="font-medium">{cli.label}</span>
+            <span className="text-[10px] font-medium text-muted">
+              {t("tabs.autonomousAgents")}
+            </span>
           </C.Item>
-        );
-      })}
+          {autonomousExpanded && autonomousAgents.map(renderAgent)}
+        </>
+      )}
 
       {actions.onEditRegistry && (
         <>

@@ -9,6 +9,8 @@ import { useTabsStore, WORKSPACE_NULL } from "@/components/tabs/tabsStore";
 import { EditorTab } from "@/components/editor/EditorTab";
 import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/cn";
+import { useThemeStore } from "@/features/theme/theme.store";
+import { highlightToHtml } from "@/features/theme/shikiHighlighter";
 
 interface MarkdownPreviewProps {
   tabId: string;
@@ -109,6 +111,8 @@ export function MarkdownPreview({ tabId, path, projectId, mode }: MarkdownPrevie
 }
 
 function MarkdownBody({ source }: { source: string }) {
+  // Subscribe so a theme swap re-runs Shiki for every block on the page.
+  const theme = useThemeStore((s) => s.theme);
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
@@ -141,20 +145,23 @@ function MarkdownBody({ source }: { source: string }) {
           </a>
         ),
         code: (p: any) => {
-          const inline = p.inline;
-          if (inline) {
+          if (p.inline) {
             return (
               <code className="rounded-xs bg-surface-strong/50 px-[5px] py-[1px] font-mono text-[12px] text-ink">
                 {p.children}
               </code>
             );
           }
-          return (
-            <pre className="my-[16px] overflow-x-auto rounded-sm border border-hairline bg-canvas-soft px-[14px] py-[12px] font-mono text-[12px] leading-[1.5] text-body">
-              <code>{p.children}</code>
-            </pre>
-          );
+          // Fenced block — react-markdown wraps it in <pre><code> and passes the
+          // ```lang on the <code> className as `language-xxx`. We override the
+          // <pre> below to a passthrough, then let ShikiCode own both elements.
+          const lang = (p.className as string | undefined)?.replace("language-", "");
+          const raw = Array.isArray(p.children)
+            ? p.children.join("")
+            : String(p.children ?? "");
+          return <ShikiCode code={raw.replace(/\n$/, "")} lang={lang} themeId={theme.id} />;
         },
+        pre: (p: any) => <>{p.children}</>,
         ul: (p) => <ul className="my-[12px] list-disc space-y-[4px] pl-[20px] text-body">{p.children}</ul>,
         ol: (p) => <ol className="my-[12px] list-decimal space-y-[4px] pl-[20px] text-body">{p.children}</ol>,
         blockquote: (p) => (
@@ -180,5 +187,48 @@ function MarkdownBody({ source }: { source: string }) {
     >
       {source}
     </ReactMarkdown>
+  );
+}
+
+/**
+ * Async-highlighted code block. Renders raw text first (no flash, no layout
+ * shift) and swaps in the Shiki HTML once the engine + the requested language +
+ * the active theme finish loading. Re-runs on every themeId change so the same
+ * block recolors live when the user picks a different palette.
+ */
+function ShikiCode({ code, lang, themeId }: { code: string; lang: string | undefined; themeId: string }) {
+  const [html, setHtml] = useState<string | null>(null);
+  const theme = useThemeStore((s) => s.theme);
+
+  useEffect(() => {
+    let cancelled = false;
+    setHtml(null);
+    highlightToHtml(code, lang, theme)
+      .then((out) => {
+        if (!cancelled) setHtml(out);
+      })
+      .catch(() => {
+        // Highlight failure (unknown language, engine init error) → leave the
+        // fallback plain `<pre>` rendered below; never crash the preview.
+      });
+    return () => {
+      cancelled = true;
+    };
+    // theme is captured by ref above; we only care about its id for re-runs
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code, lang, themeId]);
+
+  if (html) {
+    return (
+      <div
+        className="my-[16px] overflow-x-auto rounded-sm border border-hairline font-mono text-[12px] leading-[1.5] [&_pre]:m-0 [&_pre]:px-[14px] [&_pre]:py-[12px]"
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
+    );
+  }
+  return (
+    <pre className="my-[16px] overflow-x-auto rounded-sm border border-hairline bg-canvas-soft px-[14px] py-[12px] font-mono text-[12px] leading-[1.5] text-body">
+      <code>{code}</code>
+    </pre>
   );
 }

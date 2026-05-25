@@ -37,6 +37,7 @@
     "nav": {
       "general": "Geral",
       "appearance": "Aparência",
+      "interface": "Interface",
       "editor": "Editor",
       "terminal": "Terminal",
       "shortcuts": "Atalhos",
@@ -61,15 +62,22 @@
     "appearance": {
       "title": "Aparência",
       "description": "Tema e ajustes visuais.",
-      "theme": "Tema",
-      "themeHint": "Segue o sistema operacional, a menos que você defina.",
+      "mode": "Modo",
+      "modeHint": "Preferência claro / escuro. Escolher um tema abaixo sincroniza automaticamente.",
       "system": "Sistema",
       "light": "Claro",
       "dark": "Escuro",
-      "baseSize": "Tamanho base da UI",
-      "baseSizeHint": "Definido pela spec, compacto em 14px.",
-      "displayFont": "Fonte de display",
-      "displayFontHint": "Usada na tela inicial e em títulos de seção."
+      "themeGallery": "Tema",
+      "themeCount": "{{count}} temas",
+      "applyTheme": "Aplicar tema {{name}}"
+    },
+    "interface": {
+      "title": "Interface",
+      "description": "Controle quais superfícies e agentes aparecem no workspace.",
+      "launcherVisibilityTitle": "Visibilidade no launcher",
+      "launcherVisibilityHint": "Escolha quais agentes aparecem no menu +. Os ocultos continuam instalados e podem ser abertos a partir de um terminal.",
+      "autonomousTag": "autônomo",
+      "toggleAria": "Alternar {{name}} no launcher"
     },
     "editor": {
       "title": "Editor",
@@ -239,7 +247,8 @@
   },
   "tabs": {
     "newTerminal": "Novo terminal",
-    "aiClis": "CLIs de IA",
+    "codingAgents": "Agentes de Programação",
+    "autonomousAgents": "Agentes Autônomos",
     "editRegistry": "Editar registro de CLIs…",
     "newTab": "Nova aba",
     "unsavedChanges": "Alterações não salvas",

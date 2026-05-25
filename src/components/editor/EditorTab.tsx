@@ -56,7 +56,9 @@ export function EditorTab({ tabId, path, projectId }: EditorTabProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const themeComp = useRef<Compartment | null>(null);
-  const themeEffective = useThemeStore((s) => s.effective);
+  // Subscribe to the theme id (not just light/dark) so picking a different
+  // palette of the same kind still recolors the editor live.
+  const themeId = useThemeStore((s) => s.theme.id);
   const editorFontSize = useSettingsDataStore((s) => s.settings.editor.fontSize);
   const editorFontFamily = useSettingsDataStore((s) => s.settings.editor.fontFamily);
   const setLoaded = useEditorStore((s) => s.setLoaded);
@@ -245,8 +247,8 @@ export function EditorTab({ tabId, path, projectId }: EditorTabProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabId, path]);
 
-  // Reconfigure the theme in place on light/dark switch OR an editor-font change
-  // — no view rebuild, so undo history, cursor, and scroll position survive.
+  // Reconfigure the theme in place on a theme/font change — no view rebuild,
+  // so undo history, cursor, and scroll position survive.
   useEffect(() => {
     const view = viewRef.current;
     const comp = themeComp.current;
@@ -256,7 +258,7 @@ export function EditorTab({ tabId, path, projectId }: EditorTabProps) {
         buildEditorTheme({ fontSize: editorFontSize, fontFamily: editorFontFamily }),
       ),
     });
-  }, [themeEffective, editorFontSize, editorFontFamily]);
+  }, [themeId, editorFontSize, editorFontFamily]);
 
   // Honour a goto-line scheduled while this tab is already open (the creation
   // effect only sees goto requests present at mount time).

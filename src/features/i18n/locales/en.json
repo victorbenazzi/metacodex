@@ -37,6 +37,7 @@
     "nav": {
       "general": "General",
       "appearance": "Appearance",
+      "interface": "Interface",
       "editor": "Editor",
       "terminal": "Terminal",
       "shortcuts": "Shortcuts",
@@ -61,15 +62,22 @@
     "appearance": {
       "title": "Appearance",
       "description": "Theme and visual settings.",
-      "theme": "Theme",
-      "themeHint": "Follows your operating system unless overridden.",
+      "mode": "Mode",
+      "modeHint": "Light / dark preference. Picking a theme below syncs this automatically.",
       "system": "System",
       "light": "Light",
       "dark": "Dark",
-      "baseSize": "Base UI size",
-      "baseSizeHint": "Set by spec, kept compact at 14px.",
-      "displayFont": "Display font",
-      "displayFontHint": "Used on welcome and section headings."
+      "themeGallery": "Theme",
+      "themeCount": "{{count}} themes",
+      "applyTheme": "Apply {{name}} theme"
+    },
+    "interface": {
+      "title": "Interface",
+      "description": "Tweak which surfaces and agents are visible in the workspace.",
+      "launcherVisibilityTitle": "Launcher visibility",
+      "launcherVisibilityHint": "Choose which agents appear in the + menu. Hidden agents stay installed and can still be launched from a terminal.",
+      "autonomousTag": "autonomous",
+      "toggleAria": "Toggle {{name}} in the launcher"
     },
     "editor": {
       "title": "Editor",
@@ -239,7 +247,8 @@
   },
   "tabs": {
     "newTerminal": "New Terminal",
-    "aiClis": "AI CLIs",
+    "codingAgents": "Coding Agents",
+    "autonomousAgents": "Autonomous Agents",
     "editRegistry": "Edit CLI registry…",
     "newTab": "New tab",
     "unsavedChanges": "Unsaved changes",

@@ -3,9 +3,11 @@ import { Terminal, type ITheme } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { CanvasAddon } from "@xterm/addon-canvas";
+import { invoke } from "@tauri-apps/api/core";
 
 import { useThemeStore } from "@/features/theme/theme.store";
 import { useSettingsDataStore } from "@/features/settings/settings.data.store";
+import { CMD } from "@/lib/ipc";
 
 /** Read a CSS variable from :root / [data-theme]. */
 function readVar(name: string): string {
@@ -55,7 +57,9 @@ export function useXterm(): UseXtermResult {
   const firstTypoRun = useRef(true);
   const firstCursorRun = useRef(true);
   const firstScrollbackRun = useRef(true);
-  const themeEffective = useThemeStore((s) => s.effective);
+  // Reapply on any theme switch (light↔dark *and* swaps within the same kind,
+  // e.g. Tokyo Night → One Dark — both dark, different ANSI palettes).
+  const themeId = useThemeStore((s) => s.theme.id);
   const termFontFamily = useSettingsDataStore((s) => s.settings.terminal.fontFamily);
   const termFontSize = useSettingsDataStore((s) => s.settings.terminal.fontSize);
   const termCursorStyle = useSettingsDataStore((s) => s.settings.terminal.cursorStyle);
@@ -84,7 +88,16 @@ export function useXterm(): UseXtermResult {
     });
     const fit = new FitAddon();
     term.loadAddon(fit);
-    term.loadAddon(new WebLinksAddon());
+    // Default handler calls window.open(uri), which is a no-op inside Tauri's
+    // webview — route http(s) clicks through the IPC opener so they land in
+    // the user's default browser.
+    term.loadAddon(
+      new WebLinksAddon((_ev, uri) => {
+        invoke(CMD.openExternalUrl, { url: uri }).catch((err) =>
+          console.warn("[term] open_external_url failed", err),
+        );
+      }),
+    );
     term.open(containerRef.current);
     // Canvas renderer must be attached AFTER open() in xterm.js v5.5 — but
     // the open() itself can crash if it tries to fit/sync before a renderer
@@ -123,11 +136,11 @@ export function useXterm(): UseXtermResult {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Theme reactivity: re-apply when effective theme changes
+  // Theme reactivity: re-apply when the active palette changes
   useEffect(() => {
     if (!termRef.current) return;
     termRef.current.options.theme = buildTerminalTheme();
-  }, [themeEffective]);
+  }, [themeId]);
 
   // Live-apply terminal typography. Font size/family change cell metrics, so we
   // refit — and load the family first so the canvas renderer measures the right

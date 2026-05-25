@@ -11,6 +11,7 @@ import {
   Gauge,
   Terminal,
   Info,
+  LayoutPanelLeft,
   X,
   Sun,
   Moon,
@@ -29,8 +30,14 @@ import { NumberStepper } from "@/components/ui/NumberStepper";
 import { cn } from "@/lib/cn";
 import { CMD, invoke } from "@/lib/ipc";
 import { useThemeStore, type ThemeMode } from "@/features/theme/theme.store";
+import { ThemePicker } from "@/components/settings/ThemePicker";
 import { SUPPORTED_LANGUAGES } from "@/features/i18n/config";
-import { DEFAULT_CLI_REGISTRY } from "@/features/terminal/cli-registry";
+import { CLI_BRAND_ICONS } from "@/components/icons/brand";
+import {
+  DEFAULT_CLI_REGISTRY,
+  cliCategory,
+  isAgentEnabled,
+} from "@/features/terminal/cli-registry";
 import {
   cliDetectionFor,
   useCliDetections,
@@ -59,6 +66,7 @@ interface SettingsDialogProps {
 type CategoryId =
   | "general"
   | "appearance"
+  | "interface"
   | "editor"
   | "terminal"
   | "shortcuts"
@@ -75,6 +83,7 @@ interface Category {
 const CATEGORIES: Category[] = [
   { id: "general", labelKey: "settings.nav.general", icon: Sliders },
   { id: "appearance", labelKey: "settings.nav.appearance", icon: Palette },
+  { id: "interface", labelKey: "settings.nav.interface", icon: LayoutPanelLeft },
   { id: "editor", labelKey: "settings.nav.editor", icon: FileCode },
   { id: "terminal", labelKey: "settings.nav.terminal", icon: SquareTerminal },
   { id: "shortcuts", labelKey: "settings.nav.shortcuts", icon: Keyboard },
@@ -162,6 +171,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             <section className="overflow-y-auto px-[24px] py-[20px]">
               {selected === "general" && <GeneralPane />}
               {selected === "appearance" && <AppearancePane />}
+              {selected === "interface" && <InterfacePane />}
               {selected === "editor" && <EditorPane />}
               {selected === "terminal" && <TerminalPane />}
               {selected === "shortcuts" && <ShortcutsPane />}
@@ -325,18 +335,121 @@ function AppearancePane() {
     <div>
       <PaneHeader title={t("settings.appearance.title")} description={t("settings.appearance.description")} />
 
-      <Row label={t("settings.appearance.theme")} hint={t("settings.appearance.themeHint")}>
+      <Row label={t("settings.appearance.mode")} hint={t("settings.appearance.modeHint")}>
         <Segmented value={mode} options={options} onChange={setMode} />
       </Row>
 
-      <Row label={t("settings.appearance.baseSize")} hint={t("settings.appearance.baseSizeHint")}>
-        <span className="font-mono text-[11px] text-muted">14px</span>
-      </Row>
-
-      <Row label={t("settings.appearance.displayFont")} hint={t("settings.appearance.displayFontHint")}>
-        <span className="font-display text-[14px] italic text-muted">Fraunces</span>
-      </Row>
+      <div className="pt-[20px]">
+        <ThemePicker />
+      </div>
     </div>
+  );
+}
+
+function InterfacePane() {
+  const { t } = useTranslation();
+  const enabledAgents = useSettingsDataStore((s) => s.settings.interface.enabledAgents);
+  const update = useSettingsDataStore((s) => s.update);
+
+  // Stable order: coding agents first (same order as the registry), then autonomous.
+  const ordered = [
+    ...DEFAULT_CLI_REGISTRY.filter((c) => cliCategory(c) === "coding"),
+    ...DEFAULT_CLI_REGISTRY.filter((c) => cliCategory(c) === "autonomous"),
+  ];
+
+  const setEnabled = (id: string, next: boolean) => {
+    update("interface", { enabledAgents: { ...enabledAgents, [id]: next } });
+  };
+
+  return (
+    <div>
+      <PaneHeader
+        title={t("settings.interface.title")}
+        description={t("settings.interface.description")}
+      />
+
+      <div className="mb-[8px] flex items-center justify-between">
+        <h3 className="editorial-caps text-muted">
+          {t("settings.interface.launcherVisibilityTitle")}
+        </h3>
+      </div>
+      <p className="mb-[10px] text-[12px] text-muted">
+        {t("settings.interface.launcherVisibilityHint")}
+      </p>
+
+      <ul className="flex flex-col">
+        {ordered.map((cli) => {
+          const BrandIcon = CLI_BRAND_ICONS[cli.id];
+          const enabled = isAgentEnabled(cli.id, enabledAgents);
+          return (
+            <li
+              key={cli.id}
+              className="flex items-center justify-between gap-[16px] border-b border-hairline-soft py-[12px] last:border-b-0"
+            >
+              <div className="flex min-w-0 items-center gap-[10px]">
+                {BrandIcon ? (
+                  <span className="flex h-[20px] w-[20px] shrink-0 items-center justify-center text-ink">
+                    <BrandIcon size={16} />
+                  </span>
+                ) : null}
+                <div className="min-w-0">
+                  <div className="flex items-center gap-[8px]">
+                    <span className="text-[13px] font-medium text-ink">{cli.label}</span>
+                    {cliCategory(cli) === "autonomous" ? (
+                      <Badge tone="muted">{t("settings.interface.autonomousTag")}</Badge>
+                    ) : null}
+                  </div>
+                  <div className="mt-[2px] truncate font-mono text-[11px] text-muted">
+                    {cli.command}
+                  </div>
+                </div>
+              </div>
+              <Switch
+                checked={enabled}
+                onChange={(v) => setEnabled(cli.id, v)}
+                ariaLabel={t("settings.interface.toggleAria", { name: cli.label })}
+              />
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+/** Compact pill switch — visual style matches the rest of the settings dialog
+ *  (no Radix dependency, no animation library; a plain accessible button). */
+function Switch({
+  checked,
+  onChange,
+  ariaLabel,
+}: {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  ariaLabel: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={ariaLabel}
+      onClick={() => onChange(!checked)}
+      className={cn(
+        "relative inline-flex h-[18px] w-[32px] shrink-0 items-center rounded-full border transition-colors",
+        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[2px]",
+        checked
+          ? "border-ink bg-ink"
+          : "border-hairline-strong bg-surface-strong/40 hover:bg-surface-strong/60",
+      )}
+    >
+      <span
+        className={cn(
+          "inline-block h-[12px] w-[12px] rounded-full transition-transform",
+          checked ? "translate-x-[16px] bg-on-primary" : "translate-x-[2px] bg-muted",
+        )}
+      />
+    </button>
   );
 }
 

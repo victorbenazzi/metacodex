@@ -18,47 +18,77 @@ const checkingState: CliDetectionState = {
   path: null,
 };
 
+// Detection round-trips through a login shell (`$SHELL -l -c "command -v ..."`)
+// which re-sources .zshrc / nvm / mise — slow enough on macOS that running it
+// on every menu open shows a visible spinner per CLI. We cache results at the
+// module level for the lifetime of the app: each CLI is probed at most once
+// per session, results are shared across every mount of the hook, and the menu
+// reopens render the cached snapshot synchronously.
+const cache = new Map<string, CliDetectionState>();
+const inflight = new Map<string, Promise<void>>();
+const listeners = new Set<() => void>();
+
+function notify() {
+  for (const l of listeners) l();
+}
+
+function ensureDetected(cli: CliTool) {
+  if (cache.has(cli.id) || inflight.has(cli.id)) return;
+  const p = cliApi
+    .detect(cli.command)
+    .then(
+      (result) => {
+        cache.set(cli.id, {
+          ...result,
+          status: result.installed ? "installed" : "missing",
+        });
+      },
+      (err) => {
+        console.warn("[cli] detect failed", cli.id, err);
+        cache.set(cli.id, { status: "missing", installed: false, path: null });
+      },
+    )
+    .finally(() => {
+      inflight.delete(cli.id);
+      notify();
+    });
+  inflight.set(cli.id, p);
+}
+
+function snapshot(registry: CliTool[]): CliDetections {
+  const out: CliDetections = {};
+  for (const cli of registry) {
+    out[cli.id] = cache.get(cli.id) ?? checkingState;
+  }
+  return out;
+}
+
 export function emptyCliDetections(registry: CliTool[] = DEFAULT_CLI_REGISTRY): CliDetections {
   return Object.fromEntries(registry.map((cli) => [cli.id, checkingState]));
 }
 
+/**
+ * Kick off detection for every CLI in `registry` ahead of any UI that needs
+ * it. Safe to call multiple times — already-cached or in-flight entries are
+ * skipped. Wire this into app startup so the first menu open is instant.
+ */
+export function preloadCliDetections(registry: CliTool[] = DEFAULT_CLI_REGISTRY): void {
+  for (const cli of registry) ensureDetected(cli);
+}
+
 export function useCliDetections(registry: CliTool[] = DEFAULT_CLI_REGISTRY): CliDetections {
-  const [detections, setDetections] = useState<CliDetections>(() => emptyCliDetections(registry));
+  const [, force] = useState(0);
 
   useEffect(() => {
-    let cancelled = false;
-
-    setDetections(emptyCliDetections(registry));
-
-    registry.forEach((cli) => {
-      cliApi
-        .detect(cli.command)
-        .then((result) => {
-          if (cancelled) return;
-          setDetections((cur) => ({
-            ...cur,
-            [cli.id]: {
-              ...result,
-              status: result.installed ? "installed" : "missing",
-            },
-          }));
-        })
-        .catch((err) => {
-          console.warn("[cli] detect failed", cli.id, err);
-          if (cancelled) return;
-          setDetections((cur) => ({
-            ...cur,
-            [cli.id]: { status: "missing", installed: false, path: null },
-          }));
-        });
-    });
-
+    const listener = () => force((n) => n + 1);
+    listeners.add(listener);
+    preloadCliDetections(registry);
     return () => {
-      cancelled = true;
+      listeners.delete(listener);
     };
   }, [registry]);
 
-  return detections;
+  return snapshot(registry);
 }
 
 export function cliDetectionFor(cli: CliTool, detections: CliDetections): CliDetectionState {

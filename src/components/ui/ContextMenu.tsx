@@ -37,6 +37,7 @@ export function ContextMenuItem({
   trailing,
   disabled,
   className,
+  keepOpenOnSelect,
 }: {
   children: React.ReactNode;
   onSelect?: () => void;
@@ -44,6 +45,8 @@ export function ContextMenuItem({
   trailing?: React.ReactNode;
   disabled?: boolean;
   className?: string;
+  /** Stay open after selection — for in-menu toggles like collapsible headers. */
+  keepOpenOnSelect?: boolean;
 }) {
   return (
     <RCM.Item
@@ -53,6 +56,7 @@ export function ContextMenuItem({
           e.preventDefault();
           return;
         }
+        if (keepOpenOnSelect) e.preventDefault();
         onSelect?.();
       }}
       className={cn(

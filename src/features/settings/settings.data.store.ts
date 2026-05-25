@@ -22,6 +22,7 @@ interface SettingsDataState {
   update: <K extends SettingsSliceKey>(key: K, patch: Partial<AppSettings[K]>) => void;
   /** Mirror theme/language changes that originate in the theme/i18n stores. */
   setTheme: (mode: ThemeMode) => void;
+  setThemeId: (id: string) => void;
   setLanguage: (id: LanguageId) => void;
 }
 
@@ -51,12 +52,20 @@ export const useSettingsDataStore = create<SettingsDataState>((set, get) => ({
       // "start clean" decision, which was only about projects/workspace state.)
       const rawObj = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
       if (!("theme" in rawObj)) merged.theme = useThemeStore.getState().mode;
+      if (!("themeId" in rawObj)) merged.themeId = useThemeStore.getState().theme.id;
       if (!("language" in rawObj) && isLanguageId(i18n.language)) merged.language = i18n.language;
 
       set({ settings: merged, hydrated: true });
 
       // settings.json is now authoritative — reconcile the live stores to it once.
-      if (useThemeStore.getState().mode !== merged.theme) {
+      // Prefer themeId (more specific) over mode when both diverge from the
+      // live store: the user picked a palette, honor that. If the persisted
+      // themeId matches the current store we still call setThemeId so the
+      // CSS variables are guaranteed to reflect that exact palette (the
+      // module-init paint cache may have used a different one).
+      if (useThemeStore.getState().theme.id !== merged.themeId) {
+        useThemeStore.getState().setThemeId(merged.themeId);
+      } else if (useThemeStore.getState().mode !== merged.theme) {
         useThemeStore.getState().setMode(merged.theme);
       }
       if (i18n.language !== merged.language) {
@@ -81,6 +90,12 @@ export const useSettingsDataStore = create<SettingsDataState>((set, get) => ({
     if (get().hydrated) schedulePersist(() => get().settings);
   },
 
+  setThemeId: (id) => {
+    if (get().settings.themeId === id) return;
+    set({ settings: { ...get().settings, themeId: id } });
+    if (get().hydrated) schedulePersist(() => get().settings);
+  },
+
   setLanguage: (id) => {
     if (get().settings.language === id) return;
     set({ settings: { ...get().settings, language: id } });
@@ -93,7 +108,9 @@ export const useSettingsDataStore = create<SettingsDataState>((set, get) => ({
 // (they keep driving the document + their localStorage paint-cache), so there is
 // no import cycle. Registered once at module load.
 useThemeStore.subscribe((s) => {
-  useSettingsDataStore.getState().setTheme(s.mode);
+  const d = useSettingsDataStore.getState();
+  d.setTheme(s.mode);
+  d.setThemeId(s.theme.id);
 });
 i18n.on("languageChanged", (lng) => {
   if (isLanguageId(lng)) useSettingsDataStore.getState().setLanguage(lng);

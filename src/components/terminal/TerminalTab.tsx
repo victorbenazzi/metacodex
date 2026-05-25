@@ -72,6 +72,22 @@ export function TerminalTab({
     // Make `file:line` references in output clickable → open in the editor.
     const linkProvider = term.registerLinkProvider(createFileLinkProvider(term, cwd));
 
+    // Shift+Enter → send ESC+CR (the Alt/Option+Enter byte sequence), which
+    // ink / readline / prompt-kit interpret as "insert newline without
+    // submit". Plain Enter on a PTY is just `\r` with no modifier bits, so
+    // without this CLIs like Claude Code, Codex, and opencode can't tell
+    // Shift+Enter apart from Enter.
+    term.attachCustomKeyEventHandler((ev) => {
+      if (ev.type === "keydown" && ev.key === "Enter" && ev.shiftKey) {
+        const sid = sessionIdRef.current;
+        if (sid) {
+          ptyApi.write(sid, utf8ToBase64("\x1b\r")).catch(() => undefined);
+        }
+        return false;
+      }
+      return true;
+    });
+
     // Pre-register a placeholder session so UI can show "starting"
     const localKind = cliLaunchCommand ? "cli" : "shell";
 

@@ -307,7 +307,7 @@ export function TabBar({
           />
           <div
             ref={trailingRef}
-            className="absolute right-0 top-0 bottom-0 z-10 flex items-center gap-[6px] border-l border-hairline bg-canvas-soft px-[10px]"
+            className="absolute right-0 top-0 bottom-0 z-10 flex items-center gap-[6px] bg-canvas-soft px-[10px]"
           >
             {trailing}
           </div>

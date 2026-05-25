@@ -1,5 +1,6 @@
 import { isLanguageId, type LanguageId } from "@/features/i18n/config";
 import type { ThemeMode } from "@/features/theme/theme.store";
+import { DEFAULT_LIGHT_THEME_ID, isThemeId } from "@/features/theme/themes";
 
 export type TerminalCursorStyle = "bar" | "block" | "underline";
 
@@ -11,6 +12,9 @@ export type TerminalCursorStyle = "bar" | "block" | "underline";
  */
 export interface AppSettings {
   theme: ThemeMode;
+  /** Active palette id (resolved against the theme registry). When absent the
+   *  app derives a default from `theme` (light → solar-cream, dark → mono-slate). */
+  themeId: string;
   language: LanguageId;
   editor: {
     fontSize: number;
@@ -27,10 +31,18 @@ export interface AppSettings {
     workspaceSaveDebounceMs: number;
     searchDebounceMs: number;
   };
+  /** Launcher visibility and other interface-level toggles. The new-tab menu
+   *  reads these on every render — toggling immediately reflects in the UI. */
+  interface: {
+    /** Whether the "Autonomous Agents" sub-section starts expanded. Persists across sessions. */
+    autonomousAgentsExpanded: boolean;
+    /** Per-CLI visibility in the launcher menu. Missing keys default to true. */
+    enabledAgents: Record<string, boolean>;
+  };
 }
 
 /** Slices of `AppSettings` that are nested objects (patchable via `update`). */
-export type SettingsSliceKey = "editor" | "terminal" | "performance";
+export type SettingsSliceKey = "editor" | "terminal" | "performance" | "interface";
 
 /** Default monospace stack for the terminal — verbatim from `useXterm.ts`. */
 export const DEFAULT_TERMINAL_FONT_FAMILY =
@@ -43,6 +55,7 @@ export const DEFAULT_TERMINAL_FONT_FAMILY =
  */
 export const DEFAULT_SETTINGS: AppSettings = {
   theme: "system",
+  themeId: DEFAULT_LIGHT_THEME_ID,
   language: "en",
   editor: {
     fontSize: 13,
@@ -58,6 +71,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
   performance: {
     workspaceSaveDebounceMs: 350,
     searchDebounceMs: 150,
+  },
+  interface: {
+    autonomousAgentsExpanded: true,
+    enabledAgents: {},
   },
 };
 
@@ -80,6 +97,17 @@ function asObject(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
 }
 
+/** Keep only `Record<string, boolean>` entries from a raw bag (hand-edited JSON
+ *  may contain non-boolean values — silently drop those). */
+function asBoolMap(value: unknown): Record<string, boolean> {
+  const raw = asObject(value);
+  const out: Record<string, boolean> = {};
+  for (const [k, v] of Object.entries(raw)) {
+    if (typeof v === "boolean") out[k] = v;
+  }
+  return out;
+}
+
 const THEME_VALUES: ThemeMode[] = ["system", "light", "dark"];
 const CURSOR_VALUES: TerminalCursorStyle[] = ["bar", "block", "underline"];
 
@@ -94,9 +122,11 @@ export function mergeSettings(raw: unknown): AppSettings {
   const editor = asObject(r.editor);
   const terminal = asObject(r.terminal);
   const perf = asObject(r.performance);
+  const iface = asObject(r.interface);
   const D = DEFAULT_SETTINGS;
   return {
     theme: oneOf(r.theme, THEME_VALUES, D.theme),
+    themeId: isThemeId(r.themeId) ? r.themeId : D.themeId,
     language: isLanguageId(r.language) ? r.language : D.language,
     editor: {
       fontSize: clampNum(editor.fontSize, D.editor.fontSize, 8, 32),
@@ -118,6 +148,13 @@ export function mergeSettings(raw: unknown): AppSettings {
       searchDebounceMs: Math.round(
         clampNum(perf.searchDebounceMs, D.performance.searchDebounceMs, 0, 5000),
       ),
+    },
+    interface: {
+      autonomousAgentsExpanded:
+        typeof iface.autonomousAgentsExpanded === "boolean"
+          ? iface.autonomousAgentsExpanded
+          : D.interface.autonomousAgentsExpanded,
+      enabledAgents: asBoolMap(iface.enabledAgents),
     },
   };
 }
