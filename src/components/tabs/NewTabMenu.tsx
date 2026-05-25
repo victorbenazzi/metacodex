@@ -1,5 +1,5 @@
 import type { ComponentType, ReactNode } from "react";
-import { Plus, AlertTriangle, Settings2 } from "lucide-react";
+import { Plus, AlertTriangle, Loader2, Settings2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -23,6 +23,11 @@ import { Kbd } from "@/components/ui/Kbd";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { CLI_BRAND_ICONS } from "@/components/icons/brand";
 import { DEFAULT_CLI_REGISTRY, type CliTool } from "@/features/terminal/cli-registry";
+import {
+  cliDetectionFor,
+  useCliDetections,
+  type CliDetectionStatus,
+} from "@/features/terminal/cli-detection";
 import { cn } from "@/lib/cn";
 
 interface NewTabActions {
@@ -48,6 +53,7 @@ interface MenuComponents {
 
 function NewTabBody({ actions, C }: { actions: NewTabActions; C: MenuComponents }) {
   const { t } = useTranslation();
+  const detections = useCliDetections();
   // Roomier rows + a more legible highlight (full-opacity surface, not the
   // shared menu default of /70, which reads as almost no hover at this density).
   const itemClass = "py-[9px] data-[highlighted]:bg-surface-strong";
@@ -66,20 +72,13 @@ function NewTabBody({ actions, C }: { actions: NewTabActions; C: MenuComponents 
 
       {DEFAULT_CLI_REGISTRY.map((cli) => {
         const BrandIcon = CLI_BRAND_ICONS[cli.id];
+        const detection = cliDetectionFor(cli, detections);
         return (
           <C.Item
             key={cli.id}
             onSelect={() => actions.onLaunchCli(cli)}
             className={itemClass}
-            trailing={
-              cli.needsConfig ? (
-                <Tooltip content={t("cli.needsConfigTooltip")} side="top">
-                  <span className="inline-flex items-center justify-center text-muted">
-                    <Icon icon={AlertTriangle} size={13} strokeWidth={2} />
-                  </span>
-                </Tooltip>
-              ) : null
-            }
+            trailing={<CliInstallHint status={detection.status} />}
           >
             {BrandIcon ? (
               <span className="flex h-[20px] w-[20px] shrink-0 items-center justify-center">
@@ -101,6 +100,30 @@ function NewTabBody({ actions, C }: { actions: NewTabActions; C: MenuComponents 
         </>
       )}
     </>
+  );
+}
+
+function CliInstallHint({ status }: { status: CliDetectionStatus }) {
+  const { t } = useTranslation();
+
+  if (status === "installed") return null;
+
+  if (status === "checking") {
+    return (
+      <Tooltip content={t("cli.checkingTooltip")} side="top">
+        <span className="inline-flex items-center justify-center text-muted-soft">
+          <Icon icon={Loader2} size={13} className="animate-spin" />
+        </span>
+      </Tooltip>
+    );
+  }
+
+  return (
+    <Tooltip content={t("cli.notInstalledTooltip")} side="top">
+      <span className="inline-flex items-center justify-center text-warn">
+        <Icon icon={AlertTriangle} size={13} strokeWidth={2} />
+      </span>
+    </Tooltip>
   );
 }
 

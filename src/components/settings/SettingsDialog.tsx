@@ -16,6 +16,9 @@ import {
   Moon,
   Laptop,
   RotateCcw,
+  CheckCircle2,
+  CircleAlert,
+  Loader2,
   type LucideIcon,
 } from "lucide-react";
 
@@ -28,6 +31,11 @@ import { CMD, invoke } from "@/lib/ipc";
 import { useThemeStore, type ThemeMode } from "@/features/theme/theme.store";
 import { SUPPORTED_LANGUAGES } from "@/features/i18n/config";
 import { DEFAULT_CLI_REGISTRY } from "@/features/terminal/cli-registry";
+import {
+  cliDetectionFor,
+  useCliDetections,
+  type CliDetectionStatus,
+} from "@/features/terminal/cli-detection";
 import { useSettingsDataStore } from "@/features/settings/settings.data.store";
 import {
   DEFAULT_TERMINAL_FONT_FAMILY,
@@ -605,35 +613,50 @@ function RangeShortcutRow({ command }: { command: CommandDef }) {
 
 function CliRegistryPane() {
   const { t } = useTranslation();
+  const detections = useCliDetections();
+
   return (
     <div>
       <PaneHeader title={t("settings.cli.title")} description={t("settings.cli.description")} />
       <ul className="flex flex-col">
-        {DEFAULT_CLI_REGISTRY.map((cli) => (
-          <li
-            key={cli.id}
-            className="flex items-start justify-between gap-[16px] border-b border-hairline-soft py-[12px] last:border-b-0"
-          >
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-[8px]">
-                <span className="text-[13px] font-medium text-ink">{cli.label}</span>
-                {cli.dangerLevel === "dangerous" && <Badge tone="warn">{t("cli.dangerous")}</Badge>}
-                {cli.needsConfig && <Badge tone="muted">{t("cli.needsConfig")}</Badge>}
-              </div>
-              <div className="mt-[2px] font-mono text-[11px] text-muted">
-                {t("settings.cli.command")}: {cli.command}
-              </div>
-              {cli.installCommand ? (
-                <div
-                  className="mt-[2px] truncate font-mono text-[11px] text-muted-soft"
-                  title={cli.installCommand}
-                >
-                  {t("settings.cli.install")}: {cli.installCommand}
+        {DEFAULT_CLI_REGISTRY.map((cli) => {
+          const detection = cliDetectionFor(cli, detections);
+          return (
+            <li
+              key={cli.id}
+              className="flex items-start justify-between gap-[16px] border-b border-hairline-soft py-[12px] last:border-b-0"
+            >
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-[8px]">
+                  <span className="text-[13px] font-medium text-ink">{cli.label}</span>
+                  <CliStatusBadge status={detection.status} />
+                  {cli.dangerLevel === "dangerous" && <Badge tone="warn">{t("cli.dangerous")}</Badge>}
+                  {cli.needsConfig && detection.status !== "installed" ? (
+                    <Badge tone="muted">{t("cli.needsConfig")}</Badge>
+                  ) : null}
                 </div>
-              ) : null}
-            </div>
-          </li>
-        ))}
+                <div className="mt-[2px] font-mono text-[11px] text-muted">
+                  {t("settings.cli.command")}: {cli.command}
+                </div>
+                {detection.path ? (
+                  <div
+                    className="mt-[2px] truncate font-mono text-[11px] text-muted-soft"
+                    title={detection.path}
+                  >
+                    {t("settings.cli.detectedPath")}: {detection.path}
+                  </div>
+                ) : cli.installCommand ? (
+                  <div
+                    className="mt-[2px] truncate font-mono text-[11px] text-muted-soft"
+                    title={cli.installCommand}
+                  >
+                    {t("settings.cli.install")}: {cli.installCommand}
+                  </div>
+                ) : null}
+              </div>
+            </li>
+          );
+        })}
       </ul>
 
       <p className="mt-[16px] rounded-sm border border-hairline-soft bg-canvas-soft px-[12px] py-[10px] text-[12px] text-muted">
@@ -644,6 +667,35 @@ function CliRegistryPane() {
         />
       </p>
     </div>
+  );
+}
+
+function CliStatusBadge({ status }: { status: CliDetectionStatus }) {
+  const { t } = useTranslation();
+
+  if (status === "checking") {
+    return (
+      <Badge tone="muted">
+        <Icon icon={Loader2} size={10} className="animate-spin" />
+        {t("settings.cli.statusChecking")}
+      </Badge>
+    );
+  }
+
+  if (status === "installed") {
+    return (
+      <Badge tone="success">
+        <Icon icon={CheckCircle2} size={10} />
+        {t("settings.cli.statusInstalled")}
+      </Badge>
+    );
+  }
+
+  return (
+    <Badge tone="warn">
+      <Icon icon={CircleAlert} size={10} />
+      {t("settings.cli.statusMissing")}
+    </Badge>
   );
 }
 
@@ -707,11 +759,13 @@ function Badge({
   tone = "neutral",
 }: {
   children: ReactNode;
-  tone?: "neutral" | "warn" | "muted";
+  tone?: "neutral" | "warn" | "muted" | "success";
 }) {
   const cls =
     tone === "warn"
       ? "border-warn/40 text-warn bg-warn/[0.06]"
+      : tone === "success"
+        ? "border-success/35 text-success bg-success/[0.06]"
       : tone === "muted"
         ? "border-hairline text-muted"
         : "border-hairline-strong text-ink";

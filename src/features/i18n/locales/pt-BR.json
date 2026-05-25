@@ -129,6 +129,10 @@
       "description": "CLIs de IA disponíveis no menu +.",
       "command": "comando",
       "install": "instalação",
+      "detectedPath": "detectado",
+      "statusChecking": "checando",
+      "statusInstalled": "instalado",
+      "statusMissing": "ausente",
       "overridesNote": "A personalização de CLIs chega numa versão futura. Por enquanto, edite <0>{{file}}</0> e reinicie."
     },
     "about": {
@@ -143,7 +147,9 @@
   "cli": {
     "dangerous": "perigoso",
     "needsConfig": "requer config",
-    "needsConfigTooltip": "Requer configuração ou instalação"
+    "needsConfigTooltip": "Requer configuração ou instalação",
+    "checkingTooltip": "Verificando instalação…",
+    "notInstalledTooltip": "Não instalado. Clique para abrir a ajuda de instalação."
   },
   "explorer": {
     "ariaLabel": "Explorador de arquivos",
@@ -285,7 +291,7 @@
     "openInTerminal": "Abrir no terminal",
     "retryDetection": "Detectar de novo",
     "copyInstall": "Copiar comando de instalação",
-    "lookup": "O metacodex procura por <0>{{command}}</0> no seu $PATH via <1>{{detect}}</1>.",
+    "lookup": "O metacodex pergunta ao seu shell de login por <0>{{command}}</0> via <1>{{detect}}</1>.",
     "unknownCli": "CLI desconhecida: <0>{{id}}</0>",
     "detecting": "detectando {{label}}…",
     "processExited": "[processo encerrado]"

@@ -37,10 +37,6 @@ export function CliTabComponent({
       setStatus("missing");
       return;
     }
-    if (cli.needsConfig) {
-      setStatus("missing");
-      return;
-    }
     try {
       setStatus("detecting");
       const result = await cliApi.detect(cli.command);

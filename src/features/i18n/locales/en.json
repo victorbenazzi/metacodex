@@ -129,6 +129,10 @@
       "description": "AI coding CLIs available from the + menu.",
       "command": "command",
       "install": "install",
+      "detectedPath": "detected",
+      "statusChecking": "checking",
+      "statusInstalled": "installed",
+      "statusMissing": "missing",
       "overridesNote": "Custom CLI overrides will land in a future release. For now, edit <0>{{file}}</0> and restart."
     },
     "about": {
@@ -143,7 +147,9 @@
   "cli": {
     "dangerous": "dangerous",
     "needsConfig": "needs config",
-    "needsConfigTooltip": "Needs configuration or installation"
+    "needsConfigTooltip": "Needs configuration or installation",
+    "checkingTooltip": "Checking installation…",
+    "notInstalledTooltip": "Not installed. Click to open install help."
   },
   "explorer": {
     "ariaLabel": "File explorer",
@@ -285,7 +291,7 @@
     "openInTerminal": "Open in terminal",
     "retryDetection": "Retry detection",
     "copyInstall": "Copy install command",
-    "lookup": "metacodex looks for <0>{{command}}</0> on your $PATH via <1>{{detect}}</1>.",
+    "lookup": "metacodex asks your login shell for <0>{{command}}</0> via <1>{{detect}}</1>.",
     "unknownCli": "Unknown CLI id: <0>{{id}}</0>",
     "detecting": "detecting {{label}}…",
     "processExited": "[process exited]"
