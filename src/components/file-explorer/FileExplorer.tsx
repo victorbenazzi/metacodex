@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { FilePlus, FolderPlus, RefreshCw, Search } from "lucide-react";
+import { FilePlus, FolderPlus, Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Icon } from "@/components/ui/Icon";
@@ -91,7 +91,6 @@ export function FileExplorer({
             Search,
             <Kbd keys={["Mod", "Shift", "F"]} />,
           )}
-          {headerButton(t("explorer.refresh"), () => void refresh(projectId, rootPath), RefreshCw)}
         </div>
       </header>
 

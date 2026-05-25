@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { X, TerminalSquare, GitCompare } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -57,11 +57,11 @@ function renderTabIcon(tab: Tab, active: boolean): ReactNode {
   );
 }
 
-/* Width reserved on the right of the scroll area for the absolutely-positioned
-   trailing menu. The "+" lives on top of the scroll layer and never shifts as
-   tabs are added/removed/scrolled. Matches the `pr-[44px]` and `right-[44px]`
-   literals below — keep them in sync. */
-const TRAILING_PX = 44;
+/* Initial estimate for the trailing strip's width — replaced on first paint by
+   a ResizeObserver measuring the real strip. Used so the scroll container's
+   right-padding and the fade gradient line up exactly with the strip's edge,
+   even when its contents (e.g. the SC change-count) grow. */
+const TRAILING_PX_FALLBACK = 44;
 
 export function TabBar({
   tabs,
@@ -80,6 +80,26 @@ export function TabBar({
   const { t } = useTranslation();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const thumbRef = useRef<HTMLDivElement | null>(null);
+  const trailingRef = useRef<HTMLDivElement | null>(null);
+  // Real width of the trailing strip; observed so the scroll padding and fade
+  // line up exactly even as the pill expands (e.g. when the SC change count
+  // grows to "99+").
+  const [trailingWidth, setTrailingWidth] = useState(
+    trailing ? TRAILING_PX_FALLBACK : 0,
+  );
+
+  useEffect(() => {
+    const el = trailingRef.current;
+    if (!trailing || !el) {
+      setTrailingWidth(0);
+      return;
+    }
+    const sync = () => setTrailingWidth(el.offsetWidth);
+    sync();
+    const ro = new ResizeObserver(sync);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [trailing]);
 
   // VS Code-style wheel → horizontal scroll. React's onWheel is passive, so
   // preventDefault() is silently ignored — we attach a native listener with
@@ -112,7 +132,7 @@ export function TabBar({
     const thumb = thumbRef.current;
     if (!el || !thumb) return;
 
-    const trailingPad = trailing ? TRAILING_PX : 0;
+    const trailingPad = trailingWidth;
 
     const update = () => {
       const { scrollLeft, scrollWidth, clientWidth } = el;
@@ -152,7 +172,7 @@ export function TabBar({
       ro.disconnect();
       mo.disconnect();
     };
-  }, [trailing]);
+  }, [trailing, trailingWidth]);
 
   // After a layout change (tabs added/removed/active changes), keep the active
   // tab visible — scroll it into view if it's offscreen, accounting for the
@@ -167,16 +187,16 @@ export function TabBar({
     const nodeLeft = node.offsetLeft;
     const nodeRight = nodeLeft + node.offsetWidth;
     const viewLeft = el.scrollLeft;
-    const viewRight = viewLeft + el.clientWidth - (trailing ? TRAILING_PX : 0);
+    const viewRight = viewLeft + el.clientWidth - trailingWidth;
     if (nodeLeft < viewLeft) {
       el.scrollTo({ left: nodeLeft - 24, behavior: "smooth" });
     } else if (nodeRight > viewRight) {
       el.scrollTo({
-        left: nodeRight - el.clientWidth + (trailing ? TRAILING_PX : 0) + 24,
+        left: nodeRight - el.clientWidth + trailingWidth + 24,
         behavior: "smooth",
       });
     }
-  }, [activeTabId, tabs.length, trailing]);
+  }, [activeTabId, tabs.length, trailing, trailingWidth]);
 
   return (
     <NewTabContextMenu onNewTerminal={onNewTerminal} onLaunchCli={onLaunchCli}>
@@ -192,10 +212,12 @@ export function TabBar({
         ref={scrollRef}
         className={cn(
           "tab-scroll absolute inset-x-0 top-0 bottom-0 flex min-w-0 items-stretch overflow-x-auto overflow-y-hidden",
-          // Reserve room on the right so tabs don't slide under the
-          // absolutely-positioned trailing menu.
-          trailing && "pr-[44px]",
         )}
+        // Reserve room on the right so tabs don't slide under the
+        // absolutely-positioned trailing strip. Width is measured dynamically
+        // so the pill can grow (e.g. when the SC change count goes to "99+")
+        // without overlapping the last tab.
+        style={trailing ? { paddingRight: trailingWidth } : undefined}
       >
         {tabs.map((tab) => {
           const active = tab.id === activeTabId;
@@ -277,12 +299,14 @@ export function TabBar({
       {trailing ? (
         <>
           {/* Subtle fade so a tab being scrolled in/out doesn't crash into the
-              hard edge of the trailing menu. */}
+              hard edge of the trailing strip. */}
           <div
-            className="pointer-events-none absolute right-[44px] top-0 bottom-0 w-[18px] bg-gradient-to-r from-transparent to-canvas-soft"
+            className="pointer-events-none absolute top-0 bottom-0 w-[18px] bg-gradient-to-r from-transparent to-canvas-soft"
+            style={{ right: trailingWidth }}
             aria-hidden="true"
           />
           <div
+            ref={trailingRef}
             className="absolute right-0 top-0 bottom-0 z-10 flex items-center gap-[6px] border-l border-hairline bg-canvas-soft px-[10px]"
           >
             {trailing}

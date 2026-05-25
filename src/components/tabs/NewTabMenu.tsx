@@ -51,7 +51,7 @@ interface MenuComponents {
   Label: ComponentType<{ children: ReactNode }>;
 }
 
-function NewTabBody({ actions, C }: { actions: NewTabActions; C: MenuComponents }) {
+export function NewTabBody({ actions, C }: { actions: NewTabActions; C: MenuComponents }) {
   const { t } = useTranslation();
   const detections = useCliDetections();
   // Roomier rows + a more legible highlight (full-opacity surface, not the
@@ -127,7 +127,7 @@ function CliInstallHint({ status }: { status: CliDetectionStatus }) {
   );
 }
 
-const DROPDOWN_COMPONENTS: MenuComponents = {
+export const DROPDOWN_COMPONENTS: MenuComponents = {
   Item: DropdownItem,
   Separator: DropdownSeparator,
   Label: DropdownLabel,

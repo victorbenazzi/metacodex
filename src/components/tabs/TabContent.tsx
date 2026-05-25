@@ -7,8 +7,20 @@ import { ImagePreview } from "@/components/previews/ImagePreview";
 import { PdfPreview } from "@/components/previews/PdfPreview";
 import type { Tab } from "./types";
 
-interface TabContentProps {
+interface TabsBucketLike {
   tabs: Tab[];
+  activeTabId: string | null;
+}
+
+interface TabContentProps {
+  /**
+   * Every project's tab bucket. We render tabs from ALL projects so that
+   * PTYs/xterm sessions and CodeMirror buffers survive switching the active
+   * project — only the active project's active tab is shown; everything else
+   * stays mounted with display:none.
+   */
+  allBuckets: Record<string, TabsBucketLike>;
+  activeProjectKey: string;
   activeTabId: string | null;
 }
 
@@ -70,21 +82,30 @@ function renderTab(tab: Tab) {
 }
 
 /**
- * Render-all-hide-inactive: every tab stays mounted with `display: none`
- * so xterm sessions and CodeMirror state survive tab switches.
+ * Render-all-hide-inactive: every tab across EVERY project stays mounted with
+ * `display: none` so xterm/PTY sessions and CodeMirror state survive both tab
+ * switches AND project switches. The whole point of metacodex is multi-project
+ * orchestration — an AI agent running in project A must keep working when the
+ * user jumps to project B and back.
  */
-export function TabContent({ tabs, activeTabId }: TabContentProps) {
+export function TabContent({ allBuckets, activeProjectKey, activeTabId }: TabContentProps) {
   return (
     <div className="relative h-full w-full overflow-hidden bg-canvas">
-      {tabs.map((tab) => (
-        <div
-          key={tab.id}
-          style={{ display: tab.id === activeTabId ? "block" : "none" }}
-          className="h-full w-full"
-        >
-          {renderTab(tab)}
-        </div>
-      ))}
+      {Object.entries(allBuckets).flatMap(([projectKey, bucket]) =>
+        bucket.tabs.map((tab) => {
+          const isVisible =
+            projectKey === activeProjectKey && tab.id === activeTabId;
+          return (
+            <div
+              key={`${projectKey}::${tab.id}`}
+              style={{ display: isVisible ? "block" : "none" }}
+              className="h-full w-full"
+            >
+              {renderTab(tab)}
+            </div>
+          );
+        }),
+      )}
     </div>
   );
 }

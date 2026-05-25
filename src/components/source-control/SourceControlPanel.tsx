@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { GitBranch, RefreshCw, X, Check, ArrowUp, ArrowDown, GitCompare } from "lucide-react";
+import { GitBranch, Check, ArrowUp, ArrowDown, GitCompare } from "lucide-react";
 
 import { Icon } from "@/components/ui/Icon";
 import { Tooltip } from "@/components/ui/Tooltip";
@@ -17,7 +17,6 @@ interface SourceControlPanelProps {
   projectId: string;
   projectPath: string;
   onOpenDiff: (path: string, status: string) => void;
-  onClose: () => void;
 }
 
 /** Path of `abs` relative to the project `root` (root itself → its basename). */
@@ -56,11 +55,9 @@ export function SourceControlPanel({
   projectId,
   projectPath,
   onOpenDiff,
-  onClose,
 }: SourceControlPanelProps) {
   const { t } = useTranslation();
   const git = useGitStore((s) => s.byProject[projectId]);
-  const refresh = useGitStore((s) => s.refresh);
 
   const entries = useMemo(() => {
     const statuses = git?.statuses ?? {};
@@ -81,68 +78,51 @@ export function SourceControlPanel({
       className="flex h-full min-h-0 flex-col border-l border-hairline bg-canvas"
       aria-label={t("sourceControl.title")}
     >
-      <div className="shrink-0 border-b border-hairline bg-canvas-soft/55 px-[14px] py-[12px]">
-        <div className="flex items-center gap-[8px]">
+      <header className="flex h-[30px] shrink-0 items-center border-b border-hairline-soft px-[12px]">
+        <span className="editorial-caps truncate">{t("sourceControl.title")}</span>
+      </header>
+
+      <div className="shrink-0 border-b border-hairline-soft px-[14px] py-[12px]">
+        {git?.branch ? (
+          <div className="flex min-w-0 items-center gap-[6px] font-mono text-[12px]">
+            <Icon icon={GitBranch} size={11} strokeWidth={2} className="shrink-0 text-muted-soft" />
+            <span className="min-w-0 truncate text-body" title={git.branch}>{git.branch}</span>
+            {git.ahead > 0 || git.behind > 0 ? (
+              <span className="ml-auto inline-flex shrink-0 items-center gap-[6px] font-mono text-[11px] tabular-nums text-muted">
+                {git.ahead > 0 ? (
+                  <span className="inline-flex items-center gap-[1px]">
+                    <Icon icon={ArrowUp} size={10} strokeWidth={2} />
+                    {git.ahead}
+                  </span>
+                ) : null}
+                {git.behind > 0 ? (
+                  <span className="inline-flex items-center gap-[1px]">
+                    <Icon icon={ArrowDown} size={10} strokeWidth={2} />
+                    {git.behind}
+                  </span>
+                ) : null}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+
+        <div className="mt-[10px] flex items-baseline gap-[12px]">
           <Tooltip content={t("sourceControl.additions", { count: totalAdditions })} side="bottom">
-            <span className="inline-flex min-w-[42px] shrink-0 justify-end whitespace-nowrap font-mono text-[15px] font-medium leading-none tabular-nums text-success">
+            <span className="whitespace-nowrap font-mono text-[15px] font-medium leading-none tabular-nums text-success">
               +{compactCount(totalAdditions)}
             </span>
           </Tooltip>
           <Tooltip content={t("sourceControl.deletions", { count: totalDeletions })} side="bottom">
-            <span className="inline-flex min-w-[42px] shrink-0 justify-end whitespace-nowrap font-mono text-[15px] font-medium leading-none tabular-nums text-danger">
-              -{compactCount(totalDeletions)}
+            <span className="whitespace-nowrap font-mono text-[15px] font-medium leading-none tabular-nums text-danger">
+              −{compactCount(totalDeletions)}
             </span>
           </Tooltip>
-
-          <div className="ml-auto flex min-w-0 items-center gap-[6px]">
-            <span className="inline-flex h-[28px] min-w-0 items-center gap-[5px] rounded-sm border border-hairline-strong/70 bg-surface-strong/35 px-[9px] font-mono text-[12px] text-body">
-              <Icon icon={GitCompare} size={13} strokeWidth={1.8} />
-              <span className="truncate">{t("sourceControl.changes")}</span>
+          {count > 0 ? (
+            <span className="ml-auto shrink-0 font-mono text-[11px] tabular-nums text-muted-soft">
+              {t("sourceControl.changedFiles", { count })}
             </span>
-            <Tooltip content={t("sourceControl.refresh")} side="bottom">
-              <button
-                type="button"
-                onClick={() => void refresh(projectId, projectPath)}
-                aria-label={t("sourceControl.refresh")}
-                className="inline-flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-sm border border-hairline bg-surface-card/70 text-body transition-colors duration-[var(--dur-fast)] hover:border-hairline-strong hover:bg-surface-strong/45 hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-hairline-strong"
-              >
-                <Icon icon={RefreshCw} size={13} strokeWidth={1.8} />
-              </button>
-            </Tooltip>
-            <Tooltip content={t("sourceControl.close")} side="bottom">
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label={t("sourceControl.close")}
-                className="inline-flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-sm border border-hairline bg-surface-card/70 text-muted transition-colors duration-[var(--dur-fast)] hover:border-hairline-strong hover:bg-surface-strong/45 hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-hairline-strong"
-              >
-                <Icon icon={X} size={14} />
-              </button>
-            </Tooltip>
-          </div>
+          ) : null}
         </div>
-
-        {git?.branch ? (
-          <div className="mt-[10px] flex min-w-0 items-center gap-[6px] font-mono text-[11px] text-muted">
-            <Icon icon={GitBranch} size={10} strokeWidth={2} />
-            <span className="min-w-0 truncate text-body">{git.branch}</span>
-            {git.ahead > 0 ? (
-              <span className="inline-flex shrink-0 items-center rounded-xs bg-surface-strong/45 px-[5px] text-muted-soft">
-                <Icon icon={ArrowUp} size={9} strokeWidth={2} />
-                {git.ahead}
-              </span>
-            ) : null}
-            {git.behind > 0 ? (
-              <span className="inline-flex shrink-0 items-center rounded-xs bg-surface-strong/45 px-[5px] text-muted-soft">
-                <Icon icon={ArrowDown} size={9} strokeWidth={2} />
-                {git.behind}
-              </span>
-            ) : null}
-            <span className="ml-auto shrink-0 font-mono text-[10px] tabular-nums text-muted-soft">
-              {count > 0 ? t("sourceControl.changedFiles", { count }) : null}
-            </span>
-          </div>
-        ) : null}
       </div>
 
       {count === 0 ? (

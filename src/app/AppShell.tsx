@@ -122,7 +122,11 @@ export function AppShell() {
 
   // Tabs store keyed per project.
   const projectKey = project?.id ?? WORKSPACE_NULL;
-  const bucket = useTabsStore((s) => s.byProject[projectKey]) ?? EMPTY_BUCKET;
+  // Subscribe to ALL buckets — TabContent mounts every project's tabs so PTYs
+  // and editor buffers survive a project switch (hidden via display:none for
+  // anything other than the active project's active tab).
+  const allBuckets = useTabsStore((s) => s.byProject);
+  const bucket = allBuckets[projectKey] ?? EMPTY_BUCKET;
   const openTab = useTabsStore((s) => s.openTab);
   const closeTab = useTabsStore((s) => s.closeTab);
   const closeMany = useTabsStore((s) => s.closeMany);
@@ -144,7 +148,6 @@ export function AppShell() {
 
   const refreshGit = useGitStore((s) => s.refresh);
   const panelOpen = useSourceControlStore((s) => s.open);
-  const setPanelOpen = useSourceControlStore((s) => s.setOpen);
 
   // -- File watcher per project ------------------------------------------------
   // When the active project changes, ask Rust to watch its root. Stop on unmount.
@@ -629,6 +632,8 @@ export function AppShell() {
         project={project}
         tabs={bucket.tabs}
         activeTabId={bucket.activeTabId}
+        allBuckets={allBuckets}
+        activeProjectKey={projectKey}
         onSelectTab={handleSelectTab}
         onCloseTab={handleCloseTab}
         onCloseOthers={handleCloseOthers}
@@ -647,7 +652,6 @@ export function AppShell() {
             projectId={project.id}
             projectPath={project.path}
             onOpenDiff={handleOpenDiff}
-            onClose={() => setPanelOpen(false)}
           />
         ) : (
           <aside className="flex h-full min-h-0 flex-col items-center justify-center border-l border-hairline bg-canvas px-[24px] text-center">

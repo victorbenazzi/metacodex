@@ -160,7 +160,6 @@
     "newFile": "New File",
     "newFolder": "New Folder",
     "searchInProject": "Search in project",
-    "refresh": "Refresh",
     "emptyFolder": "(empty folder)",
     "couldNotReadFolder": "could not read folder"
   },
@@ -336,7 +335,6 @@
   "sourceControl": {
     "toggle": "Source Control",
     "title": "Source Control",
-    "changes": "Changes",
     "changedFiles_one": "{{count}} file",
     "changedFiles_other": "{{count}} files",
     "additions_one": "{{count}} addition",
@@ -344,8 +342,6 @@
     "deletions_one": "{{count}} deletion",
     "deletions_other": "{{count}} deletions",
     "openDiff": "Open diff",
-    "refresh": "Refresh",
-    "close": "Close panel",
     "empty": "No changes",
     "noProject": "Open a project to see its changes."
   },

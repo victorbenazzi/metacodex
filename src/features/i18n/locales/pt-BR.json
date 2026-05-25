@@ -160,7 +160,6 @@
     "newFile": "Novo arquivo",
     "newFolder": "Nova pasta",
     "searchInProject": "Buscar no projeto",
-    "refresh": "Atualizar",
     "emptyFolder": "(pasta vazia)",
     "couldNotReadFolder": "não foi possível ler a pasta"
   },
@@ -336,7 +335,6 @@
   "sourceControl": {
     "toggle": "Controle de versão",
     "title": "Controle de versão",
-    "changes": "Alterações",
     "changedFiles_one": "{{count}} arquivo",
     "changedFiles_other": "{{count}} arquivos",
     "additions_one": "{{count}} adição",
@@ -344,8 +342,6 @@
     "deletions_one": "{{count}} remoção",
     "deletions_other": "{{count}} remoções",
     "openDiff": "Abrir diff",
-    "refresh": "Atualizar",
-    "close": "Fechar painel",
     "empty": "Nenhuma alteração",
     "noProject": "Abra um projeto para ver as alterações."
   },

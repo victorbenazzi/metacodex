@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { EditorState, Compartment, type Extension } from "@codemirror/state";
+import { EditorState, Compartment, Annotation, type Extension } from "@codemirror/state";
 import {
   EditorView,
   keymap,
@@ -43,6 +43,13 @@ interface EditorTabProps {
   path: string;
   projectId: string;
 }
+
+/**
+ * Marks dispatches that originate from the agent-driven external reload path
+ * (or from a user-confirmed reload). The updateListener uses this to know it
+ * should NOT flag the buffer dirty — the change came from disk, not the user.
+ */
+const ExternalReload = Annotation.define<true>();
 
 export function EditorTab({ tabId, path, projectId }: EditorTabProps) {
   const { t } = useTranslation();
@@ -177,8 +184,17 @@ export function EditorTab({ tabId, path, projectId }: EditorTabProps) {
           ),
           EditorView.updateListener.of((u) => {
             if (u.docChanged) {
-              setDirty(tabId, true);
-              updateTab(projectId ?? WORKSPACE_NULL, tabId, { dirty: true });
+              // Skip dirty-marking when the change came from disk (agent edited
+              // the file from a terminal tab and the reconciler is silently
+              // syncing the buffer). The dot on the tab is reserved for the
+              // user's own edits — AI saves are already on disk.
+              const isExternal = u.transactions.some((tr) =>
+                tr.annotation(ExternalReload),
+              );
+              if (!isExternal) {
+                setDirty(tabId, true);
+                updateTab(projectId ?? WORKSPACE_NULL, tabId, { dirty: true });
+              }
             }
             if (u.docChanged || u.selectionSet) {
               publishStatus(u.state);
@@ -281,8 +297,14 @@ export function EditorTab({ tabId, path, projectId }: EditorTabProps) {
         anchor: Math.min(sel.anchor, next.length),
         head: Math.min(sel.head, next.length),
       },
+      // Tag this transaction so the updateListener skips dirty marking — the
+      // change came from disk (agent edit / confirmed reload), not the user.
+      annotations: ExternalReload.of(true),
     });
     setLoaded(tabId, next); // resets baseline + clears the external flag
+    // The buffer now matches disk again — make sure the tab dot is cleared,
+    // even if the user had pending edits before clicking "Reload".
+    updateTab(projectId ?? WORKSPACE_NULL, tabId, { dirty: false });
     setSavingNotice(t("editor.reloaded"));
     setTimeout(() => setSavingNotice(null), 1400);
     // eslint-disable-next-line react-hooks/exhaustive-deps
