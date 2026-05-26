@@ -35,7 +35,8 @@ import { useEditorReconcile } from "@/features/editor/useEditorReconcile";
 import { EV, listenTo, type FsChangedPayload } from "@/lib/events";
 import { dirname } from "@/lib/path";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { cn } from "@/lib/cn";
+import { ResizeHandle } from "@/components/ui/ResizeHandle";
+import { PANEL_LIMITS } from "@/features/settings/settings.types";
 import { CMD, invoke } from "@/lib/ipc";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
@@ -156,6 +157,29 @@ export function AppShell() {
 
   const refreshGit = useGitStore((s) => s.refresh);
   const panelOpen = useSourceControlStore((s) => s.open);
+
+  // Resizable panel widths — driven by settings, persisted to ~/.metacodex.
+  const explorerWidth = useSettingsDataStore((s) => s.settings.panels.explorerWidth);
+  const sourceControlWidth = useSettingsDataStore(
+    (s) => s.settings.panels.sourceControlWidth,
+  );
+  const updateSettings = useSettingsDataStore((s) => s.update);
+  const handleExplorerWidthChange = useCallback(
+    (next: number) => updateSettings("panels", { explorerWidth: Math.round(next) }),
+    [updateSettings],
+  );
+  const handleSourceControlWidthChange = useCallback(
+    (next: number) => updateSettings("panels", { sourceControlWidth: Math.round(next) }),
+    [updateSettings],
+  );
+  const resetExplorerWidth = useCallback(
+    () => updateSettings("panels", { explorerWidth: PANEL_LIMITS.explorer.default }),
+    [updateSettings],
+  );
+  const resetSourceControlWidth = useCallback(
+    () => updateSettings("panels", { sourceControlWidth: PANEL_LIMITS.sourceControl.default }),
+    [updateSettings],
+  );
 
   // -- File watcher per project ------------------------------------------------
   // When the active project changes, ask Rust to watch its root. Stop on unmount.
@@ -609,32 +633,46 @@ export function AppShell() {
     sendToTerminal,
   ]);
 
+  // CSS-grid template: the variable-width columns interpolate the current
+  // settings so resizing rerenders only this style + the dragged column.
+  const gridTemplateColumns = panelOpen
+    ? `56px ${explorerWidth}px minmax(0,1fr) ${sourceControlWidth}px`
+    : `56px ${explorerWidth}px minmax(0,1fr)`;
+
   return (
     <div
-      className={cn(
-        "grid h-screen w-screen grid-rows-[36px_minmax(0,1fr)] bg-canvas text-ink",
-        panelOpen
-          ? "grid-cols-[56px_248px_minmax(0,1fr)_340px]"
-          : "grid-cols-[56px_248px_minmax(0,1fr)]",
-      )}
+      className="grid h-screen w-screen grid-rows-[36px_minmax(0,1fr)] bg-canvas text-ink"
+      style={{ gridTemplateColumns }}
     >
       <TitleBar workspaceName={project?.name} className="col-span-full" />
 
       <MiniProjectSidebar onOpenFolder={handleOpenFolder} />
 
-      <ExplorerPanel
-        hasProject={!!project}
-        projectId={project?.id}
-        projectName={project?.name}
-        projectPath={project?.path}
-        onOpenFolder={handleOpenFolder}
-        onOpenFile={handleOpenFile}
-        onRequestDelete={handleRequestDelete}
-        onRename={handleRename}
-        onOpenInTerminal={handleOpenInTerminal}
-        onLaunchCliInPath={handleLaunchCliInPath}
-        onMove={handleMove}
-      />
+      <div className="relative min-w-0">
+        <ExplorerPanel
+          hasProject={!!project}
+          projectId={project?.id}
+          projectName={project?.name}
+          projectPath={project?.path}
+          onOpenFolder={handleOpenFolder}
+          onOpenFile={handleOpenFile}
+          onRequestDelete={handleRequestDelete}
+          onRename={handleRename}
+          onOpenInTerminal={handleOpenInTerminal}
+          onLaunchCliInPath={handleLaunchCliInPath}
+          onMove={handleMove}
+        />
+        <ResizeHandle
+          side="right"
+          value={explorerWidth}
+          min={PANEL_LIMITS.explorer.min}
+          max={PANEL_LIMITS.explorer.max}
+          toDelta={(dx) => dx}
+          onChange={handleExplorerWidthChange}
+          onReset={resetExplorerWidth}
+          ariaLabel={t("appShell.resizeExplorer")}
+        />
+      </div>
 
       <WorkArea
         project={project}
@@ -655,19 +693,33 @@ export function AppShell() {
       />
 
       {panelOpen ? (
-        project ? (
-          <SourceControlPanel
-            projectId={project.id}
-            projectPath={project.path}
-            onOpenDiff={handleOpenDiff}
+        <div className="relative min-w-0">
+          {project ? (
+            <SourceControlPanel
+              projectId={project.id}
+              projectPath={project.path}
+              onOpenDiff={handleOpenDiff}
+            />
+          ) : (
+            <aside className="flex h-full min-h-0 flex-col items-center justify-center border-l border-hairline bg-canvas px-[24px] text-center">
+              <p className="font-mono text-[12px] text-muted">
+                {t("sourceControl.noProject")}
+              </p>
+            </aside>
+          )}
+          <ResizeHandle
+            side="left"
+            value={sourceControlWidth}
+            min={PANEL_LIMITS.sourceControl.min}
+            max={PANEL_LIMITS.sourceControl.max}
+            // Panel sits on the right edge of the window — dragging RIGHT
+            // shrinks it, dragging LEFT grows it. Invert the pointer delta.
+            toDelta={(dx) => -dx}
+            onChange={handleSourceControlWidthChange}
+            onReset={resetSourceControlWidth}
+            ariaLabel={t("appShell.resizeSourceControl")}
           />
-        ) : (
-          <aside className="flex h-full min-h-0 flex-col items-center justify-center border-l border-hairline bg-canvas px-[24px] text-center">
-            <p className="font-mono text-[12px] text-muted">
-              {t("sourceControl.noProject")}
-            </p>
-          </aside>
-        )
+        </div>
       ) : null}
 
       <CloseTabsConfirm

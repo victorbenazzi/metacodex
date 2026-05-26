@@ -89,6 +89,11 @@ export const TreeNode = memo(function TreeNode({
   const toggle = useExplorerStore((s) => s.toggleExpand);
   const setSelected = useExplorerStore((s) => s.setSelected);
   const gitStatus = useGitStore((s) => s.byProject[projectId]?.statuses?.[entry.path]);
+  // Tint entries that appeared on disk in the last few seconds (created by
+  // the IA in a terminal tab, by another process, or via inline-create).
+  // The animation drives both the held tint and the final fade-out.
+  const recentTimestamp = bucket?.recentlyAdded?.[entry.path];
+  const isRecent = recentTimestamp !== undefined;
 
   const [editing, setEditing] = useState(false);
   const [isDropTarget, setIsDropTarget] = useState(false);
@@ -205,6 +210,9 @@ export const TreeNode = memo(function TreeNode({
               ? "bg-accent/15 hover:bg-accent/20"
               : "hover:bg-surface-strong/45 focus-visible:bg-surface-strong/55",
             "data-[state=open]:bg-surface-strong/55",
+            // Recent-file tint runs underneath the selection/hover layers
+            // and overrides them visually for ~14.4s before fading out.
+            isRecent && !isSelected && "animate-explorer-recent-tint",
             isDropTarget &&
               "bg-accent/20 ring-1 ring-inset ring-accent/60",
           )}

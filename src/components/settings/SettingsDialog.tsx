@@ -46,6 +46,7 @@ import {
 import { useSettingsDataStore } from "@/features/settings/settings.data.store";
 import {
   DEFAULT_TERMINAL_FONT_FAMILY,
+  type ExplorerIconStyle,
   type TerminalCursorStyle,
 } from "@/features/settings/settings.types";
 import { COMMANDS, COMMANDS_BY_ID } from "@/features/keybindings/commands";
@@ -349,6 +350,7 @@ function AppearancePane() {
 function InterfacePane() {
   const { t } = useTranslation();
   const enabledAgents = useSettingsDataStore((s) => s.settings.interface.enabledAgents);
+  const iconStyle = useSettingsDataStore((s) => s.settings.interface.explorerIconStyle);
   const update = useSettingsDataStore((s) => s.update);
 
   // Stable order: coding agents first (same order as the registry), then autonomous.
@@ -361,6 +363,11 @@ function InterfacePane() {
     update("interface", { enabledAgents: { ...enabledAgents, [id]: next } });
   };
 
+  const iconStyleOptions: { id: ExplorerIconStyle; label: string }[] = [
+    { id: "mono", label: t("settings.interface.iconStyleMono") },
+    { id: "color", label: t("settings.interface.iconStyleColor") },
+  ];
+
   return (
     <div>
       <PaneHeader
@@ -368,7 +375,18 @@ function InterfacePane() {
         description={t("settings.interface.description")}
       />
 
-      <div className="mb-[8px] flex items-center justify-between">
+      <Row
+        label={t("settings.interface.iconStyle")}
+        hint={t("settings.interface.iconStyleHint")}
+      >
+        <Segmented
+          value={iconStyle}
+          options={iconStyleOptions}
+          onChange={(v) => update("interface", { explorerIconStyle: v })}
+        />
+      </Row>
+
+      <div className="mb-[8px] mt-[20px] flex items-center justify-between">
         <h3 className="editorial-caps text-muted">
           {t("settings.interface.launcherVisibilityTitle")}
         </h3>

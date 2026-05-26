@@ -74,6 +74,10 @@
     "interface": {
       "title": "Interface",
       "description": "Tweak which surfaces and agents are visible in the workspace.",
+      "iconStyle": "File icons",
+      "iconStyleHint": "Monochrome follows the theme. Colored paints brand-known files with their canonical color.",
+      "iconStyleMono": "Mono",
+      "iconStyleColor": "Colored",
       "launcherVisibilityTitle": "Launcher visibility",
       "launcherVisibilityHint": "Choose which agents appear in the + menu. Hidden agents stay installed and can still be launched from a terminal.",
       "autonomousTag": "autonomous",
@@ -287,7 +291,9 @@
     "agentCount_other": "{{count}} agents",
     "closeManyDescription_one": "{{inventory}} will be stopped. Running processes will be terminated and in-progress responses discarded.",
     "closeManyDescription_other": "{{inventory}} will be stopped. Running processes will be terminated and in-progress responses discarded.",
-    "and": " and "
+    "and": " and ",
+    "resizeExplorer": "Resize file explorer panel",
+    "resizeSourceControl": "Resize source control panel"
   },
   "terminal": {
     "notInstalled": "not installed",
@@ -357,6 +363,7 @@
   "diff": {
     "comparedWithHead": "compared with HEAD",
     "identical": "No changes against HEAD.",
-    "failed": "Could not load diff: {{error}}"
+    "failed": "Could not load diff: {{error}}",
+    "resizeSplit": "Resize diff split"
   }
 }

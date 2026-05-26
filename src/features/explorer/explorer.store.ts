@@ -28,7 +28,18 @@ interface ExplorerBucket {
   selected: SelectedNode | null;
   /** In-progress inline create, if any. */
   creating: CreatingState | null;
+  /**
+   * Absolute paths of entries that appeared in a directory listing since the
+   * previous refresh — used to tint "just-appeared" files (typically created
+   * by the IA running in the terminal). Value is the Date.now() timestamp
+   * when the entry was first observed; auto-cleared after RECENT_TTL_MS.
+   */
+  recentlyAdded: Record<string, number>;
 }
+
+/** How long a newly-appeared entry keeps its tint. Matches the
+ *  `explorer-recent-tint` keyframe duration (15s) in `tailwind.config.js`. */
+export const RECENT_TTL_MS = 15_000;
 
 interface ExplorerState {
   byProject: Record<string, ExplorerBucket>;
@@ -67,6 +78,8 @@ interface ExplorerState {
   ) => Promise<string>;
   /** Move `from` into `toDir` (preserving basename). Returns the new path. */
   moveNode: (projectId: string, from: string, toDir: string) => Promise<string>;
+  /** Drop a path from the recentlyAdded map (called by the TTL timer). */
+  clearRecent: (projectId: string, path: string) => void;
 }
 
 const emptyBucket = (): ExplorerBucket => ({
@@ -74,6 +87,7 @@ const emptyBucket = (): ExplorerBucket => ({
   children: {},
   selected: null,
   creating: null,
+  recentlyAdded: {},
 });
 
 export const useExplorerStore = create<ExplorerState>((set, get) => ({
@@ -147,6 +161,13 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
 
   refresh: async (projectId, path) => {
     const cur = get().byProject[projectId] ?? emptyBucket();
+    // Snapshot the previous listing so we can diff after the reload.
+    // We only mark "recent" when there was a prior listing — first-time
+    // loads of a folder shouldn't tint every single entry.
+    const before = cur.children[path];
+    const beforePaths =
+      Array.isArray(before) ? new Set(before.map((e) => e.path)) : null;
+
     const nextChildren = { ...cur.children };
     delete nextChildren[path];
     set((state) => ({
@@ -156,12 +177,51 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
       },
     }));
     await get().loadIfNeeded(projectId, path);
+
+    if (!beforePaths) return;
+    const after = get().byProject[projectId]?.children[path];
+    if (!Array.isArray(after)) return;
+    const created = after
+      .map((e) => e.path)
+      .filter((p) => !beforePaths.has(p));
+    if (created.length === 0) return;
+
+    const now = Date.now();
+    set((state) => {
+      const b = state.byProject[projectId] ?? emptyBucket();
+      const recent = { ...b.recentlyAdded };
+      for (const p of created) recent[p] = now;
+      return {
+        byProject: {
+          ...state.byProject,
+          [projectId]: { ...b, recentlyAdded: recent },
+        },
+      };
+    });
+    // Auto-clear after the TTL. If the entry was already removed (deleted,
+    // moved, project closed), clearRecent is a no-op.
+    for (const p of created) {
+      setTimeout(() => get().clearRecent(projectId, p), RECENT_TTL_MS);
+    }
   },
 
   clearProject: (projectId) =>
     set((state) => {
       const { [projectId]: _, ...rest } = state.byProject;
       return { byProject: rest };
+    }),
+
+  clearRecent: (projectId, path) =>
+    set((state) => {
+      const cur = state.byProject[projectId];
+      if (!cur || !(path in cur.recentlyAdded)) return state;
+      const { [path]: _, ...rest } = cur.recentlyAdded;
+      return {
+        byProject: {
+          ...state.byProject,
+          [projectId]: { ...cur, recentlyAdded: rest },
+        },
+      };
     }),
 
   deleteNode: async (projectId, path) => {

@@ -84,6 +84,15 @@ export default {
           "0%": { backgroundPosition: "-200% 0" },
           "100%": { backgroundPosition: "200% 0" },
         },
+        // Explorer "just appeared" tint: holds the recent color for ~96% of
+        // the run, then fades the last 600ms (96% of 15s). `forwards` keeps
+        // the row transparent after the animation ends so the row stays
+        // selectable without any leftover tint.
+        "explorer-recent-tint": {
+          "0%": { backgroundColor: "var(--explorer-recent)" },
+          "96%": { backgroundColor: "var(--explorer-recent)" },
+          "100%": { backgroundColor: "transparent" },
+        },
       },
       animation: {
         // Enter decelerates in (ease-out); exit accelerates out (ease-in) and
@@ -92,6 +101,7 @@ export default {
         // Durations/easings are tokens — see --dur-enter/--dur-exit in tokens.css.
         "fade-in": "fade-in var(--dur-enter) var(--ease-out)",
         "fade-out": "fade-out var(--dur-exit) var(--ease-in) forwards",
+        "explorer-recent-tint": "explorer-recent-tint 15s linear forwards",
       },
     },
   },

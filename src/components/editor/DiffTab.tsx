@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { EditorState, type Extension } from "@codemirror/state";
 import { EditorView, lineNumbers } from "@codemirror/view";
@@ -9,8 +9,10 @@ import { gitApi } from "@/features/git/git.service";
 import { useGitStore } from "@/features/git/git.store";
 import { useThemeStore } from "@/features/theme/theme.store";
 import { useSettingsDataStore } from "@/features/settings/settings.data.store";
+import { PANEL_LIMITS } from "@/features/settings/settings.types";
 import { languageFor } from "@/features/editor/language-map";
 import { gitColorForBadge, gitStatusLabelKey } from "@/features/git/gitStatus";
+import { ResizeHandle } from "@/components/ui/ResizeHandle";
 import { buildEditorTheme } from "./editorTheme";
 import { buildMergeTheme } from "./diffTheme";
 import { ext, basename } from "@/lib/path";
@@ -46,16 +48,35 @@ async function readSides(path: string): Promise<{ head: string; working: string 
 export function DiffTab({ path, projectId, status }: DiffTabProps) {
   const { t } = useTranslation();
   const hostRef = useRef<HTMLDivElement | null>(null);
+  const splitFrameRef = useRef<HTMLDivElement | null>(null);
   const mergeRef = useRef<MergeView | null>(null);
   const themeId = useThemeStore((s) => s.theme.id);
   const editorFontSize = useSettingsDataStore((s) => s.settings.editor.fontSize);
   const editorFontFamily = useSettingsDataStore((s) => s.settings.editor.fontFamily);
+  const diffSplitRatio = useSettingsDataStore((s) => s.settings.panels.diffSplitRatio);
+  const updateSettings = useSettingsDataStore((s) => s.update);
   const gitInfo = useGitStore((s) => (projectId ? s.byProject[projectId] : undefined));
 
   const [phase, setPhase] = useState<"loading" | "ready" | "identical" | "error">(
     "loading",
   );
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Convert a pointer dx (px) to a ratio delta against the current diff
+  // viewport width — used by ResizeHandle. Reads width imperatively so a
+  // window resize during drag keeps the math honest without re-arming an effect.
+  const ratioFromDx = useCallback((dx: number): number => {
+    const w = splitFrameRef.current?.clientWidth ?? 0;
+    return w > 0 ? dx / w : 0;
+  }, []);
+  const onSplitChange = useCallback(
+    (next: number) => updateSettings("panels", { diffSplitRatio: next }),
+    [updateSettings],
+  );
+  const onSplitReset = useCallback(
+    () => updateSettings("panels", { diffSplitRatio: PANEL_LIMITS.diff.default }),
+    [updateSettings],
+  );
 
   // Build (or rebuild on theme/font change) the merge view from scratch.
   useEffect(() => {
@@ -167,8 +188,37 @@ export function DiffTab({ path, projectId, status }: DiffTabProps) {
           {t(gitStatusLabelKey(status))}
         </span>
       </div>
-      <div className="relative min-h-0 flex-1">
-        <div ref={hostRef} className="mcx-mergeview h-full w-full" />
+      <div ref={splitFrameRef} className="relative min-h-0 flex-1">
+        <div
+          ref={hostRef}
+          className="mcx-mergeview h-full w-full"
+          // Publish the persisted ratio so the CSS rule on .mcx-mergeview
+          // overrides the first editor's flex-basis. Drag updates write back
+          // to settings, which re-renders this style.
+          style={
+            {
+              ["--mcx-diff-split-pct" as any]: `${(diffSplitRatio * 100).toFixed(3)}%`,
+            } as React.CSSProperties
+          }
+        />
+        {phase === "ready" ? (
+          <ResizeHandle
+            side="center"
+            value={diffSplitRatio}
+            min={PANEL_LIMITS.diff.min}
+            max={PANEL_LIMITS.diff.max}
+            toDelta={ratioFromDx}
+            onChange={onSplitChange}
+            onReset={onSplitReset}
+            ariaLabel={t("diff.resizeSplit")}
+            // Free-floating seam: anchor the 8px hit zone so its center sits
+            // exactly on the editor boundary. Tracks the persisted ratio via
+            // CSS calc — no JS re-layout on each render.
+            style={{
+              left: `calc(${(diffSplitRatio * 100).toFixed(3)}% - 4px)`,
+            }}
+          />
+        ) : null}
         {phase !== "ready" ? (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-[24px] text-center">
             <span className="font-mono text-[12px] text-muted">

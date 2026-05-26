@@ -4,6 +4,12 @@ import { DEFAULT_LIGHT_THEME_ID, isThemeId } from "@/features/theme/themes";
 
 export type TerminalCursorStyle = "bar" | "block" | "underline";
 
+/** Visual style for file/folder icons in the explorer. `mono` follows the
+ *  current text color (token-driven, premium minimalist look); `color` paints
+ *  brand-known files with their canonical brand hex while folders + generic
+ *  files stay monochrome — a focused color pop, not a rainbow. */
+export type ExplorerIconStyle = "mono" | "color";
+
 /**
  * The full set of user preferences persisted to `~/.metacodex/settings.json`.
  * `theme` and `language` mirror the existing theme/i18n stores (which still own
@@ -38,11 +44,39 @@ export interface AppSettings {
     autonomousAgentsExpanded: boolean;
     /** Per-CLI visibility in the launcher menu. Missing keys default to true. */
     enabledAgents: Record<string, boolean>;
+    /** File/folder icon style in the explorer tree. */
+    explorerIconStyle: ExplorerIconStyle;
+  };
+  /** Persisted horizontal dimensions of the resizable shell panels. Survives
+   *  project switches and app restarts. Widths are integers in px; the diff
+   *  split is the fraction of the diff viewport occupied by the HEAD side. */
+  panels: {
+    explorerWidth: number;
+    sourceControlWidth: number;
+    diffSplitRatio: number;
   };
 }
 
 /** Slices of `AppSettings` that are nested objects (patchable via `update`). */
-export type SettingsSliceKey = "editor" | "terminal" | "performance" | "interface";
+export type SettingsSliceKey =
+  | "editor"
+  | "terminal"
+  | "performance"
+  | "interface"
+  | "panels";
+
+/** Resize bounds for the shell panels. Conventions:
+ *  - Explorer: VS Code uses ~170px floor; we sit slightly above so the path
+ *    column stays legible. The ceiling keeps the editor area dominant.
+ *  - Source Control: similar reasoning but wider floor since the file list
+ *    needs room for badges + relative path.
+ *  - Diff split: 0.2 / 0.8 mirrors common merge-tool limits so one side never
+ *    collapses to unusable. */
+export const PANEL_LIMITS = {
+  explorer: { min: 180, max: 480, default: 248 },
+  sourceControl: { min: 240, max: 560, default: 340 },
+  diff: { min: 0.2, max: 0.8, default: 0.5 },
+} as const;
 
 /** Default monospace stack for the terminal — verbatim from `useXterm.ts`. */
 export const DEFAULT_TERMINAL_FONT_FAMILY =
@@ -75,6 +109,12 @@ export const DEFAULT_SETTINGS: AppSettings = {
   interface: {
     autonomousAgentsExpanded: true,
     enabledAgents: {},
+    explorerIconStyle: "mono",
+  },
+  panels: {
+    explorerWidth: PANEL_LIMITS.explorer.default,
+    sourceControlWidth: PANEL_LIMITS.sourceControl.default,
+    diffSplitRatio: PANEL_LIMITS.diff.default,
   },
 };
 
@@ -110,6 +150,7 @@ function asBoolMap(value: unknown): Record<string, boolean> {
 
 const THEME_VALUES: ThemeMode[] = ["system", "light", "dark"];
 const CURSOR_VALUES: TerminalCursorStyle[] = ["bar", "block", "underline"];
+const ICON_STYLE_VALUES: ExplorerIconStyle[] = ["mono", "color"];
 
 /**
  * Coerce arbitrary (possibly hand-edited / partial) JSON into a fully-populated,
@@ -123,6 +164,7 @@ export function mergeSettings(raw: unknown): AppSettings {
   const terminal = asObject(r.terminal);
   const perf = asObject(r.performance);
   const iface = asObject(r.interface);
+  const panels = asObject(r.panels);
   const D = DEFAULT_SETTINGS;
   return {
     theme: oneOf(r.theme, THEME_VALUES, D.theme),
@@ -155,6 +197,35 @@ export function mergeSettings(raw: unknown): AppSettings {
           ? iface.autonomousAgentsExpanded
           : D.interface.autonomousAgentsExpanded,
       enabledAgents: asBoolMap(iface.enabledAgents),
+      explorerIconStyle: oneOf(
+        iface.explorerIconStyle,
+        ICON_STYLE_VALUES,
+        D.interface.explorerIconStyle,
+      ),
+    },
+    panels: {
+      explorerWidth: Math.round(
+        clampNum(
+          panels.explorerWidth,
+          D.panels.explorerWidth,
+          PANEL_LIMITS.explorer.min,
+          PANEL_LIMITS.explorer.max,
+        ),
+      ),
+      sourceControlWidth: Math.round(
+        clampNum(
+          panels.sourceControlWidth,
+          D.panels.sourceControlWidth,
+          PANEL_LIMITS.sourceControl.min,
+          PANEL_LIMITS.sourceControl.max,
+        ),
+      ),
+      diffSplitRatio: clampNum(
+        panels.diffSplitRatio,
+        D.panels.diffSplitRatio,
+        PANEL_LIMITS.diff.min,
+        PANEL_LIMITS.diff.max,
+      ),
     },
   };
 }

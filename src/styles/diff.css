@@ -1,0 +1,30 @@
+/*
+ * Side-by-side diff split overrides.
+ *
+ * `@codemirror/merge` paints the two editors with `flex: 1 1 0` so they share
+ * width evenly. We override the first editor's `flex` so it honors a runtime
+ * percentage published as `--mcx-diff-split-pct` on the host. The companion
+ * `ResizeHandle` rides on top at `left: var(--mcx-diff-split-pct)` and writes
+ * the same variable on drag.
+ *
+ * Falls back to 50% when the variable is missing so this also works for any
+ * future merge view that doesn't opt in to user resize.
+ */
+
+.mcx-mergeview {
+  /* Default split = 50%. The component re-publishes the persisted value. */
+  --mcx-diff-split-pct: 50%;
+}
+
+.mcx-mergeview .cm-mergeView .cm-mergeViewEditor:first-child {
+  flex: 0 0 var(--mcx-diff-split-pct);
+  min-width: 0;
+  /* Permanent 1px seam between the two sides. Sits inside A's overflow:hidden
+     box, exactly at the boundary the ResizeHandle's hover/drag rail covers. */
+  border-right: 1px solid var(--hairline);
+}
+
+.mcx-mergeview .cm-mergeView .cm-mergeViewEditor:last-child {
+  flex: 1 1 0;
+  min-width: 0;
+}

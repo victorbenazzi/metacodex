@@ -5,6 +5,7 @@
 @import "./styles/tokens.css";
 @import "./styles/scrollbar.css";
 @import "./styles/xterm.css";
+@import "./styles/diff.css";
 
 @tailwind base;
 @tailwind components;
@@ -91,6 +92,14 @@
   /* Drag region for native window */
   [data-tauri-drag-region] {
     cursor: default;
+  }
+
+  /* Force the grabbing cursor globally while a project tile is being
+     reordered, overriding the cursor:pointer / cursor:text that nested
+     elements might otherwise paint. */
+  body.is-reordering-projects,
+  body.is-reordering-projects * {
+    cursor: grabbing !important;
   }
 }
 

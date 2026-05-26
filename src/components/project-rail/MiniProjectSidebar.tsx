@@ -1,4 +1,4 @@
-import { useState, type DragEvent } from "react";
+import { useEffect, useRef, useState, type PointerEvent as RPointerEvent } from "react";
 import { FolderPlus, Settings, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -23,10 +23,9 @@ interface MiniProjectSidebarProps {
   onOpenFolder: () => void;
 }
 
-interface DropTarget {
-  id: string;
-  pos: "before" | "after";
-}
+// Minimum pointer travel before a press becomes a drag. Below this, the press
+// is treated as a click (setActive). Tuned for trackpad sensitivity.
+const DRAG_THRESHOLD_PX = 4;
 
 export function MiniProjectSidebar({ onOpenFolder }: MiniProjectSidebarProps) {
   const { t } = useTranslation();
@@ -41,77 +40,171 @@ export function MiniProjectSidebar({ onOpenFolder }: MiniProjectSidebarProps) {
   const settingsOpen = useSettingsStore((s) => s.open);
   const setSettingsOpen = useSettingsStore((s) => s.setOpen);
 
+  // Drag state.
+  //  - draggingId: the project currently being dragged (drives the dim-in-place + ghost).
+  //  - dropIndex: insertion slot (0..projects.length) where the dragged tile would land.
+  //  - pointerPos: viewport-space pointer position used to anchor the ghost.
   const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
+  const [dropIndex, setDropIndex] = useState<number | null>(null);
+  const [pointerPos, setPointerPos] = useState<{ x: number; y: number } | null>(null);
+  // Set by pointermove when the gesture escalates to a drag; drained by the
+  // next click on the same tile so a drop doesn't also activate the project.
+  const suppressClickRef = useRef(false);
 
-  const resetDrag = () => {
-    setDraggingId(null);
-    setDropTarget(null);
+  // One DOM ref per tile wrapper. Used during drag to compute which gap the
+  // pointer is currently over and where to draw the drop indicator.
+  const tileRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const railRef = useRef<HTMLDivElement | null>(null);
+  const setTileRef = (id: string) => (el: HTMLDivElement | null) => {
+    if (el) tileRefs.current.set(id, el);
+    else tileRefs.current.delete(id);
   };
 
-  const onTileDragStart = (id: string) => (e: DragEvent<HTMLButtonElement>) => {
-    setDraggingId(id);
-    e.dataTransfer.effectAllowed = "move";
-    try {
-      e.dataTransfer.setData("text/plain", id);
-    } catch {
-      // Some WKWebView contexts reject setData with non-text/uri MIME types — ignore.
-    }
-  };
-
-  const onTileDragOver = (id: string) => (e: DragEvent<HTMLButtonElement>) => {
+  // Global cursor while dragging — applied as a body class so EVERY element
+  // (including buttons that opt into cursor:pointer) shows the grabbing cursor.
+  useEffect(() => {
     if (!draggingId) return;
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-    if (draggingId === id) {
-      setDropTarget(null);
-      return;
+    document.body.classList.add("is-reordering-projects");
+    return () => {
+      document.body.classList.remove("is-reordering-projects");
+    };
+  }, [draggingId]);
+
+  const computeDropIndex = (clientY: number): number => {
+    // Walk visible tiles top-down; the first one whose midpoint sits below the
+    // pointer is the insertion slot. Falling through past all of them means
+    // "append to end".
+    for (let i = 0; i < projects.length; i++) {
+      const el = tileRefs.current.get(projects[i].id);
+      if (!el) continue;
+      const rect = el.getBoundingClientRect();
+      if (clientY < rect.top + rect.height / 2) return i;
     }
-    const rect = e.currentTarget.getBoundingClientRect();
-    const middle = rect.top + rect.height / 2;
-    const pos: "before" | "after" = e.clientY < middle ? "before" : "after";
-    setDropTarget((prev) =>
-      prev?.id === id && prev.pos === pos ? prev : { id, pos },
-    );
+    return projects.length;
   };
 
-  const onTileDrop = (id: string) => (e: DragEvent<HTMLButtonElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!draggingId || draggingId === id || !dropTarget) {
-      resetDrag();
+  const onTilePointerDown =
+    (id: string) => (e: RPointerEvent<HTMLDivElement>) => {
+      // Only left-button presses initiate drag. Right-click falls through to
+      // the Radix ContextMenu trigger nested inside; middle/etc. are ignored.
+      if (e.button !== 0) return;
+      // Skip when the press originated on an interactive overlay (e.g. the
+      // context menu itself was open and the click closes it). Heuristic:
+      // [data-radix-*] descendants.
+      const target = e.target as HTMLElement | null;
+      if (target?.closest("[role=menu]")) return;
+
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch {
+        // Some WKWebView builds reject capture for non-touch pointers when the
+        // capture target sits behind a Radix Slot. The window-level listeners
+        // below cover that fallback.
+      }
+
+      const startX = e.clientX;
+      const startY = e.clientY;
+      const wrapperEl = e.currentTarget;
+      let dragging = false;
+      let localDropIndex: number | null = null;
+
+      const onMove = (ev: PointerEvent) => {
+        if (!dragging) {
+          const dx = ev.clientX - startX;
+          const dy = ev.clientY - startY;
+          if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
+          dragging = true;
+          suppressClickRef.current = true;
+          setDraggingId(id);
+        }
+        const idx = computeDropIndex(ev.clientY);
+        localDropIndex = idx;
+        setDropIndex(idx);
+        setPointerPos({ x: ev.clientX, y: ev.clientY });
+      };
+
+      const cleanup = () => {
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+        window.removeEventListener("pointercancel", onCancel);
+        try {
+          wrapperEl.releasePointerCapture(e.pointerId);
+        } catch {
+          // No-op if capture was never granted or already released.
+        }
+      };
+
+      const onUp = () => {
+        cleanup();
+        if (dragging && localDropIndex != null) {
+          const sourceIdx = projects.findIndex((p) => p.id === id);
+          // Drops at the source's own slots (`i` and `i+1`) are no-ops; skip.
+          if (
+            sourceIdx >= 0 &&
+            localDropIndex !== sourceIdx &&
+            localDropIndex !== sourceIdx + 1
+          ) {
+            const ids = projects.map((p) => p.id);
+            const [moved] = ids.splice(sourceIdx, 1);
+            const insertAt =
+              localDropIndex > sourceIdx ? localDropIndex - 1 : localDropIndex;
+            ids.splice(insertAt, 0, moved);
+            void reorder(ids);
+          }
+        }
+        setDraggingId(null);
+        setDropIndex(null);
+        setPointerPos(null);
+      };
+
+      const onCancel = () => {
+        cleanup();
+        setDraggingId(null);
+        setDropIndex(null);
+        setPointerPos(null);
+      };
+
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+      window.addEventListener("pointercancel", onCancel);
+    };
+
+  const onTileClick = (id: string) => () => {
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false;
       return;
     }
-    const ids = projects.map((p) => p.id);
-    const from = ids.indexOf(draggingId);
-    let to = ids.indexOf(id);
-    if (from < 0 || to < 0) {
-      resetDrag();
-      return;
-    }
-    if (dropTarget.pos === "after") to += 1;
-    const next = [...ids];
-    next.splice(from, 1);
-    const insertAt = from < to ? to - 1 : to;
-    next.splice(insertAt, 0, draggingId);
-    resetDrag();
-    void reorder(next);
+    void setActive(id);
   };
 
-  // Container-level dragOver: always allow drop with the "move" cursor so the
-  // WKWebView doesn't paint the cursor as "+" (copy) or "🚫" (no-drop) over
-  // the gaps between tiles.
-  const onRailDragOver = (e: DragEvent<HTMLDivElement>) => {
-    if (!draggingId) return;
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-  };
+  // Indicator visibility: hide on the two slots adjacent to the source tile,
+  // since dropping there is a no-op (and the visual line would be misleading).
+  const sourceIdx = draggingId
+    ? projects.findIndex((p) => p.id === draggingId)
+    : -1;
+  const showDropIndicator =
+    draggingId !== null &&
+    dropIndex !== null &&
+    dropIndex !== sourceIdx &&
+    dropIndex !== sourceIdx + 1;
 
-  const onRailDragLeave = (e: DragEvent<HTMLDivElement>) => {
-    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
-      setDropTarget(null);
+  const indicatorY = (() => {
+    if (!showDropIndicator || dropIndex === null || !railRef.current) return null;
+    if (dropIndex === projects.length) {
+      const last = projects[projects.length - 1];
+      const el = last ? tileRefs.current.get(last.id) : null;
+      if (!el) return null;
+      return el.offsetTop + el.offsetHeight + 3;
     }
-  };
+    const target = projects[dropIndex];
+    const el = target ? tileRefs.current.get(target.id) : null;
+    if (!el) return null;
+    return el.offsetTop - 5;
+  })();
+
+  const draggingProject = draggingId
+    ? projects.find((p) => p.id === draggingId) ?? null
+    : null;
 
   return (
     <>
@@ -120,31 +213,43 @@ export function MiniProjectSidebar({ onOpenFolder }: MiniProjectSidebarProps) {
         aria-label={t("projectRail.ariaLabel")}
       >
         <div
-          className="flex flex-1 flex-col items-center gap-[8px] overflow-y-auto overflow-x-hidden px-[8px] py-[14px]"
-          onDragOver={onRailDragOver}
-          onDragLeave={onRailDragLeave}
+          ref={railRef}
+          className="relative flex flex-1 flex-col items-center gap-[8px] overflow-y-auto overflow-x-hidden px-[8px] py-[14px]"
         >
-          {projects.map((p) => {
-            const dropPos =
-              dropTarget?.id === p.id && draggingId && draggingId !== p.id
-                ? dropTarget.pos
-                : null;
-            return (
-              <div key={p.id} className="relative">
-                {/* Drop indicator lines, drawn outside the button so the tile doesn't shift */}
-                {dropPos === "before" ? (
-                  <span
-                    aria-hidden
-                    className="pointer-events-none absolute -top-[5px] left-[2px] right-[2px] h-[2px] rounded-full bg-ink/80"
-                  />
-                ) : null}
-                {dropPos === "after" ? (
-                  <span
-                    aria-hidden
-                    className="pointer-events-none absolute -bottom-[5px] left-[2px] right-[2px] h-[2px] rounded-full bg-ink/80"
-                  />
-                ) : null}
+          {/* Drop indicator — absolutely positioned in the rail's flow so the
+              surrounding tiles don't reflow as the pointer moves between gaps.
+              Bookended with two small caps to give the line a deliberate,
+              non-default look that reads at a glance against any tile color. */}
+          {indicatorY !== null ? (
+            <span
+              aria-hidden
+              className="pointer-events-none absolute left-[6px] right-[6px] flex items-center"
+              style={{ top: `${indicatorY - 1}px`, height: "3px" }}
+            >
+              <span className="h-[6px] w-[6px] -ml-[1px] rounded-full bg-ink" />
+              <span className="h-[2px] flex-1 bg-ink" />
+              <span className="h-[6px] w-[6px] -mr-[1px] rounded-full bg-ink" />
+            </span>
+          ) : null}
 
+          {projects.map((p) => {
+            const isBeingDragged = draggingId === p.id;
+            return (
+              <div
+                key={p.id}
+                ref={setTileRef(p.id)}
+                onPointerDown={onTilePointerDown(p.id)}
+                // touch-action: none prevents the WebView from interpreting
+                // vertical pointer drags as page scroll, which would cancel
+                // pointermove before we cross the drag threshold.
+                className={cn(
+                  "relative touch-none transition-opacity duration-150",
+                  isBeingDragged ? "opacity-30" : "opacity-100",
+                  // cursor: grab signals draggability; switches to grabbing
+                  // globally via body.is-reordering-projects.
+                  "cursor-grab active:cursor-grabbing",
+                )}
+              >
                 <ProjectContextMenu
                   project={p}
                   onRequestRename={() => setRenameTarget(p)}
@@ -153,13 +258,8 @@ export function MiniProjectSidebar({ onOpenFolder }: MiniProjectSidebarProps) {
                   <ProjectTile
                     project={p}
                     active={p.id === activeProjectId}
-                    isDragging={draggingId === p.id}
-                    onClick={() => setActive(p.id)}
-                    draggable
-                    onDragStart={onTileDragStart(p.id)}
-                    onDragOver={onTileDragOver(p.id)}
-                    onDragEnd={resetDrag}
-                    onDrop={onTileDrop(p.id)}
+                    isDragging={false}
+                    onClick={onTileClick(p.id)}
                   />
                 </ProjectContextMenu>
               </div>
@@ -199,6 +299,29 @@ export function MiniProjectSidebar({ onOpenFolder }: MiniProjectSidebarProps) {
           </Tooltip>
         </div>
       </aside>
+
+      {/* Floating drag ghost — viewport-fixed and pointer-events:none so it
+          glides under the cursor without intercepting events from the rail. */}
+      {draggingProject && pointerPos ? (
+        <div
+          aria-hidden
+          className="pointer-events-none fixed z-[1000]"
+          style={{
+            top: pointerPos.y,
+            left: pointerPos.x,
+            transform: "translate(-50%, -50%) rotate(-3deg)",
+          }}
+        >
+          <div className="rounded-md shadow-[0_10px_30px_-6px_rgba(0,0,0,0.45),0_2px_6px_-2px_rgba(0,0,0,0.25)]">
+            <ProjectTile
+              project={draggingProject}
+              active={draggingProject.id === activeProjectId}
+              isDragging={false}
+              onClick={() => undefined}
+            />
+          </div>
+        </div>
+      ) : null}
 
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
 

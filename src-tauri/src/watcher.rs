@@ -41,8 +41,12 @@ impl WatcherManager {
 
         let app = self.app_handle.clone();
         let pid = project_id.clone();
+        // 80ms keeps fs events feeling near-instant in the explorer (the IA
+        // creates files via the terminal and the user expects them to pop in
+        // immediately). Below ~50ms we'd start seeing redundant churn for
+        // editor saves; above ~150ms the lag becomes perceptible.
         let mut debouncer = new_debouncer(
-            Duration::from_millis(250),
+            Duration::from_millis(80),
             move |res: DebounceEventResult| {
                 let events = match res {
                     Ok(events) => events,

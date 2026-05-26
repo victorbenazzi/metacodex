@@ -74,6 +74,10 @@
     "interface": {
       "title": "Interface",
       "description": "Controle quais superfícies e agentes aparecem no workspace.",
+      "iconStyle": "Ícones de arquivos",
+      "iconStyleHint": "Monocromático segue o tema. Colorido pinta arquivos com marca conhecida na cor original.",
+      "iconStyleMono": "Mono",
+      "iconStyleColor": "Colorido",
       "launcherVisibilityTitle": "Visibilidade no launcher",
       "launcherVisibilityHint": "Escolha quais agentes aparecem no menu +. Os ocultos continuam instalados e podem ser abertos a partir de um terminal.",
       "autonomousTag": "autônomo",
@@ -287,7 +291,9 @@
     "agentCount_other": "{{count}} agentes",
     "closeManyDescription_one": "{{inventory}} será interrompido. Processos em execução serão encerrados e respostas em andamento, descartadas.",
     "closeManyDescription_other": "{{inventory}} serão interrompidos. Processos em execução serão encerrados e respostas em andamento, descartadas.",
-    "and": " e "
+    "and": " e ",
+    "resizeExplorer": "Redimensionar painel de arquivos",
+    "resizeSourceControl": "Redimensionar painel de Source Control"
   },
   "terminal": {
     "notInstalled": "não instalado",
@@ -357,6 +363,7 @@
   "diff": {
     "comparedWithHead": "comparado com HEAD",
     "identical": "Sem alterações em relação ao HEAD.",
-    "failed": "Não foi possível carregar o diff: {{error}}"
+    "failed": "Não foi possível carregar o diff: {{error}}",
+    "resizeSplit": "Redimensionar divisão do diff"
   }
 }

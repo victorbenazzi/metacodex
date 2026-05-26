@@ -43,6 +43,12 @@
   --diff-modify: #4c6f8a;
   --diff-remove: #cf2d56;
 
+  /* Explorer: ephemeral tint for files that just appeared on disk
+     (created by the IA in the terminal, by another process, or by the
+     user via inline create). Held full for ~14.4s, then fades the last
+     600ms via the `explorer-recent-tint` keyframe. */
+  --explorer-recent: rgba(76, 111, 138, 0.18);
+
   /* Diff view (side-by-side) line + token surfaces */
   --diff-add-line: rgba(58, 155, 118, 0.10);
   --diff-add-text: rgba(58, 155, 118, 0.26);
@@ -187,6 +193,9 @@
   --diff-add: #4ec99a;
   --diff-modify: #88a8c2;
   --diff-remove: #ff5a7d;
+
+  /* Explorer recent-file tint — dark variant, sits at ~14% alpha. */
+  --explorer-recent: rgba(136, 168, 194, 0.22);
 
   /* Diff view (side-by-side) line + token surfaces */
   --diff-add-line: rgba(78, 201, 154, 0.13);
