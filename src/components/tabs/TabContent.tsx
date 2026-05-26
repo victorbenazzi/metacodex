@@ -24,7 +24,7 @@ interface TabContentProps {
   activeTabId: string | null;
 }
 
-function renderTab(tab: Tab) {
+function renderTab(tab: Tab, isVisible: boolean) {
   switch (tab.kind) {
     case "terminal":
       return (
@@ -34,6 +34,7 @@ function renderTab(tab: Tab) {
           projectId={tab.projectId}
           label={tab.title}
           prefillCommand={tab.prefillCommand}
+          isVisible={isVisible}
         />
       );
     case "cli":
@@ -45,6 +46,7 @@ function renderTab(tab: Tab) {
           label={tab.title}
           cliId={tab.cliId}
           launchCommand={tab.launchCommand}
+          isVisible={isVisible}
         />
       );
     case "editor":
@@ -101,7 +103,7 @@ export function TabContent({ allBuckets, activeProjectKey, activeTabId }: TabCon
               style={{ display: isVisible ? "block" : "none" }}
               className="h-full w-full"
             >
-              {renderTab(tab)}
+              {renderTab(tab, isVisible)}
             </div>
           );
         }),

@@ -1,5 +1,11 @@
 import type { ComponentType, ReactNode } from "react";
-import { Plus, AlertTriangle, ChevronDown, ChevronRight, Loader2, Settings2 } from "lucide-react";
+import {
+  Plus,
+  ChevronDown,
+  ChevronRight,
+  Settings2,
+  GitBranch,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -28,11 +34,6 @@ import {
   isAgentEnabled,
   type CliTool,
 } from "@/features/terminal/cli-registry";
-import {
-  cliDetectionFor,
-  useCliDetections,
-  type CliDetectionStatus,
-} from "@/features/terminal/cli-detection";
 import { useSettingsDataStore } from "@/features/settings/settings.data.store";
 import { cn } from "@/lib/cn";
 
@@ -40,6 +41,8 @@ interface NewTabActions {
   onNewTerminal: () => void;
   onLaunchCli: (cli: CliTool) => void;
   onEditRegistry?: () => void;
+  /** Open the WorktreeCreateDialog flow. Only shown when a project is active. */
+  onNewWorktree?: () => void;
 }
 
 // Polymorphic body — the SAME items are rendered inside a Radix DropdownMenu
@@ -60,7 +63,6 @@ interface MenuComponents {
 
 export function NewTabBody({ actions, C }: { actions: NewTabActions; C: MenuComponents }) {
   const { t } = useTranslation();
-  const detections = useCliDetections();
   const enabledAgents = useSettingsDataStore((s) => s.settings.interface.enabledAgents);
   const autonomousExpanded = useSettingsDataStore(
     (s) => s.settings.interface.autonomousAgentsExpanded,
@@ -74,15 +76,16 @@ export function NewTabBody({ actions, C }: { actions: NewTabActions; C: MenuComp
   const codingAgents = visible.filter((cli) => cliCategory(cli) === "coding");
   const autonomousAgents = visible.filter((cli) => cliCategory(cli) === "autonomous");
 
+  // No install-state hint on launcher rows — the install guide surfaces inside
+  // the tab via CliMissingPanel after the user clicks. Settings > CLI Registry
+  // is the canonical place to inspect detection state.
   const renderAgent = (cli: CliTool) => {
     const BrandIcon = CLI_BRAND_ICONS[cli.id];
-    const detection = cliDetectionFor(cli, detections);
     return (
       <C.Item
         key={cli.id}
         onSelect={() => actions.onLaunchCli(cli)}
         className={itemClass}
-        trailing={<CliInstallHint status={detection.status} />}
       >
         {BrandIcon ? (
           <span className="flex h-[20px] w-[20px] shrink-0 items-center justify-center">
@@ -103,6 +106,13 @@ export function NewTabBody({ actions, C }: { actions: NewTabActions; C: MenuComp
       >
         <span className="font-medium">{t("tabs.newTerminal")}</span>
       </C.Item>
+
+      {actions.onNewWorktree ? (
+        <C.Item onSelect={actions.onNewWorktree} className={itemClass}>
+          <Icon icon={GitBranch} size={13} className="text-muted" />
+          <span className="font-medium">{t("tabs.newWorktree")}</span>
+        </C.Item>
+      ) : null}
 
       {codingAgents.length > 0 && (
         <>
@@ -147,30 +157,6 @@ export function NewTabBody({ actions, C }: { actions: NewTabActions; C: MenuComp
         </>
       )}
     </>
-  );
-}
-
-function CliInstallHint({ status }: { status: CliDetectionStatus }) {
-  const { t } = useTranslation();
-
-  if (status === "installed") return null;
-
-  if (status === "checking") {
-    return (
-      <Tooltip content={t("cli.checkingTooltip")} side="top">
-        <span className="inline-flex items-center justify-center text-muted-soft">
-          <Icon icon={Loader2} size={13} className="animate-spin" />
-        </span>
-      </Tooltip>
-    );
-  }
-
-  return (
-    <Tooltip content={t("cli.notInstalledTooltip")} side="top">
-      <span className="inline-flex items-center justify-center text-warn">
-        <Icon icon={AlertTriangle} size={13} strokeWidth={2} />
-      </span>
-    </Tooltip>
   );
 }
 

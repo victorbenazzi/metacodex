@@ -3,6 +3,7 @@ import { useTranslation, Trans } from "react-i18next";
 
 import { TerminalTab } from "./TerminalTab";
 import { CliMissingPanel } from "./CliMissingPanel";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { cliApi } from "@/features/terminal/cli.service";
 import { cliById, type CliTool } from "@/features/terminal/cli-registry";
 import { useTabsStore, WORKSPACE_NULL } from "@/components/tabs/tabsStore";
@@ -15,6 +16,7 @@ interface CliTabComponentProps {
   cliId: string;
   launchCommand: string;
   label: string;
+  isVisible?: boolean;
 }
 
 type Status = "detecting" | "missing" | "ready";
@@ -26,6 +28,7 @@ export function CliTabComponent({
   cliId,
   launchCommand,
   label,
+  isVisible,
 }: CliTabComponentProps) {
   const { t } = useTranslation();
   const [status, setStatus] = useState<Status>("detecting");
@@ -68,12 +71,19 @@ export function CliTabComponent({
 
   if (!cli || status === "missing") {
     if (!cli) {
-      // Unknown cli id — render a small generic missing panel by faking a CliTool
       return (
-        <div className="flex h-full items-center justify-center p-[32px]">
-          <p className="text-[13px] text-danger">
-            <Trans i18nKey="terminal.unknownCli" values={{ id: cliId }} components={[<code className="font-mono" />]} />
-          </p>
+        <div className="h-full bg-canvas">
+          <EmptyState
+            body={
+              <span className="text-danger">
+                <Trans
+                  i18nKey="terminal.unknownCli"
+                  values={{ id: cliId }}
+                  components={[<code className="font-mono" />]}
+                />
+              </span>
+            }
+          />
         </div>
       );
     }
@@ -88,8 +98,8 @@ export function CliTabComponent({
 
   if (status === "detecting") {
     return (
-      <div className="flex h-full items-center justify-center bg-canvas">
-        <p className="font-mono text-[11px] text-muted-soft">{t("terminal.detecting", { label: cli.label })}</p>
+      <div className="h-full bg-canvas">
+        <EmptyState body={t("terminal.detecting", { label: cli.label })} />
       </div>
     );
   }
@@ -103,6 +113,7 @@ export function CliTabComponent({
       label={label}
       cliLaunchCommand={launchCommand}
       cliToolId={cliId}
+      isVisible={isVisible}
     />
   );
 }

@@ -562,7 +562,7 @@ function TreeChildren({
           {createRow}
           {createRow ? null : (
             <div
-              className="py-[3px] font-mono text-[11px] italic text-muted-soft"
+              className="py-[3px] font-mono text-[11px] text-muted-soft"
               style={{ paddingLeft: indentPx }}
             >
               {t("tree.empty")}

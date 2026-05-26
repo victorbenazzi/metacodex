@@ -4,6 +4,8 @@ import { AppShell } from "@/app/AppShell";
 import { KeyboardShortcuts } from "@/app/KeyboardShortcuts";
 import { SearchDialog } from "@/components/search/SearchDialog";
 import { CommandPalette } from "@/components/command-palette/CommandPalette";
+import { DiagnosticLogPanel } from "@/components/diagnostics/DiagnosticLogPanel";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { initThemeListener } from "@/features/theme/theme.store";
 
 export default function App() {
@@ -35,11 +37,12 @@ export default function App() {
   }, []);
 
   return (
-    <>
+    <ErrorBoundary>
       <KeyboardShortcuts />
       <AppShell />
       <SearchDialog />
       <CommandPalette />
-    </>
+      <DiagnosticLogPanel />
+    </ErrorBoundary>
   );
 }

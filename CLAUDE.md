@@ -41,7 +41,16 @@ State is split into **Zustand stores per feature** (`src/features/<feature>/<fea
 
 - `projects.store` — list + active id (hydrated from Rust on mount).
 - `tabs` store (`src/components/tabs/tabsStore.ts`) — `byProject: Record<projectKey, { tabs, activeTabId }>`. Use `WORKSPACE_NULL` as the bucket key when no project is active (Day-1 users can open terminal tabs before adding any project).
-- `explorer`, `git`, `editor`, `search`, `theme`, `settings` (dialog open/close), `settings.data` (user preferences — see Persistence), `keybindings` (rebindable shortcuts) — each own their slice; never reach across stores inside a component, derive in `AppShell` or selectors.
+- `explorer`, `git`, `editor` + `editor-status`, `search`, `theme`, `keybindings` (rebindable shortcuts) — feature-local slices.
+- `settings` (dialog open/close) vs `settings.data` (user preferences — see Persistence) — kept separate so the dialog can mount/unmount without thrashing prefs.
+- `worktrees` (`features/git/worktrees.store.ts`) — list per project + `occupancyByPath` (which paths have a tab pointing at them).
+- `source-control` (`features/source-control/sourceControl.store.ts`) — right-panel open/closed.
+- `resume` (`features/resume/resume.store.ts`) — recent agent sessions registry; rendered on Welcome + ProjectEmptyState.
+- `terminal` (`features/terminal/terminal.store.ts`) — PTY session registry mirroring Rust state.
+- `agent-status` (`features/terminal/agent-status.store.ts`) — per-tab `idle | working | needs-attention | done` derived from OSC + heuristics; powers the tab status dot and Cmd+Shift+U jump.
+- `tabMetadata` (`features/terminal/tabMetadata.store.ts`) — per-tab branch / cwd / listening ports, polled via `useTabMetadataPolling`; powers `TabTooltip`.
+- `command-palette` (`features/command-palette/command-palette.store.ts`) — open + mode (commands vs files).
+- Never reach across stores inside a component — derive in `AppShell` or selectors.
 - Tabs are **keyed by project**: switching the active project swaps the entire visible tab bucket — terminals/CLIs from project A stay alive in memory but aren't shown while project B is active.
 
 ### Persistence (`~/.metacodex/`)
@@ -50,10 +59,11 @@ All persistence lives in a `~/.metacodex/` dot-folder in the user's home (NOT `~
 
 ```
 ~/.metacodex/
-├── settings.json        # user prefs (theme, language, fonts, terminal, debounces)
+├── settings.json        # user prefs (theme, language, fonts, terminal, debounces, uiDensity)
 ├── keybindings.json     # shortcut overrides (only what differs from defaults)
 └── state/
     ├── projects.json     # registry + lastActiveProjectId
+    ├── resume.json       # recent agent sessions (pruned to last 30 days at boot)
     └── workspace/{id}.json  # per-project: open tabs, active tab, expanded paths
 ```
 
@@ -96,7 +106,7 @@ One `notify_debouncer_mini::Debouncer` per project root, lifecycle owned by `Wat
 
 ## Conventions to follow
 
-- **MVP safety rule: NO file or folder deletion / rename.** The spec explicitly excludes these mutation paths from MVP — don't add `rm`/`mv` commands or UI even if the file browser tempts you to. (Rename for *projects* is fine — that just edits the registry, not the disk.)
+- **Explorer is fully mutable** (since 2026-05-21) — create / rename / delete / drag-move all wired through `explorer.store` → Rust commands (`create_file`, `create_dir`, `rename_path`, `delete_path`, `move_path`). Every mutation passes `ensure_within_roots` (no path outside a registered project root can be touched). Moves **refuse on conflict** rather than overwrite. If you add a new mutation, it MUST: (a) go through a roots-checked Rust command, (b) write atomically, (c) call `tabsStore.remapForRename` / `closeForRemovedPath` so open editor tabs follow.
 - **Atomic writes** for files: write to `<path>.<ext>.metacodex.tmp`, then `rename`. See `fs_ops::write_file_text` (project files, roots-checked) and `config_paths::write_json_atomic` (`~/.metacodex` config, app-derived paths).
 - **Path aliases**: `@/*` → `src/*` (Vite + tsconfig). Imports inside `src/` should use `@/...` not relative `../../`.
 - **IDs**: `nanoid` on the frontend (via `src/lib/idGen.ts` `newId(n)`); UUIDv4 on the Rust side for PTY session ids.
@@ -109,12 +119,21 @@ One `notify_debouncer_mini::Debouncer` per project root, lifecycle owned by `Wat
 
 | You want to… | Start here |
 |---|---|
-| Add a new Tauri command | `src-tauri/src/commands/<area>.rs` + register in `lib.rs` + mirror in `src/lib/ipc.ts::CMD` |
+| Add a new Tauri command | `src-tauri/src/commands/<area>.rs` + register in `lib.rs::invoke_handler!` + mirror in `src/lib/ipc.ts::CMD` |
 | Change app shell layout | `src/app/AppShell.tsx` (grid template lives there) |
 | Add a new tab kind | `src/components/tabs/types.ts` (discriminated union) → `TabContent.tsx` (renderer) → `AppShell.handleOpenFile` (routing) |
 | Add a new CLI to the launcher | `src/features/terminal/cli-registry.ts::DEFAULT_CLI_REGISTRY` |
-| Add/change a user setting | `src/features/settings/settings.types.ts` (`AppSettings` + `DEFAULT_SETTINGS`) → wire its consumer → control in `SettingsDialog.tsx` + i18n keys (both locales) |
+| Add/change a user setting | `src/features/settings/settings.types.ts` (`AppSettings` + `DEFAULT_SETTINGS` + `mergeSettings`) → wire its consumer → control in `SettingsDialog.tsx` + i18n keys (both locales) |
 | Add/rebind a keyboard shortcut | `src/features/keybindings/commands.ts` (registry) → dispatch in `KeyboardShortcuts.tsx` |
+| Touch the right panel (Source Control) | `src/components/source-control/SourceControlPanel.tsx` + `features/source-control/sourceControl.store.ts` (open/closed) |
+| Worktrees (list / create / merge) | `features/git/worktrees.store.ts` + `worktrees.service.ts` + `components/source-control/Worktree*Dialog.tsx`; Rust side in `commands/git.rs` (`git_worktree_*`, `git_merge_into`) |
+| Resume registry (recent agent sessions) | `features/resume/resume.store.ts` + `components/resume/ResumeCards.tsx`; Rust side `commands/resume.rs` (persists to `~/.metacodex/state/resume.json`) |
+| Agent status (idle/working/needs-attention/done) | OSC parsing in `components/terminal/oscHandlers.ts` + heuristic in `agentHeuristic.ts` → writes to `features/terminal/agent-status.store.ts` |
+| Tab tooltip / per-tab branch+ports | `features/terminal/tabMetadata.store.ts` + `useTabMetadataPolling` → `components/tabs/TabTooltip.tsx` |
+| OS notifications / sound | `commands/notifications.rs` (`notify_show`) ← dispatched from `features/terminal/notificationDispatch.ts` when an agent event fires |
+| UI density (compact / comfortable / spacious) | `settings.types.ts::UI_DENSITY_MULTIPLIER` → `AppShell` writes `--density-multiplier` → every `--space-*` token in `tokens.css` is `calc()` against it |
+| Empty / loading / missing state | `components/ui/EmptyState.tsx` (shared chrome: hairline card, Fraunces display, optional icon) |
 | Where config + state persist | `~/.metacodex/` via `src-tauri/src/config_paths.rs` |
 | Tweak design tokens | `src/styles/tokens.css` (light + dark blocks) → `tailwind.config.js` if exposing a new token to Tailwind classes |
 | Tauri app config (window, identifier, bundle) | `src-tauri/tauri.conf.json` |
+| Tauri capability/ACL grants | `src-tauri/capabilities/default.json` |

@@ -1,7 +1,10 @@
 pub mod cli;
+pub mod diagnostics;
 pub mod filesystem;
 pub mod git;
+pub mod notifications;
 pub mod projects;
+pub mod resume;
 pub mod search;
 pub mod settings;
 pub mod system;

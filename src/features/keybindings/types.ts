@@ -8,7 +8,9 @@ export type CommandId =
   | "search.inProject"
   | "palette.commands"
   | "palette.files"
-  | "file.save";
+  | "file.save"
+  | "tab.jumpToNextAttention"
+  | "diagnostics.toggle";
 
 export type CommandCategory = "general" | "navigation" | "view" | "editing";
 

@@ -5,6 +5,7 @@ import { Icon } from "@/components/ui/Icon";
 import { Kbd } from "@/components/ui/Kbd";
 import { BackgroundGrain } from "@/components/ui/BackgroundGrain";
 import { cn } from "@/lib/cn";
+import { ResumeCards } from "@/components/resume/ResumeCards";
 
 interface WelcomeScreenProps {
   onOpenFolder: () => void;
@@ -56,7 +57,7 @@ export function WelcomeScreen({ onOpenFolder, onOpenTerminal }: WelcomeScreenPro
           </h1>
         </div>
 
-        <p className="mt-[12px] max-w-[520px] font-display text-[18px] italic leading-[1.5] text-body">
+        <p className="mt-[12px] max-w-[520px] font-display text-[18px] leading-[1.5] text-body">
           {t("welcome.tagline")}
         </p>
 
@@ -79,6 +80,10 @@ export function WelcomeScreen({ onOpenFolder, onOpenTerminal }: WelcomeScreenPro
           <PrincipleCard label={t("welcome.realPtyLabel")} body={t("welcome.realPtyBody")} />
         </div>
 
+        <div className="mt-[40px] max-w-[640px]">
+          <ResumeCards title={t("resume.titleGlobal")} limit={3} />
+        </div>
+
         <FooterMeta />
       </div>
     </div>
@@ -91,7 +96,7 @@ function PrimaryAction({ onClick, children }: { onClick: () => void; children: R
       type="button"
       onClick={onClick}
       className={cn(
-        "inline-flex h-[36px] items-center gap-[8px] rounded-sm bg-ink px-[16px] text-[13px] font-medium text-on-primary",
+        "press-feedback inline-flex h-[36px] items-center gap-[8px] rounded-sm bg-ink px-[16px] text-[13px] font-medium text-on-primary",
         "transition-colors duration-150 hover:bg-primary-active focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[3px]",
       )}
     >

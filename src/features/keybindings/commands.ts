@@ -65,6 +65,18 @@ export const COMMANDS: CommandDef[] = [
     category: "editing",
     passive: true,
   },
+  {
+    id: "tab.jumpToNextAttention",
+    defaultBinding: ["mod+shift+u"],
+    descriptionKey: "settings.shortcuts.cmd.tabJumpToNextAttention",
+    category: "navigation",
+  },
+  {
+    id: "diagnostics.toggle",
+    defaultBinding: ["mod+shift+d"],
+    descriptionKey: "settings.shortcuts.cmd.diagnosticsToggle",
+    category: "view",
+  },
 ];
 
 export const COMMANDS_BY_ID: Record<CommandId, CommandDef> = Object.fromEntries(

@@ -80,7 +80,12 @@ export const useSettingsDataStore = create<SettingsDataState>((set, get) => ({
   update: (key, patch) => {
     const cur = get().settings;
     const slice = { ...(cur[key] as object), ...(patch as object) };
-    set({ settings: { ...cur, [key]: slice } as AppSettings });
+    // Run the merged candidate through mergeSettings so any out-of-range or
+    // wrong-typed value gets clamped on the way in. Before this guard the
+    // store accepted e.g. scrollback=-1 or workspaceSaveDebounceMs=1e9 and
+    // only clamped them at the next hydrate — confusing for the user.
+    const next = mergeSettings({ ...cur, [key]: slice });
+    set({ settings: next });
     if (get().hydrated) schedulePersist(() => get().settings);
   },
 

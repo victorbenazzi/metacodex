@@ -13,7 +13,9 @@
     "copied": "copied",
     "docs": "Docs",
     "imagesFilter": "Images",
-    "closeDialog": "Close dialog"
+    "closeDialog": "Close dialog",
+    "close": "Close",
+    "dismiss": "Dismiss"
   },
   "welcome": {
     "eyebrow": "Welcome",
@@ -40,6 +42,7 @@
       "interface": "Interface",
       "editor": "Editor",
       "terminal": "Terminal",
+      "notifications": "Notifications",
       "shortcuts": "Shortcuts",
       "advanced": "Advanced",
       "cli": "CLI Registry",
@@ -78,6 +81,11 @@
       "iconStyleHint": "Monochrome follows the theme. Colored paints brand-known files with their canonical color.",
       "iconStyleMono": "Mono",
       "iconStyleColor": "Colored",
+      "density": "Density",
+      "densityHint": "Flexes spacing globally. Compact for dense data, spacious for breathing room.",
+      "densityCompact": "Compact",
+      "densityComfortable": "Comfortable",
+      "densitySpacious": "Spacious",
       "launcherVisibilityTitle": "Launcher visibility",
       "launcherVisibilityHint": "Choose which agents appear in the + menu. Hidden agents stay installed and can still be launched from a terminal.",
       "autonomousTag": "autonomous",
@@ -108,6 +116,16 @@
       "scrollback": "Scrollback",
       "scrollbackHint": "Lines of history kept per terminal. Lowering it fully applies to new terminals."
     },
+    "notifications": {
+      "title": "Notifications",
+      "description": "How metacodex signals you when an agent finishes a task or asks for input. Tab badges are always on; the toggles below control the louder surfaces.",
+      "osNotifications": "macOS notifications",
+      "osNotificationsHint": "Show a system banner when an agent in the background finishes or requests your attention.",
+      "sound": "Notification sound",
+      "soundHint": "Play a short chime alongside the banner.",
+      "notifyWhenFocused": "Notify even when focused",
+      "notifyWhenFocusedHint": "Off: when metacodex is active and the affected tab is selected, only the tab dot lights up — no banner. On: always show the banner."
+    },
     "shortcuts": {
       "title": "Shortcuts",
       "description": "Click a shortcut to rebind it. Conflicts are flagged before they apply.",
@@ -125,7 +143,9 @@
         "paletteCommands": "Command palette",
         "paletteFiles": "Go to file",
         "projectSwitch": "Switch to project N",
-        "fileSave": "Save active file"
+        "fileSave": "Save active file",
+        "tabJumpToNextAttention": "Jump to next agent waiting",
+        "diagnosticsToggle": "Show diagnostic log"
       }
     },
     "advanced": {
@@ -262,7 +282,36 @@
     "closeAll": "Close all",
     "copyPath": "Copy path",
     "revealInFinder": "Reveal in Finder",
-    "copyCwd": "Copy directory"
+    "copyCwd": "Copy directory",
+    "status": {
+      "idle": "Idle",
+      "working": "Working…",
+      "needsAttention": "Needs your input",
+      "done": "Done"
+    },
+    "jumpToNextAttention": "Jump to next agent waiting",
+    "jumpAllIdle": "All agents idle",
+    "newWorktree": "New worktree…"
+  },
+  "notifications": {
+    "agentDone": "Agent finished",
+    "agentNeedsAttention": "Agent needs you"
+  },
+  "resume": {
+    "titleProject": "Pick up where you left off in {{name}}",
+    "titleGlobal": "Pick up where you left off",
+    "empty": "No recent agent sessions.",
+    "resumeButton": "Resume",
+    "discardButton": "Discard",
+    "lastSeen": "{{ago}} ago",
+    "cliUnavailable": "{{cli}} not installed",
+    "confirmDiscardTitle": "Forget this session?",
+    "confirmDiscardBody": "It will no longer appear in resume lists. The agent's own history (if any) is not touched."
+  },
+  "tabInspector": {
+    "tooltip": {
+      "noMetadata": "Loading metadata…"
+    }
   },
   "appShell": {
     "openFolderTitle": "Open folder",
@@ -275,6 +324,10 @@
     "deleteConfirmFile": "Delete",
     "deleteConfirmFolder": "Delete folder",
     "deleteSkip": "Don't ask again this session",
+    "moveTitle": "Move \"{{name}}\"?",
+    "moveDescription": "Move into {{toDir}}/",
+    "moveConfirm": "Move",
+    "moveSkip": "Don't confirm moves this session",
     "closeAgentTitle": "Close {{title}}?",
     "closeAgentDescription": "The agent session is active. Any in-progress response will be discarded.",
     "closeAgentConfirm": "Close agent",
@@ -308,7 +361,13 @@
     "lookup": "metacodex asks your login shell for <0>{{command}}</0> via <1>{{detect}}</1>.",
     "unknownCli": "Unknown CLI id: <0>{{id}}</0>",
     "detecting": "detecting {{label}}…",
-    "processExited": "[process exited]"
+    "processExited": "[process exited]",
+    "exitBanner": {
+      "nonzero": "Process exited with code {{code}}.",
+      "readerError": "Terminal I/O failed — output above may be truncated.",
+      "killed": "Process was killed.",
+      "openLog": "Open diagnostic log"
+    }
   },
   "editor": {
     "couldNotRead": "could not read",
@@ -358,12 +417,69 @@
     "deletions_other": "{{count}} deletions",
     "openDiff": "Open diff",
     "empty": "No changes",
-    "noProject": "Open a project to see its changes."
+    "noProject": "Open a project to see its changes.",
+    "worktrees": {
+      "title": "Worktrees",
+      "empty": "No worktrees yet. Use the + to spin one up for an agent.",
+      "add": "New worktree…",
+      "refresh": "Refresh worktrees",
+      "occupiedBy_one": "{{count}} tab uses this worktree",
+      "occupiedBy_other": "{{count}} tabs use this worktree",
+      "locked": "Locked",
+      "merge": "Merge into current branch…",
+      "abandon": "Abandon worktree",
+      "abandonTitle": "Abandon worktree {{branch}}?",
+      "abandonBody": "The worktree directory and its checkout will be removed. Unpushed commits on this branch will be lost.",
+      "abandonForce": "Force (discard unmerged work)",
+      "revealInFinder": "Reveal in Finder",
+      "openTerminalHere": "New terminal here",
+      "removeFailed": "Could not remove worktree:\n\n{{error}}",
+      "mergeFailed": "Merge failed:\n\n{{error}}"
+    }
+  },
+  "worktrees": {
+    "dialog": {
+      "title": "New worktree for {{cli}}",
+      "titleGeneric": "New worktree",
+      "description": "A worktree is a parallel checkout of this repo. The agent can edit, run tests, and commit on a different branch without disturbing your main checkout.",
+      "branchLabel": "Branch name",
+      "branchHint": "Created if it doesn't exist yet. Reused if it does.",
+      "baseLabel": "Base branch",
+      "baseHint": "Where the new branch starts from. HEAD is the current branch.",
+      "create": "Create worktree",
+      "createAndLaunch": "Create + launch",
+      "creating": "Creating…",
+      "branchInvalid": "Branch name can only contain letters, numbers, dots, dashes, slashes and underscores.",
+      "branchExists": "Branch already exists."
+    },
+    "merge": {
+      "title": "Merge {{branch}}",
+      "description": "Merge this worktree's branch into the project's current HEAD.",
+      "confirm": "Merge",
+      "strategy": {
+        "ffOnly": "Fast-forward only",
+        "ffOnlyHint": "Safe. Only works if the histories already line up linearly.",
+        "merge": "Merge commit",
+        "mergeHint": "Creates a merge commit, preserving the branch's history.",
+        "squash": "Squash",
+        "squashHint": "Collapses every change into a single commit on HEAD."
+      }
+    },
+    "tab": {
+      "branchPill": "worktree: {{branch}}"
+    }
   },
   "diff": {
     "comparedWithHead": "compared with HEAD",
     "identical": "No changes against HEAD.",
     "failed": "Could not load diff: {{error}}",
     "resizeSplit": "Resize diff split"
+  },
+  "diagnostics": {
+    "title": "Diagnostic log",
+    "empty": "No events yet. Toggle with Cmd+Shift+D.",
+    "filterPlaceholder": "Filter by kind…",
+    "copyToClipboard": "Copy as JSONL",
+    "clear": "Clear"
   }
 }

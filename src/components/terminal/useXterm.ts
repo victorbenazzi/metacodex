@@ -44,6 +44,12 @@ export interface UseXtermResult {
   containerRef: React.MutableRefObject<HTMLDivElement | null>;
   termRef: React.MutableRefObject<Terminal | null>;
   fitRef: React.MutableRefObject<FitAddon | null>;
+  /** True once the Terminal has been disposed. Callers MUST check this before
+   *  any term.write/scroll/resize call — xterm v5 throws (or silently noops)
+   *  on a disposed terminal, and an in-flight pty://data chunk arriving after
+   *  unmount would otherwise crash the listener. Set synchronously in the
+   *  unmount cleanup, before term.dispose() runs. */
+  disposedRef: React.MutableRefObject<boolean>;
 }
 
 /** Create + mount an xterm.js terminal. Theme follows the app theme reactively. */
@@ -51,6 +57,7 @@ export function useXterm(): UseXtermResult {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
+  const disposedRef = useRef<boolean>(false);
   // Skip the first run of each live-apply effect below: the terminal is created
   // with the current settings via getState(), so the initial pass is a no-op we
   // don't want (an early fit() could race the deferred canvas-renderer init).
@@ -67,6 +74,12 @@ export function useXterm(): UseXtermResult {
 
   useEffect(() => {
     if (!containerRef.current) return;
+    // Reset the disposed flag on every (re-)mount. React StrictMode in dev
+    // intentionally runs effect setup → cleanup → setup on the same component
+    // instance; the cleanup leaves `disposedRef.current === true`, which would
+    // make the next mount's pty://data listener silently drop every chunk —
+    // visible as a blank terminal that "doesn't load".
+    disposedRef.current = false;
     const initialTerm = useSettingsDataStore.getState().settings.terminal;
     const term = new Terminal({
       fontFamily: initialTerm.fontFamily,
@@ -128,6 +141,9 @@ export function useXterm(): UseXtermResult {
     fitRef.current = fit;
 
     return () => {
+      // Flip the disposed flag BEFORE term.dispose() so any pending
+      // pty://data listener short-circuits instead of writing to a corpse.
+      disposedRef.current = true;
       termRef.current = null;
       fitRef.current = null;
       term.dispose();
@@ -189,5 +205,5 @@ export function useXterm(): UseXtermResult {
     if (termRef.current) termRef.current.options.scrollback = termScrollback;
   }, [termScrollback]);
 
-  return { containerRef, termRef, fitRef };
+  return { containerRef, termRef, fitRef, disposedRef };
 }

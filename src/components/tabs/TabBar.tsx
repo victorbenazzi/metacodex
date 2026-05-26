@@ -10,6 +10,10 @@ import type { CliTool } from "@/features/terminal/cli-registry";
 import type { Tab } from "./types";
 import { TabContextMenu } from "./TabContextMenu";
 import { NewTabContextMenu } from "./NewTabMenu";
+import { TabStatusDot } from "./TabStatusDot";
+import { TabTooltip } from "./TabTooltip";
+import { TabWorktreePill } from "./TabWorktreePill";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 interface TabBarProps {
   tabs: Tab[];
@@ -201,7 +205,7 @@ export function TabBar({
   return (
     <NewTabContextMenu onNewTerminal={onNewTerminal} onLaunchCli={onLaunchCli}>
     <div
-      className="relative z-20 h-[30px] border-b border-hairline bg-canvas-soft"
+      className="relative z-20 h-[34px] border-b border-hairline bg-canvas-soft"
       data-tauri-drag-region
     >
       {/* The scroll container fills the row exactly. The native scrollbar is
@@ -243,6 +247,7 @@ export function TabBar({
               }
               onCopyCwd={isProcessTab ? () => onCopyTabCwd(tab.id) : undefined}
             >
+              <Tooltip content={<TabTooltip tab={tab} />} side="bottom" align="start">
               <button
                 type="button"
                 data-tab-id={tab.id}
@@ -256,7 +261,7 @@ export function TabBar({
                   e.stopPropagation();
                 }}
                 className={cn(
-                  "group relative flex h-[30px] min-w-[140px] max-w-[220px] shrink-0 items-center gap-[8px] border-r border-hairline px-[10px]",
+                  "group relative flex h-[34px] min-w-[140px] max-w-[220px] shrink-0 items-center gap-[8px] border-r border-hairline px-[10px]",
                   "transition-colors duration-100",
                   active
                     ? "bg-canvas text-ink"
@@ -264,16 +269,24 @@ export function TabBar({
                 )}
                 aria-current={active ? "page" : undefined}
               >
-                {renderTabIcon(tab, active)}
-                <span className="flex-1 truncate text-left font-mono text-[12px] tracking-tight">
-                  {tab.title}
-                </span>
+                {/* Dirty marker sits LEFT of the icon — VS Code / Cursor / JetBrains
+                    convention. Reading order: state → identity → name → controls. */}
                 {tab.dirty ? (
                   <span
-                    className="h-[6px] w-[6px] rounded-full bg-ink"
+                    className="h-[6px] w-[6px] shrink-0 rounded-full bg-ink"
                     aria-label={t("tabs.unsavedChanges")}
                   />
                 ) : null}
+                {renderTabIcon(tab, active)}
+                {tab.kind === "terminal" || tab.kind === "cli" ? (
+                  <TabStatusDot tabId={tab.id} />
+                ) : null}
+                <span className="flex-1 truncate text-left font-mono text-[12px] tracking-tight">
+                  {tab.title}
+                </span>
+                {/* Worktree pill sits at the trailing edge, just before close —
+                    branch identity is metadata, not part of the title scan. */}
+                <TabWorktreePill tab={tab} />
                 <span
                   role="button"
                   tabIndex={-1}
@@ -282,7 +295,7 @@ export function TabBar({
                     onClose(tab.id);
                   }}
                   className={cn(
-                    "ml-auto inline-flex h-[18px] w-[18px] items-center justify-center rounded-xs text-muted opacity-0 transition-all duration-100",
+                    "inline-flex h-[18px] w-[18px] items-center justify-center rounded-xs text-muted opacity-0 transition-all duration-100",
                     "hover:bg-surface-strong/80 hover:text-ink group-hover:opacity-100",
                     active && "opacity-60",
                   )}
@@ -292,6 +305,7 @@ export function TabBar({
                 </span>
                 {active ? <span className="tab-indicator" /> : null}
               </button>
+              </Tooltip>
             </TabContextMenu>
           );
         })}

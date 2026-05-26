@@ -22,13 +22,20 @@ interface TabsState {
   updateTab: (projectKey: string, tabId: string, patch: Partial<Tab>) => void;
   /** Close any file-backed tab whose path === removedPath or sits inside it. */
   closeForRemovedPath: (projectKey: string, removedPath: string) => void;
-  /** Rewrite path/title/id of any file-backed tab affected by a rename. */
+  /** Rewrite path/title of any file-backed tab affected by a rename. Tab ids
+   *  STAY STABLE so editor-store entries (keyed by tabId) survive the rename. */
   remapForRename: (
     projectKey: string,
     oldPath: string,
     newPath: string,
   ) => void;
+  /** Drop the bucket entirely — used when a project is removed from the app. */
+  dropBucket: (projectKey: string) => void;
   getBucket: (projectKey: string) => TabsBucket;
+  /** Locate an existing file-backed tab by absolute path. Used for dedup
+   *  in `openTab` so the same path always focuses one tab, even after a
+   *  rename has rewritten that tab's `path` (its `id` may not match). */
+  findByPath: (projectKey: string, path: string) => Tab | null;
 }
 
 const emptyBucket: TabsBucket = { tabs: [], activeTabId: null };
@@ -38,16 +45,30 @@ export const useTabsStore = create<TabsState>((set, get) => ({
   openTab: (projectKey, tab, setActive = true) =>
     set((state) => {
       const cur = state.byProject[projectKey] ?? emptyBucket;
-      // Avoid duplicates of file-path tabs by ID; terminals have unique IDs.
-      const existingIdx = cur.tabs.findIndex((t) => t.id === tab.id);
-      const nextTabs =
-        existingIdx >= 0 ? cur.tabs : [...cur.tabs, tab];
+      // Dedup strategy:
+      //  1) If `tab` has a `path`, prefer matching by path — covers the case
+      //     where a tab was renamed (its `id` is now decoupled from the new
+      //     path, but the tab still represents that file).
+      //  2) Otherwise fall back to id-based dedup for terminals / non-file tabs.
+      const tabPath = "path" in tab ? (tab as { path?: string }).path : undefined;
+      let existingIdx = -1;
+      if (tabPath) {
+        existingIdx = cur.tabs.findIndex(
+          (t) => "path" in t && (t as { path?: string }).path === tabPath,
+        );
+      }
+      if (existingIdx < 0) {
+        existingIdx = cur.tabs.findIndex((t) => t.id === tab.id);
+      }
+      const existing = existingIdx >= 0 ? cur.tabs[existingIdx] : null;
+      const nextTabs = existing ? cur.tabs : [...cur.tabs, tab];
+      const focusId = existing ? existing.id : tab.id;
       return {
         byProject: {
           ...state.byProject,
           [projectKey]: {
             tabs: nextTabs,
-            activeTabId: setActive ? tab.id : cur.activeTabId ?? tab.id,
+            activeTabId: setActive ? focusId : cur.activeTabId ?? focusId,
           },
         },
       };
@@ -160,25 +181,43 @@ export const useTabsStore = create<TabsState>((set, get) => ({
       const cur = state.byProject[projectKey];
       if (!cur) return state;
       let changed = false;
-      let nextActiveId = cur.activeTabId;
       const nextTabs = cur.tabs.map((t) => {
         if (!("path" in t) || !t.path) return t;
+        // The `+ "/"` guard prevents prefix collisions: "/foo" must not match
+        // "/foobar/x.ts" — only "/foo" itself or "/foo/<child>".
         if (t.path !== oldPath && !t.path.startsWith(oldPath + "/")) return t;
         changed = true;
         const remapped = newPath + t.path.slice(oldPath.length);
-        const oldId = t.id;
-        const newId = oldId.startsWith("f-") ? `f-${remapped}` : oldId;
-        if (cur.activeTabId === oldId) nextActiveId = newId;
-        return { ...t, id: newId, path: remapped, title: basename(remapped) } as Tab;
+        // Keep `id` stable — the editor store (keyed by tabId) follows the
+        // rename automatically because its key never changes. The path-based
+        // dedup in `openTab` handles re-opening the same file by its new path.
+        return { ...t, path: remapped, title: basename(remapped) } as Tab;
       });
       if (!changed) return state;
       return {
         byProject: {
           ...state.byProject,
-          [projectKey]: { tabs: nextTabs, activeTabId: nextActiveId },
+          [projectKey]: { tabs: nextTabs, activeTabId: cur.activeTabId },
         },
       };
     }),
 
+  dropBucket: (projectKey) =>
+    set((state) => {
+      if (!(projectKey in state.byProject)) return state;
+      const { [projectKey]: _, ...rest } = state.byProject;
+      return { byProject: rest };
+    }),
+
   getBucket: (projectKey) => get().byProject[projectKey] ?? emptyBucket,
+
+  findByPath: (projectKey, path) => {
+    const cur = get().byProject[projectKey];
+    if (!cur) return null;
+    return (
+      cur.tabs.find(
+        (t) => "path" in t && (t as { path?: string }).path === path,
+      ) ?? null
+    );
+  },
 }));

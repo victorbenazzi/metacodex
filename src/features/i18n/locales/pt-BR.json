@@ -13,7 +13,9 @@
     "copied": "copiado",
     "docs": "Docs",
     "imagesFilter": "Imagens",
-    "closeDialog": "Fechar"
+    "closeDialog": "Fechar",
+    "close": "Fechar",
+    "dismiss": "Dispensar"
   },
   "welcome": {
     "eyebrow": "Bem-vindo",
@@ -40,6 +42,7 @@
       "interface": "Interface",
       "editor": "Editor",
       "terminal": "Terminal",
+      "notifications": "Notificações",
       "shortcuts": "Atalhos",
       "advanced": "Avançado",
       "cli": "Registro de CLIs",
@@ -78,6 +81,11 @@
       "iconStyleHint": "Monocromático segue o tema. Colorido pinta arquivos com marca conhecida na cor original.",
       "iconStyleMono": "Mono",
       "iconStyleColor": "Colorido",
+      "density": "Densidade",
+      "densityHint": "Ajusta o espaçamento globalmente. Compacta para dados densos, espaçosa para mais respiro.",
+      "densityCompact": "Compacta",
+      "densityComfortable": "Confortável",
+      "densitySpacious": "Espaçosa",
       "launcherVisibilityTitle": "Visibilidade no launcher",
       "launcherVisibilityHint": "Escolha quais agentes aparecem no menu +. Os ocultos continuam instalados e podem ser abertos a partir de um terminal.",
       "autonomousTag": "autônomo",
@@ -108,6 +116,16 @@
       "scrollback": "Histórico (scrollback)",
       "scrollbackHint": "Linhas de histórico mantidas por terminal. Reduzir só se aplica totalmente a novos terminais."
     },
+    "notifications": {
+      "title": "Notificações",
+      "description": "Como o metacodex te avisa quando um agente conclui ou pede uma resposta. O ponto na aba está sempre ligado; abaixo controlam as superfícies mais barulhentas.",
+      "osNotifications": "Notificações do macOS",
+      "osNotificationsHint": "Mostra um banner do sistema quando um agente em segundo plano conclui ou pede atenção.",
+      "sound": "Som de notificação",
+      "soundHint": "Toca um sinal curto junto com o banner.",
+      "notifyWhenFocused": "Notificar mesmo em foco",
+      "notifyWhenFocusedHint": "Desligado: quando o metacodex está ativo e a aba afetada está aberta, só o ponto da aba acende. Ligado: sempre mostra o banner."
+    },
     "shortcuts": {
       "title": "Atalhos",
       "description": "Clique em um atalho para redefini-lo. Conflitos são sinalizados antes de aplicar.",
@@ -125,7 +143,9 @@
         "paletteCommands": "Paleta de comandos",
         "paletteFiles": "Ir para arquivo",
         "projectSwitch": "Trocar para o projeto N",
-        "fileSave": "Salvar arquivo ativo"
+        "fileSave": "Salvar arquivo ativo",
+        "tabJumpToNextAttention": "Pular para o próximo agente aguardando",
+        "diagnosticsToggle": "Abrir log de diagnóstico"
       }
     },
     "advanced": {
@@ -262,7 +282,36 @@
     "closeAll": "Fechar todas",
     "copyPath": "Copiar caminho",
     "revealInFinder": "Revelar no Finder",
-    "copyCwd": "Copiar diretório"
+    "copyCwd": "Copiar diretório",
+    "status": {
+      "idle": "Ocioso",
+      "working": "Trabalhando…",
+      "needsAttention": "Aguarda você",
+      "done": "Concluído"
+    },
+    "jumpToNextAttention": "Pular para o próximo agente aguardando",
+    "jumpAllIdle": "Todos os agentes ociosos",
+    "newWorktree": "Nova worktree…"
+  },
+  "notifications": {
+    "agentDone": "Agente concluído",
+    "agentNeedsAttention": "Agente aguarda você"
+  },
+  "resume": {
+    "titleProject": "Retome de onde parou em {{name}}",
+    "titleGlobal": "Retome de onde parou",
+    "empty": "Nenhuma sessão recente.",
+    "resumeButton": "Retomar",
+    "discardButton": "Descartar",
+    "lastSeen": "há {{ago}}",
+    "cliUnavailable": "{{cli}} não instalado",
+    "confirmDiscardTitle": "Esquecer esta sessão?",
+    "confirmDiscardBody": "Não aparecerá mais nas listas. O histórico do agente (se houver) não é alterado."
+  },
+  "tabInspector": {
+    "tooltip": {
+      "noMetadata": "Carregando metadados…"
+    }
   },
   "appShell": {
     "openFolderTitle": "Abrir pasta",
@@ -275,6 +324,10 @@
     "deleteConfirmFile": "Apagar",
     "deleteConfirmFolder": "Apagar pasta",
     "deleteSkip": "Não perguntar novamente nesta sessão",
+    "moveTitle": "Mover \"{{name}}\"?",
+    "moveDescription": "Mover para {{toDir}}/",
+    "moveConfirm": "Mover",
+    "moveSkip": "Não confirmar movimentações nesta sessão",
     "closeAgentTitle": "Encerrar {{title}}?",
     "closeAgentDescription": "A sessão do agente está ativa. Qualquer resposta em andamento será descartada.",
     "closeAgentConfirm": "Encerrar agente",
@@ -308,7 +361,13 @@
     "lookup": "O metacodex pergunta ao seu shell de login por <0>{{command}}</0> via <1>{{detect}}</1>.",
     "unknownCli": "CLI desconhecida: <0>{{id}}</0>",
     "detecting": "detectando {{label}}…",
-    "processExited": "[processo encerrado]"
+    "processExited": "[processo encerrado]",
+    "exitBanner": {
+      "nonzero": "O processo saiu com código {{code}}.",
+      "readerError": "Falha de I/O no terminal — a saída acima pode estar truncada.",
+      "killed": "O processo foi encerrado.",
+      "openLog": "Abrir log de diagnóstico"
+    }
   },
   "editor": {
     "couldNotRead": "não foi possível ler",
@@ -358,12 +417,69 @@
     "deletions_other": "{{count}} remoções",
     "openDiff": "Abrir diff",
     "empty": "Nenhuma alteração",
-    "noProject": "Abra um projeto para ver as alterações."
+    "noProject": "Abra um projeto para ver as alterações.",
+    "worktrees": {
+      "title": "Worktrees",
+      "empty": "Nenhuma worktree ainda. Use o + para criar uma para um agente.",
+      "add": "Nova worktree…",
+      "refresh": "Atualizar worktrees",
+      "occupiedBy_one": "{{count}} aba usa esta worktree",
+      "occupiedBy_other": "{{count}} abas usam esta worktree",
+      "locked": "Travada",
+      "merge": "Mesclar no branch atual…",
+      "abandon": "Abandonar worktree",
+      "abandonTitle": "Abandonar worktree {{branch}}?",
+      "abandonBody": "O diretório e o checkout da worktree serão removidos. Commits não-pushados desta branch serão perdidos.",
+      "abandonForce": "Forçar (descartar trabalho não mesclado)",
+      "revealInFinder": "Revelar no Finder",
+      "openTerminalHere": "Novo terminal aqui",
+      "removeFailed": "Não foi possível remover a worktree:\n\n{{error}}",
+      "mergeFailed": "Falha ao mesclar:\n\n{{error}}"
+    }
+  },
+  "worktrees": {
+    "dialog": {
+      "title": "Nova worktree para {{cli}}",
+      "titleGeneric": "Nova worktree",
+      "description": "Uma worktree é um checkout paralelo do mesmo repo. O agente pode editar, rodar testes e commitar em outra branch sem mexer no seu checkout principal.",
+      "branchLabel": "Nome da branch",
+      "branchHint": "Criada se ainda não existir. Reaproveitada se existir.",
+      "baseLabel": "Branch base",
+      "baseHint": "De onde a nova branch parte. HEAD é a branch atual.",
+      "create": "Criar worktree",
+      "createAndLaunch": "Criar e iniciar",
+      "creating": "Criando…",
+      "branchInvalid": "Nome só pode conter letras, números, pontos, traços, barras e underscores.",
+      "branchExists": "Branch já existe."
+    },
+    "merge": {
+      "title": "Mesclar {{branch}}",
+      "description": "Mescla a branch desta worktree no HEAD atual do projeto.",
+      "confirm": "Mesclar",
+      "strategy": {
+        "ffOnly": "Somente fast-forward",
+        "ffOnlyHint": "Seguro. Só funciona se o histórico já é linear.",
+        "merge": "Commit de merge",
+        "mergeHint": "Cria um commit de merge, preservando o histórico da branch.",
+        "squash": "Squash",
+        "squashHint": "Colapsa todas as mudanças num único commit no HEAD."
+      }
+    },
+    "tab": {
+      "branchPill": "worktree: {{branch}}"
+    }
   },
   "diff": {
     "comparedWithHead": "comparado com HEAD",
     "identical": "Sem alterações em relação ao HEAD.",
     "failed": "Não foi possível carregar o diff: {{error}}",
     "resizeSplit": "Redimensionar divisão do diff"
+  },
+  "diagnostics": {
+    "title": "Log de diagnóstico",
+    "empty": "Nenhum evento ainda. Abra com Cmd+Shift+D.",
+    "filterPlaceholder": "Filtrar por tipo…",
+    "copyToClipboard": "Copiar como JSONL",
+    "clear": "Limpar"
   }
 }

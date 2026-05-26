@@ -10,6 +10,13 @@ export default {
         "surface-card": "var(--surface-card)",
         "surface-strong": "var(--surface-strong)",
 
+        // Semantic surface aliases — express intent (elevation) rather than
+        // a specific color value. Defined in tokens.css.
+        "surface-0": "var(--surface-0)",
+        "surface-1": "var(--surface-1)",
+        "surface-2": "var(--surface-2)",
+        "surface-3": "var(--surface-3)",
+
         hairline: "var(--hairline)",
         "hairline-soft": "var(--hairline-soft)",
         "hairline-strong": "var(--hairline-strong)",
@@ -45,9 +52,14 @@ export default {
         mono: ['"JetBrains Mono"', '"SF Mono"', "ui-monospace", "Menlo", "monospace"],
       },
       fontSize: {
-        ui: ["14px", { lineHeight: "1.5" }],
-        caption: ["12px", { lineHeight: "1.4" }],
-        mono: ["13px", { lineHeight: "1.5" }],
+        // Strict 4-tier UI scale + 2 display tiers. Driven by --fs-* tokens.
+        label: ["var(--fs-label)", { lineHeight: "1.4", letterSpacing: "var(--tracking-label)" }],
+        caption: ["var(--fs-caption)", { lineHeight: "1.4" }],
+        ui: ["var(--fs-ui)", { lineHeight: "1.5" }],
+        title: ["var(--fs-title)", { lineHeight: "1.4", letterSpacing: "-0.005em" }],
+        "display-s": ["var(--fs-display-s)", { lineHeight: "1.25", letterSpacing: "-0.012em" }],
+        "display-l": ["var(--fs-display-l)", { lineHeight: "1.02", letterSpacing: "-0.022em" }],
+        mono: ["var(--fs-mono)", { lineHeight: "1.5" }],
       },
       borderRadius: {
         xs: "var(--radius-xs)",
@@ -56,6 +68,15 @@ export default {
         lg: "var(--radius-lg)",
         xl: "var(--radius-xl)",
         pill: "var(--radius-pill)",
+      },
+      boxShadow: {
+        elevated: "var(--shadow-elevated)",
+        drag: "var(--shadow-drag)",
+      },
+      backgroundColor: {
+        // Modal/dialog scrim. Token-driven so light and dark themes can tune
+        // alpha independently without component edits.
+        scrim: "var(--overlay-scrim)",
       },
       spacing: {
         xxs: "var(--space-xxs)",
@@ -93,6 +114,13 @@ export default {
           "96%": { backgroundColor: "var(--explorer-recent)" },
           "100%": { backgroundColor: "transparent" },
         },
+        // Tab-status "working" indicator — pure opacity, slow enough not to
+        // distract but visible enough to read at a glance. Triangulated by
+        // Radix scale tests: 1.6s feels alive, 0.8s feels anxious.
+        "tab-status-pulse": {
+          "0%, 100%": { opacity: "0.35" },
+          "50%": { opacity: "0.85" },
+        },
       },
       animation: {
         // Enter decelerates in (ease-out); exit accelerates out (ease-in) and
@@ -102,6 +130,7 @@ export default {
         "fade-in": "fade-in var(--dur-enter) var(--ease-out)",
         "fade-out": "fade-out var(--dur-exit) var(--ease-in) forwards",
         "explorer-recent-tint": "explorer-recent-tint 15s linear forwards",
+        "tab-status-pulse": "tab-status-pulse 1.6s ease-in-out infinite",
       },
     },
   },

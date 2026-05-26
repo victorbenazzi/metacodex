@@ -144,7 +144,7 @@ export function FileExplorer({
         ) : Array.isArray(rootChildren) ? (
           rootChildren.length === 0 ? (
             creatingAtRoot ? null : (
-              <p className="px-[16px] py-[10px] font-mono text-[11px] italic text-muted-soft">
+              <p className="px-[16px] py-[10px] font-mono text-[11px] text-muted-soft">
                 {t("explorer.emptyFolder")}
               </p>
             )

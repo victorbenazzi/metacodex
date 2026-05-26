@@ -48,6 +48,24 @@ impl ProjectsCache {
     pub fn project_roots(&self) -> Vec<String> {
         self.inner.read().iter().map(|p| p.path.clone()).collect()
     }
+
+    /// Find the project (id, path) whose root is a prefix of `path`. Picks the
+    /// longest matching root in case the user has registered nested folders.
+    /// Returns `None` when no project owns the path.
+    pub fn find_owner(&self, path: &str) -> Option<(String, String)> {
+        let normalized = crate::util::paths::normalize(std::path::Path::new(path));
+        let mut best: Option<(String, String, usize)> = None;
+        for p in self.inner.read().iter() {
+            let root = crate::util::paths::normalize(std::path::Path::new(&p.path));
+            if normalized == root || normalized.starts_with(&root) {
+                let depth = root.components().count();
+                if best.as_ref().map(|(_, _, d)| depth > *d).unwrap_or(true) {
+                    best = Some((p.id.clone(), p.path.clone(), depth));
+                }
+            }
+        }
+        best.map(|(id, root, _)| (id, root))
+    }
 }
 
 fn load_file() -> AppResult<ProjectsFile> {

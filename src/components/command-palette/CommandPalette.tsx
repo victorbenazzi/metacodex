@@ -194,7 +194,7 @@ export function CommandPalette() {
       <RD.Portal>
         <RD.Overlay
           className={cn(
-            "fixed inset-0 z-[100] bg-[rgba(38,37,30,0.32)]",
+            "fixed inset-0 z-[100] bg-scrim",
             "data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out",
           )}
         />

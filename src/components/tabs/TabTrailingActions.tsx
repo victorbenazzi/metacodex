@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { PanelRight, Plus } from "lucide-react";
+import { GitBranch, Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -21,6 +21,7 @@ interface TabTrailingActionsProps {
   onNewTerminal: () => void;
   onLaunchCli: (cli: CliTool) => void;
   onEditRegistry?: () => void;
+  onNewWorktree?: () => void;
 }
 
 /**
@@ -36,6 +37,7 @@ export function TabTrailingActions({
   onNewTerminal,
   onLaunchCli,
   onEditRegistry,
+  onNewWorktree,
 }: TabTrailingActionsProps) {
   const { t } = useTranslation();
   const panelOpen = useSourceControlStore((s) => s.open);
@@ -79,7 +81,7 @@ export function TabTrailingActions({
         </Tooltip>
         <DropdownContent align="end" sideOffset={8}>
           <NewTabBody
-            actions={{ onNewTerminal, onLaunchCli, onEditRegistry }}
+            actions={{ onNewTerminal, onLaunchCli, onEditRegistry, onNewWorktree }}
             C={DROPDOWN_COMPONENTS}
           />
         </DropdownContent>
@@ -101,7 +103,7 @@ export function TabTrailingActions({
                   : "text-muted hover:bg-surface-strong/45 hover:text-body",
               )}
             >
-              <Icon icon={PanelRight} size={12} strokeWidth={1.75} />
+              <Icon icon={GitBranch} size={12} strokeWidth={1.75} />
               {changeCount > 0 ? (
                 <span>{changeCount > 99 ? "99+" : changeCount}</span>
               ) : null}

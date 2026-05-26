@@ -1,23 +1,18 @@
 import * as Lucide from "lucide-react";
-import { AlertTriangle, Loader2, TerminalSquare } from "lucide-react";
+import { TerminalSquare } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { BackgroundGrain } from "@/components/ui/BackgroundGrain";
 import { Icon } from "@/components/ui/Icon";
 import { Kbd } from "@/components/ui/Kbd";
-import { Tooltip } from "@/components/ui/Tooltip";
 import { CLI_BRAND_ICONS } from "@/components/icons/brand";
 import { DEFAULT_CLI_REGISTRY, type CliTool } from "@/features/terminal/cli-registry";
-import {
-  cliDetectionFor,
-  useCliDetections,
-  type CliDetectionStatus,
-} from "@/features/terminal/cli-detection";
 import { tileBackground, tileIconColor } from "@/features/projects/color";
 import { isCustomIcon } from "@/features/projects/customIcon.service";
 import { useThemeStore } from "@/features/theme/theme.store";
 import type { Project } from "@/features/projects/project.types";
 import { cn } from "@/lib/cn";
+import { ResumeCards } from "@/components/resume/ResumeCards";
 
 interface ProjectEmptyStateProps {
   project: Project;
@@ -40,7 +35,6 @@ function getLucideIcon(name: string): Lucide.LucideIcon {
 export function ProjectEmptyState({ project, onNewTerminal, onLaunchCli }: ProjectEmptyStateProps) {
   const { t } = useTranslation();
   const theme = useThemeStore((s) => s.effective);
-  const detections = useCliDetections();
 
   const usesCustom = isCustomIcon(project.icon);
   const FallbackIcon = usesCustom ? Lucide.Folder : getLucideIcon(project.icon);
@@ -88,9 +82,20 @@ export function ProjectEmptyState({ project, onNewTerminal, onLaunchCli }: Proje
           </div>
         </div>
 
-        <p className="mt-[16px] max-w-[520px] font-display text-[17px] italic leading-[1.5] text-body">
+        <p className="mt-[16px] max-w-[520px] font-display text-[17px] leading-[1.5] text-body">
           {t("projectEmpty.tagline")}
         </p>
+
+        {/* Resume tile group — only renders when there are recent sessions for
+            this project. Lives before the terminal/agent CTAs so it grabs
+            attention as the "fast lane" back to in-flight work. */}
+        <div className="mt-[28px] max-w-[640px]">
+          <ResumeCards
+            projectId={project.id}
+            title={t("resume.titleProject", { name: project.name })}
+            limit={5}
+          />
+        </div>
 
         {/* Primary: open a terminal */}
         <div className="mt-[28px]">
@@ -115,12 +120,9 @@ export function ProjectEmptyState({ project, onNewTerminal, onLaunchCli }: Proje
           <div className="mt-[14px] grid max-w-[600px] grid-cols-2 gap-[10px] sm:grid-cols-3">
             {DEFAULT_CLI_REGISTRY.map((cli) => {
               const BrandIcon = CLI_BRAND_ICONS[cli.id];
-              const detection = cliDetectionFor(cli, detections);
-              const tooltip =
-                detection.status === "checking"
-                  ? t("cli.checkingTooltip")
-                  : t("cli.notInstalledTooltip");
-              const button = (
+              // Launcher rows stay quiet about detection state. Clicking a
+              // missing CLI opens its tab with the CliMissingPanel guide.
+              return (
                 <button
                   key={cli.id}
                   type="button"
@@ -139,15 +141,7 @@ export function ProjectEmptyState({ project, onNewTerminal, onLaunchCli }: Proje
                   <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink">
                     {cli.label}
                   </span>
-                  <CliTileStatusIcon status={detection.status} />
                 </button>
-              );
-              return detection.status === "installed" ? (
-                button
-              ) : (
-                <Tooltip key={cli.id} content={tooltip} side="top">
-                  {button}
-                </Tooltip>
               );
             })}
           </div>
@@ -157,14 +151,3 @@ export function ProjectEmptyState({ project, onNewTerminal, onLaunchCli }: Proje
   );
 }
 
-function CliTileStatusIcon({ status }: { status: CliDetectionStatus }) {
-  if (status === "installed") return null;
-
-  if (status === "checking") {
-    return (
-      <Icon icon={Loader2} size={12} className="shrink-0 animate-spin text-muted-soft" />
-    );
-  }
-
-  return <Icon icon={AlertTriangle} size={12} className="shrink-0 text-warn" />;
-}

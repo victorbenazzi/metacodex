@@ -2,6 +2,12 @@ import { create } from "zustand";
 
 import { projectsApi } from "./project.service";
 import type { Project } from "./project.types";
+import { useTabsStore } from "@/components/tabs/tabsStore";
+import { useTerminalStore } from "@/features/terminal/terminal.store";
+import { ptyApi } from "@/features/terminal/terminal.service";
+import { useExplorerStore } from "@/features/explorer/explorer.store";
+import { useGitStore } from "@/features/git/git.store";
+import { watcherApi } from "@/features/filesystem/watcher.service";
 
 interface ProjectsState {
   projects: Project[];
@@ -52,6 +58,32 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
   },
 
   remove: async (id) => {
+    // Tear down every live resource attached to this project BEFORE the Rust
+    // registry forgets it — otherwise leaked PTYs keep emitting pty://data
+    // for a project the UI no longer knows about, and the next click on a
+    // sibling project lands on stale tab/terminal state (the "stuck after
+    // remove" bug).
+    const tabs = useTabsStore.getState();
+    const bucket = tabs.byProject[id];
+    if (bucket) {
+      const sessions = useTerminalStore.getState().sessions;
+      for (const tab of bucket.tabs) {
+        if (tab.kind !== "terminal" && tab.kind !== "cli") continue;
+        // Find any PTY session bound to this tab and kill it in Rust.
+        for (const s of Object.values(sessions)) {
+          if (s.tabId === tab.id) {
+            void ptyApi.kill(s.id).catch(() => undefined);
+            useTerminalStore.getState().remove(s.id);
+          }
+        }
+      }
+      tabs.dropBucket(id);
+    }
+    // Drop any per-project caches/refs the rest of the app keeps.
+    useExplorerStore.getState().clearProject(id);
+    useGitStore.getState().clearProject(id);
+    void watcherApi.unwatch(id).catch(() => undefined);
+
     await projectsApi.remove(id);
     const next = get().projects.filter((p) => p.id !== id);
     const activeProjectId = get().activeProjectId === id ? null : get().activeProjectId;

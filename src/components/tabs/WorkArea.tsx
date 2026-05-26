@@ -33,6 +33,7 @@ interface WorkAreaProps {
   onCopyTabCwd: (id: string) => void;
   onNewTerminal: () => void;
   onLaunchCli: (cli: CliTool) => void;
+  onNewWorktree?: () => void;
   onOpenFolder: () => void;
   project: Project | null;
 }
@@ -51,6 +52,7 @@ export function WorkArea({
   onCopyTabCwd,
   onNewTerminal,
   onLaunchCli,
+  onNewWorktree,
   onOpenFolder,
   project,
 }: WorkAreaProps) {
@@ -79,6 +81,7 @@ export function WorkArea({
             <TabTrailingActions
               onNewTerminal={onNewTerminal}
               onLaunchCli={onLaunchCli}
+              onNewWorktree={onNewWorktree}
             />
           }
         />
@@ -86,11 +89,12 @@ export function WorkArea({
         <NewTabContextMenu onNewTerminal={onNewTerminal} onLaunchCli={onLaunchCli}>
           <div
             data-tauri-drag-region
-            className="flex h-[30px] shrink-0 items-center justify-end border-b border-hairline px-[10px]"
+            className="flex h-[34px] shrink-0 items-center justify-end border-b border-hairline px-[10px]"
           >
             <TabTrailingActions
               onNewTerminal={onNewTerminal}
               onLaunchCli={onLaunchCli}
+              onNewWorktree={onNewWorktree}
             />
           </div>
         </NewTabContextMenu>

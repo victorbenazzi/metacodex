@@ -12,6 +12,7 @@ import {
   Terminal,
   Info,
   LayoutPanelLeft,
+  Bell,
   X,
   Sun,
   Moon,
@@ -48,6 +49,7 @@ import {
   DEFAULT_TERMINAL_FONT_FAMILY,
   type ExplorerIconStyle,
   type TerminalCursorStyle,
+  type UiDensity,
 } from "@/features/settings/settings.types";
 import { COMMANDS, COMMANDS_BY_ID } from "@/features/keybindings/commands";
 import { useKeybindingsStore } from "@/features/keybindings/keybindings.store";
@@ -70,6 +72,7 @@ type CategoryId =
   | "interface"
   | "editor"
   | "terminal"
+  | "notifications"
   | "shortcuts"
   | "advanced"
   | "cli"
@@ -87,6 +90,7 @@ const CATEGORIES: Category[] = [
   { id: "interface", labelKey: "settings.nav.interface", icon: LayoutPanelLeft },
   { id: "editor", labelKey: "settings.nav.editor", icon: FileCode },
   { id: "terminal", labelKey: "settings.nav.terminal", icon: SquareTerminal },
+  { id: "notifications", labelKey: "settings.nav.notifications", icon: Bell },
   { id: "shortcuts", labelKey: "settings.nav.shortcuts", icon: Keyboard },
   { id: "advanced", labelKey: "settings.nav.advanced", icon: Gauge },
   { id: "cli", labelKey: "settings.nav.cli", icon: Terminal },
@@ -127,22 +131,22 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
       <RD.Portal>
         <RD.Overlay
           className={cn(
-            "fixed inset-0 z-[100] bg-[rgba(38,37,30,0.32)]",
+            "fixed inset-0 z-[100] bg-scrim",
             "data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out",
           )}
         />
         <RD.Content
           className={cn(
             "fixed left-1/2 top-1/2 z-[101] -translate-x-1/2 -translate-y-1/2",
-            "h-[520px] w-[760px] overflow-hidden rounded-lg border border-hairline bg-surface-card",
+            "h-[min(640px,90vh)] w-[min(880px,92vw)] overflow-hidden rounded-lg border border-hairline bg-surface-card shadow-elevated",
             "data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out",
           )}
           aria-describedby={undefined}
         >
           <RD.Title className="sr-only">metacodex settings</RD.Title>
 
-          <header className="relative flex h-[44px] items-center justify-between border-b border-hairline-soft px-[16px]">
-            <div className="flex items-center gap-[10px]">
+          <header className="relative flex h-[48px] items-center justify-between border-b border-hairline-soft px-[20px]">
+            <div className="flex items-center gap-[12px]">
               <span className="editorial-caps">{t("settings.header")}</span>
               <span className="font-mono text-[11px] text-muted-soft">metacodex</span>
             </div>
@@ -150,15 +154,15 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               <button
                 type="button"
                 aria-label={t("settings.close")}
-                className="inline-flex h-[24px] w-[24px] items-center justify-center rounded-xs text-muted hover:bg-surface-strong/55 hover:text-ink"
+                className="inline-flex h-[26px] w-[26px] items-center justify-center rounded-xs text-muted hover:bg-surface-strong/55 hover:text-ink"
               >
                 <Icon icon={X} size={13} />
               </button>
             </RD.Close>
           </header>
 
-          <div className="grid h-[calc(100%-44px)] grid-cols-[220px_1fr]">
-            <aside className="flex flex-col gap-[1px] overflow-y-auto border-r border-hairline-soft bg-canvas-soft p-[8px]">
+          <div className="grid h-[calc(100%-48px)] grid-cols-[200px_1fr]">
+            <aside className="flex flex-col gap-[1px] overflow-y-auto border-r border-hairline-soft bg-canvas-soft p-[10px]">
               {CATEGORIES.map((c) => (
                 <SidebarRow
                   key={c.id}
@@ -169,12 +173,13 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               ))}
             </aside>
 
-            <section className="overflow-y-auto px-[24px] py-[20px]">
+            <section className="overflow-y-auto px-[32px] py-[26px]">
               {selected === "general" && <GeneralPane />}
               {selected === "appearance" && <AppearancePane />}
               {selected === "interface" && <InterfacePane />}
               {selected === "editor" && <EditorPane />}
               {selected === "terminal" && <TerminalPane />}
+              {selected === "notifications" && <NotificationsPane />}
               {selected === "shortcuts" && <ShortcutsPane />}
               {selected === "advanced" && <AdvancedPane />}
               {selected === "cli" && <CliRegistryPane />}
@@ -351,6 +356,7 @@ function InterfacePane() {
   const { t } = useTranslation();
   const enabledAgents = useSettingsDataStore((s) => s.settings.interface.enabledAgents);
   const iconStyle = useSettingsDataStore((s) => s.settings.interface.explorerIconStyle);
+  const density = useSettingsDataStore((s) => s.settings.interface.uiDensity);
   const update = useSettingsDataStore((s) => s.update);
 
   // Stable order: coding agents first (same order as the registry), then autonomous.
@@ -368,12 +374,29 @@ function InterfacePane() {
     { id: "color", label: t("settings.interface.iconStyleColor") },
   ];
 
+  const densityOptions: { id: UiDensity; label: string }[] = [
+    { id: "compact", label: t("settings.interface.densityCompact") },
+    { id: "comfortable", label: t("settings.interface.densityComfortable") },
+    { id: "spacious", label: t("settings.interface.densitySpacious") },
+  ];
+
   return (
     <div>
       <PaneHeader
         title={t("settings.interface.title")}
         description={t("settings.interface.description")}
       />
+
+      <Row
+        label={t("settings.interface.density")}
+        hint={t("settings.interface.densityHint")}
+      >
+        <Segmented
+          value={density}
+          options={densityOptions}
+          onChange={(v) => update("interface", { uiDensity: v })}
+        />
+      </Row>
 
       <Row
         label={t("settings.interface.iconStyle")}
@@ -562,6 +585,54 @@ function TerminalPane() {
           max={500000}
           step={1000}
           onChange={(v) => update("terminal", { scrollback: v })}
+        />
+      </Row>
+    </div>
+  );
+}
+
+function NotificationsPane() {
+  const { t } = useTranslation();
+  const notifications = useSettingsDataStore((s) => s.settings.notifications);
+  const update = useSettingsDataStore((s) => s.update);
+
+  return (
+    <div>
+      <PaneHeader
+        title={t("settings.notifications.title")}
+        description={t("settings.notifications.description")}
+      />
+
+      <Row
+        label={t("settings.notifications.osNotifications")}
+        hint={t("settings.notifications.osNotificationsHint")}
+      >
+        <Switch
+          checked={notifications.osNotificationsEnabled}
+          onChange={(v) => update("notifications", { osNotificationsEnabled: v })}
+          ariaLabel={t("settings.notifications.osNotifications")}
+        />
+      </Row>
+
+      <Row
+        label={t("settings.notifications.sound")}
+        hint={t("settings.notifications.soundHint")}
+      >
+        <Switch
+          checked={notifications.soundEnabled}
+          onChange={(v) => update("notifications", { soundEnabled: v })}
+          ariaLabel={t("settings.notifications.sound")}
+        />
+      </Row>
+
+      <Row
+        label={t("settings.notifications.notifyWhenFocused")}
+        hint={t("settings.notifications.notifyWhenFocusedHint")}
+      >
+        <Switch
+          checked={notifications.notifyWhenFocused}
+          onChange={(v) => update("notifications", { notifyWhenFocused: v })}
+          ariaLabel={t("settings.notifications.notifyWhenFocused")}
         />
       </Row>
     </div>
@@ -846,7 +917,7 @@ function AboutPane() {
       >
         metacodex
       </h1>
-      <p className="mt-[10px] font-display text-[16px] italic leading-[1.5] text-body">
+      <p className="mt-[10px] font-display text-[16px] leading-[1.5] text-body">
         {t("settings.about.tagline")}
       </p>
       <ul className="mt-[20px] flex flex-col gap-[6px]">
@@ -869,7 +940,7 @@ function AboutPane() {
           type="button"
           onClick={openAuthorSite}
           title="victorbenazzi.com.br"
-          className="group inline-flex items-center gap-[3px] rounded-[3px] text-ink transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[2px]"
+          className="group inline-flex items-center gap-[3px] rounded-xs text-ink transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[2px]"
         >
           <span className="underline decoration-1 decoration-hairline underline-offset-[3px] transition-colors duration-150 group-hover:decoration-muted">
             Victor Benazzi

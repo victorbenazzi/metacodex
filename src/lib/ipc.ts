@@ -11,6 +11,8 @@ export const CMD = {
   ptyResize: "pty_resize",
   ptyKill: "pty_kill",
   ptyList: "pty_list",
+  ptyMetadataBatch: "pty_metadata_batch",
+  ptyUpdateCwd: "pty_update_cwd",
 
   // cli
   cliDetect: "cli_detect",
@@ -64,6 +66,23 @@ export const CMD = {
   // git
   gitStatus: "git_status",
   gitFileHeadContent: "git_file_head_content",
+  gitWorktreeList: "git_worktree_list",
+  gitWorktreeAdd: "git_worktree_add",
+  gitWorktreeRemove: "git_worktree_remove",
+  gitMergeInto: "git_merge_into",
+
+  // notifications
+  notifyShow: "notify_show",
+
+  // resume
+  resumeList: "resume_list",
+  resumeSave: "resume_save",
+  resumeDiscard: "resume_discard",
+  resumePrune: "resume_prune",
+
+  // diagnostics
+  diagWriteSessionLog: "write_session_log",
+  diagWriteCrash: "write_crash",
 } as const;
 
 export type CmdName = (typeof CMD)[keyof typeof CMD];

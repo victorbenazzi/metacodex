@@ -11,7 +11,7 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantClasses: Record<Variant, string> = {
   primary:
-    "bg-ink text-on-primary hover:bg-primary-active focus-visible:outline-ink",
+    "press-feedback bg-ink text-on-primary hover:bg-primary-active focus-visible:outline-ink",
   ghost:
     "bg-transparent text-ink hover:bg-surface-strong/60 focus-visible:outline-ink",
   outline:

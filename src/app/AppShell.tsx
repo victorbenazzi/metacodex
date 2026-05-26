@@ -6,7 +6,6 @@ import { MiniProjectSidebar } from "@/components/project-rail/MiniProjectSidebar
 import { ExplorerPanel } from "@/components/file-explorer/ExplorerPanel";
 import { WorkArea } from "@/components/tabs/WorkArea";
 import { TitleBar } from "@/app/TitleBar";
-import { SourceControlPanel } from "@/components/source-control/SourceControlPanel";
 import {
   useTabsStore,
   WORKSPACE_NULL,
@@ -19,6 +18,7 @@ import { preloadCliDetections } from "@/features/terminal/cli-detection";
 import { basename } from "@/lib/path";
 import { useProjectsStore } from "@/features/projects/project.store";
 import { useSettingsDataStore } from "@/features/settings/settings.data.store";
+import { UI_DENSITY_MULTIPLIER } from "@/features/settings/settings.types";
 import { useKeybindingsStore } from "@/features/keybindings/keybindings.store";
 import { useExplorerStore } from "@/features/explorer/explorer.store";
 import {
@@ -32,14 +32,34 @@ import { useTerminalStore } from "@/features/terminal/terminal.store";
 import { ptyApi } from "@/features/terminal/terminal.service";
 import { utf8ToBase64 } from "@/lib/base64";
 import { useEditorReconcile } from "@/features/editor/useEditorReconcile";
-import { EV, listenTo, type FsChangedPayload } from "@/lib/events";
+import {
+  EV,
+  listenTo,
+  type FsChangedPayload,
+  type FsRenamedPayload,
+  type PtyBackpressurePayload,
+  type PtyExitPayload,
+} from "@/lib/events";
 import { dirname } from "@/lib/path";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { ResizeHandle } from "@/components/ui/ResizeHandle";
 import { PANEL_LIMITS } from "@/features/settings/settings.types";
 import { CMD, invoke } from "@/lib/ipc";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
+import {
+  attentionOrder,
+  useAgentStatusStore,
+} from "@/features/terminal/agent-status.store";
+import { useTabMetadataPolling } from "@/features/terminal/useTabMetadataPolling";
+import { SourceControlPanel } from "@/components/source-control/SourceControlPanel";
+import { useWorktreesStore } from "@/features/git/worktrees.store";
+import { useWorktreeOccupancySync } from "@/features/git/useWorktreeOccupancySync";
+import { WorktreeCreateDialog } from "@/components/source-control/WorktreeCreateDialog";
+import { useResumeStore } from "@/features/resume/resume.store";
+import { recordDiag, useDiagnosticsStore } from "@/features/diagnostics/diagnostics.store";
+import { useSaveStatusStore } from "@/features/workspace/saveStatus.store";
 
 type PendingClose = {
   ids: string[];
@@ -54,6 +74,12 @@ interface PendingDelete {
   path: string;
   name: string;
   isDir: boolean;
+}
+
+interface PendingMove {
+  from: string;
+  toDir: string;
+  name: string;
 }
 
 function processSummary(tabs: Tab[]): { terminals: number; agents: number } {
@@ -103,10 +129,26 @@ export function AppShell() {
     if (!settingsHydrated) hydrateSettings();
   }, [settingsHydrated, hydrateSettings]);
 
+  // Drive the global density multiplier from settings. The CSS var multiplies
+  // every --space-* token so a single toggle reflows the whole chrome rhythm.
+  const uiDensity = useSettingsDataStore((s) => s.settings.interface.uiDensity);
+  useEffect(() => {
+    document.documentElement.style.setProperty(
+      "--density-multiplier",
+      String(UI_DENSITY_MULTIPLIER[uiDensity]),
+    );
+  }, [uiDensity]);
+
   // Hydrate custom keybindings from ~/.metacodex/keybindings.json once at startup.
   useEffect(() => {
     if (!keybindingsHydrated) hydrateKeybindings();
   }, [keybindingsHydrated, hydrateKeybindings]);
+
+  // Hydrate the resume registry from ~/.metacodex/state/resume.json. We pull
+  // the last 30 days — older entries already pruned at startup by Rust.
+  useEffect(() => {
+    void useResumeStore.getState().hydrate();
+  }, []);
 
   // Warm the CLI-detection cache at boot. Each probe shells out through a
   // login shell which is slow on macOS; doing it eagerly here means the
@@ -117,6 +159,14 @@ export function AppShell() {
 
   // Keep open editor buffers in sync with files agents edit from terminal tabs.
   useEditorReconcile();
+
+  // Pulse branch / cwd / listening-ports for each running PTY into the
+  // tab-metadata store. Powers the TabTooltip + TabInspectorPanel.
+  useTabMetadataPolling();
+
+  // Maintain `occupancyByPath` (worktree path → tabId[]) so the worktrees
+  // section can flag entries currently in use.
+  useWorktreeOccupancySync();
 
   useEffect(() => {
     (async () => {
@@ -143,7 +193,12 @@ export function AppShell() {
 
   const [pendingClose, setPendingClose] = useState<PendingClose | null>(null);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
+  const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
+  const [worktreeDialogOpen, setWorktreeDialogOpen] = useState(false);
   const [skipDeleteInSession, setSkipDeleteInSession] = useState(false);
+  const [skipMoveInSession, setSkipMoveInSession] = useState(false);
+  const skipMoveRef = useRef(false);
+  skipMoveRef.current = skipMoveInSession;
   // Mirror skipDeleteInSession in a ref so the latest value is visible to the
   // checkbox handler that lives inside the dialog (which closes the dialog
   // before re-rendering the confirm callback in some flows).
@@ -196,8 +251,9 @@ export function AppShell() {
   // Listen for filesystem changes globally and route to the right project.
   useEffect(() => {
     let unlisten: (() => void) | undefined;
+    let unlistenRenamed: (() => void) | undefined;
     (async () => {
-      const off = await listenTo<FsChangedPayload>(EV.fsChanged, (e) => {
+      const off = await listenTo<FsChangedPayload>(EV.fsChanged, async (e) => {
         const { projectId, paths } = e.payload;
         const explorer = useExplorerStore.getState();
         // Invalidate cached children for any directory that contains an event path.
@@ -220,11 +276,44 @@ export function AppShell() {
         if (proj) {
           void useGitStore.getState().refresh(projectId, proj.path);
         }
+        // External rm / external rename: stat each touched path. Anything
+        // that no longer exists AND is currently open as a file-backed tab
+        // gets closed so the user doesn't end up saving into a dead path.
+        // In-app rename takes a different code path (fs://renamed below)
+        // and updates the tab's path WITHOUT closing.
+        const bucket2 = useTabsStore.getState().byProject[projectId];
+        if (bucket2) {
+          const openFilePaths = new Set<string>();
+          for (const t of bucket2.tabs) {
+            if ("path" in t && (t as { path?: string }).path) {
+              openFilePaths.add((t as { path: string }).path);
+            }
+          }
+          // Only stat paths that match an open tab — keeps the IPC blast
+          // small even when the watcher fires for hundreds of changes.
+          const candidates = paths.filter((p) => openFilePaths.has(p));
+          for (const p of candidates) {
+            try {
+              await invoke(CMD.stat, { path: p });
+            } catch {
+              // stat failure (ENOENT or otherwise) → close the tab(s) at this path.
+              useTabsStore.getState().closeForRemovedPath(projectId, p);
+              recordDiag("tab.close_external", { projectId, detail: { path: p } });
+            }
+          }
+        }
+      });
+      const offRen = await listenTo<FsRenamedPayload>(EV.fsRenamed, (e) => {
+        const { projectId, oldPath, newPath } = e.payload;
+        useTabsStore.getState().remapForRename(projectId, oldPath, newPath);
+        recordDiag("fs.renamed", { projectId, detail: { oldPath, newPath } });
       });
       unlisten = off;
+      unlistenRenamed = offRen;
     })();
     return () => {
       unlisten?.();
+      unlistenRenamed?.();
     };
   }, []);
 
@@ -232,87 +321,223 @@ export function AppShell() {
   useEffect(() => {
     if (!project) return;
     void refreshGit(project.id, project.path);
+    void useWorktreesStore.getState().refresh(project.id, project.path);
   }, [project, refreshGit]);
 
   // -- Workspace persistence ----------------------------------------------------
-  // Tracks which project buckets have already been hydrated from the persisted
-  // workspaceState so we don't replay restoration on every render and also
-  // don't save a clobbering empty state before hydration completes.
-  const hydratedWorkspaces = useRef<Set<string>>(new Set());
+  // Tri-state per project:
+  //   "pending" — load issued, not yet resolved. Saves are blocked.
+  //   "loaded"  — load succeeded; saves are allowed.
+  //   "failed"  — load errored or returned corrupt data. Saves stay BLOCKED for
+  //               the rest of the session so a stale empty bucket can't clobber
+  //               the file on disk. User sees a save-status dot in red.
+  //
+  // The old single-Set design called .add() synchronously BEFORE awaiting
+  // workspaceApi.load(), which meant a failed/empty load was indistinguishable
+  // from a successful one — the next save fired and overwrote disk with {tabs:[]}.
+  const hydrationStatus = useRef<Map<string, "pending" | "loaded" | "failed">>(new Map());
+
+  // Forget hydration marks for projects that no longer exist — otherwise
+  // re-adding a folder with the same id (Rust hashes by path) would skip
+  // the workspace reload and ship a stale bucket.
+  useEffect(() => {
+    const live = new Set(projects.map((p) => p.id));
+    for (const id of Array.from(hydrationStatus.current.keys())) {
+      if (!live.has(id)) hydrationStatus.current.delete(id);
+    }
+  }, [projects]);
 
   useEffect(() => {
     if (!project) return;
-    if (hydratedWorkspaces.current.has(project.id)) return;
-    hydratedWorkspaces.current.add(project.id);
+    if (hydrationStatus.current.has(project.id)) return;
+    hydrationStatus.current.set(project.id, "pending");
+    const projectId = project.id;
     (async () => {
       try {
-        const ws = await workspaceApi.load(project.id);
-        if (!ws) return;
+        const ws = await workspaceApi.load(projectId);
         const tabsStore = useTabsStore.getState();
-        for (const st of ws.openTabs) {
-          let tab: Tab | null = null;
-          if (st.kind === "editor" && st.path) {
-            tab = { id: st.id, kind: "editor", title: st.title, projectId: project.id, path: st.path };
-          } else if (st.kind === "markdown" && st.path) {
-            tab = {
-              id: st.id,
-              kind: "markdown",
-              title: st.title,
-              projectId: project.id,
-              path: st.path,
-              mode: (st.mode as "preview" | "source") ?? "preview",
-            };
-          } else if (st.kind === "image" && st.path) {
-            tab = { id: st.id, kind: "image", title: st.title, projectId: project.id, path: st.path };
-          } else if (st.kind === "pdf" && st.path) {
-            tab = { id: st.id, kind: "pdf", title: st.title, projectId: project.id, path: st.path };
+        if (ws) {
+          for (const st of ws.openTabs) {
+            let tab: Tab | null = null;
+            if (st.kind === "editor" && st.path) {
+              tab = { id: st.id, kind: "editor", title: st.title, projectId, path: st.path };
+            } else if (st.kind === "markdown" && st.path) {
+              tab = {
+                id: st.id,
+                kind: "markdown",
+                title: st.title,
+                projectId,
+                path: st.path,
+                mode: (st.mode as "preview" | "source") ?? "preview",
+              };
+            } else if (st.kind === "image" && st.path) {
+              tab = { id: st.id, kind: "image", title: st.title, projectId, path: st.path };
+            } else if (st.kind === "pdf" && st.path) {
+              tab = { id: st.id, kind: "pdf", title: st.title, projectId, path: st.path };
+            }
+            if (tab) tabsStore.openTab(projectId, tab, false);
           }
-          if (tab) tabsStore.openTab(project.id, tab, false);
-        }
-        if (ws.activeTabId) tabsStore.setActiveTab(project.id, ws.activeTabId);
-        if (ws.expandedPaths.length > 0) {
-          const expStore = useExplorerStore.getState();
-          for (const p of ws.expandedPaths) {
-            void expStore.toggleExpand(project.id, p);
+          if (ws.activeTabId) tabsStore.setActiveTab(projectId, ws.activeTabId);
+          if (ws.expandedPaths.length > 0) {
+            const expStore = useExplorerStore.getState();
+            for (const p of ws.expandedPaths) {
+              void expStore.toggleExpand(projectId, p);
+            }
           }
         }
+        // Mark loaded AFTER all the openTab/setActiveTab calls complete so
+        // their state mutations don't trigger a premature save effect run.
+        hydrationStatus.current.set(projectId, "loaded");
       } catch (err) {
+        // Refuse to save for this project this session — disk file stays as-is.
+        hydrationStatus.current.set(projectId, "failed");
+        recordDiag("workspace.load.fail", {
+          projectId,
+          detail: { error: err instanceof Error ? err.message : String(err) },
+        });
         console.warn("[workspace] load failed", err);
       }
     })();
   }, [project]);
 
+  // Pending save timers, keyed by projectId. Kept in a ref (not closure-local)
+  // so the before-quit listener can iterate ALL pending timers and flush them
+  // synchronously regardless of which project is currently active.
+  const saveTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  // Snapshot+save helper used by both the debounced effect and the quit flush.
+  const performWorkspaceSave = useCallback(async (projectId: string) => {
+    const cur = useTabsStore.getState().byProject[projectId];
+    const explorerBucket = useExplorerStore.getState().byProject[projectId];
+    const expandedPaths = explorerBucket ? Array.from(explorerBucket.expanded) : [];
+    const persistTabs: SerializedTab[] = (cur?.tabs ?? [])
+      .map((t): SerializedTab | null => {
+        if (t.kind === "markdown") {
+          return { id: t.id, kind: "markdown", title: t.title, path: t.path, mode: t.mode };
+        }
+        if (t.kind === "editor" || t.kind === "image" || t.kind === "pdf") {
+          return { id: t.id, kind: t.kind, title: t.title, path: t.path };
+        }
+        return null;
+      })
+      .filter((t): t is SerializedTab => t !== null);
+    useSaveStatusStore.getState().beginSave();
+    try {
+      await workspaceApi.save(projectId, {
+        openTabs: persistTabs,
+        activeTabId: cur?.activeTabId ?? null,
+        expandedPaths,
+      });
+      useSaveStatusStore.getState().markSaved();
+      recordDiag("workspace.save.ok", { projectId, detail: { tabs: persistTabs.length } });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      useSaveStatusStore.getState().markFailed(message);
+      recordDiag("workspace.save.fail", {
+        projectId,
+        detail: { error: message },
+      });
+      console.warn("[workspace] save failed", err);
+    }
+  }, []);
+
+  // Global PTY observability: forward backpressure + exit events into the
+  // diagnostics ring buffer so Cmd+Shift+D shows them regardless of which tab
+  // is active. Per-tab UX (banners, status dot) is handled separately in
+  // TerminalTab — this is observability only.
+  useEffect(() => {
+    let offBp: (() => void) | undefined;
+    let offExit: (() => void) | undefined;
+    (async () => {
+      offBp = await listenTo<PtyBackpressurePayload>(EV.ptyBackpressure, (e) => {
+        recordDiag("pty.backpressure", {
+          sessionId: e.payload.sessionId,
+          detail: { queueDepth: e.payload.queueDepth, stalledMs: e.payload.stalledMs },
+        });
+      });
+      offExit = await listenTo<PtyExitPayload>(EV.ptyExit, (e) => {
+        const reason = e.payload.reason ?? "normal";
+        const kind = reason === "reader_error" ? "pty.reader_error" : "pty.exit";
+        recordDiag(kind, {
+          sessionId: e.payload.session_id,
+          detail: { exitCode: e.payload.exit_code, reason },
+        });
+      });
+    })();
+    return () => {
+      offBp?.();
+      offExit?.();
+    };
+  }, []);
+
+  // Listen for the Rust quit handshake (Cmd+Q → prevent_close → emit
+  // app://before-quit → 300ms budget → kill_all → exit). When it fires we
+  // flush every "loaded" project's pending save SYNCHRONOUSLY so debounced
+  // changes don't disappear with the app process.
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+    (async () => {
+      const off = await listenTo<unknown>(EV.beforeQuit, async () => {
+        // Cancel all pending debounce timers — we're about to save explicitly.
+        for (const timer of saveTimers.current.values()) clearTimeout(timer);
+        saveTimers.current.clear();
+        const loadedProjects = Array.from(hydrationStatus.current.entries())
+          .filter(([, status]) => status === "loaded")
+          .map(([id]) => id);
+        await Promise.all(loadedProjects.map((pid) => performWorkspaceSave(pid)));
+        recordDiag("app.before_quit", {
+          detail: { savedCount: loadedProjects.length },
+        });
+        // Best-effort dump of the diagnostics ring buffer to disk so the user
+        // can read the last session's events after a crash / quick quit.
+        try {
+          await invoke(CMD.diagWriteSessionLog, {
+            payload: useDiagnosticsStore.getState().serialize(),
+          });
+        } catch {
+          // ignore — disk dump is observability, not load-bearing
+        }
+      });
+      if (cancelled) {
+        off();
+        return;
+      }
+      unlisten = off;
+    })();
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  }, [performWorkspaceSave]);
+
   useEffect(() => {
     if (!project) return;
-    if (!hydratedWorkspaces.current.has(project.id)) return;
+    if (hydrationStatus.current.get(project.id) !== "loaded") return;
+    const projectId = project.id;
     // Read the debounce imperatively so changing it doesn't re-arm this effect.
     const saveDebounceMs =
       useSettingsDataStore.getState().settings.performance.workspaceSaveDebounceMs;
+    // Clear any previous pending timer for this project (latest write wins).
+    const prev = saveTimers.current.get(projectId);
+    if (prev) clearTimeout(prev);
     const handle = setTimeout(() => {
-      const cur = useTabsStore.getState().byProject[project.id];
-      const explorerBucket = useExplorerStore.getState().byProject[project.id];
-      const expandedPaths = explorerBucket ? Array.from(explorerBucket.expanded) : [];
-      const persistTabs: SerializedTab[] = (cur?.tabs ?? [])
-        .map((t): SerializedTab | null => {
-          if (t.kind === "markdown") {
-            return { id: t.id, kind: "markdown", title: t.title, path: t.path, mode: t.mode };
-          }
-          if (t.kind === "editor" || t.kind === "image" || t.kind === "pdf") {
-            return { id: t.id, kind: t.kind, title: t.title, path: t.path };
-          }
-          return null;
-        })
-        .filter((t): t is SerializedTab => t !== null);
-      workspaceApi
-        .save(project.id, {
-          openTabs: persistTabs,
-          activeTabId: cur?.activeTabId ?? null,
-          expandedPaths,
-        })
-        .catch((err) => console.warn("[workspace] save failed", err));
+      saveTimers.current.delete(projectId);
+      void performWorkspaceSave(projectId);
     }, saveDebounceMs);
-    return () => clearTimeout(handle);
-  }, [project, bucket.tabs, bucket.activeTabId]);
+    saveTimers.current.set(projectId, handle);
+    // On unmount / project switch: flush immediately INSTEAD of dropping the
+    // pending save — guarantees the bucket we're leaving lands on disk even if
+    // the user switched within the debounce window.
+    return () => {
+      const pending = saveTimers.current.get(projectId);
+      if (pending) {
+        clearTimeout(pending);
+        saveTimers.current.delete(projectId);
+        void performWorkspaceSave(projectId);
+      }
+    };
+  }, [project, bucket.tabs, bucket.activeTabId, performWorkspaceSave]);
 
   // -- Actions ------------------------------------------------------------------
   const handleOpenFolder = useCallback(async () => {
@@ -388,6 +613,28 @@ export function AppShell() {
       });
     },
     [openTab, projectKey, project, activeCwd],
+  );
+
+  const handleOpenWorktreeDialog = useCallback(() => {
+    if (!project) return;
+    setWorktreeDialogOpen(true);
+  }, [project]);
+
+  const handleAfterWorktreeCreate = useCallback(
+    ({ branch, path }: { branch: string; path: string }) => {
+      setWorktreeDialogOpen(false);
+      if (!project) return;
+      // Open a plain terminal pointing at the new worktree path. The user can
+      // then pick a CLI from there or just work with their shell.
+      openTab(projectKey, {
+        id: `t-${newId(10)}`,
+        kind: "terminal",
+        title: branch,
+        projectId: project.id,
+        cwd: path,
+      });
+    },
+    [openTab, projectKey, project],
   );
 
   const requestClose = useCallback(
@@ -499,23 +746,25 @@ export function AppShell() {
   const handleRename = useCallback(
     async (path: string, newName: string, _isDir: boolean): Promise<string> => {
       if (!project) throw new Error("no active project");
-      const newPath = await useExplorerStore
+      // The Rust command emits `fs://renamed` synchronously after the rename
+      // succeeds — the global listener calls tabsStore.remapForRename, so we
+      // don't need a local call here (would be a redundant no-op).
+      return useExplorerStore
         .getState()
         .renameNode(project.id, path, newName);
-      useTabsStore.getState().remapForRename(project.id, path, newPath);
-      return newPath;
     },
     [project],
   );
 
-  const handleMove = useCallback(
+  const performMove = useCallback(
     async (from: string, toDir: string): Promise<void> => {
       if (!project) return;
       try {
-        const newPath = await useExplorerStore
+        // Same as handleRename: Rust emits fs://renamed which drives the tab
+        // remap centrally — no local call needed.
+        await useExplorerStore
           .getState()
           .moveNode(project.id, from, toDir);
-        useTabsStore.getState().remapForRename(project.id, from, newPath);
       } catch (err) {
         console.warn("[explorer] move failed", err);
         window.alert(
@@ -526,6 +775,21 @@ export function AppShell() {
       }
     },
     [project, t],
+  );
+
+  const handleMove = useCallback(
+    async (from: string, toDir: string): Promise<void> => {
+      if (!project) return;
+      // No-op moves (drop into current parent) skip the dialog — almost always
+      // an accidental drag the user just dropped right back where it started.
+      if (dirname(from) === toDir) return;
+      if (skipMoveRef.current) {
+        void performMove(from, toDir);
+        return;
+      }
+      setPendingMove({ from, toDir, name: basename(from) });
+    },
+    [project, performMove],
   );
 
   const handleOpenInTerminal = useCallback(
@@ -612,6 +876,22 @@ export function AppShell() {
     [projects, setActive],
   );
 
+  // Cmd+Shift+U: walk through tabs that are flagged needs-attention (then done)
+  // in the CURRENT project's bucket. Wrap around — if we're already on the
+  // most-urgent tab, the next press goes to the second-most-urgent. If nothing
+  // is waiting, do nothing visible (a toast would itself become a distraction).
+  const jumpToNextAttention = useCallback(() => {
+    const byTab = useAgentStatusStore.getState().byTab;
+    const localIds = new Set(bucket.tabs.map((tab) => tab.id));
+    const ordered = attentionOrder(byTab).filter((id) => localIds.has(id));
+    if (ordered.length === 0) return;
+    const activeIdx = bucket.activeTabId
+      ? ordered.indexOf(bucket.activeTabId)
+      : -1;
+    const next = ordered[(activeIdx + 1) % ordered.length];
+    if (next) setActiveTab(projectKey, next);
+  }, [bucket.tabs, bucket.activeTabId, projectKey, setActiveTab]);
+
   useEffect(() => {
     (window as any).__metacodex = {
       newTerminal: handleNewTerminal,
@@ -620,6 +900,7 @@ export function AppShell() {
       switchProject,
       openFile: handleOpenFile,
       sendToTerminal,
+      jumpToNextAttention,
     };
     return () => {
       delete (window as any).__metacodex;
@@ -631,10 +912,13 @@ export function AppShell() {
     switchProject,
     handleOpenFile,
     sendToTerminal,
+    jumpToNextAttention,
   ]);
 
   // CSS-grid template: the variable-width columns interpolate the current
   // settings so resizing rerenders only this style + the dragged column.
+  // The right panel currently hosts Source Control only — see
+  // `SourceControlPanel.tsx`.
   const gridTemplateColumns = panelOpen
     ? `56px ${explorerWidth}px minmax(0,1fr) ${sourceControlWidth}px`
     : `56px ${explorerWidth}px minmax(0,1fr)`;
@@ -689,6 +973,7 @@ export function AppShell() {
         onCopyTabCwd={handleCopyTabCwd}
         onNewTerminal={handleNewTerminal}
         onLaunchCli={handleLaunchCli}
+        onNewWorktree={project ? handleOpenWorktreeDialog : undefined}
         onOpenFolder={handleOpenFolder}
       />
 
@@ -701,10 +986,11 @@ export function AppShell() {
               onOpenDiff={handleOpenDiff}
             />
           ) : (
-            <aside className="flex h-full min-h-0 flex-col items-center justify-center border-l border-hairline bg-canvas px-[24px] text-center">
-              <p className="font-mono text-[12px] text-muted">
-                {t("sourceControl.noProject")}
-              </p>
+            <aside
+              className="h-full min-h-0 border-l border-hairline bg-canvas"
+              aria-label={t("sourceControl.title")}
+            >
+              <EmptyState body={t("sourceControl.noProject")} />
             </aside>
           )}
           <ResizeHandle
@@ -744,6 +1030,31 @@ export function AppShell() {
           void performDelete(target);
         }}
       />
+
+      <MoveNodeConfirm
+        state={pendingMove}
+        skipChecked={skipMoveInSession}
+        onSkipChange={setSkipMoveInSession}
+        onCancel={() => setPendingMove(null)}
+        onConfirm={() => {
+          if (!pendingMove) return;
+          const target = pendingMove;
+          setPendingMove(null);
+          void performMove(target.from, target.toDir);
+        }}
+      />
+
+      {project ? (
+        <WorktreeCreateDialog
+          open={worktreeDialogOpen}
+          onOpenChange={setWorktreeDialogOpen}
+          projectId={project.id}
+          projectPath={project.path}
+          defaultBranchName=""
+          defaultCliId={null}
+          onAfterCreate={handleAfterWorktreeCreate}
+        />
+      ) : null}
     </div>
   );
 }
@@ -825,6 +1136,55 @@ function DeleteNodeConfirm({
       onConfirm={onConfirm}
       skipOption={{
         label: t("appShell.deleteSkip"),
+        checked: skipChecked,
+        onChange: onSkipChange,
+      }}
+    />
+  );
+}
+
+interface MoveNodeConfirmProps {
+  state: PendingMove | null;
+  skipChecked: boolean;
+  onSkipChange: (next: boolean) => void;
+  onCancel: () => void;
+  onConfirm: () => void;
+}
+
+function MoveNodeConfirm({
+  state,
+  skipChecked,
+  onSkipChange,
+  onCancel,
+  onConfirm,
+}: MoveNodeConfirmProps) {
+  const { t } = useTranslation();
+  const open = state !== null;
+  const title = state ? t("appShell.moveTitle", { name: state.name }) : "";
+  const description = state
+    ? t("appShell.moveDescription", { toDir: state.toDir })
+    : "";
+  return (
+    <ConfirmDialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) onCancel();
+      }}
+      tone="neutral"
+      title={title}
+      description={description}
+      details={
+        state ? (
+          <span className="font-mono text-[11px] text-muted-soft">
+            {state.from}
+          </span>
+        ) : null
+      }
+      confirmLabel={t("appShell.moveConfirm")}
+      cancelLabel={t("common.cancel")}
+      onConfirm={onConfirm}
+      skipOption={{
+        label: t("appShell.moveSkip"),
         checked: skipChecked,
         onChange: onSkipChange,
       }}

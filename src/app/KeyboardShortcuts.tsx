@@ -5,12 +5,14 @@ import type { ResolvedCommand } from "@/features/keybindings/types";
 import { useSettingsStore } from "@/features/settings/settings.store";
 import { useSearchUiStore } from "@/features/search/search.store";
 import { useCommandPaletteStore } from "@/features/command-palette/command-palette.store";
+import { useDiagnosticsStore } from "@/features/diagnostics/diagnostics.store";
 
 interface MetacodexApi {
   newTerminal?: () => void;
   openFolder?: () => void;
   closeActiveTab?: () => void;
   switchProject?: (n: number) => void;
+  jumpToNextAttention?: () => void;
 }
 
 /**
@@ -47,6 +49,12 @@ function dispatchCommand(cmd: ResolvedCommand) {
       break;
     case "file.save":
       // passive — never reached (returned before dispatch), here for exhaustiveness
+      break;
+    case "tab.jumpToNextAttention":
+      api?.jumpToNextAttention?.();
+      break;
+    case "diagnostics.toggle":
+      useDiagnosticsStore.getState().toggle();
       break;
   }
 }

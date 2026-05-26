@@ -10,6 +10,19 @@ export type TerminalCursorStyle = "bar" | "block" | "underline";
  *  files stay monochrome — a focused color pop, not a rainbow. */
 export type ExplorerIconStyle = "mono" | "color";
 
+/** Global density tier. Multiplies the `--space-*` token scale by 0.85 / 1 /
+ *  1.15 — touches every spacing-based surface uniformly without touching
+ *  per-component values. */
+export type UiDensity = "compact" | "comfortable" | "spacious";
+
+/** Numeric multiplier each density tier maps to. Kept here next to the type
+ *  so the AppShell consumer and SettingsDialog UI agree on the same scale. */
+export const UI_DENSITY_MULTIPLIER: Record<UiDensity, number> = {
+  compact: 0.85,
+  comfortable: 1,
+  spacious: 1.15,
+};
+
 /**
  * The full set of user preferences persisted to `~/.metacodex/settings.json`.
  * `theme` and `language` mirror the existing theme/i18n stores (which still own
@@ -46,6 +59,8 @@ export interface AppSettings {
     enabledAgents: Record<string, boolean>;
     /** File/folder icon style in the explorer tree. */
     explorerIconStyle: ExplorerIconStyle;
+    /** Global spacing density (compact / comfortable / spacious). */
+    uiDensity: UiDensity;
   };
   /** Persisted horizontal dimensions of the resizable shell panels. Survives
    *  project switches and app restarts. Widths are integers in px; the diff
@@ -55,6 +70,19 @@ export interface AppSettings {
     sourceControlWidth: number;
     diffSplitRatio: number;
   };
+  /** Surfaces around agent activity in terminal tabs. When an agent finishes
+   *  or asks for input we update the tab badge unconditionally; OS banners and
+   *  sound are user-controlled here. */
+  notifications: {
+    /** Show a macOS notification banner when an agent emits OSC 9/99/777 or
+     *  the heuristic flags `needs-attention`. Default: on (opt-out). */
+    osNotificationsEnabled: boolean;
+    /** Play a short chime alongside the banner. Default: on. */
+    soundEnabled: boolean;
+    /** Fire the OS banner even when the metacodex window is focused AND the
+     *  affected tab is the active one. Default: off (the badge is enough). */
+    notifyWhenFocused: boolean;
+  };
 }
 
 /** Slices of `AppSettings` that are nested objects (patchable via `update`). */
@@ -63,7 +91,8 @@ export type SettingsSliceKey =
   | "terminal"
   | "performance"
   | "interface"
-  | "panels";
+  | "panels"
+  | "notifications";
 
 /** Resize bounds for the shell panels. Conventions:
  *  - Explorer: VS Code uses ~170px floor; we sit slightly above so the path
@@ -110,11 +139,17 @@ export const DEFAULT_SETTINGS: AppSettings = {
     autonomousAgentsExpanded: true,
     enabledAgents: {},
     explorerIconStyle: "mono",
+    uiDensity: "comfortable",
   },
   panels: {
     explorerWidth: PANEL_LIMITS.explorer.default,
     sourceControlWidth: PANEL_LIMITS.sourceControl.default,
     diffSplitRatio: PANEL_LIMITS.diff.default,
+  },
+  notifications: {
+    osNotificationsEnabled: true,
+    soundEnabled: true,
+    notifyWhenFocused: false,
   },
 };
 
@@ -151,6 +186,7 @@ function asBoolMap(value: unknown): Record<string, boolean> {
 const THEME_VALUES: ThemeMode[] = ["system", "light", "dark"];
 const CURSOR_VALUES: TerminalCursorStyle[] = ["bar", "block", "underline"];
 const ICON_STYLE_VALUES: ExplorerIconStyle[] = ["mono", "color"];
+const DENSITY_VALUES: UiDensity[] = ["compact", "comfortable", "spacious"];
 
 /**
  * Coerce arbitrary (possibly hand-edited / partial) JSON into a fully-populated,
@@ -165,6 +201,7 @@ export function mergeSettings(raw: unknown): AppSettings {
   const perf = asObject(r.performance);
   const iface = asObject(r.interface);
   const panels = asObject(r.panels);
+  const notif = asObject(r.notifications);
   const D = DEFAULT_SETTINGS;
   return {
     theme: oneOf(r.theme, THEME_VALUES, D.theme),
@@ -202,6 +239,7 @@ export function mergeSettings(raw: unknown): AppSettings {
         ICON_STYLE_VALUES,
         D.interface.explorerIconStyle,
       ),
+      uiDensity: oneOf(iface.uiDensity, DENSITY_VALUES, D.interface.uiDensity),
     },
     panels: {
       explorerWidth: Math.round(
@@ -226,6 +264,20 @@ export function mergeSettings(raw: unknown): AppSettings {
         PANEL_LIMITS.diff.min,
         PANEL_LIMITS.diff.max,
       ),
+    },
+    notifications: {
+      osNotificationsEnabled:
+        typeof notif.osNotificationsEnabled === "boolean"
+          ? notif.osNotificationsEnabled
+          : D.notifications.osNotificationsEnabled,
+      soundEnabled:
+        typeof notif.soundEnabled === "boolean"
+          ? notif.soundEnabled
+          : D.notifications.soundEnabled,
+      notifyWhenFocused:
+        typeof notif.notifyWhenFocused === "boolean"
+          ? notif.notifyWhenFocused
+          : D.notifications.notifyWhenFocused,
     },
   };
 }

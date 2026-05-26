@@ -18,8 +18,7 @@ export function ContextMenuContent({
           "z-50 min-w-[200px] rounded-md border border-hairline bg-surface-card p-[5px] text-[13px] text-ink",
           // Tight floating elevation — Linear/Raycast aesthetic, denser than
           // Tailwind's shadow-lg. Layered to read at any background luminance.
-          "shadow-[0_12px_30px_-12px_rgba(15,14,11,0.28),0_2px_4px_-2px_rgba(15,14,11,0.08)]",
-          "dark:shadow-[0_14px_36px_-12px_rgba(0,0,0,0.7),0_2px_6px_-2px_rgba(0,0,0,0.4)]",
+          "shadow-elevated",
           "data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out",
           className,
         )}

@@ -24,8 +24,11 @@ interface MiniProjectSidebarProps {
 }
 
 // Minimum pointer travel before a press becomes a drag. Below this, the press
-// is treated as a click (setActive). Tuned for trackpad sensitivity.
-const DRAG_THRESHOLD_PX = 4;
+// is treated as a click (setActive). 8px is roomy enough to absorb the small
+// pointer oscillation a MacBook trackpad emits during a deliberate tap — at
+// 4px those taps were silently flipping into "drag" mode and suppressing the
+// click, which is the "I can't switch projects" symptom on trackpad users.
+const DRAG_THRESHOLD_PX = 8;
 
 export function MiniProjectSidebar({ onOpenFolder }: MiniProjectSidebarProps) {
   const { t } = useTranslation();
@@ -50,6 +53,12 @@ export function MiniProjectSidebar({ onOpenFolder }: MiniProjectSidebarProps) {
   // Set by pointermove when the gesture escalates to a drag; drained by the
   // next click on the same tile so a drop doesn't also activate the project.
   const suppressClickRef = useRef(false);
+  // Timestamp of the most recent pointerup-driven activation. Lets the
+  // onClick handler bail when the click fires right after the pointerup
+  // (the common path on platforms where the click event isn't broken) —
+  // and gracefully degrade when click never arrives (WKWebView + composed
+  // Radix Slots), since the timestamp is naturally stale by the next press.
+  const lastPointerActivationRef = useRef(0);
 
   // One DOM ref per tile wrapper. Used during drag to compute which gap the
   // pointer is currently over and where to draw the drop indicator.
@@ -94,17 +103,18 @@ export function MiniProjectSidebar({ onOpenFolder }: MiniProjectSidebarProps) {
       const target = e.target as HTMLElement | null;
       if (target?.closest("[role=menu]")) return;
 
-      try {
-        e.currentTarget.setPointerCapture(e.pointerId);
-      } catch {
-        // Some WKWebView builds reject capture for non-touch pointers when the
-        // capture target sits behind a Radix Slot. The window-level listeners
-        // below cover that fallback.
-      }
+      // IMPORTANT: do NOT call setPointerCapture here. In WKWebView, capturing
+      // a pointer on this wrapper div consistently SUPPRESSES the `click`
+      // event on the nested <button> (which is asChild'd by TooltipTrigger +
+      // ContextMenuTrigger — two composed Radix Slots, a known-broken combo
+      // in WKWebView per MEMORY's "Drag = pointer events" note). Without
+      // capture, window-level pointermove/pointerup listeners are enough to
+      // track the gesture, and the child button's onClick fires normally.
+      // For drags that escape the rail bounds, window listeners receive the
+      // events anyway — capture is unnecessary.
 
       const startX = e.clientX;
       const startY = e.clientY;
-      const wrapperEl = e.currentTarget;
       let dragging = false;
       let localDropIndex: number | null = null;
 
@@ -127,11 +137,6 @@ export function MiniProjectSidebar({ onOpenFolder }: MiniProjectSidebarProps) {
         window.removeEventListener("pointermove", onMove);
         window.removeEventListener("pointerup", onUp);
         window.removeEventListener("pointercancel", onCancel);
-        try {
-          wrapperEl.releasePointerCapture(e.pointerId);
-        } catch {
-          // No-op if capture was never granted or already released.
-        }
       };
 
       const onUp = () => {
@@ -151,6 +156,14 @@ export function MiniProjectSidebar({ onOpenFolder }: MiniProjectSidebarProps) {
             ids.splice(insertAt, 0, moved);
             void reorder(ids);
           }
+        } else if (!dragging) {
+          // Belt-and-suspenders: even though there's no pointer capture in
+          // play, Radix Slot composition has been known to swallow the
+          // child button's click. Activating from pointerup guarantees the
+          // project actually switches. The lastPointerActivation timestamp
+          // gate below prevents double-fire when the click DOES arrive.
+          lastPointerActivationRef.current = performance.now();
+          void setActive(id);
         }
         setDraggingId(null);
         setDropIndex(null);
@@ -170,10 +183,15 @@ export function MiniProjectSidebar({ onOpenFolder }: MiniProjectSidebarProps) {
     };
 
   const onTileClick = (id: string) => () => {
+    // Drag end already fired setActive — don't double-activate.
     if (suppressClickRef.current) {
       suppressClickRef.current = false;
       return;
     }
+    // pointerup already activated within the last 250ms — skip. After 250ms,
+    // assume this is a genuine standalone click (e.g. keyboard Enter on a
+    // focused tile, where there was no pointerup).
+    if (performance.now() - lastPointerActivationRef.current < 250) return;
     void setActive(id);
   };
 
@@ -312,7 +330,7 @@ export function MiniProjectSidebar({ onOpenFolder }: MiniProjectSidebarProps) {
             transform: "translate(-50%, -50%) rotate(-3deg)",
           }}
         >
-          <div className="rounded-md shadow-[0_10px_30px_-6px_rgba(0,0,0,0.45),0_2px_6px_-2px_rgba(0,0,0,0.25)]">
+          <div className="rounded-md shadow-drag">
             <ProjectTile
               project={draggingProject}
               active={draggingProject.id === activeProjectId}

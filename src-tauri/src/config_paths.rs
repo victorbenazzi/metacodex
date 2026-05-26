@@ -55,6 +55,21 @@ pub fn workspace_dir() -> AppResult<PathBuf> {
     Ok(state_dir()?.join("workspace"))
 }
 
+/// `~/.metacodex/state/resume.json` — agent-session resume registry.
+pub fn resume_file() -> AppResult<PathBuf> {
+    Ok(state_dir()?.join("resume.json"))
+}
+
+/// `~/.metacodex/state/last-session.log` — diagnostics ring-buffer dump on quit.
+pub fn last_session_log_file() -> AppResult<PathBuf> {
+    Ok(state_dir()?.join("last-session.log"))
+}
+
+/// `~/.metacodex/state/last-crash.json` — last ErrorBoundary catch.
+pub fn last_crash_file() -> AppResult<PathBuf> {
+    Ok(state_dir()?.join("last-crash.json"))
+}
+
 /// Path to a single project's workspace file: `state/workspace/{id}.json`.
 ///
 /// Guards the id (which is server-generated, but belt-and-suspenders) so a

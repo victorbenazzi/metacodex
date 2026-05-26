@@ -1,7 +1,8 @@
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { GitBranch, Check, ArrowUp, ArrowDown, GitCompare } from "lucide-react";
 
+import { EmptyState } from "@/components/ui/EmptyState";
 import { Icon } from "@/components/ui/Icon";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { useGitStore } from "@/features/git/git.store";
@@ -12,6 +13,9 @@ import {
 } from "@/features/git/gitStatus";
 import { basename, dirname } from "@/lib/path";
 import { cn } from "@/lib/cn";
+import { useTabsStore, WORKSPACE_NULL } from "@/components/tabs/tabsStore";
+import { newId } from "@/lib/idGen";
+import { WorktreesSection } from "./WorktreesSection";
 
 interface SourceControlPanelProps {
   projectId: string;
@@ -58,6 +62,20 @@ export function SourceControlPanel({
 }: SourceControlPanelProps) {
   const { t } = useTranslation();
   const git = useGitStore((s) => s.byProject[projectId]);
+  const openTab = useTabsStore((s) => s.openTab);
+
+  const openTerminalAt = useCallback(
+    (cwd: string, name: string) => {
+      openTab(projectId ?? WORKSPACE_NULL, {
+        id: `t-${newId(10)}`,
+        kind: "terminal",
+        title: name,
+        projectId,
+        cwd,
+      });
+    },
+    [openTab, projectId],
+  );
 
   const entries = useMemo(() => {
     const statuses = git?.statuses ?? {};
@@ -81,6 +99,12 @@ export function SourceControlPanel({
       <header className="flex h-[30px] shrink-0 items-center border-b border-hairline-soft px-[12px]">
         <span className="editorial-caps truncate">{t("sourceControl.title")}</span>
       </header>
+
+      <WorktreesSection
+        projectId={projectId}
+        projectPath={projectPath}
+        onOpenInTerminal={openTerminalAt}
+      />
 
       <div className="shrink-0 border-b border-hairline-soft px-[14px] py-[12px]">
         {git?.branch ? (
@@ -108,12 +132,12 @@ export function SourceControlPanel({
 
         <div className="mt-[10px] flex items-baseline gap-[12px]">
           <Tooltip content={t("sourceControl.additions", { count: totalAdditions })} side="bottom">
-            <span className="whitespace-nowrap font-mono text-[15px] font-medium leading-none tabular-nums text-success">
+            <span className="whitespace-nowrap font-mono text-[15px] font-medium leading-none tabular-nums text-success/85">
               +{compactCount(totalAdditions)}
             </span>
           </Tooltip>
           <Tooltip content={t("sourceControl.deletions", { count: totalDeletions })} side="bottom">
-            <span className="whitespace-nowrap font-mono text-[15px] font-medium leading-none tabular-nums text-danger">
+            <span className="whitespace-nowrap font-mono text-[15px] font-medium leading-none tabular-nums text-danger/85">
               −{compactCount(totalDeletions)}
             </span>
           </Tooltip>
@@ -126,9 +150,8 @@ export function SourceControlPanel({
       </div>
 
       {count === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-[10px] px-[24px] text-center">
-          <Icon icon={Check} size={20} className="text-muted-soft" />
-          <p className="font-mono text-[12px] text-muted">{t("sourceControl.empty")}</p>
+        <div className="min-h-0 flex-1">
+          <EmptyState icon={Check} body={t("sourceControl.empty")} />
         </div>
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto py-[8px]">
@@ -153,7 +176,7 @@ export function SourceControlPanel({
                   aria-label={`${t(gitStatusLabelKey(code))}: ${rel}`}
                   className="flex min-w-0 items-center gap-[8px] rounded-xs px-[6px] py-[5px] text-left transition-colors duration-[var(--dur-fast)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-hairline-strong"
                 >
-                  <span className="inline-flex h-[18px] min-w-[25px] shrink-0 items-center justify-center rounded-[3px] border border-hairline bg-surface-card px-[4px] font-mono text-[9px] leading-none text-muted-soft">
+                  <span className="inline-flex h-[18px] min-w-[25px] shrink-0 items-center justify-center rounded-xs border border-hairline bg-surface-card px-[4px] font-mono text-[10px] leading-none tracking-tight text-muted-soft">
                     {fileBadge(name)}
                   </span>
                   <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-body group-hover:text-ink">
@@ -173,10 +196,10 @@ export function SourceControlPanel({
                   </Tooltip>
                 </button>
 
-                <span className="justify-self-end font-mono text-[12px] tabular-nums text-success">
+                <span className="justify-self-end font-mono text-[12px] tabular-nums text-success/85">
                   {additions > 0 ? `+${compactCount(additions)}` : ""}
                 </span>
-                <span className="justify-self-end font-mono text-[12px] tabular-nums text-danger">
+                <span className="justify-self-end font-mono text-[12px] tabular-nums text-danger/85">
                   {deletions > 0 ? `-${compactCount(deletions)}` : ""}
                 </span>
                 <Tooltip content={t("sourceControl.openDiff")} side="left">

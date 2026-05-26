@@ -24,6 +24,11 @@ pub struct FsChangedPayload {
 /// releases its OS-level watcher.
 pub struct WatcherManager {
     by_project: Mutex<HashMap<String, Debouncer<notify::RecommendedWatcher>>>,
+    /// Path we asked notify to watch for each project. Used to make `watch()`
+    /// idempotent — a no-op when called twice with the same (id, path) — so
+    /// the rapid project-switch path doesn't drop in-flight events from the
+    /// existing debouncer's 80ms window.
+    paths_by_project: Mutex<HashMap<String, PathBuf>>,
     app_handle: AppHandle,
 }
 
@@ -31,13 +36,29 @@ impl WatcherManager {
     pub fn new(app_handle: AppHandle) -> Self {
         Self {
             by_project: Mutex::new(HashMap::new()),
+            paths_by_project: Mutex::new(HashMap::new()),
             app_handle,
         }
     }
 
     pub fn watch(&self, project_id: String, path: PathBuf) -> AppResult<()> {
-        // If we're already watching this project, refresh by dropping the old one first.
-        self.by_project.lock().remove(&project_id);
+        // Idempotent: if the same (project, path) pair is already wired, keep
+        // the existing debouncer alive — its in-flight events would otherwise
+        // be lost in the 80ms gap between remove() and the new insert.
+        if let Some(existing) = self.paths_by_project.lock().get(&project_id) {
+            if existing == &path {
+                return Ok(());
+            }
+        }
+        // Different path (or no entry): drop the old debouncer OUTSIDE the
+        // lock so its callback thread can't try to re-acquire the lock during
+        // shutdown (which would deadlock with parking_lot::Mutex). Take the
+        // value out, release the guard, then drop the value.
+        let old_debouncer = {
+            let mut guard = self.by_project.lock();
+            guard.remove(&project_id)
+        };
+        drop(old_debouncer);
 
         let app = self.app_handle.clone();
         let pid = project_id.clone();
@@ -61,9 +82,18 @@ impl WatcherManager {
                 let mut paths: Vec<String> = events
                     .iter()
                     .map(|e| e.path.display().to_string())
+                    // Drop `.metacodex/worktrees/*` — those are parallel
+                    // checkouts of THIS repo; the main project's git status
+                    // is unaffected by edits inside them, and forwarding the
+                    // events triggers redundant explorer refreshes for files
+                    // the user can't see (the explorer hides hidden dirs).
+                    .filter(|p| !p.contains("/.metacodex/worktrees/"))
                     .collect();
                 paths.sort();
                 paths.dedup();
+                if paths.is_empty() {
+                    return;
+                }
                 let _ = app.emit(
                     EV_FS_CHANGED,
                     FsChangedPayload {
@@ -80,12 +110,22 @@ impl WatcherManager {
             .watch(&path, RecursiveMode::Recursive)
             .map_err(|e| AppError::Other(format!("watch {}: {e}", path.display())))?;
 
+        self.paths_by_project
+            .lock()
+            .insert(project_id.clone(), path);
         self.by_project.lock().insert(project_id, debouncer);
         Ok(())
     }
 
     pub fn unwatch(&self, project_id: &str) {
-        self.by_project.lock().remove(project_id);
+        self.paths_by_project.lock().remove(project_id);
+        // Same drop-outside-the-lock rule as watch(): keep the callback
+        // thread from racing the lock during Drop.
+        let old = {
+            let mut guard = self.by_project.lock();
+            guard.remove(project_id)
+        };
+        drop(old);
     }
 }
 

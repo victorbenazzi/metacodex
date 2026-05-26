@@ -13,10 +13,28 @@
   --surface-card: #ffffff;
   --surface-strong: #e6e5e0;
 
+  /* Surface elevation scale — aliases on top of the canvas/card tokens so
+     components can express intent ("this is elevated") instead of color
+     ("this is white"). Same physical color today, different semantic. */
+  --surface-0: var(--canvas);
+  --surface-1: var(--canvas-soft);
+  --surface-2: var(--surface-card);
+  --surface-3: var(--surface-card);
+
   /* Hairlines */
   --hairline: #e6e5e0;
   --hairline-soft: #efeee8;
   --hairline-strong: #cfcdc4;
+
+  /* Scrim + elevation. Light theme: warm ink at low alpha so modals read as
+     "the canvas tinted darker", not "a black square covering everything". */
+  --overlay-scrim: rgba(38, 37, 30, 0.32);
+  --shadow-elevated:
+    0 1px 0 var(--hairline-soft),
+    0 12px 28px -10px rgba(38, 37, 30, 0.10);
+  --shadow-drag:
+    0 18px 36px -12px rgba(38, 37, 30, 0.28),
+    0 4px 8px -4px rgba(38, 37, 30, 0.18);
 
   /* High-contrast scrollbar thumb for the tab strip — visible at 1px against
      the canvas-soft background. Light theme: near-black; dark theme: near-white. */
@@ -69,20 +87,31 @@
   --radius-xl: 16px;
   --radius-pill: 9999px;
 
-  /* Spacing scale (4 / 8 / 12 / 16 / 20 / 24 / 32) */
-  --space-xxs: 4px;
-  --space-xs: 8px;
-  --space-sm: 12px;
-  --space-base: 16px;
-  --space-md: 20px;
-  --space-lg: 24px;
-  --space-xl: 32px;
+  /* Spacing scale (4 / 8 / 12 / 16 / 20 / 24 / 32). Each token multiplies
+     against --density-multiplier so the entire chrome rhythm flexes from a
+     single setting (compact / comfortable / spacious). */
+  --space-xxs: calc(4px * var(--density-multiplier));
+  --space-xs: calc(8px * var(--density-multiplier));
+  --space-sm: calc(12px * var(--density-multiplier));
+  --space-base: calc(16px * var(--density-multiplier));
+  --space-md: calc(20px * var(--density-multiplier));
+  --space-lg: calc(24px * var(--density-multiplier));
+  --space-xl: calc(32px * var(--density-multiplier));
 
-  /* Type scale */
-  --fs-ui: 14px;
+  /* Type scale. The chrome operates on a strict 4-tier scale (label, caption,
+     ui, title) plus 2 display tiers (display-s, display-l) reserved for hero
+     surfaces. Anything outside this range is a sign the surface drifted out
+     of system. Letter-spacing for `label` is exposed as --tracking-label so
+     uppercase eyebrow rows stay consistent across components. */
+  --fs-label: 11px;
   --fs-caption: 12px;
-  --fs-mono: 13px;
+  --fs-ui: 13px;
+  --fs-title: 15px;
+  --fs-display-s: 22px;
   --fs-display: 44px;
+  --fs-display-l: 88px;
+  --fs-mono: 13px;
+  --tracking-label: 0.06em;
 
   /* Fonts */
   --font-sans: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -95,11 +124,21 @@
   --dur-fast: 120ms;
   --dur-base: 180ms;
   --dur-slow: 280ms;
+
+  /* Press feedback for primary CTAs — tiny scale-down on :active to give
+     tactile confirmation. Restricted to actions (not navigation/tabs). */
+  --press-scale: 0.98;
+  --press-dur: 80ms;
   /* Unified popup motion (dialogs, menus, palette, tooltips). Exit is ~70% of
      enter — "exit faster than enter" — so dismissals feel instant. Pure-opacity
      fade only; never animate transform here or it fights the modal centering. */
   --dur-enter: 150ms;
   --dur-exit: 105ms;
+
+  /* Density multiplier — applied by AppShell from the `interface.uiDensity`
+     setting (compact 0.85, comfortable 1, spacious 1.15). Spacing tokens are
+     derived so a single setting flexes the entire chrome rhythm. */
+  --density-multiplier: 1;
 
   /* Layout */
   --rail-w: 56px;
@@ -168,10 +207,26 @@
   --surface-card: #1d1c18;
   --surface-strong: #2a2924;
 
+  /* Surface elevation scale — see :root for the rationale. */
+  --surface-0: var(--canvas);
+  --surface-1: var(--canvas-soft);
+  --surface-2: var(--surface-card);
+  --surface-3: var(--surface-card);
+
   /* Hairlines */
   --hairline: #2c2b26;
   --hairline-soft: #232220;
   --hairline-strong: #44423a;
+
+  /* Scrim + elevation. Dark theme: deeper alpha because the canvas itself is
+     already low-luminance — needs more separation to read as overlay. */
+  --overlay-scrim: rgba(0, 0, 0, 0.55);
+  --shadow-elevated:
+    0 1px 0 var(--hairline-soft),
+    0 12px 28px -10px rgba(0, 0, 0, 0.50);
+  --shadow-drag:
+    0 18px 36px -12px rgba(0, 0, 0, 0.70),
+    0 4px 8px -4px rgba(0, 0, 0, 0.50);
 
   --scrollbar-tab-thumb: rgba(255, 255, 255, 0.9);
 
@@ -260,4 +315,19 @@
   --syntax-link: #e3a35a;
   --syntax-heading: #f7f7f4;
   --syntax-invalid: #ff5a7d;
+}
+
+/* Press feedback — opt-in via the .press-feedback class on primary action
+   buttons. Scoped to a single utility so it doesn't fight with each button's
+   color/bg transitions (which can stay at their own duration). Respects
+   prefers-reduced-motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .press-feedback {
+    will-change: transform;
+    transition: transform var(--press-dur) var(--ease-in);
+  }
+
+  .press-feedback:active {
+    transform: scale(var(--press-scale));
+  }
 }
