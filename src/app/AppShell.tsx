@@ -822,7 +822,7 @@ export function AppShell() {
   );
 
   const handleOpenFile = useCallback(
-    (path: string, name: string) => {
+    (path: string, name: string, openInEditMode?: boolean) => {
       if (!project) return;
       const e = ext(name);
       const id = `f-${path}`;
@@ -834,7 +834,7 @@ export function AppShell() {
           title: name,
           projectId: project.id,
           path,
-          mode: "preview",
+          mode: openInEditMode ? "source" : "preview",
         };
       } else if (["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(e)) {
         tab = { id, kind: "image", title: name, projectId: project.id, path };

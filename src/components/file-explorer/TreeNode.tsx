@@ -53,7 +53,7 @@ function canDropInto(destDir: string): boolean {
 }
 
 export interface TreeNodeActions {
-  onOpenFile: (path: string, name: string) => void;
+  onOpenFile: (path: string, name: string, openInEditMode?: boolean) => void;
   onRequestDelete: (path: string, name: string, isDir: boolean) => void;
   /** Performs the rename. Resolves with the new absolute path; rejects on failure. */
   onRename: (path: string, newName: string, isDir: boolean) => Promise<string>;
@@ -424,7 +424,7 @@ export function CreateRow({
   parentPath: string;
   kind: CreateKind;
   depth: number;
-  onOpenFile: (path: string, name: string) => void;
+  onOpenFile: (path: string, name: string, openInEditMode?: boolean) => void;
 }) {
   const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -450,7 +450,10 @@ export function CreateRow({
     committingRef.current = true;
     try {
       const newPath = await createNode(projectId, parentPath, name, kind);
-      if (kind === "file") onOpenFile(newPath, basename(newPath));
+      // Manual creation → land in edit mode (markdown opens "source", not the
+      // empty preview pane). AI-created files come in through other paths and
+      // keep the default preview behavior.
+      if (kind === "file") onOpenFile(newPath, basename(newPath), true);
     } catch (err) {
       committingRef.current = false;
       const msg = err instanceof Error ? err.message : String(err);
