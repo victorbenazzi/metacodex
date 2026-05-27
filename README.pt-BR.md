@@ -1,5 +1,10 @@
 <div align="center">
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./public/white-metacodex-icon.png">
+  <img src="./public/black-metacodex-icon.png" alt="metacodex" width="96">
+</picture>
+
 # metacodex
 
 **Um workspace de desenvolvimento local-first, premium, para programar com agentes de IA pelo terminal.**
