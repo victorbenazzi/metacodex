@@ -103,7 +103,7 @@ export function TerminalTab({
   // it had pre-hide (possibly 0 if it was first hidden). The result is content
   // clipped at the bottom and a PTY out of sync with the visible viewport.
   //
-  // Two regressions worth guarding here (both observed in WKWebView):
+  // Three regressions worth guarding here (all observed in WKWebView):
   //   1. Layout can report a transient size for 1-2 frames after `display:block`
   //      lands; if we fit on the first frame, we may lock in the wrong rows.
   //      We poll across frames until the size stabilizes (same value twice).
@@ -112,6 +112,15 @@ export function TerminalTab({
   //      pixel cache stays stale from the pre-hide layout — bottom rows look
   //      empty until the user nudges the window. We force a `refresh()` after
   //      fit so the canvas redraws even when fit is a no-op.
+  //   3. Same no-op fit case also skips `term.resize()` → skips xterm's
+  //      `_afterResize` → skips `viewport.syncScrollArea(true)`. The viewport's
+  //      `_scrollArea.style.height` then stays cached at whatever the buffer
+  //      length was when sync last ran, so mouse-wheel-up has nothing to scroll
+  //      into — even though the scrollback IS populated. Typing the next chunk
+  //      of output (or anything that grows the buffer) re-syncs and unblocks
+  //      scrolling, which makes the bug look like it "fixes itself". We poke
+  //      the private viewport sync directly after every fit to keep the scroll
+  //      area honest regardless of whether fit actually resized.
   useEffect(() => {
     if (!isVisible) return;
     let cancelled = false;
@@ -149,6 +158,8 @@ export function TerminalTab({
         // dimensions change; if rows/cols match the pre-hide values, the
         // CanvasAddon never repaints and stale rows remain on screen.
         term.refresh(0, Math.max(0, term.rows - 1));
+        // Force the viewport scroll area to sync. See item (3) above.
+        (term as any)._core?.viewport?.syncScrollArea?.(true);
         term.scrollToBottom();
       } catch {
         // ignore — observer below will retry
@@ -406,6 +417,12 @@ export function TerminalTab({
             // Force a redraw — see the comment on the isVisible effect for the
             // pixel-cache staleness this guards against.
             t.refresh(0, Math.max(0, t.rows - 1));
+            // And force a viewport sync so mouse-wheel scroll stays alive even
+            // when fit() short-circuited — same root cause, see item (3) on
+            // the isVisible effect. This is the path hit when the Source
+            // Control panel opens / closes and width changes by a small amount
+            // that doesn't bump cols.
+            (t as any)._core?.viewport?.syncScrollArea?.(true);
           } catch {
             // ignore
           }
