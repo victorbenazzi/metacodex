@@ -13,6 +13,8 @@ interface MetacodexApi {
   closeActiveTab?: () => void;
   switchProject?: (n: number) => void;
   jumpToNextAttention?: () => void;
+  renameActiveTab?: () => void;
+  moveActiveTab?: (delta: -1 | 1) => void;
 }
 
 /**
@@ -31,6 +33,15 @@ function dispatchCommand(cmd: ResolvedCommand) {
       break;
     case "tab.close":
       api?.closeActiveTab?.();
+      break;
+    case "tab.rename":
+      api?.renameActiveTab?.();
+      break;
+    case "tab.moveLeft":
+      api?.moveActiveTab?.(-1);
+      break;
+    case "tab.moveRight":
+      api?.moveActiveTab?.(1);
       break;
     case "project.switch":
       if (cmd.arg) api?.switchProject?.(cmd.arg);

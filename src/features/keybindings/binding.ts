@@ -16,6 +16,16 @@ const ALIASES: Record<string, string> = {
   esc: "escape",
   return: "enter",
   "↵": "enter",
+  // Arrow keys — `e.key` reports `ArrowLeft` (lowercased to `arrowleft`), but
+  // user-facing bindings read more naturally as `left` / `right` / etc.
+  left: "arrowleft",
+  right: "arrowright",
+  up: "arrowup",
+  down: "arrowdown",
+  "←": "arrowleft",
+  "→": "arrowright",
+  "↑": "arrowup",
+  "↓": "arrowdown",
 };
 
 /** Parse a canonical-ish binding string ("mod+shift+f") into a `Binding`. */
@@ -76,6 +86,10 @@ const NAMED_DISPLAY: Record<string, string> = {
   escape: "Esc",
   tab: "Tab",
   backspace: "Backspace",
+  arrowleft: "←",
+  arrowright: "→",
+  arrowup: "↑",
+  arrowdown: "↓",
 };
 
 /** Tokens for `<Kbd keys={…}>` from a binding string, e.g.

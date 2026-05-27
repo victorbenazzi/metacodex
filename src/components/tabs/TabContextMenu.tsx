@@ -7,6 +7,8 @@ import {
   FolderOpen,
   Square,
   CornerDownLeft,
+  Pencil,
+  RotateCcw,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -27,6 +29,10 @@ interface TabContextMenuProps {
   onClose: () => void;
   onCloseOthers: () => void;
   onCloseAll: () => void;
+  /** Enter inline rename mode. Provide only for terminal/cli tabs. */
+  onRename?: () => void;
+  /** Clear the user-set title. Provide only when `tab.userTitle` is set. */
+  onResetTitle?: () => void;
   onCopyPath?: () => void;
   onRevealInFinder?: () => void;
   onCopyCwd?: () => void;
@@ -41,6 +47,8 @@ export function TabContextMenu({
   onClose,
   onCloseOthers,
   onCloseAll,
+  onRename,
+  onResetTitle,
   onCopyPath,
   onRevealInFinder,
   onCopyCwd,
@@ -65,6 +73,19 @@ export function TabContextMenu({
     >
       <RCM.Trigger asChild>{children}</RCM.Trigger>
       <ContextMenuContent>
+        {onRename ? (
+          <>
+            <ContextMenuItem
+              onSelect={onRename}
+              trailing={isActive ? <Kbd keys={["F2"]} /> : null}
+            >
+              <Icon icon={Pencil} size={12} className="text-muted" />
+              {t("tabs.rename")}
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+          </>
+        ) : null}
+
         <ContextMenuItem
           onSelect={onClose}
           trailing={isActive ? <Kbd keys={["Mod", "W"]} /> : null}
@@ -82,6 +103,16 @@ export function TabContextMenu({
             <ContextMenuItem onSelect={onCloseAll}>
               <Icon icon={XSquare} size={12} className="text-muted" />
               {t("tabs.closeAll")}
+            </ContextMenuItem>
+          </>
+        ) : null}
+
+        {onResetTitle ? (
+          <>
+            <ContextMenuSeparator />
+            <ContextMenuItem onSelect={onResetTitle}>
+              <Icon icon={RotateCcw} size={12} className="text-muted" />
+              {t("tabs.resetTitle")}
             </ContextMenuItem>
           </>
         ) : null}

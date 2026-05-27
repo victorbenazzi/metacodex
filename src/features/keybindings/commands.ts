@@ -34,6 +34,24 @@ export const COMMANDS: CommandDef[] = [
     category: "view",
   },
   {
+    id: "tab.rename",
+    defaultBinding: ["f2"],
+    descriptionKey: "settings.shortcuts.cmd.tabRename",
+    category: "view",
+  },
+  {
+    id: "tab.moveLeft",
+    defaultBinding: ["alt+left"],
+    descriptionKey: "settings.shortcuts.cmd.tabMoveLeft",
+    category: "view",
+  },
+  {
+    id: "tab.moveRight",
+    defaultBinding: ["alt+right"],
+    descriptionKey: "settings.shortcuts.cmd.tabMoveRight",
+    category: "view",
+  },
+  {
     id: "search.inProject",
     defaultBinding: ["mod+shift+f"],
     descriptionKey: "settings.shortcuts.cmd.searchInProject",

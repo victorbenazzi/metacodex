@@ -1,7 +1,12 @@
 import type { IDisposable, Terminal } from "@xterm/xterm";
 
 /**
- * Hooks xterm's OSC parser into metacodex's agent surface. Four sequences:
+ * Hooks xterm's OSC parser into metacodex's agent surface. Sequences:
+ *
+ * - **OSC 0 / 1 / 2** — terminal/tab title. Emitted by Claude Code (OSC 0/2),
+ *   Codex CLI (OSC 0), tmux, most shells. xterm.js' OSC parser handles both
+ *   BEL and ST terminators transparently, so `data` is just the raw title
+ *   string. Drives the tab's `agentTitle` override.
  *
  * - **OSC 7** — emitted by oh-my-zsh / starship / mosh / many shells on every
  *   directory change: `\e]7;file:///abs/path\e\\` (or BEL-terminated). Powers
@@ -36,6 +41,9 @@ export interface OscPayloadNotify {
 export interface OscHandlerOpts {
   onNotify: (payload: OscPayloadNotify) => void;
   onCwd: (path: string) => void;
+  /** Raw title from OSC 0/1/2 — sanitization is the caller's job (it's the
+   *  only one that knows the tab's `defaultTitle` to compare against). */
+  onTitle: (raw: string) => void;
 }
 
 function clampUrgency(raw: string | undefined): number {
@@ -59,6 +67,18 @@ function decodeFileUri(uri: string): string | null {
 
 export function installOscHandlers(term: Terminal, opts: OscHandlerOpts): IDisposable[] {
   const disposables: IDisposable[] = [];
+
+  // OSC 0 / 1 / 2 — window/icon title. Treat all three the same; the only
+  // distinction at the protocol level is which one the terminal surfaces in
+  // its chrome (window vs icon), which doesn't apply here.
+  for (const code of [0, 1, 2]) {
+    disposables.push(
+      term.parser.registerOscHandler(code, (data) => {
+        opts.onTitle(data);
+        return true;
+      }),
+    );
+  }
 
   // OSC 7 — cwd. `data` is the full URI (everything between `OSC 7;` and ST/BEL).
   disposables.push(

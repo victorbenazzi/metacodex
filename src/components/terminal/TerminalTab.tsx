@@ -14,7 +14,7 @@ import {
   type PtyExitReason,
 } from "@/lib/events";
 import { base64ToUint8Array, utf8ToBase64 } from "@/lib/base64";
-import { WORKSPACE_NULL } from "@/components/tabs/tabsStore";
+import { useTabsStore, WORKSPACE_NULL } from "@/components/tabs/tabsStore";
 import { createFileLinkProvider } from "./terminalLinks";
 import { installOscHandlers } from "./oscHandlers";
 import { createAgentHeuristic } from "./agentHeuristic";
@@ -23,6 +23,29 @@ import { dispatchAgentNotification } from "@/features/terminal/notificationDispa
 import { CMD, invoke } from "@/lib/ipc";
 import { useSessionCapture } from "@/features/resume/useSessionCapture";
 import { TerminalExitBanner } from "./TerminalExitBanner";
+
+const AGENT_TITLE_MAX = 40;
+
+/**
+ * Clean up a raw OSC 0/1/2 payload before storing it as the tab's agentTitle.
+ * Strips C0/C1 control bytes, removes invisible/bidi formatting characters
+ * (some agents emit BOMs/zero-width chars that would render as gaps), collapses
+ * whitespace, trims, and caps the length so a verbose agent doesn't blow up
+ * the tab width. Returns null if the result is empty or coincides with the
+ * default label (no point overriding with the same string).
+ */
+function sanitizeAgentTitle(raw: string, defaultTitle: string): string | null {
+  // eslint-disable-next-line no-control-regex
+  let s = raw.replace(/[\x00-\x1f\x7f-\x9f]/g, " ");
+  // Strip invisible/bidi: ZWSP, ZWNJ, ZWJ, LRM/RLM, BOM, LRE/RLE/PDF/LRO/RLO,
+  // word-joiner, narrow no-break space.
+  s = s.replace(/[​-‏‪-‮⁠﻿­ ]/g, "");
+  s = s.replace(/\s+/g, " ").trim();
+  if (!s) return null;
+  if (s.length > AGENT_TITLE_MAX) s = s.slice(0, AGENT_TITLE_MAX - 1) + "…";
+  if (s === defaultTitle) return null;
+  return s;
+}
 
 interface TerminalTabProps {
   tabId: string;
@@ -189,6 +212,10 @@ export function TerminalTab({
     // which gates the OS banner + chime behind user settings.
     const agentStore = useAgentStatusStore.getState();
     let lastCwdPushed: string | null = null;
+    // Resolve project key once per session — used by OSC title updates which
+    // hit `useTabsStore.getState().setTabTitles(projectKey, tabId, ...)`.
+    const projectKey = projectId ?? WORKSPACE_NULL;
+    let lastAgentTitlePushed: string | null = null;
     const oscDisposables = installOscHandlers(term, {
       onCwd: (path) => {
         // OSC 7 fires on every `cd` (oh-my-zsh `chpwd_functions`). Skip the
@@ -200,6 +227,17 @@ export function TerminalTab({
         if (!sid) return;
         invoke(CMD.ptyUpdateCwd, { sessionId: sid, cwd: path }).catch((err) => {
           console.warn("[pty_update_cwd] failed", err);
+        });
+      },
+      onTitle: (raw) => {
+        // Agents often re-emit OSC titles many times per second (Codex paints
+        // a spinner into the title bar). Sanitize, dedupe, and only commit
+        // when the visible title would actually change.
+        const cleaned = sanitizeAgentTitle(raw, label);
+        if (cleaned === lastAgentTitlePushed) return;
+        lastAgentTitlePushed = cleaned;
+        useTabsStore.getState().setTabTitles(projectKey, tabId, {
+          agentTitle: cleaned ?? null,
         });
       },
       onNotify: (payload) => {
@@ -358,6 +396,11 @@ export function TerminalTab({
           // Promote the tab dot to `done` so the user sees the agent finished
           // even after switching away. Heuristic + OSC keep it bounded.
           useAgentStatusStore.getState().setStatus(tabId, "done");
+          // Clear the agent's "I am doing X" title — it's stale the moment the
+          // process exits. User overrides (userTitle) stay untouched.
+          useTabsStore.getState().setTabTitles(projectKey, tabId, {
+            agentTitle: null,
+          });
           dispatchAgentNotification({
             tabId,
             title: i18n.t("notifications.agentDone"),

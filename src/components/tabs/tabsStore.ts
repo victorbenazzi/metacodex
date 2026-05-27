@@ -15,11 +15,27 @@ interface TabsBucket {
 
 interface TabsState {
   byProject: Record<string, TabsBucket>;
+  /** Id of the tab currently in inline-rename edit mode (across all projects —
+   *  only one input can be active at a time). Null when no edit is in progress. */
+  editingTabId: string | null;
   openTab: (projectKey: string, tab: Tab, setActive?: boolean) => void;
   closeTab: (projectKey: string, tabId: string) => void;
   closeMany: (projectKey: string, tabIds: string[]) => void;
   setActiveTab: (projectKey: string, tabId: string) => void;
   updateTab: (projectKey: string, tabId: string, patch: Partial<Tab>) => void;
+  /** Reorder a single tab to a new index within its project bucket. No-op if
+   *  the move is invalid or doesn't change the order. Preserves `activeTabId`. */
+  moveTab: (projectKey: string, tabId: string, toIndex: number) => void;
+  /** Patch title overrides on a tab. Passing `userTitle: ""` or `userTitle: null`
+   *  clears the manual rename (title falls back to agentTitle / default). Same
+   *  contract for `agentTitle`. */
+  setTabTitles: (
+    projectKey: string,
+    tabId: string,
+    patch: { agentTitle?: string | null; userTitle?: string | null },
+  ) => void;
+  /** Enter / exit inline rename mode for a tab. Pass null to exit. */
+  setEditingTabId: (tabId: string | null) => void;
   /** Close any file-backed tab whose path === removedPath or sits inside it. */
   closeForRemovedPath: (projectKey: string, removedPath: string) => void;
   /** Rewrite path/title of any file-backed tab affected by a rename. Tab ids
@@ -42,6 +58,7 @@ const emptyBucket: TabsBucket = { tabs: [], activeTabId: null };
 
 export const useTabsStore = create<TabsState>((set, get) => ({
   byProject: {},
+  editingTabId: null,
   openTab: (projectKey, tab, setActive = true) =>
     set((state) => {
       const cur = state.byProject[projectKey] ?? emptyBucket;
@@ -89,6 +106,8 @@ export const useTabsStore = create<TabsState>((set, get) => ({
           ...state.byProject,
           [projectKey]: { tabs: nextTabs, activeTabId },
         },
+        // Clear inline-edit if the tab being closed was the one in edit mode.
+        editingTabId: state.editingTabId === tabId ? null : state.editingTabId,
       };
     }),
   closeMany: (projectKey, tabIds) =>
@@ -116,6 +135,10 @@ export const useTabsStore = create<TabsState>((set, get) => ({
           ...state.byProject,
           [projectKey]: { tabs: nextTabs, activeTabId },
         },
+        editingTabId:
+          state.editingTabId && killSet.has(state.editingTabId)
+            ? null
+            : state.editingTabId,
       };
     }),
   setActiveTab: (projectKey, tabId) =>
@@ -145,6 +168,68 @@ export const useTabsStore = create<TabsState>((set, get) => ({
         },
       };
     }),
+  moveTab: (projectKey, tabId, toIndex) =>
+    set((state) => {
+      const cur = state.byProject[projectKey];
+      if (!cur) return state;
+      const fromIdx = cur.tabs.findIndex((t) => t.id === tabId);
+      if (fromIdx === -1) return state;
+      // Clamp + early-exit when the move is a no-op. Note: target index is
+      // expressed in the ORIGINAL array — after removing `from`, an index
+      // greater than `from` shifts down by one. We normalize first.
+      const clamped = Math.max(0, Math.min(cur.tabs.length - 1, toIndex));
+      if (clamped === fromIdx) return state;
+      const next = cur.tabs.slice();
+      const [moved] = next.splice(fromIdx, 1);
+      next.splice(clamped, 0, moved);
+      return {
+        byProject: {
+          ...state.byProject,
+          [projectKey]: { tabs: next, activeTabId: cur.activeTabId },
+        },
+      };
+    }),
+
+  setTabTitles: (projectKey, tabId, patch) =>
+    set((state) => {
+      const cur = state.byProject[projectKey];
+      if (!cur) return state;
+      const idx = cur.tabs.findIndex((t) => t.id === tabId);
+      if (idx === -1) return state;
+      const tab = cur.tabs[idx];
+      // Build the next tab, removing the override fields entirely when the
+      // caller passes `null` or empty string. Storing `undefined` keeps the
+      // override absent (vs. set-to-empty-string, which would lock the title
+      // blank).
+      const nextAgent =
+        patch.agentTitle === null || patch.agentTitle === ""
+          ? undefined
+          : patch.agentTitle !== undefined
+            ? patch.agentTitle
+            : tab.agentTitle;
+      const nextUser =
+        patch.userTitle === null || patch.userTitle === ""
+          ? undefined
+          : patch.userTitle !== undefined
+            ? patch.userTitle
+            : tab.userTitle;
+      if (nextAgent === tab.agentTitle && nextUser === tab.userTitle) {
+        return state;
+      }
+      const nextTab = { ...tab, agentTitle: nextAgent, userTitle: nextUser } as Tab;
+      const nextTabs = cur.tabs.slice();
+      nextTabs[idx] = nextTab;
+      return {
+        byProject: {
+          ...state.byProject,
+          [projectKey]: { tabs: nextTabs, activeTabId: cur.activeTabId },
+        },
+      };
+    }),
+
+  setEditingTabId: (tabId) =>
+    set((state) => (state.editingTabId === tabId ? state : { editingTabId: tabId })),
+
   closeForRemovedPath: (projectKey, removedPath) =>
     set((state) => {
       const cur = state.byProject[projectKey];
@@ -173,6 +258,10 @@ export const useTabsStore = create<TabsState>((set, get) => ({
           ...state.byProject,
           [projectKey]: { tabs: nextTabs, activeTabId },
         },
+        editingTabId:
+          state.editingTabId && kill.has(state.editingTabId)
+            ? null
+            : state.editingTabId,
       };
     }),
 
@@ -205,8 +294,14 @@ export const useTabsStore = create<TabsState>((set, get) => ({
   dropBucket: (projectKey) =>
     set((state) => {
       if (!(projectKey in state.byProject)) return state;
-      const { [projectKey]: _, ...rest } = state.byProject;
-      return { byProject: rest };
+      const { [projectKey]: removed, ...rest } = state.byProject;
+      const editingDied =
+        state.editingTabId != null &&
+        removed.tabs.some((t) => t.id === state.editingTabId);
+      return {
+        byProject: rest,
+        editingTabId: editingDied ? null : state.editingTabId,
+      };
     }),
 
   getBucket: (projectKey) => get().byProject[projectKey] ?? emptyBucket,

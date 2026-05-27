@@ -4,7 +4,7 @@ import { GitBranch } from "lucide-react";
 import { Icon } from "@/components/ui/Icon";
 import { useTerminalStore } from "@/features/terminal/terminal.store";
 import { useTabMetadataStore } from "@/features/terminal/tabMetadata.store";
-import type { Tab } from "./types";
+import { resolveTabTitle, type Tab } from "./types";
 
 interface TabTooltipProps {
   tab: Tab;
@@ -39,9 +39,21 @@ export function TabTooltip({ tab }: TabTooltipProps) {
   });
   const meta = useTabMetadataStore((s) => (sessionId ? s.bySessionId[sessionId] : undefined));
 
+  // Show a discreet origin line when the displayed title isn't the default —
+  // user-rename always wins over agent-rename in `resolveTabTitle`, so the
+  // precedence here mirrors that.
+  const titleOrigin = tab.userTitle
+    ? "tabs.tooltipUserTitle"
+    : tab.agentTitle
+      ? "tabs.tooltipAgentTitle"
+      : null;
+
   return (
     <div className="flex max-w-[320px] flex-col gap-[6px]">
-      <span className="text-[12px] font-medium text-ink truncate">{tab.title}</span>
+      <span className="text-[12px] font-medium text-ink truncate">{resolveTabTitle(tab)}</span>
+      {titleOrigin ? (
+        <span className="text-[10px] text-muted-soft">{t(titleOrigin)}</span>
+      ) : null}
 
       {meta?.branch ? (
         <span className="flex items-center gap-[5px] text-[11px] text-body">

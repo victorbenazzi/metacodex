@@ -201,6 +201,9 @@ export function AppShell() {
   const closeTab = useTabsStore((s) => s.closeTab);
   const closeMany = useTabsStore((s) => s.closeMany);
   const setActiveTab = useTabsStore((s) => s.setActiveTab);
+  const moveTabStore = useTabsStore((s) => s.moveTab);
+  const setTabTitles = useTabsStore((s) => s.setTabTitles);
+  const setEditingTabId = useTabsStore((s) => s.setEditingTabId);
 
   const [pendingClose, setPendingClose] = useState<PendingClose | null>(null);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
@@ -725,6 +728,52 @@ export function AppShell() {
     [bucket.tabs],
   );
 
+  // Manual rename. Empty / whitespace-only input clears the user override —
+  // the tab falls back to agentTitle / default. Otherwise we cap to a hard
+  // limit so a stuffed string can't blow up the tab width.
+  const handleRenameTab = useCallback(
+    (tabId: string, newTitle: string) => {
+      const trimmed = newTitle.trim();
+      const next = trimmed ? trimmed.slice(0, 60) : null;
+      setTabTitles(projectKey, tabId, { userTitle: next });
+    },
+    [setTabTitles, projectKey],
+  );
+
+  const handleMoveTab = useCallback(
+    (tabId: string, toIndex: number) => {
+      moveTabStore(projectKey, tabId, toIndex);
+    },
+    [moveTabStore, projectKey],
+  );
+
+  // Triggered by F2 — finds the active tab and enters inline rename mode.
+  // No-op if the active tab isn't renamable (file tabs) or there's no
+  // active tab.
+  const renameActiveTab = useCallback(() => {
+    const id = bucket.activeTabId;
+    if (!id) return;
+    const tab = bucket.tabs.find((t) => t.id === id);
+    if (!tab) return;
+    if (tab.kind !== "terminal" && tab.kind !== "cli") return;
+    setEditingTabId(id);
+  }, [bucket.activeTabId, bucket.tabs, setEditingTabId]);
+
+  // Triggered by Alt+←/Alt+→ — keyboard equivalent of the drag-reorder, so
+  // users who can't (or don't want to) drag can still rearrange tabs.
+  const moveActiveTab = useCallback(
+    (delta: -1 | 1) => {
+      const id = bucket.activeTabId;
+      if (!id) return;
+      const idx = bucket.tabs.findIndex((t) => t.id === id);
+      if (idx < 0) return;
+      const next = idx + delta;
+      if (next < 0 || next >= bucket.tabs.length) return;
+      moveTabStore(projectKey, id, next);
+    },
+    [bucket.activeTabId, bucket.tabs, moveTabStore, projectKey],
+  );
+
   const performDelete = useCallback(
     async (target: PendingDelete) => {
       if (!project) return;
@@ -912,6 +961,8 @@ export function AppShell() {
       openFile: handleOpenFile,
       sendToTerminal,
       jumpToNextAttention,
+      renameActiveTab,
+      moveActiveTab,
     };
     return () => {
       delete (window as any).__metacodex;
@@ -924,6 +975,8 @@ export function AppShell() {
     handleOpenFile,
     sendToTerminal,
     jumpToNextAttention,
+    renameActiveTab,
+    moveActiveTab,
   ]);
 
   // CSS-grid template: the variable-width columns interpolate the current
@@ -982,6 +1035,8 @@ export function AppShell() {
         onCopyTabPath={handleCopyTabPath}
         onRevealTabInFinder={handleRevealTabInFinder}
         onCopyTabCwd={handleCopyTabCwd}
+        onRenameTab={handleRenameTab}
+        onMoveTab={handleMoveTab}
         onNewTerminal={handleNewTerminal}
         onLaunchCli={handleLaunchCli}
         onNewWorktree={project ? handleOpenWorktreeDialog : undefined}

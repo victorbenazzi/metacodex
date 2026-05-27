@@ -98,7 +98,9 @@
      reordered, overriding the cursor:pointer / cursor:text that nested
      elements might otherwise paint. */
   body.is-reordering-projects,
-  body.is-reordering-projects * {
+  body.is-reordering-projects *,
+  body.is-reordering-tabs,
+  body.is-reordering-tabs * {
     cursor: grabbing !important;
   }
 }

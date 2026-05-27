@@ -31,6 +31,8 @@ interface WorkAreaProps {
   onCopyTabPath: (id: string) => void;
   onRevealTabInFinder: (id: string) => void;
   onCopyTabCwd: (id: string) => void;
+  onRenameTab: (id: string, newTitle: string) => void;
+  onMoveTab: (id: string, toIndex: number) => void;
   onNewTerminal: () => void;
   onLaunchCli: (cli: CliTool) => void;
   onNewWorktree?: () => void;
@@ -50,6 +52,8 @@ export function WorkArea({
   onCopyTabPath,
   onRevealTabInFinder,
   onCopyTabCwd,
+  onRenameTab,
+  onMoveTab,
   onNewTerminal,
   onLaunchCli,
   onNewWorktree,
@@ -75,6 +79,8 @@ export function WorkArea({
           onCopyTabPath={onCopyTabPath}
           onRevealTabInFinder={onRevealTabInFinder}
           onCopyTabCwd={onCopyTabCwd}
+          onRenameTab={onRenameTab}
+          onMoveTab={onMoveTab}
           onNewTerminal={onNewTerminal}
           onLaunchCli={onLaunchCli}
           trailing={
