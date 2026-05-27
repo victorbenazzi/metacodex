@@ -31,6 +31,30 @@ It's built as a **Tauri 2** shell — a small Rust core that owns every system c
 
 It feels closer to Linear / Raycast than to a typical Electron IDE: token-driven theming, a single opacity fade for every popup, native-style focus rings, and a tab bar that doesn't leak browser chrome.
 
+## Download & install
+
+**For Apple Silicon Macs (M1 / M2 / M3 / M4).** Three steps, ~30 seconds:
+
+1. **Download** [`metacodex_<latest>_aarch64.dmg`](https://github.com/victorbenazzi/metacodex/releases/latest) from the Releases page.
+2. **Open the `.dmg`** and drag `metacodex.app` into `/Applications`.
+3. **Open Terminal and paste this one line:**
+   ```bash
+   sudo xattr -cr /Applications/metacodex.app && open /Applications/metacodex.app
+   ```
+   *One-time per install. macOS quarantines unsigned apps; this clears the flag and opens metacodex.*
+
+That's it — no account, no setup wizard. Future versions arrive automatically (see [Auto-update](#auto-update) below).
+
+> Intel Mac, Windows and Linux builds are temporarily disabled while we verify each platform end-to-end. Apple Silicon ships first because it's what the maintainer runs daily; the others come back one by one. Open an issue if you want a specific platform prioritised.
+>
+> Stuck on *"app is damaged"* or *"developer cannot be verified"*? See the full [signature workaround](#macos-signature-error-app-is-damaged--cannot-be-opened).
+
+## Auto-update
+
+From **v0.0.3** onwards, metacodex updates itself. Shortly after launch the app checks this repo's `latest.json`; when a newer release exists, a blue **Update** pill appears in the top bar. One click → the new payload is downloaded, signature-verified against the bundled public key, swapped in place, and the app relaunches. No reinstall.
+
+> ⚠️ If macOS re-quarantines the app after an in-place update (rare, but happens to unsigned bundles), run `sudo xattr -cr /Applications/metacodex.app` once and reopen. Yes, we know — Apple charges $99/year to make this message go away. The day metacodex pays its own credit card, we'll sign it. Until then: terminal.
+
 ## Why
 
 | Pain | metacodex's take |
@@ -95,27 +119,6 @@ To run from source you need:
 | **Rust** (stable) | Tauri Rust core — install via [`rustup`](https://rustup.rs) |
 | **Node.js 20+** | Vite / TS |
 | **pnpm** | Package manager — `npm i -g pnpm` (or `corepack enable`) |
-
-## Download
-
-Grab a pre-built `.dmg` for your Mac from the [Releases page](https://github.com/victorbenazzi/metacodex/releases/latest):
-
-- `metacodex_<version>_aarch64.dmg` — **Apple Silicon (M1/M2/M3/M4)**
-
-> Intel Mac, Windows and Linux builds are temporarily disabled while we polish each one. Apple Silicon ships first because it's what the maintainer runs day-to-day; the other targets come back once verified end-to-end. Open an issue if you want a specific platform prioritised.
-
-After dragging metacodex into `/Applications`, run the [signature workaround](#macos-signature-error-app-is-damaged--cannot-be-opened) once. (Releases are currently unsigned.)
-
-## Auto-update
-
-From **v0.0.3** onwards, metacodex updates itself.
-
-1. Shortly after launch, the app checks this repo's `latest.json` for a newer release.
-2. If one exists, a blue **Update** pill appears in the top bar (next to the project switcher).
-3. Click it → the new `.app.tar.gz` payload is downloaded, its signature is verified against the public key embedded in `src-tauri/tauri.conf.json`, the `.app` is swapped in place, and the app relaunches itself.
-4. No reinstall. No re-`xattr` on every update — the new bundle usually inherits the quarantine-cleared state from the previous one.
-
-If macOS re-quarantines the app after an in-place update (rare on signed apps, sometimes happens to unsigned ones like this), just re-run the [signature workaround](#macos-signature-error-app-is-damaged--cannot-be-opened) once. Yes, we know — Apple charges $99/year to make this message go away. The day metacodex pays its own credit card, we'll sign it. Until then: terminal.
 
 ## Install (from source)
 

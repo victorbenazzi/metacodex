@@ -31,6 +31,30 @@ A base é uma **shell Tauri 2** — um núcleo Rust pequeno que detém todo I/O 
 
 A sensação é mais próxima de Linear / Raycast do que de uma IDE Electron tradicional: theming via tokens, um único fade de opacidade pra todo popup, focus rings nativos e uma barra de abas que não vaza chrome de browser.
 
+## Download & instalação
+
+**Para Macs Apple Silicon (M1 / M2 / M3 / M4).** Três passos, ~30 segundos:
+
+1. **Baixe** [`metacodex_<última>_aarch64.dmg`](https://github.com/victorbenazzi/metacodex/releases/latest) na página de Releases.
+2. **Abra o `.dmg`** e arraste `metacodex.app` pra `/Applications`.
+3. **Abra o Terminal e cole essa linha única:**
+   ```bash
+   sudo xattr -cr /Applications/metacodex.app && open /Applications/metacodex.app
+   ```
+   *Só uma vez por instalação. O macOS coloca apps não-assinados em quarentena; esse comando limpa o flag e abre o metacodex.*
+
+Pronto — sem conta, sem wizard de setup. Versões futuras chegam sozinhas (veja [Auto-update](#auto-update) abaixo).
+
+> Builds pra Mac Intel, Windows e Linux estão temporariamente desativadas enquanto cada plataforma é verificada ponta a ponta. Apple Silicon sai primeiro porque é o que o mantenedor usa no dia a dia; as outras voltam uma a uma. Abra uma issue se quiser priorizar alguma.
+>
+> Travou em *"app está danificado"* ou *"o desenvolvedor não pode ser verificado"*? Veja o [workaround completo de assinatura](#erro-de-assinatura-no-macos-app-está-danificado--não-pode-ser-aberto).
+
+## Auto-update
+
+A partir da **v0.0.3**, o metacodex se atualiza sozinho. Logo após abrir, o app consulta o `latest.json` deste repo; quando aparece versão nova, surge a pill azul **Update** no topbar. Um clique → o novo payload é baixado, a assinatura é verificada contra a chave pública embutida, o `.app` é trocado no lugar e o app reabre sozinho. Sem reinstalar.
+
+> ⚠️ Se o macOS recolocar a quarentena após um update in-place (raro, mas acontece em apps não-assinados), rode `sudo xattr -cr /Applications/metacodex.app` uma vez e abra de novo. Sim, a gente sabe — a Apple cobra $99/ano pra essa mensagem sumir. No dia que o metacodex tiver cartão de crédito próprio, a gente assina. Até lá: terminal.
+
 ## Por que existe
 
 | Dor | Resposta do metacodex |
@@ -95,27 +119,6 @@ Pra rodar a partir do código você precisa de:
 | **Rust** (stable) | Núcleo Rust do Tauri — instale via [`rustup`](https://rustup.rs) |
 | **Node.js 20+** | Vite / TS |
 | **pnpm** | Gerenciador de pacotes — `npm i -g pnpm` (ou `corepack enable`) |
-
-## Download
-
-Pegue um `.dmg` pré-buildado pro seu Mac na [página de Releases](https://github.com/victorbenazzi/metacodex/releases/latest):
-
-- `metacodex_<versão>_aarch64.dmg` — **Apple Silicon (M1/M2/M3/M4)**
-
-> Builds pra Mac Intel, Windows e Linux estão temporariamente desativadas enquanto cada uma é polida. Apple Silicon sai primeiro porque é o que o mantenedor usa no dia a dia; as outras voltam uma a uma assim que cada uma for verificada ponta a ponta. Abra uma issue se quiser priorizar alguma plataforma específica.
-
-Depois de arrastar o metacodex pra `/Applications`, rode o [workaround de assinatura](#erro-de-assinatura-no-macos-app-está-danificado--não-pode-ser-aberto) uma vez. (As releases atuais não são assinadas.)
-
-## Auto-update
-
-A partir da **v0.0.3**, o metacodex se atualiza sozinho.
-
-1. Logo após o app abrir, ele consulta o `latest.json` desse repo procurando versão nova.
-2. Se houver, uma pill azul **Update** aparece no topbar (do lado do seletor de projetos).
-3. Clique → o novo payload `.app.tar.gz` é baixado, a assinatura é verificada contra a chave pública embutida em `src-tauri/tauri.conf.json`, o `.app` é trocado no lugar e o app reabre sozinho.
-4. Sem reinstalar. Sem rodar `xattr` de novo a cada update — o novo bundle normalmente herda o estado de quarentena já limpo do anterior.
-
-Se o macOS recolocar a quarentena depois de um update in-place (raro em apps assinados, às vezes acontece em não-assinados como este), basta rodar o [workaround de assinatura](#erro-de-assinatura-no-macos-app-está-danificado--não-pode-ser-aberto) uma vez. Sim, a gente sabe — a Apple cobra $99/ano pra essa mensagem sumir. No dia que o metacodex tiver cartão de crédito próprio, a gente assina. Até lá: terminal.
 
 ## Instalação (a partir do código)
 
