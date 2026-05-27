@@ -98,12 +98,24 @@ Pra rodar a partir do código você precisa de:
 
 ## Download
 
-Pegue um `.dmg` pré-buildado pro seu Mac na [página de Releases](https://github.com/victorbenazzi/metacodex/releases/latest). Dois assets por release:
+Pegue um `.dmg` pré-buildado pro seu Mac na [página de Releases](https://github.com/victorbenazzi/metacodex/releases/latest):
 
-- `metacodex_<versão>_aarch64.dmg` — Apple Silicon (M1/M2/M3/M4)
-- `metacodex_<versão>_x64.dmg` — Macs Intel
+- `metacodex_<versão>_aarch64.dmg` — **Apple Silicon (M1/M2/M3/M4)**
+
+> Builds pra Mac Intel, Windows e Linux estão temporariamente desativadas enquanto cada uma é polida. Apple Silicon sai primeiro porque é o que o mantenedor usa no dia a dia; as outras voltam uma a uma assim que cada uma for verificada ponta a ponta. Abra uma issue se quiser priorizar alguma plataforma específica.
 
 Depois de arrastar o metacodex pra `/Applications`, rode o [workaround de assinatura](#erro-de-assinatura-no-macos-app-está-danificado--não-pode-ser-aberto) uma vez. (As releases atuais não são assinadas.)
+
+## Auto-update
+
+A partir da **v0.0.3**, o metacodex se atualiza sozinho.
+
+1. Logo após o app abrir, ele consulta o `latest.json` desse repo procurando versão nova.
+2. Se houver, uma pill azul **Update** aparece no topbar (do lado do seletor de projetos).
+3. Clique → o novo payload `.app.tar.gz` é baixado, a assinatura é verificada contra a chave pública embutida em `src-tauri/tauri.conf.json`, o `.app` é trocado no lugar e o app reabre sozinho.
+4. Sem reinstalar. Sem rodar `xattr` de novo a cada update — o novo bundle normalmente herda o estado de quarentena já limpo do anterior.
+
+Se o macOS recolocar a quarentena depois de um update in-place (raro em apps assinados, às vezes acontece em não-assinados como este), basta rodar o [workaround de assinatura](#erro-de-assinatura-no-macos-app-está-danificado--não-pode-ser-aberto) uma vez. Sim, a gente sabe — a Apple cobra $99/ano pra essa mensagem sumir. No dia que o metacodex tiver cartão de crédito próprio, a gente assina. Até lá: terminal.
 
 ## Instalação (a partir do código)
 

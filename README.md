@@ -98,12 +98,24 @@ To run from source you need:
 
 ## Download
 
-Grab a pre-built `.dmg` for your Mac from the [Releases page](https://github.com/victorbenazzi/metacodex/releases/latest). Two assets per release:
+Grab a pre-built `.dmg` for your Mac from the [Releases page](https://github.com/victorbenazzi/metacodex/releases/latest):
 
-- `metacodex_<version>_aarch64.dmg` — Apple Silicon (M1/M2/M3/M4)
-- `metacodex_<version>_x64.dmg` — Intel Macs
+- `metacodex_<version>_aarch64.dmg` — **Apple Silicon (M1/M2/M3/M4)**
+
+> Intel Mac, Windows and Linux builds are temporarily disabled while we polish each one. Apple Silicon ships first because it's what the maintainer runs day-to-day; the other targets come back once verified end-to-end. Open an issue if you want a specific platform prioritised.
 
 After dragging metacodex into `/Applications`, run the [signature workaround](#macos-signature-error-app-is-damaged--cannot-be-opened) once. (Releases are currently unsigned.)
+
+## Auto-update
+
+From **v0.0.3** onwards, metacodex updates itself.
+
+1. Shortly after launch, the app checks this repo's `latest.json` for a newer release.
+2. If one exists, a blue **Update** pill appears in the top bar (next to the project switcher).
+3. Click it → the new `.app.tar.gz` payload is downloaded, its signature is verified against the public key embedded in `src-tauri/tauri.conf.json`, the `.app` is swapped in place, and the app relaunches itself.
+4. No reinstall. No re-`xattr` on every update — the new bundle usually inherits the quarantine-cleared state from the previous one.
+
+If macOS re-quarantines the app after an in-place update (rare on signed apps, sometimes happens to unsigned ones like this), just re-run the [signature workaround](#macos-signature-error-app-is-damaged--cannot-be-opened) once. Yes, we know — Apple charges $99/year to make this message go away. The day metacodex pays its own credit card, we'll sign it. Until then: terminal.
 
 ## Install (from source)
 
