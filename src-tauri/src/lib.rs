@@ -25,6 +25,8 @@ pub fn run() {
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         // Cmd+Q / window-close handshake. We intercept the close, fire the
         // before-quit event for the frontend to flush pending workspace saves,
         // wait a short window, then reap all PTY children before exit. Without

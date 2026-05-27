@@ -60,6 +60,7 @@ import { WorktreeCreateDialog } from "@/components/source-control/WorktreeCreate
 import { useResumeStore } from "@/features/resume/resume.store";
 import { recordDiag, useDiagnosticsStore } from "@/features/diagnostics/diagnostics.store";
 import { useSaveStatusStore } from "@/features/workspace/saveStatus.store";
+import { checkSilent as checkUpdatesSilent } from "@/features/updates/updates.service";
 
 type PendingClose = {
   ids: string[];
@@ -155,6 +156,16 @@ export function AppShell() {
   // launcher menu opens with results already resolved.
   useEffect(() => {
     preloadCliDetections();
+  }, []);
+
+  // Silent updater probe. Delayed past initial paint + hydration so it never
+  // competes for IPC bandwidth on cold boot; skipped entirely in dev mode by
+  // the service (no installed binary to compare against).
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      void checkUpdatesSilent();
+    }, 3000);
+    return () => window.clearTimeout(handle);
   }, []);
 
   // Keep open editor buffers in sync with files agents edit from terminal tabs.

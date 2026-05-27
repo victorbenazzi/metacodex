@@ -56,6 +56,12 @@
   --danger: #cf2d56;
   --warn: #b9722a;
 
+  /* Update pill (top bar) — a quiet blue that reads as "informational action"
+     without competing with --success (git clean) or --warn (saving). Light
+     theme stays muted; the dark variant lifts saturation to survive the dim
+     canvas. */
+  --update-blue: #3b6fb8;
+
   /* Diff / git change gutter */
   --diff-add: #3a9b76;
   --diff-modify: #4c6f8a;
@@ -243,6 +249,7 @@
   --success: #4ec99a;
   --danger: #ff5a7d;
   --warn: #e3a35a;
+  --update-blue: #6aa3e8;
 
   /* Diff / git change gutter */
   --diff-add: #4ec99a;

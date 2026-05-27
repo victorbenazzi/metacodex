@@ -481,5 +481,14 @@
     "filterPlaceholder": "Filter by kind…",
     "copyToClipboard": "Copy as JSONL",
     "clear": "Clear"
+  },
+  "updates": {
+    "pill": {
+      "available": "Update {{version}}",
+      "downloading": "Updating… {{percent}}%",
+      "downloadingIndeterminate": "Updating…",
+      "installing": "Relaunching…",
+      "error": "Update failed — retry"
+    }
   }
 }

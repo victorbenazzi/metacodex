@@ -8,6 +8,7 @@ import { useProjectsStore } from "@/features/projects/project.store";
 import { Icon } from "@/components/ui/Icon";
 import { useSaveStatusStore } from "@/features/workspace/saveStatus.store";
 import { useDiagnosticsStore } from "@/features/diagnostics/diagnostics.store";
+import { UpdatePill } from "@/components/updates/UpdatePill";
 
 interface TitleBarProps {
   workspaceName?: string;
@@ -81,6 +82,7 @@ export function TitleBar({ workspaceName, className }: TitleBarProps) {
             ) : null}
           </span>
         ) : null}
+        <UpdatePill />
       </div>
 
       {/* Right slot: workspace save-status dot (saving / saved / failed). The
