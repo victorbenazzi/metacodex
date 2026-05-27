@@ -102,23 +102,53 @@ export function TerminalTab({
   // sometimes misses that transition, so the xterm renderer keeps the cols/rows
   // it had pre-hide (possibly 0 if it was first hidden). The result is content
   // clipped at the bottom and a PTY out of sync with the visible viewport.
-  // Force-refit on every transition into the visible state, then snap to the
-  // bottom so the prompt sits where the user expects.
+  //
+  // Two regressions worth guarding here (both observed in WKWebView):
+  //   1. Layout can report a transient size for 1-2 frames after `display:block`
+  //      lands; if we fit on the first frame, we may lock in the wrong rows.
+  //      We poll across frames until the size stabilizes (same value twice).
+  //   2. If the container size happens to match what xterm already stored,
+  //      `fit.fit()` short-circuits without resizing, AND the CanvasAddon's
+  //      pixel cache stays stale from the pre-hide layout — bottom rows look
+  //      empty until the user nudges the window. We force a `refresh()` after
+  //      fit so the canvas redraws even when fit is a no-op.
   useEffect(() => {
     if (!isVisible) return;
     let cancelled = false;
+    let attempts = 0;
+    let lastW = 0;
+    let lastH = 0;
+    let stableFrames = 0;
     const tick = () => {
       if (cancelled) return;
       const term = termRef.current;
       const fit = fitRef.current;
       const container = containerRef.current;
       if (!term || !fit || !container) return;
-      if (!container.clientWidth || !container.clientHeight) {
+      const w = container.clientWidth;
+      const h = container.clientHeight;
+      if (!w || !h) {
+        if (attempts++ < 30) requestAnimationFrame(tick);
+        return;
+      }
+      if (w === lastW && h === lastH) {
+        stableFrames++;
+      } else {
+        stableFrames = 0;
+        lastW = w;
+        lastH = h;
+      }
+      // Two stable frames OR ~16 attempts (~250ms) — whichever first.
+      if (stableFrames < 2 && attempts++ < 16) {
         requestAnimationFrame(tick);
         return;
       }
       try {
         fit.fit();
+        // Force a full redraw — `fit.fit()` only calls `term.resize()` when
+        // dimensions change; if rows/cols match the pre-hide values, the
+        // CanvasAddon never repaints and stale rows remain on screen.
+        term.refresh(0, Math.max(0, term.rows - 1));
         term.scrollToBottom();
       } catch {
         // ignore — observer below will retry
@@ -200,12 +230,28 @@ export function TerminalTab({
     }, 1000);
 
     // Shift+Enter → send ESC+CR (the Alt/Option+Enter byte sequence), which
-    // ink / readline / prompt-kit interpret as "insert newline without
-    // submit". Plain Enter on a PTY is just `\r` with no modifier bits, so
-    // without this CLIs like Claude Code, Codex, and opencode can't tell
-    // Shift+Enter apart from Enter.
+    // ink / readline / prompt-kit / bubbletea interpret as "insert newline
+    // without submit". Plain Enter on a PTY is just `\r` with no modifier
+    // bits, so without this CLIs like Claude Code, Codex, opencode and Aider
+    // can't tell Shift+Enter apart from Enter.
+    //
+    // Two subtleties (both regressions waiting to happen):
+    //   1. `attachCustomKeyEventHandler` returning false makes xterm SKIP its
+    //      normal keydown path — including the `preventDefault()` it would
+    //      otherwise call. Without our own preventDefault here, WKWebView's
+    //      default action inserts a `\n` into xterm's helper <textarea>,
+    //      which then leaks through the `input` listener as a stray `\n`
+    //      sent to the PTY immediately AFTER our `\x1b\r`. Most CLIs
+    //      interpret that trailing `\n` as "submit", so the user sees their
+    //      message dispatched without the newline they wanted.
+    //   2. Match on `ev.code === "Enter"` too — WKWebView in some keyboard
+    //      layouts (ABNT2, AZERTY) reports `ev.key` as a localized label
+    //      while `ev.code` stays canonical.
     term.attachCustomKeyEventHandler((ev) => {
-      if (ev.type === "keydown" && ev.key === "Enter" && ev.shiftKey) {
+      const isEnter = ev.key === "Enter" || ev.code === "Enter" || ev.keyCode === 13;
+      if (ev.type === "keydown" && isEnter && ev.shiftKey) {
+        ev.preventDefault();
+        ev.stopPropagation();
         const sid = sessionIdRef.current;
         if (sid) {
           ptyApi.write(sid, utf8ToBase64("\x1b\r")).catch(() => undefined);
@@ -336,29 +382,43 @@ export function TerminalTab({
       }
     })();
 
-    // Re-fit on container resize
+    // Re-fit on container resize. Coalesce bursts of size changes (panel drag,
+    // window resize) into one fit per frame so the CanvasAddon doesn't thrash
+    // its texture atlas mid-stream.
     const container = containerRef.current;
     let ro: ResizeObserver | undefined;
+    let fitRaf = 0;
     if (container) {
-      ro = new ResizeObserver(() => {
-        const f = fitRef.current;
-        // Don't fit while the tab is hidden (display:none → 0×0). FitAddon would
-        // clamp to its minimum cols (~2) and resize the PTY to that, mangling
-        // TUIs like Claude Code into one-char-per-line. The observer fires again
-        // with real dimensions when the tab is shown, which re-fits correctly.
-        if (!f || !container.clientWidth || !container.clientHeight) return;
-        try {
-          f.fit();
-        } catch {
-          // ignore
-        }
-      });
+      const schedule = () => {
+        if (fitRaf) return;
+        fitRaf = requestAnimationFrame(() => {
+          fitRaf = 0;
+          const f = fitRef.current;
+          const t = termRef.current;
+          // Don't fit while the tab is hidden (display:none → 0×0). FitAddon
+          // would clamp to its minimum cols (~2) and resize the PTY to that,
+          // mangling TUIs like Claude Code into one-char-per-line. The observer
+          // fires again with real dimensions when the tab is shown, which
+          // re-fits correctly.
+          if (!f || !t || !container.clientWidth || !container.clientHeight) return;
+          try {
+            f.fit();
+            // Force a redraw — see the comment on the isVisible effect for the
+            // pixel-cache staleness this guards against.
+            t.refresh(0, Math.max(0, t.rows - 1));
+          } catch {
+            // ignore
+          }
+        });
+      };
+      ro = new ResizeObserver(schedule);
       ro.observe(container);
     }
 
     return () => {
       cancelled = true;
       ro?.disconnect();
+      if (fitRaf) cancelAnimationFrame(fitRaf);
       linkProvider.dispose();
       for (const d of oscDisposables) d.dispose();
       heuristic.dispose();
