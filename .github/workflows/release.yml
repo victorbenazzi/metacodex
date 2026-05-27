@@ -15,28 +15,7 @@ jobs:
   publish-tauri:
     permissions:
       contents: write
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: macos-latest
-            target: aarch64-apple-darwin
-            arch_label: aarch64
-            args: "--target aarch64-apple-darwin"
-          - platform: macos-latest
-            target: x86_64-apple-darwin
-            arch_label: x64
-            args: "--target x86_64-apple-darwin"
-          - platform: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
-            arch_label: amd64
-            args: ""
-          - platform: windows-latest
-            target: x86_64-pc-windows-msvc
-            arch_label: x64
-            args: ""
-
-    runs-on: ${{ matrix.platform }}
+    runs-on: macos-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -52,28 +31,16 @@ jobs:
           node-version: 20
           cache: pnpm
 
-      - name: Install Linux build deps
-        if: matrix.platform == 'ubuntu-22.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libssl-dev \
-            libgtk-3-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev \
-            patchelf
-
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target }}
+          targets: aarch64-apple-darwin
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
           workspaces: ./src-tauri -> target
-          key: ${{ matrix.target }}
+          key: aarch64-apple-darwin
 
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
@@ -90,11 +57,10 @@ jobs:
           releaseBody: |
             ## metacodex ${{ github.event.inputs.tag || github.ref_name }}
 
-            ### Downloads
+            ### Download
             - **macOS Apple Silicon (M1/M2/M3/M4)** → `metacodex_*_aarch64.dmg`
-            - **macOS Intel** → `metacodex_*_x64.dmg`
-            - **Windows** → `metacodex_*_x64-setup.exe`
-            - **Linux** → `metacodex_*_amd64.AppImage`
+
+            > _macOS Intel, Windows and Linux builds are temporarily disabled while we polish them. They will be back soon._
 
             ### Auto-update
             Already running a previous version? metacodex will check for this release on next launch and show an **Update** pill in the top bar. One click — download, install, relaunch. No reinstall.
@@ -112,4 +78,4 @@ jobs:
           releaseDraft: true
           prerelease: false
           includeUpdaterJson: true
-          args: ${{ matrix.args }}
+          args: "--target aarch64-apple-darwin"
