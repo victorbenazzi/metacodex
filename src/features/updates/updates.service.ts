@@ -36,6 +36,44 @@ export async function checkSilent(): Promise<void> {
   }
 }
 
+export type ManualCheckResult =
+  | { kind: "available"; version: string }
+  | { kind: "up-to-date" }
+  | { kind: "dev" }
+  | { kind: "error"; message: string };
+
+/**
+ * Explicit check triggered from the About pane. Same wire path as
+ * `checkSilent`, but surfaces the outcome to the caller instead of swallowing
+ * it — the About pane uses the result to render an inline "you're on the
+ * latest" or "couldn't check" affordance next to the button. Errors are also
+ * pushed to the store so the topbar pill can react.
+ */
+export async function checkForUpdatesManual(): Promise<ManualCheckResult> {
+  if (import.meta.env.DEV) return { kind: "dev" };
+  const store = useUpdatesStore.getState();
+  store.setStatus({ kind: "checking" });
+  try {
+    const update = await check();
+    if (!update) {
+      store.setStatus({ kind: "idle" });
+      cachedUpdate = null;
+      return { kind: "up-to-date" };
+    }
+    cachedUpdate = update;
+    store.setStatus({
+      kind: "available",
+      version: update.version,
+      notes: update.body,
+    });
+    return { kind: "available", version: update.version };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    store.setStatus({ kind: "error", message });
+    return { kind: "error", message };
+  }
+}
+
 /**
  * User clicked the pill. Drives downloadAndInstall, streaming progress into
  * the store; on completion we relaunch the app so the new binary boots clean.

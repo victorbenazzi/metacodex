@@ -176,7 +176,12 @@
       "version": "versão",
       "platform": "plataforma",
       "stack": "stack",
-      "author": "feito por"
+      "author": "feito por",
+      "checkForUpdates": "Verificar atualizações",
+      "checking": "Verificando…",
+      "upToDate": "Você está na versão mais recente",
+      "devNoUpdates": "Atualizações desabilitadas em dev mode",
+      "checkFailed": "Não foi possível contatar o servidor de updates"
     }
   },
   "cli": {

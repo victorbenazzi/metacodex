@@ -18,11 +18,14 @@ import {
   Moon,
   Laptop,
   RotateCcw,
+  RefreshCw,
+  Download,
   CheckCircle2,
   CircleAlert,
   Loader2,
   type LucideIcon,
 } from "lucide-react";
+import { getVersion } from "@tauri-apps/api/app";
 
 import { Icon } from "@/components/ui/Icon";
 import { Kbd } from "@/components/ui/Kbd";
@@ -60,6 +63,11 @@ import {
   isModifierOnly,
 } from "@/features/keybindings/binding";
 import type { CommandDef, CommandId } from "@/features/keybindings/types";
+import { useUpdatesStore } from "@/features/updates/updates.store";
+import {
+  checkForUpdatesManual,
+  startInstall,
+} from "@/features/updates/updates.service";
 
 interface SettingsDialogProps {
   open: boolean;
@@ -903,11 +911,47 @@ function CliStatusBadge({ status }: { status: CliDetectionStatus }) {
 
 function AboutPane() {
   const { t } = useTranslation();
+  const [version, setVersion] = useState<string | null>(null);
+  const [lastResult, setLastResult] = useState<"up-to-date" | "dev" | null>(null);
+  const updateStatus = useUpdatesStore((s) => s.status);
+
+  useEffect(() => {
+    let cancelled = false;
+    getVersion()
+      .then((v) => {
+        if (!cancelled) setVersion(v);
+      })
+      .catch(() => {
+        if (!cancelled) setVersion(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const isChecking = updateStatus.kind === "checking";
+  const isAvailable = updateStatus.kind === "available";
+  const isBusy =
+    updateStatus.kind === "downloading" || updateStatus.kind === "installing";
+  const isError = updateStatus.kind === "error";
+
+  const handleCheck = async () => {
+    setLastResult(null);
+    const result = await checkForUpdatesManual();
+    if (result.kind === "up-to-date") setLastResult("up-to-date");
+    else if (result.kind === "dev") setLastResult("dev");
+  };
+
+  const handleInstall = () => {
+    void startInstall();
+  };
+
   const openAuthorSite = () => {
     invoke(CMD.openExternalUrl, {
       url: "https://www.victorbenazzi.com.br/?utm_source=metacodex&utm_medium=app&utm_campaign=about",
     }).catch((err) => console.warn("[open_external_url] failed", err));
   };
+
   return (
     <div>
       <PaneHeader title={t("settings.about.title")} />
@@ -922,7 +966,8 @@ function AboutPane() {
       </p>
       <ul className="mt-[20px] flex flex-col gap-[6px]">
         <li className="font-mono text-[11px] text-muted">
-          {t("settings.about.version")} <span className="text-ink">0.0.1</span>
+          {t("settings.about.version")}{" "}
+          <span className="text-ink">{version ?? "…"}</span>
         </li>
         <li className="font-mono text-[11px] text-muted">
           {t("settings.about.platform")} <span className="text-ink">macOS · Apple Silicon</span>
@@ -934,6 +979,61 @@ function AboutPane() {
           </span>
         </li>
       </ul>
+
+      <div className="mt-[18px] flex flex-wrap items-center gap-[10px]">
+        {isAvailable ? (
+          <button
+            type="button"
+            onClick={handleInstall}
+            className="inline-flex items-center gap-[6px] rounded-sm border border-[var(--update-blue)]/45 bg-[var(--update-blue)]/14 px-[10px] py-[5px] font-mono text-[11px] leading-none text-[var(--update-blue)] transition-colors duration-150 hover:bg-[var(--update-blue)]/20"
+            title={t("updates.pill.available", { version: updateStatus.version })}
+          >
+            <Icon icon={Download} size={10} strokeWidth={2} />
+            <span>{t("updates.pill.available", { version: updateStatus.version })}</span>
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={handleCheck}
+            disabled={isChecking || isBusy}
+            className="inline-flex items-center gap-[6px] rounded-sm border border-hairline-strong px-[10px] py-[5px] font-mono text-[11px] leading-none text-ink transition-colors duration-150 hover:bg-surface-strong/45 disabled:cursor-default disabled:opacity-50"
+          >
+            <Icon
+              icon={isChecking ? Loader2 : RefreshCw}
+              size={10}
+              strokeWidth={2}
+              className={isChecking ? "animate-spin" : undefined}
+            />
+            <span>
+              {isChecking
+                ? t("settings.about.checking")
+                : t("settings.about.checkForUpdates")}
+            </span>
+          </button>
+        )}
+
+        {!isChecking && !isAvailable && lastResult === "up-to-date" && (
+          <span className="inline-flex items-center gap-[4px] font-mono text-[11px] text-success">
+            <Icon icon={CheckCircle2} size={10} strokeWidth={2} />
+            {t("settings.about.upToDate")}
+          </span>
+        )}
+        {!isChecking && lastResult === "dev" && (
+          <span className="font-mono text-[11px] text-muted">
+            {t("settings.about.devNoUpdates")}
+          </span>
+        )}
+        {!isChecking && !isAvailable && isError && (
+          <span
+            className="inline-flex items-center gap-[4px] font-mono text-[11px] text-warn"
+            title={updateStatus.message}
+          >
+            <Icon icon={CircleAlert} size={10} strokeWidth={2} />
+            {t("settings.about.checkFailed")}
+          </span>
+        )}
+      </div>
+
       <p className="mt-[18px] font-mono text-[11px] text-muted">
         {t("settings.about.author")}{" "}
         <button
