@@ -1,11 +1,14 @@
+use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use serde::Serialize;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 
 use crate::error::{AppError, AppResult};
+use crate::events::{GitCloneProgressPayload, EV_GIT_CLONE_PROGRESS};
 use crate::git::{file_head_content, git_info, GitInfo};
 use crate::projects::ProjectsCache;
 use crate::util::paths;
@@ -267,6 +270,168 @@ pub async fn git_worktree_remove(
             )));
         }
         Ok(())
+    })
+    .await
+    .map_err(|e| AppError::Other(format!("join: {e}")))?
+}
+
+// -- Clone --------------------------------------------------------------------
+
+fn invalid_folder_name(name: &str) -> bool {
+    name.is_empty()
+        || name.contains('/')
+        || name.contains('\\')
+        || name == "."
+        || name == ".."
+        || name.contains('\0')
+}
+
+/// Parse a single stderr line from `git clone --progress`. Lines look like:
+///   "Receiving objects:  47% (470/1000), 1.2 MiB | 600 KiB/s"
+///   "Resolving deltas: 100% (300/300), done."
+/// We only care about the "<phase>: <percent>%" prefix.
+fn parse_clone_progress(line: &str) -> Option<(String, u32)> {
+    let colon = line.find(':')?;
+    let phase = line[..colon].trim().to_string();
+    if phase.is_empty() {
+        return None;
+    }
+    let rest = &line[colon + 1..];
+    let pct_end = rest.find('%')?;
+    let pct_str = rest[..pct_end].trim();
+    let pct: u32 = pct_str.parse().ok()?;
+    Some((phase, pct.min(100)))
+}
+
+#[tauri::command]
+pub async fn git_clone(
+    app: AppHandle,
+    op_id: String,
+    url: String,
+    parent_dir: String,
+    folder_name: String,
+) -> AppResult<String> {
+    // Validation — destination lives outside any registered root, so we can't
+    // use ensure_within_roots. Tight argument checks instead.
+    let url_trimmed = url.trim().to_string();
+    if url_trimmed.is_empty() || url_trimmed.len() > 2048 {
+        return Err(AppError::Other("invalid url".into()));
+    }
+    if invalid_folder_name(folder_name.trim()) {
+        return Err(AppError::Other("invalid folder name".into()));
+    }
+    let folder = folder_name.trim().to_string();
+    let parent = PathBuf::from(&parent_dir);
+    if !parent.is_absolute() {
+        return Err(AppError::Other("parent_dir must be absolute".into()));
+    }
+    if !parent.exists() || !parent.is_dir() {
+        return Err(AppError::Other("parent_dir does not exist".into()));
+    }
+    let dest = parent.join(&folder);
+    if dest.exists() {
+        return Err(AppError::Other(format!(
+            "destination already exists: {}",
+            dest.display()
+        )));
+    }
+
+    let dest_str = dest.to_string_lossy().into_owned();
+    let dest_for_thread = dest.clone();
+    let op_id_clone = op_id.clone();
+
+    tokio::task::spawn_blocking(move || -> AppResult<String> {
+        let mut child = Command::new("git")
+            .arg("clone")
+            .arg("--progress")
+            .arg(&url_trimmed)
+            .arg(dest_for_thread.as_os_str())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            // Disable interactive credential prompts — they'd hang our pipe forever.
+            // The user's credential helper / SSH agent still works; only the
+            // tty-prompt fallback is suppressed.
+            .env("GIT_TERMINAL_PROMPT", "0")
+            .spawn()
+            .map_err(|e| AppError::Other(format!("git clone spawn: {e}")))?;
+
+        // Read stderr line-by-line. `git clone --progress` separates progress
+        // updates with carriage returns, NOT newlines — BufRead::read_until('\r')
+        // gives us each progress tick. We aggregate the last raw line so we can
+        // surface it in the error message on failure.
+        let stderr = child
+            .stderr
+            .take()
+            .ok_or_else(|| AppError::Other("git clone: no stderr pipe".into()))?;
+        let mut reader = BufReader::new(stderr);
+
+        let mut last_emit = Instant::now() - Duration::from_secs(1);
+        let mut last_phase = String::new();
+        let mut last_percent: i32 = -1;
+        let mut full_stderr = String::new();
+        let mut chunk: Vec<u8> = Vec::with_capacity(256);
+
+        loop {
+            chunk.clear();
+            let n = match reader.read_until(b'\n', &mut chunk) {
+                Ok(0) => break,
+                Ok(n) => n,
+                Err(_) => break,
+            };
+            // Progress ticks arrive separated by \r; split on either.
+            let raw = String::from_utf8_lossy(&chunk[..n]);
+            for part in raw.split(['\r', '\n']) {
+                let line = part.trim();
+                if line.is_empty() {
+                    continue;
+                }
+                full_stderr.push_str(line);
+                full_stderr.push('\n');
+                if let Some((phase, percent)) = parse_clone_progress(line) {
+                    let same_phase = phase == last_phase;
+                    let same_pct = (percent as i32) == last_percent;
+                    let elapsed = last_emit.elapsed();
+                    // Always emit phase changes and 100%; otherwise throttle ~100ms.
+                    let should_emit = !same_phase
+                        || percent == 100
+                        || (!same_pct && elapsed >= Duration::from_millis(100));
+                    if should_emit {
+                        last_emit = Instant::now();
+                        last_phase = phase.clone();
+                        last_percent = percent as i32;
+                        let _ = app.emit(
+                            EV_GIT_CLONE_PROGRESS,
+                            GitCloneProgressPayload {
+                                op_id: op_id_clone.clone(),
+                                phase,
+                                percent,
+                            },
+                        );
+                    }
+                }
+            }
+        }
+
+        let status = child
+            .wait()
+            .map_err(|e| AppError::Other(format!("git clone wait: {e}")))?;
+        if !status.success() {
+            // Best-effort cleanup of a partially-created destination so the
+            // user can retry without hitting "destination already exists".
+            let _ = std::fs::remove_dir_all(&dest_for_thread);
+            let trimmed = full_stderr.trim();
+            // Truncate the message so a giant stderr doesn't blow up the toast.
+            // Keep the TAIL — that's where the actual fatal line lives.
+            let msg = if trimmed.chars().count() > 2000 {
+                let tail: String = trimmed.chars().rev().take(2000).collect();
+                tail.chars().rev().collect()
+            } else {
+                trimmed.to_string()
+            };
+            return Err(AppError::Other(msg));
+        }
+
+        Ok(dest_str)
     })
     .await
     .map_err(|e| AppError::Other(format!("join: {e}")))?

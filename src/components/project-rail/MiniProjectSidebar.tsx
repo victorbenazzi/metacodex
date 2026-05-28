@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type PointerEvent as RPointerEvent } from "react";
-import { FolderPlus, Settings, Trash2 } from "lucide-react";
+import { FolderOpen, FolderPlus, Github, Settings, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Icon } from "@/components/ui/Icon";
@@ -10,6 +10,12 @@ import {
   DialogContent,
   DialogRoot,
 } from "@/components/ui/Dialog";
+import {
+  DropdownContent,
+  DropdownItem,
+  DropdownRoot,
+  DropdownTrigger,
+} from "@/components/ui/DropdownMenu";
 import { ProjectTile } from "./ProjectTile";
 import { ProjectContextMenu } from "./ProjectContextMenu";
 import { RenameProjectDialog } from "./RenameProjectDialog";
@@ -21,6 +27,7 @@ import { cn } from "@/lib/cn";
 
 interface MiniProjectSidebarProps {
   onOpenFolder: () => void;
+  onCloneFromGithub: () => void;
 }
 
 // Minimum pointer travel before a press becomes a drag. Below this, the press
@@ -30,7 +37,7 @@ interface MiniProjectSidebarProps {
 // click, which is the "I can't switch projects" symptom on trackpad users.
 const DRAG_THRESHOLD_PX = 8;
 
-export function MiniProjectSidebar({ onOpenFolder }: MiniProjectSidebarProps) {
+export function MiniProjectSidebar({ onOpenFolder, onCloneFromGithub }: MiniProjectSidebarProps) {
   const { t } = useTranslation();
   const projects = useProjectsStore((s) => s.projects);
   const activeProjectId = useProjectsStore((s) => s.activeProjectId);
@@ -286,20 +293,40 @@ export function MiniProjectSidebar({ onOpenFolder }: MiniProjectSidebarProps) {
         </div>
 
         <div className="flex w-full shrink-0 flex-col items-center gap-[6px] border-t border-hairline-soft py-[10px]">
-          <Tooltip content={t("projectRail.openFolder")} shortcut={<Kbd keys={["Mod", "O"]} />} side="right">
-            <button
-              type="button"
-              onClick={onOpenFolder}
-              className={cn(
-                "inline-flex h-[32px] w-[32px] items-center justify-center rounded-sm",
-                "text-muted hover:bg-surface-strong/55 hover:text-ink transition-colors",
-                "focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[2px]",
-              )}
-              aria-label={t("projectRail.openFolder")}
-            >
-              <Icon icon={FolderPlus} size={15} />
-            </button>
-          </Tooltip>
+          <DropdownRoot>
+            <Tooltip content={t("projectRail.addProject")} side="right">
+              <DropdownTrigger asChild>
+                <button
+                  type="button"
+                  className={cn(
+                    "inline-flex h-[32px] w-[32px] items-center justify-center rounded-sm",
+                    "text-muted hover:bg-surface-strong/55 hover:text-ink transition-colors",
+                    "focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[2px]",
+                    "data-[state=open]:bg-surface-strong/55 data-[state=open]:text-ink",
+                  )}
+                  aria-label={t("projectRail.addProject")}
+                >
+                  <Icon icon={FolderPlus} size={15} />
+                </button>
+              </DropdownTrigger>
+            </Tooltip>
+            <DropdownContent align="start" sideOffset={8}>
+              <DropdownItem
+                onSelect={onOpenFolder}
+                trailing={<Kbd keys={["Mod", "O"]} />}
+              >
+                <Icon icon={FolderOpen} size={13} className="text-muted" />
+                {t("welcome.openProjectMenu.local")}
+              </DropdownItem>
+              <DropdownItem
+                onSelect={onCloneFromGithub}
+                trailing={<Kbd keys={["Mod", "Shift", "O"]} />}
+              >
+                <Icon icon={Github} size={13} className="text-muted" />
+                {t("welcome.openProjectMenu.github")}
+              </DropdownItem>
+            </DropdownContent>
+          </DropdownRoot>
 
           <Tooltip content={t("projectRail.settings")} shortcut={<Kbd keys={["Mod", ","]} />} side="right">
             <button

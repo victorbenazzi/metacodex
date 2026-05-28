@@ -2,6 +2,7 @@
 export type CommandId =
   | "terminal.new"
   | "folder.open"
+  | "folder.clone"
   | "tab.close"
   | "tab.rename"
   | "tab.moveLeft"

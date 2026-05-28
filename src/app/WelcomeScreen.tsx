@@ -1,14 +1,22 @@
-import { FolderOpen, TerminalSquare } from "lucide-react";
+import { forwardRef } from "react";
+import { ChevronDown, FolderOpen, Github, TerminalSquare } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Icon } from "@/components/ui/Icon";
 import { Kbd } from "@/components/ui/Kbd";
 import { BackgroundGrain } from "@/components/ui/BackgroundGrain";
+import {
+  DropdownContent,
+  DropdownItem,
+  DropdownRoot,
+  DropdownTrigger,
+} from "@/components/ui/DropdownMenu";
 import { cn } from "@/lib/cn";
 import { ResumeCards } from "@/components/resume/ResumeCards";
 
 interface WelcomeScreenProps {
   onOpenFolder: () => void;
+  onCloneFromGithub: () => void;
   onOpenTerminal: () => void;
 }
 
@@ -19,7 +27,11 @@ interface WelcomeScreenProps {
  *   - Mono for the metadata strip
  * Hairlines only, no shadows, lots of negative space.
  */
-export function WelcomeScreen({ onOpenFolder, onOpenTerminal }: WelcomeScreenProps) {
+export function WelcomeScreen({
+  onOpenFolder,
+  onCloneFromGithub,
+  onOpenTerminal,
+}: WelcomeScreenProps) {
   const { t } = useTranslation();
   return (
     <div className="relative flex h-full w-full overflow-hidden bg-canvas">
@@ -62,11 +74,31 @@ export function WelcomeScreen({ onOpenFolder, onOpenTerminal }: WelcomeScreenPro
         </p>
 
         <div className="mt-[36px] flex items-center gap-[10px]">
-          <PrimaryAction onClick={onOpenFolder}>
-            <Icon icon={FolderOpen} size={14} className="text-on-primary" />
-            <span>{t("welcome.openFolder")}</span>
-            <Kbd keys={["Mod", "O"]} className="ml-[6px] text-on-primary/70" />
-          </PrimaryAction>
+          <DropdownRoot>
+            <DropdownTrigger asChild>
+              <PrimaryAction>
+                <Icon icon={FolderOpen} size={14} className="text-on-primary" />
+                <span>{t("welcome.openProject")}</span>
+                <Icon icon={ChevronDown} size={12} className="ml-[2px] text-on-primary/80" />
+              </PrimaryAction>
+            </DropdownTrigger>
+            <DropdownContent align="start">
+              <DropdownItem
+                onSelect={onOpenFolder}
+                trailing={<Kbd keys={["Mod", "O"]} />}
+              >
+                <Icon icon={FolderOpen} size={13} className="text-muted" />
+                {t("welcome.openProjectMenu.local")}
+              </DropdownItem>
+              <DropdownItem
+                onSelect={onCloneFromGithub}
+                trailing={<Kbd keys={["Mod", "Shift", "O"]} />}
+              >
+                <Icon icon={Github} size={13} className="text-muted" />
+                {t("welcome.openProjectMenu.github")}
+              </DropdownItem>
+            </DropdownContent>
+          </DropdownRoot>
 
           <SecondaryAction onClick={onOpenTerminal}>
             <Icon icon={TerminalSquare} size={14} />
@@ -90,20 +122,24 @@ export function WelcomeScreen({ onOpenFolder, onOpenTerminal }: WelcomeScreenPro
   );
 }
 
-function PrimaryAction({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "press-feedback inline-flex h-[36px] items-center gap-[8px] rounded-sm bg-ink px-[16px] text-[13px] font-medium text-on-primary",
-        "transition-colors duration-150 hover:bg-primary-active focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[3px]",
-      )}
-    >
-      {children}
-    </button>
-  );
-}
+const PrimaryAction = forwardRef<HTMLButtonElement, React.ButtonHTMLAttributes<HTMLButtonElement>>(
+  function PrimaryAction({ children, className, type = "button", ...props }, ref) {
+    return (
+      <button
+        ref={ref}
+        type={type}
+        className={cn(
+          "press-feedback inline-flex h-[36px] items-center gap-[8px] rounded-sm bg-ink px-[16px] text-[13px] font-medium text-on-primary",
+          "transition-colors duration-150 hover:bg-primary-active focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[3px]",
+          className,
+        )}
+        {...props}
+      >
+        {children}
+      </button>
+    );
+  },
+);
 
 function SecondaryAction({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
   return (

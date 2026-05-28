@@ -72,7 +72,7 @@ export function DropdownItem({
         className,
       )}
     >
-      <span className="flex min-w-0 items-center gap-[10px] truncate">{children}</span>
+      <span className="flex items-center gap-[10px] whitespace-nowrap">{children}</span>
       {trailing ? <span className="shrink-0 text-muted">{trailing}</span> : null}
     </RDM.Item>
   );
@@ -84,6 +84,8 @@ export function DropdownSeparator() {
 
 export function DropdownLabel({ children }: { children: React.ReactNode }) {
   return (
-    <RDM.Label className="px-[10px] pb-[4px] pt-[6px] editorial-caps">{children}</RDM.Label>
+    <RDM.Label className="whitespace-nowrap px-[10px] pb-[4px] pt-[6px] editorial-caps">
+      {children}
+    </RDM.Label>
   );
 }

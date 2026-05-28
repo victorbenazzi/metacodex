@@ -9,6 +9,7 @@ export const EV = {
   fsChanged: "fs://changed",
   fsRenamed: "fs://renamed",
   beforeQuit: "app://before-quit",
+  gitCloneProgress: "git://clone-progress",
 } as const;
 
 export type EventName = (typeof EV)[keyof typeof EV];
@@ -41,6 +42,12 @@ export interface FsRenamedPayload {
   projectId: string;
   oldPath: string;
   newPath: string;
+}
+
+export interface GitCloneProgressPayload {
+  opId: string;
+  phase: string;
+  percent: number;
 }
 
 // Rust backpressure payload uses serde camelCase — matches the field names above

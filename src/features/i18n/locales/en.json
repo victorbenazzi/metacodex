@@ -21,6 +21,11 @@
     "eyebrow": "Welcome",
     "tagline": "A quiet, local-first workspace for code, with a real native terminal and your favourite AI coding CLIs one keystroke away.",
     "openFolder": "Open folder",
+    "openProject": "Open project",
+    "openProjectMenu": {
+      "local": "Open folder…",
+      "github": "Clone from GitHub…"
+    },
     "openTerminal": "Open terminal",
     "localFirstLabel": "Local first",
     "localFirstBody": "Projects stay on disk. metacodex only stores workspace metadata.",
@@ -148,7 +153,8 @@
         "projectSwitch": "Switch to project N",
         "fileSave": "Save active file",
         "tabJumpToNextAttention": "Jump to next agent waiting",
-        "diagnosticsToggle": "Show diagnostic log"
+        "diagnosticsToggle": "Show diagnostic log",
+        "folderClone": "Clone from GitHub"
       }
     },
     "advanced": {
@@ -249,6 +255,7 @@
   "projectRail": {
     "ariaLabel": "Project rail",
     "openFolder": "Open folder",
+    "addProject": "Add project",
     "settings": "Settings",
     "openSettings": "Open settings",
     "switchTo": "Switch to {{name}}",
@@ -480,6 +487,39 @@
     },
     "tab": {
       "branchPill": "worktree: {{branch}}"
+    }
+  },
+  "cloneFromGithub": {
+    "title": "Clone from GitHub",
+    "description": "Paste a repository URL. metacodex clones it locally and opens it as a project.",
+    "url": {
+      "label": "Repository URL",
+      "placeholder": "https://github.com/owner/repo"
+    },
+    "parent": {
+      "label": "Clone into",
+      "placeholder": "Choose a parent folder",
+      "choose": "Choose…",
+      "dialogTitle": "Choose parent folder"
+    },
+    "name": {
+      "label": "Folder name",
+      "placeholder": "repo"
+    },
+    "preview": "Will be created at:",
+    "submit": "Clone",
+    "submitting": "Cloning…",
+    "connecting": "Connecting to remote…",
+    "errors": {
+      "nameInvalid": "Folder name cannot contain slashes or special characters.",
+      "authFailed": "Private repository. Set up SSH or run `gh auth login` in a terminal, then try again.",
+      "notFound": "Repository not found. Check the URL.",
+      "destExists": "A folder named \"{{name}}\" already exists in {{parent}}.",
+      "network": "Could not reach the remote. Check your connection and try again."
+    },
+    "notify": {
+      "successTitle": "Project cloned",
+      "successBody": "{{name}} is ready."
     }
   },
   "diff": {

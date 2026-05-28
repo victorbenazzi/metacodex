@@ -37,6 +37,7 @@ interface WorkAreaProps {
   onLaunchCli: (cli: CliTool) => void;
   onNewWorktree?: () => void;
   onOpenFolder: () => void;
+  onCloneFromGithub: () => void;
   project: Project | null;
 }
 
@@ -58,6 +59,7 @@ export function WorkArea({
   onLaunchCli,
   onNewWorktree,
   onOpenFolder,
+  onCloneFromGithub,
   project,
 }: WorkAreaProps) {
   // TabContent always lives at the same JSX position regardless of whether the
@@ -120,7 +122,11 @@ export function WorkArea({
                 onLaunchCli={onLaunchCli}
               />
             ) : (
-              <WelcomeScreen onOpenFolder={onOpenFolder} onOpenTerminal={onNewTerminal} />
+              <WelcomeScreen
+                onOpenFolder={onOpenFolder}
+                onCloneFromGithub={onCloneFromGithub}
+                onOpenTerminal={onNewTerminal}
+              />
             )}
           </div>
         ) : null}

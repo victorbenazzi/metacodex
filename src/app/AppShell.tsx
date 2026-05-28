@@ -57,6 +57,7 @@ import { SourceControlPanel } from "@/components/source-control/SourceControlPan
 import { useWorktreesStore } from "@/features/git/worktrees.store";
 import { useWorktreeOccupancySync } from "@/features/git/useWorktreeOccupancySync";
 import { WorktreeCreateDialog } from "@/components/source-control/WorktreeCreateDialog";
+import { CloneFromGithubDialog } from "@/components/project-rail/CloneFromGithubDialog";
 import { useResumeStore } from "@/features/resume/resume.store";
 import { recordDiag, useDiagnosticsStore } from "@/features/diagnostics/diagnostics.store";
 import { useSaveStatusStore } from "@/features/workspace/saveStatus.store";
@@ -209,6 +210,7 @@ export function AppShell() {
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
   const [worktreeDialogOpen, setWorktreeDialogOpen] = useState(false);
+  const [cloneDialogOpen, setCloneDialogOpen] = useState(false);
   const [skipDeleteInSession, setSkipDeleteInSession] = useState(false);
   const [skipMoveInSession, setSkipMoveInSession] = useState(false);
   const skipMoveRef = useRef(false);
@@ -568,6 +570,10 @@ export function AppShell() {
       console.error("openDialog failed", err);
     }
   }, [addProject, t]);
+
+  const handleCloneFromGithub = useCallback(() => {
+    setCloneDialogOpen(true);
+  }, []);
 
   const handleNewTerminal = useCallback(() => {
     openTab(projectKey, {
@@ -956,6 +962,7 @@ export function AppShell() {
     (window as any).__metacodex = {
       newTerminal: handleNewTerminal,
       openFolder: handleOpenFolder,
+      cloneFromGithub: handleCloneFromGithub,
       closeActiveTab,
       switchProject,
       openFile: handleOpenFile,
@@ -970,6 +977,7 @@ export function AppShell() {
   }, [
     handleNewTerminal,
     handleOpenFolder,
+    handleCloneFromGithub,
     closeActiveTab,
     switchProject,
     handleOpenFile,
@@ -994,7 +1002,10 @@ export function AppShell() {
     >
       <TitleBar workspaceName={project?.name} className="col-span-full" />
 
-      <MiniProjectSidebar onOpenFolder={handleOpenFolder} />
+      <MiniProjectSidebar
+        onOpenFolder={handleOpenFolder}
+        onCloneFromGithub={handleCloneFromGithub}
+      />
 
       <div className="relative min-w-0">
         <ExplorerPanel
@@ -1041,6 +1052,7 @@ export function AppShell() {
         onLaunchCli={handleLaunchCli}
         onNewWorktree={project ? handleOpenWorktreeDialog : undefined}
         onOpenFolder={handleOpenFolder}
+        onCloneFromGithub={handleCloneFromGithub}
       />
 
       {panelOpen ? (
@@ -1121,6 +1133,11 @@ export function AppShell() {
           onAfterCreate={handleAfterWorktreeCreate}
         />
       ) : null}
+
+      <CloneFromGithubDialog
+        open={cloneDialogOpen}
+        onOpenChange={setCloneDialogOpen}
+      />
     </div>
   );
 }

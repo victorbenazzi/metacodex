@@ -113,6 +113,7 @@ pub fn run() {
             commands::git::git_worktree_add,
             commands::git::git_worktree_remove,
             commands::git::git_merge_into,
+            commands::git::git_clone,
             commands::notifications::notify_show,
             commands::resume::resume_list,
             commands::resume::resume_save,

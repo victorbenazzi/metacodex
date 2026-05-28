@@ -121,6 +121,13 @@ export default {
           "0%, 100%": { opacity: "0.35" },
           "50%": { opacity: "0.85" },
         },
+        // Indeterminate progress bar — a 33%-wide fill slides across the track.
+        // Used while we haven't received the first percent event yet (e.g. while
+        // git is negotiating with the remote before download starts).
+        "progress-indeterminate": {
+          "0%": { transform: "translateX(-100%)" },
+          "100%": { transform: "translateX(400%)" },
+        },
       },
       animation: {
         // Enter decelerates in (ease-out); exit accelerates out (ease-in) and
@@ -131,6 +138,7 @@ export default {
         "fade-out": "fade-out var(--dur-exit) var(--ease-in) forwards",
         "explorer-recent-tint": "explorer-recent-tint 15s linear forwards",
         "tab-status-pulse": "tab-status-pulse 1.6s ease-in-out infinite",
+        "progress-indeterminate": "progress-indeterminate 1.4s ease-in-out infinite",
       },
     },
   },

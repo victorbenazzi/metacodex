@@ -66,7 +66,7 @@ export function ContextMenuItem({
         className,
       )}
     >
-      <span className="flex min-w-0 items-center gap-[10px]">{children}</span>
+      <span className="flex items-center gap-[10px] whitespace-nowrap">{children}</span>
       {trailing ? <span className="shrink-0 text-muted">{trailing}</span> : null}
     </RCM.Item>
   );
@@ -78,7 +78,9 @@ export function ContextMenuSeparator() {
 
 export function ContextMenuLabel({ children }: { children: React.ReactNode }) {
   return (
-    <RCM.Label className="px-[10px] pb-[4px] pt-[6px] editorial-caps">{children}</RCM.Label>
+    <RCM.Label className="whitespace-nowrap px-[10px] pb-[4px] pt-[6px] editorial-caps">
+      {children}
+    </RCM.Label>
   );
 }
 
@@ -97,7 +99,7 @@ export function ContextMenuSub({
           "data-[highlighted]:bg-surface-strong/70 data-[state=open]:bg-surface-strong/70 data-[highlighted]:text-ink",
         )}
       >
-        <span className="flex min-w-0 items-center gap-[10px]">{trigger}</span>
+        <span className="flex items-center gap-[10px] whitespace-nowrap">{trigger}</span>
         <span className="text-muted">›</span>
       </RCM.SubTrigger>
       <RCM.Portal>

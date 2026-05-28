@@ -22,6 +22,12 @@ export const COMMANDS: CommandDef[] = [
     category: "general",
   },
   {
+    id: "folder.clone",
+    defaultBinding: ["mod+shift+o"],
+    descriptionKey: "settings.shortcuts.cmd.folderClone",
+    category: "general",
+  },
+  {
     id: "settings.open",
     defaultBinding: ["mod+,"],
     descriptionKey: "settings.shortcuts.cmd.settingsOpen",

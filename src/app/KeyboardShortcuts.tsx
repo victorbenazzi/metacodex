@@ -10,6 +10,7 @@ import { useDiagnosticsStore } from "@/features/diagnostics/diagnostics.store";
 interface MetacodexApi {
   newTerminal?: () => void;
   openFolder?: () => void;
+  cloneFromGithub?: () => void;
   closeActiveTab?: () => void;
   switchProject?: (n: number) => void;
   jumpToNextAttention?: () => void;
@@ -30,6 +31,9 @@ function dispatchCommand(cmd: ResolvedCommand) {
       break;
     case "folder.open":
       api?.openFolder?.();
+      break;
+    case "folder.clone":
+      api?.cloneFromGithub?.();
       break;
     case "tab.close":
       api?.closeActiveTab?.();

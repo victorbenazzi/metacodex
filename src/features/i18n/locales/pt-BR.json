@@ -21,6 +21,11 @@
     "eyebrow": "Bem-vindo",
     "tagline": "Um espaço de trabalho silencioso e local-first para código, com um terminal nativo de verdade e suas CLIs de IA favoritas a um atalho de distância.",
     "openFolder": "Abrir pasta",
+    "openProject": "Abrir projeto",
+    "openProjectMenu": {
+      "local": "Abrir pasta…",
+      "github": "Clonar do GitHub…"
+    },
     "openTerminal": "Abrir terminal",
     "localFirstLabel": "Local first",
     "localFirstBody": "Os projetos ficam no disco. O metacodex só guarda metadados do workspace.",
@@ -148,7 +153,8 @@
         "projectSwitch": "Trocar para o projeto N",
         "fileSave": "Salvar arquivo ativo",
         "tabJumpToNextAttention": "Pular para o próximo agente aguardando",
-        "diagnosticsToggle": "Abrir log de diagnóstico"
+        "diagnosticsToggle": "Abrir log de diagnóstico",
+        "folderClone": "Clonar do GitHub"
       }
     },
     "advanced": {
@@ -249,6 +255,7 @@
   "projectRail": {
     "ariaLabel": "Trilha de projetos",
     "openFolder": "Abrir pasta",
+    "addProject": "Adicionar projeto",
     "settings": "Configurações",
     "openSettings": "Abrir configurações",
     "switchTo": "Mudar para {{name}}",
@@ -480,6 +487,39 @@
     },
     "tab": {
       "branchPill": "worktree: {{branch}}"
+    }
+  },
+  "cloneFromGithub": {
+    "title": "Clonar do GitHub",
+    "description": "Cole a URL do repositório. O metacodex clona localmente e abre como projeto.",
+    "url": {
+      "label": "URL do repositório",
+      "placeholder": "https://github.com/owner/repo"
+    },
+    "parent": {
+      "label": "Clonar para",
+      "placeholder": "Escolha uma pasta de destino",
+      "choose": "Escolher…",
+      "dialogTitle": "Escolha a pasta de destino"
+    },
+    "name": {
+      "label": "Nome da pasta",
+      "placeholder": "repo"
+    },
+    "preview": "Será criado em:",
+    "submit": "Clonar",
+    "submitting": "Clonando…",
+    "connecting": "Conectando ao remoto…",
+    "errors": {
+      "nameInvalid": "O nome da pasta não pode conter barras ou caracteres especiais.",
+      "authFailed": "Repositório privado. Configure SSH ou rode `gh auth login` no terminal e tente de novo.",
+      "notFound": "Repositório não encontrado. Confira a URL.",
+      "destExists": "Já existe uma pasta chamada \"{{name}}\" em {{parent}}.",
+      "network": "Não foi possível alcançar o remoto. Verifique sua conexão e tente de novo."
+    },
+    "notify": {
+      "successTitle": "Projeto clonado",
+      "successBody": "{{name}} está pronto."
     }
   },
   "diff": {
