@@ -59,8 +59,10 @@
   /* Update pill (top bar) — a quiet blue that reads as "informational action"
      without competing with --success (git clean) or --warn (saving). Light
      theme stays muted; the dark variant lifts saturation to survive the dim
-     canvas. */
+     canvas. `-strong` is the solid-bg variant tuned to pair with white text
+     at AA contrast in both themes (~5:1 light, ~4.7:1 dark). */
   --update-blue: #3b6fb8;
+  --update-blue-strong: #3162c9;
 
   /* Diff / git change gutter */
   --diff-add: #3a9b76;
@@ -250,6 +252,7 @@
   --danger: #ff5a7d;
   --warn: #e3a35a;
   --update-blue: #6aa3e8;
+  --update-blue-strong: #3b6fb8;
 
   /* Diff / git change gutter */
   --diff-add: #4ec99a;

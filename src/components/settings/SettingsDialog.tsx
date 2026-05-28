@@ -985,7 +985,7 @@ function AboutPane() {
           <button
             type="button"
             onClick={handleInstall}
-            className="inline-flex items-center gap-[6px] rounded-sm border border-[var(--update-blue)]/45 bg-[var(--update-blue)]/14 px-[10px] py-[5px] font-mono text-[11px] leading-none text-[var(--update-blue)] transition-colors duration-150 hover:bg-[var(--update-blue)]/20"
+            className="inline-flex items-center gap-[6px] rounded-sm border border-[var(--update-blue-strong)] bg-[var(--update-blue-strong)] px-[10px] py-[5px] font-mono text-[11px] leading-none text-white transition duration-150 hover:brightness-110"
             title={t("updates.pill.available", { version: updateStatus.version })}
           >
             <Icon icon={Download} size={10} strokeWidth={2} />

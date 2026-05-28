@@ -27,7 +27,7 @@ export function UpdatePill() {
 
   const colorClass = isError
     ? "border-[var(--warn)]/45 bg-[var(--warn)]/12 text-[var(--warn)] hover:bg-[var(--warn)]/18"
-    : "border-[var(--update-blue)]/50 bg-[var(--update-blue)]/14 text-[var(--update-blue)] hover:bg-[var(--update-blue)]/20";
+    : "border-[var(--update-blue-strong)] bg-[var(--update-blue-strong)] text-white hover:brightness-110";
 
   let label: string;
   let LeftIcon = Download;
