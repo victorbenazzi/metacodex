@@ -272,17 +272,30 @@ export function AppShell() {
       const off = await listenTo<FsChangedPayload>(EV.fsChanged, async (e) => {
         const { projectId, paths } = e.payload;
         const explorer = useExplorerStore.getState();
-        // Invalidate cached children for any directory that contains an event path.
-        const dirs = new Set<string>();
-        for (const p of paths) {
-          dirs.add(dirname(p));
-        }
+        // Invalidate cached children for every cached directory affected by an
+        // event path. A plain `dirname(p)` is NOT enough: on macOS the notify
+        // FSEvents backend coalesces bursts (e.g. an agent creating many files
+        // at once via the terminal) into a single *directory-level* event whose
+        // path is the directory itself — sometimes an ancestor — carrying a
+        // "rescan subtree" hint, NOT the individual file paths. So for each
+        // event path we refresh: its parent dir (normal file-level event), the
+        // path itself when it's a cached dir (coalesced dir-level event), and
+        // any cached directory nested under it (subtree rescan). Without the
+        // latter two, a file created inside an expanded subfolder during a burst
+        // never appears until a manual collapse/re-expand.
         const bucket = explorer.byProject[projectId];
         if (bucket) {
-          for (const d of dirs) {
-            if (bucket.children[d]) {
-              void explorer.refresh(projectId, d);
+          const cachedDirs = Object.keys(bucket.children);
+          const toRefresh = new Set<string>();
+          for (const p of paths) {
+            toRefresh.add(dirname(p));
+            toRefresh.add(p);
+            for (const d of cachedDirs) {
+              if (d.startsWith(p + "/")) toRefresh.add(d);
             }
+          }
+          for (const d of toRefresh) {
+            if (bucket.children[d]) void explorer.refresh(projectId, d);
           }
         }
         // Refresh git status — file changes typically alter git state.
