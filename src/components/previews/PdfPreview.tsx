@@ -6,6 +6,7 @@ import { fsApi } from "@/features/filesystem/filesystem.service";
 import { base64ToUint8Array } from "@/lib/base64";
 import { Icon } from "@/components/ui/Icon";
 import { Button } from "@/components/ui/Button";
+import { SendToProjectButton } from "@/components/previews/PreviewToolbar";
 import { basename } from "@/lib/path";
 
 // pdfjs worker config. We use the unpkg-hosted worker for dev; a bundled worker
@@ -21,9 +22,10 @@ async function loadPdfjs() {
 
 interface PdfPreviewProps {
   path: string;
+  preview?: boolean;
 }
 
-export function PdfPreview({ path }: PdfPreviewProps) {
+export function PdfPreview({ path, preview = false }: PdfPreviewProps) {
   const { t } = useTranslation();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [page, setPage] = useState(1);
@@ -39,7 +41,9 @@ export function PdfPreview({ path }: PdfPreviewProps) {
 
     (async () => {
       try {
-        const file = await fsApi.readFileBytes(path);
+        const file = preview
+          ? await fsApi.readPreviewBytes(path)
+          : await fsApi.readFileBytes(path);
         if (cancelled) return;
         const data = base64ToUint8Array(file.b64);
         const pdfjs = await loadPdfjs();
@@ -65,7 +69,7 @@ export function PdfPreview({ path }: PdfPreviewProps) {
         d.destroy?.();
       }
     };
-  }, [path]);
+  }, [path, preview]);
 
   const renderPage = async (n: number) => {
     const doc = docRef.current;
@@ -93,6 +97,7 @@ export function PdfPreview({ path }: PdfPreviewProps) {
       >
         <span className="editorial-caps truncate">{t("editor.pdfLabel", { name: basename(path) })}</span>
         <div className="flex items-center gap-[6px]">
+          {preview ? <SendToProjectButton path={path} /> : null}
           <Button
             variant="ghost"
             size="icon"

@@ -1,4 +1,9 @@
+use std::sync::Arc;
+
+use tauri::{AppHandle, Manager};
+
 use crate::error::{AppError, AppResult};
+use crate::open_files::PendingOpenFiles;
 
 /// Open an http(s) URL in the user's default browser.
 ///
@@ -47,4 +52,12 @@ pub async fn open_external_url(url: String) -> AppResult<()> {
             .map_err(|e| AppError::Other(format!("xdg-open failed: {e}")))?;
         Ok(())
     }
+}
+
+/// Drain any files the OS queued for opening before the webview was ready (cold
+/// start via Finder "Open With" / double-click). The frontend calls this once on
+/// mount and opens each path in preview mode.
+#[tauri::command]
+pub async fn take_pending_open_files(app: AppHandle) -> Vec<String> {
+    app.state::<Arc<PendingOpenFiles>>().drain()
 }

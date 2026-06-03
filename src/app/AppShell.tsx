@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { homeDir } from "@tauri-apps/api/path";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 
 import { MiniProjectSidebar } from "@/components/project-rail/MiniProjectSidebar";
 import { ExplorerPanel } from "@/components/file-explorer/ExplorerPanel";
@@ -11,8 +12,11 @@ import {
   WORKSPACE_NULL,
 } from "@/components/tabs/tabsStore";
 import type { Tab } from "@/components/tabs/types";
+import { fileKindFor } from "@/components/tabs/fileKind";
+import { SendToProjectDialog, type SentToProject } from "@/components/previews/SendToProjectDialog";
+import { DropOverlay } from "@/components/previews/DropOverlay";
+import { flushEditor } from "@/features/editor/editorSavers";
 import { newId } from "@/lib/idGen";
-import { ext } from "@/lib/path";
 import { cliLaunchString, type CliTool } from "@/features/terminal/cli-registry";
 import { preloadCliDetections } from "@/features/terminal/cli-detection";
 import { basename } from "@/lib/path";
@@ -37,6 +41,7 @@ import {
   listenTo,
   type FsChangedPayload,
   type FsRenamedPayload,
+  type OpenFilePayload,
   type PtyBackpressurePayload,
   type PtyExitPayload,
 } from "@/lib/events";
@@ -82,6 +87,15 @@ interface PendingMove {
   from: string;
   toDir: string;
   name: string;
+}
+
+/** Heuristic: dropped paths with a file extension are previewed; extensionless
+ *  paths (folders, `Makefile`, …) route to "add project". Stat can't help here —
+ *  a dropped path lives outside any root, so the roots-checked stat would reject
+ *  it. The extension test is good enough; an add-project on a non-folder just
+ *  errors and is swallowed. */
+function looksLikeFile(path: string): boolean {
+  return /\.[^./\\]{1,16}$/.test(basename(path));
 }
 
 function processSummary(tabs: Tab[]): { terminals: number; agents: number } {
@@ -211,6 +225,10 @@ export function AppShell() {
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
   const [worktreeDialogOpen, setWorktreeDialogOpen] = useState(false);
   const [cloneDialogOpen, setCloneDialogOpen] = useState(false);
+  // Preview mode: file being sent to a project (null = dialog closed) + the
+  // drag-over feedback flag for the global file-drop target.
+  const [sendToProjectPath, setSendToProjectPath] = useState<string | null>(null);
+  const [dropActive, setDropActive] = useState(false);
   const [skipDeleteInSession, setSkipDeleteInSession] = useState(false);
   const [skipMoveInSession, setSkipMoveInSession] = useState(false);
   const skipMoveRef = useRef(false);
@@ -441,6 +459,10 @@ export function AppShell() {
     const expandedPaths = explorerBucket ? Array.from(explorerBucket.expanded) : [];
     const persistTabs: SerializedTab[] = (cur?.tabs ?? [])
       .map((t): SerializedTab | null => {
+        // Preview tabs (projectId null) are ephemeral — never persisted, like
+        // terminals. They'd otherwise rehydrate as project tabs pointing outside
+        // the project root.
+        if (t.projectId == null) return null;
         if (t.kind === "markdown") {
           return { id: t.id, kind: "markdown", title: t.title, path: t.path, mode: t.mode };
         }
@@ -903,10 +925,10 @@ export function AppShell() {
   const handleOpenFile = useCallback(
     (path: string, name: string, openInEditMode?: boolean) => {
       if (!project) return;
-      const e = ext(name);
       const id = `f-${path}`;
+      const kind = fileKindFor(name);
       let tab: Tab;
-      if (["md", "mdx", "markdown"].includes(e)) {
+      if (kind === "markdown") {
         tab = {
           id,
           kind: "markdown",
@@ -915,9 +937,9 @@ export function AppShell() {
           path,
           mode: openInEditMode ? "source" : "preview",
         };
-      } else if (["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(e)) {
+      } else if (kind === "image") {
         tab = { id, kind: "image", title: name, projectId: project.id, path };
-      } else if (e === "pdf") {
+      } else if (kind === "pdf") {
         tab = { id, kind: "pdf", title: name, projectId: project.id, path };
       } else {
         tab = { id, kind: "editor", title: name, projectId: project.id, path };
@@ -926,6 +948,146 @@ export function AppShell() {
     },
     [openTab, projectKey, project],
   );
+
+  // Open a file for preview, with NO project required. The tab carries
+  // `projectId: null` (the preview invariant) and lands in whatever bucket is
+  // currently visible so it shows in context. Ephemeral — never persisted.
+  const handleOpenPreviewFile = useCallback(
+    (path: string) => {
+      const name = basename(path);
+      const id = `pf-${path}`;
+      const kind = fileKindFor(name);
+      const base = { id, title: name, projectId: null, path } as const;
+      let tab: Tab;
+      if (kind === "markdown") {
+        tab = { ...base, kind: "markdown", mode: "preview" };
+      } else if (kind === "image") {
+        tab = { ...base, kind: "image" };
+      } else if (kind === "pdf") {
+        tab = { ...base, kind: "pdf" };
+      } else {
+        tab = { ...base, kind: "editor" };
+      }
+      openTab(projectKey, tab);
+    },
+    [openTab, projectKey],
+  );
+
+  // Native file picker → preview. The OS dialog is the consent boundary that
+  // lets the preview commands read a file outside any project root.
+  const handlePickPreviewFile = useCallback(async () => {
+    try {
+      const selected = await openDialog({
+        directory: false,
+        multiple: false,
+        title: t("preview.openTitle"),
+      });
+      if (typeof selected === "string" && selected.length > 0) {
+        handleOpenPreviewFile(selected);
+      }
+    } catch (err) {
+      console.error("preview openDialog failed", err);
+    }
+  }, [handleOpenPreviewFile, t]);
+
+  // Send-to-project: flush any unsaved edits to disk first (so the move carries
+  // them), then open the picker dialog.
+  const handleSendToProject = useCallback(async (path: string) => {
+    await flushEditor(`pf-${path}`).catch(() => undefined);
+    setSendToProjectPath(path);
+  }, []);
+
+  // After the move succeeds: close the (ephemeral) preview tab, switch to the
+  // destination project, open the moved file as a real project tab, and refresh
+  // the destination folder in the explorer so it surfaces.
+  const handleSentToProject = useCallback(
+    ({ project: dest, oldPath, newPath, toDir }: SentToProject) => {
+      const previewId = `pf-${oldPath}`;
+      const buckets = useTabsStore.getState().byProject;
+      for (const [key, b] of Object.entries(buckets)) {
+        if (b.tabs.some((tb) => tb.id === previewId)) {
+          closeTab(key, previewId);
+        }
+      }
+      const name = basename(newPath);
+      const fid = `f-${newPath}`;
+      const kind = fileKindFor(name);
+      let tab: Tab;
+      if (kind === "markdown") {
+        tab = { id: fid, kind: "markdown", title: name, projectId: dest.id, path: newPath, mode: "preview" };
+      } else if (kind === "image") {
+        tab = { id: fid, kind: "image", title: name, projectId: dest.id, path: newPath };
+      } else if (kind === "pdf") {
+        tab = { id: fid, kind: "pdf", title: name, projectId: dest.id, path: newPath };
+      } else {
+        tab = { id: fid, kind: "editor", title: name, projectId: dest.id, path: newPath };
+      }
+      openTab(dest.id, tab);
+      void setActive(dest.id);
+      void useExplorerStore.getState().refresh(dest.id, toDir);
+    },
+    [closeTab, openTab, setActive],
+  );
+
+  // Files opened from the OS (Finder "Open With" / double-click) arrive as
+  // `app://open-file`. On mount also drain anything queued before the webview
+  // was listening (cold start). `openTab` dedups by path, so a path delivered
+  // through both channels opens a single tab.
+  useEffect(() => {
+    let off: (() => void) | undefined;
+    let cancelled = false;
+    (async () => {
+      off = await listenTo<OpenFilePayload>(EV.openFile, (e) => {
+        for (const p of e.payload.paths) handleOpenPreviewFile(p);
+      });
+      if (cancelled) {
+        off?.();
+        return;
+      }
+      try {
+        const pending = await invoke<string[]>(CMD.takePendingOpenFiles);
+        for (const p of pending) handleOpenPreviewFile(p);
+      } catch {
+        // nothing queued
+      }
+    })();
+    return () => {
+      cancelled = true;
+      off?.();
+    };
+  }, [handleOpenPreviewFile]);
+
+  // Global file drag-drop onto the window: files → preview, folders → add as a
+  // project. The drop target is webview-wide; the DropOverlay is purely visual.
+  useEffect(() => {
+    let un: (() => void) | undefined;
+    let cancelled = false;
+    (async () => {
+      const unlisten = await getCurrentWebview().onDragDropEvent((event) => {
+        const payload = event.payload;
+        if (payload.type === "enter" || payload.type === "over") {
+          setDropActive(true);
+        } else if (payload.type === "drop") {
+          setDropActive(false);
+          for (const path of payload.paths) {
+            if (looksLikeFile(path)) handleOpenPreviewFile(path);
+            else void addProject(path).catch(() => undefined);
+          }
+        } else {
+          setDropActive(false);
+        }
+      });
+      if (cancelled) {
+        unlisten();
+        return;
+      }
+      un = unlisten;
+    })();
+    return () => {
+      cancelled = true;
+      un?.();
+    };
+  }, [handleOpenPreviewFile, addProject]);
 
   const handleOpenDiff = useCallback(
     (path: string, status: string) => {
@@ -979,6 +1141,9 @@ export function AppShell() {
       closeActiveTab,
       switchProject,
       openFile: handleOpenFile,
+      openPreviewFile: handleOpenPreviewFile,
+      pickPreviewFile: handlePickPreviewFile,
+      sendToProject: handleSendToProject,
       sendToTerminal,
       jumpToNextAttention,
       renameActiveTab,
@@ -994,6 +1159,9 @@ export function AppShell() {
     closeActiveTab,
     switchProject,
     handleOpenFile,
+    handleOpenPreviewFile,
+    handlePickPreviewFile,
+    handleSendToProject,
     sendToTerminal,
     jumpToNextAttention,
     renameActiveTab,
@@ -1010,9 +1178,10 @@ export function AppShell() {
 
   return (
     <div
-      className="grid h-screen w-screen grid-rows-[36px_minmax(0,1fr)] bg-canvas text-ink"
+      className="relative grid h-screen w-screen grid-rows-[36px_minmax(0,1fr)] bg-canvas text-ink"
       style={{ gridTemplateColumns }}
     >
+      <DropOverlay active={dropActive} />
       <TitleBar workspaceName={project?.name} className="col-span-full" />
 
       <MiniProjectSidebar
@@ -1066,6 +1235,7 @@ export function AppShell() {
         onNewWorktree={project ? handleOpenWorktreeDialog : undefined}
         onOpenFolder={handleOpenFolder}
         onCloneFromGithub={handleCloneFromGithub}
+        onOpenPreviewFile={handlePickPreviewFile}
       />
 
       {panelOpen ? (
@@ -1150,6 +1320,14 @@ export function AppShell() {
       <CloneFromGithubDialog
         open={cloneDialogOpen}
         onOpenChange={setCloneDialogOpen}
+      />
+
+      <SendToProjectDialog
+        path={sendToProjectPath}
+        onOpenChange={(o) => {
+          if (!o) setSendToProjectPath(null);
+        }}
+        onSent={handleSentToProject}
       />
     </div>
   );

@@ -1,5 +1,5 @@
 import { forwardRef } from "react";
-import { ChevronDown, FolderOpen, Github, TerminalSquare } from "lucide-react";
+import { ChevronDown, FileText, FolderOpen, Github, TerminalSquare } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Icon } from "@/components/ui/Icon";
@@ -18,6 +18,7 @@ interface WelcomeScreenProps {
   onOpenFolder: () => void;
   onCloneFromGithub: () => void;
   onOpenTerminal: () => void;
+  onOpenPreviewFile: () => void;
 }
 
 /**
@@ -31,6 +32,7 @@ export function WelcomeScreen({
   onOpenFolder,
   onCloneFromGithub,
   onOpenTerminal,
+  onOpenPreviewFile,
 }: WelcomeScreenProps) {
   const { t } = useTranslation();
   return (
@@ -104,6 +106,11 @@ export function WelcomeScreen({
             <Icon icon={TerminalSquare} size={14} />
             <span>{t("welcome.openTerminal")}</span>
             <Kbd keys={["Mod", "T"]} className="ml-[6px]" />
+          </SecondaryAction>
+
+          <SecondaryAction onClick={onOpenPreviewFile}>
+            <Icon icon={FileText} size={14} />
+            <span>{t("welcome.openFile")}</span>
           </SecondaryAction>
         </div>
 

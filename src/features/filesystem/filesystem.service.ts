@@ -42,4 +42,28 @@ export const fsApi = {
   movePath(from: string, toDir: string): Promise<string> {
     return invoke<string>(CMD.movePath, { from, toDir });
   },
+
+  // --- Preview mode: files outside any registered project root. These bypass the
+  // roots check on the Rust side (extension allowlist + size cap), so they're only
+  // used for tabs whose projectId is null. ---
+
+  readPreviewText(path: string, maxBytes?: number): Promise<TextFile> {
+    return invoke<TextFile>(CMD.readPreviewText, {
+      path,
+      maxBytes: maxBytes ?? null,
+    });
+  },
+  readPreviewBytes(path: string, maxBytes?: number): Promise<BytesFile> {
+    return invoke<BytesFile>(CMD.readPreviewBytes, {
+      path,
+      maxBytes: maxBytes ?? null,
+    });
+  },
+  writePreviewText(path: string, content: string): Promise<void> {
+    return invoke<void>(CMD.writePreviewText, { path, content });
+  },
+  /** Move a previewed file into a project folder ("send to project"). Returns the new absolute path. */
+  moveIntoProject(from: string, toDir: string): Promise<string> {
+    return invoke<string>(CMD.moveIntoProject, { from, toDir });
+  },
 };

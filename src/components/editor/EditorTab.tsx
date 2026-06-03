@@ -21,7 +21,9 @@ import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 
 import { fsApi } from "@/features/filesystem/filesystem.service";
 import { useEditorStore } from "@/features/editor/editor.store";
-import { useTabsStore, WORKSPACE_NULL } from "@/components/tabs/tabsStore";
+import { registerEditorSaver } from "@/features/editor/editorSavers";
+import { useTabsStore } from "@/components/tabs/tabsStore";
+import { PreviewToolbar } from "@/components/previews/PreviewToolbar";
 import { useThemeStore } from "@/features/theme/theme.store";
 import { useSettingsDataStore } from "@/features/settings/settings.data.store";
 import { usePendingGotoStore } from "@/features/search/search.store";
@@ -42,6 +44,15 @@ interface EditorTabProps {
   tabId: string;
   path: string;
   projectId: string;
+  /** Tab bucket key (`project.id` or WORKSPACE_NULL/preview). Used for store
+   *  mutations; NOT the same as projectId, which is "" for preview tabs. */
+  projectKey: string;
+  /** Preview tab (file outside any project): read/write via the roots-bypassing
+   *  preview commands and skip project-only features (git gutter, HEAD diff). */
+  preview?: boolean;
+  /** Rendered inside MarkdownPreview's source view, which owns its own header —
+   *  suppress the standalone preview toolbar to avoid doubling it up. */
+  embedded?: boolean;
 }
 
 /**
@@ -51,7 +62,14 @@ interface EditorTabProps {
  */
 const ExternalReload = Annotation.define<true>();
 
-export function EditorTab({ tabId, path, projectId }: EditorTabProps) {
+export function EditorTab({
+  tabId,
+  path,
+  projectId,
+  projectKey,
+  preview = false,
+  embedded = false,
+}: EditorTabProps) {
   const { t } = useTranslation();
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -76,7 +94,10 @@ export function EditorTab({ tabId, path, projectId }: EditorTabProps) {
   const clearStatus = useEditorStatusStore((s) => s.clear);
   // Re-fetch HEAD for the change gutter whenever this project's git state moves
   // (commit, checkout, stage). The object identity changes on every refresh.
-  const gitInfo = useGitStore((s) => (projectId ? s.byProject[projectId] : undefined));
+  // Preview files live outside any repo — skip git entirely.
+  const gitInfo = useGitStore((s) =>
+    !preview && projectId ? s.byProject[projectId] : undefined,
+  );
 
   const [loadError, setLoadError] = useState<string | null>(null);
   const [binary, setBinary] = useState<boolean>(false);
@@ -94,7 +115,9 @@ export function EditorTab({ tabId, path, projectId }: EditorTabProps) {
 
     (async () => {
       try {
-        const text = await fsApi.readFileText(path, 25 * 1024 * 1024);
+        const text = preview
+          ? await fsApi.readPreviewText(path, 25 * 1024 * 1024)
+          : await fsApi.readFileText(path, 25 * 1024 * 1024);
         if (cancelled) return;
         // Heuristic binary detection on the first 8 KiB
         const sample = text.content.slice(0, 8192);
@@ -195,7 +218,7 @@ export function EditorTab({ tabId, path, projectId }: EditorTabProps) {
               );
               if (!isExternal) {
                 setDirty(tabId, true);
-                updateTab(projectId ?? WORKSPACE_NULL, tabId, { dirty: true });
+                updateTab(projectKey, tabId, { dirty: true });
               }
             }
             if (u.docChanged || u.selectionSet) {
@@ -219,13 +242,16 @@ export function EditorTab({ tabId, path, projectId }: EditorTabProps) {
         });
         publishStatus(view.state);
 
-        // Seed the change gutter with the file's committed (HEAD) text.
-        void gitApi
-          .fileHeadContent(path)
-          .then((head) => {
-            if (!cancelled) view.dispatch({ effects: setHeadContent.of(head) });
-          })
-          .catch(() => undefined);
+        // Seed the change gutter with the file's committed (HEAD) text. Preview
+        // files aren't in a repo — skip the HEAD lookup entirely.
+        if (!preview) {
+          void gitApi
+            .fileHeadContent(path)
+            .then((head) => {
+              if (!cancelled) view.dispatch({ effects: setHeadContent.of(head) });
+            })
+            .catch(() => undefined);
+        }
 
         // If a search-result click scheduled a goto-line for this tab, honour it now.
         const pendingLine = usePendingGotoStore.getState().consume(tabId);
@@ -273,6 +299,7 @@ export function EditorTab({ tabId, path, projectId }: EditorTabProps) {
   // Refresh the change gutter when this project's git state moves (commit,
   // checkout, …). The initial fetch is handled by the build effect above.
   useEffect(() => {
+    if (preview) return;
     const view = viewRef.current;
     if (!view) return;
     void gitApi
@@ -306,7 +333,7 @@ export function EditorTab({ tabId, path, projectId }: EditorTabProps) {
     setLoaded(tabId, next); // resets baseline + clears the external flag
     // The buffer now matches disk again — make sure the tab dot is cleared,
     // even if the user had pending edits before clicking "Reload".
-    updateTab(projectId ?? WORKSPACE_NULL, tabId, { dirty: false });
+    updateTab(projectKey, tabId, { dirty: false });
     setSavingNotice(t("editor.reloaded"));
     setTimeout(() => setSavingNotice(null), 1400);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -315,9 +342,13 @@ export function EditorTab({ tabId, path, projectId }: EditorTabProps) {
   const saveBuffer = async (content: string) => {
     setSaving(tabId, true);
     try {
-      await fsApi.writeFileText(path, content);
+      if (preview) {
+        await fsApi.writePreviewText(path, content);
+      } else {
+        await fsApi.writeFileText(path, content);
+      }
       setLoaded(tabId, content); // buffer now matches disk — update the baseline
-      updateTab(projectId ?? WORKSPACE_NULL, tabId, { dirty: false });
+      updateTab(projectKey, tabId, { dirty: false });
       setSavingNotice(t("editor.saved"));
       setTimeout(() => setSavingNotice(null), 1400);
     } catch (err: any) {
@@ -327,6 +358,18 @@ export function EditorTab({ tabId, path, projectId }: EditorTabProps) {
       setSaving(tabId, false);
     }
   };
+
+  // Expose an imperative flush so "send to project" can persist unsaved edits
+  // before the file is moved. No-ops when the buffer is clean.
+  const saveBufferRef = useRef(saveBuffer);
+  saveBufferRef.current = saveBuffer;
+  useEffect(() => {
+    return registerEditorSaver(tabId, async () => {
+      const view = viewRef.current;
+      const st = useEditorStore.getState().get(tabId);
+      if (view && st?.dirty) await saveBufferRef.current(view.state.doc.toString());
+    });
+  }, [tabId]);
 
   if (loadError) {
     return (
@@ -360,10 +403,14 @@ export function EditorTab({ tabId, path, projectId }: EditorTabProps) {
           state={externalState}
           onReload={() => confirmReload(tabId)}
           onKeepMine={() => dismissExternal(tabId)}
-          onClose={() => closeTab(projectId ?? WORKSPACE_NULL, tabId)}
+          onClose={() => closeTab(projectKey, tabId)}
         />
       ) : null}
-      <EditorBreadcrumbs tabId={tabId} fileName={basename(path)} />
+      {preview && !embedded ? (
+        <PreviewToolbar path={path} />
+      ) : (
+        <EditorBreadcrumbs tabId={tabId} fileName={basename(path)} />
+      )}
       <div ref={hostRef} className="min-h-0 flex-1" />
       {fileMeta ? (
         <EditorStatusBar

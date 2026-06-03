@@ -24,7 +24,11 @@ interface TabContentProps {
   activeTabId: string | null;
 }
 
-function renderTab(tab: Tab, isVisible: boolean) {
+function renderTab(tab: Tab, isVisible: boolean, projectKey: string) {
+  // Invariant: a file tab with `projectId === null` is a preview tab (opened
+  // outside any project). Renderers branch on this to read/write via the
+  // roots-bypassing preview commands and to skip project-only features (git).
+  const preview = tab.projectId == null;
   switch (tab.kind) {
     case "terminal":
       return (
@@ -55,6 +59,8 @@ function renderTab(tab: Tab, isVisible: boolean) {
           tabId={tab.id}
           path={tab.path}
           projectId={tab.projectId ?? ""}
+          projectKey={projectKey}
+          preview={preview}
         />
       );
     case "diff":
@@ -71,13 +77,15 @@ function renderTab(tab: Tab, isVisible: boolean) {
           tabId={tab.id}
           path={tab.path}
           projectId={tab.projectId ?? ""}
+          projectKey={projectKey}
           mode={tab.mode}
+          preview={preview}
         />
       );
     case "image":
-      return <ImagePreview path={tab.path} />;
+      return <ImagePreview path={tab.path} preview={preview} />;
     case "pdf":
-      return <PdfPreview path={tab.path} />;
+      return <PdfPreview path={tab.path} preview={preview} />;
     default:
       return null;
   }
@@ -103,7 +111,7 @@ export function TabContent({ allBuckets, activeProjectKey, activeTabId }: TabCon
               style={{ display: isVisible ? "block" : "none" }}
               className="h-full w-full"
             >
-              {renderTab(tab, isVisible)}
+              {renderTab(tab, isVisible, projectKey)}
             </div>
           );
         }),

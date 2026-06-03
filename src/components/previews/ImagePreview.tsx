@@ -1,13 +1,15 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { fsApi } from "@/features/filesystem/filesystem.service";
+import { SendToProjectButton } from "@/components/previews/PreviewToolbar";
 import { basename } from "@/lib/path";
 
 interface ImagePreviewProps {
   path: string;
+  preview?: boolean;
 }
 
-export function ImagePreview({ path }: ImagePreviewProps) {
+export function ImagePreview({ path, preview = false }: ImagePreviewProps) {
   const { t } = useTranslation();
   const [dataUrl, setDataUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -19,7 +21,9 @@ export function ImagePreview({ path }: ImagePreviewProps) {
     setError(null);
     (async () => {
       try {
-        const f = await fsApi.readFileBytes(path);
+        const f = preview
+          ? await fsApi.readPreviewBytes(path)
+          : await fsApi.readFileBytes(path);
         if (cancelled) return;
         const mime = f.mime ?? "application/octet-stream";
         setDataUrl(`data:${mime};base64,${f.b64}`);
@@ -31,15 +35,16 @@ export function ImagePreview({ path }: ImagePreviewProps) {
     return () => {
       cancelled = true;
     };
-  }, [path]);
+  }, [path, preview]);
 
   return (
     <div className="relative flex h-full flex-col bg-canvas">
       <header
         data-tauri-drag-region
-        className="flex h-[34px] shrink-0 items-center border-b border-hairline-soft px-[14px]"
+        className="flex h-[34px] shrink-0 items-center justify-between border-b border-hairline-soft px-[14px]"
       >
         <span className="editorial-caps">{t("editor.image")}</span>
+        {preview ? <SendToProjectButton path={path} /> : null}
       </header>
       <div className="flex flex-1 items-center justify-center overflow-auto p-[24px]">
         {error ? (

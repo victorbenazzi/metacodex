@@ -15,7 +15,24 @@
     "imagesFilter": "Images",
     "closeDialog": "Close dialog",
     "close": "Close",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "expand": "Expand",
+    "collapse": "Collapse"
+  },
+  "preview": {
+    "badge": "Preview",
+    "sendToProject": "Send to project",
+    "openTitle": "Open a file to preview",
+    "dropHint": "Drop to preview"
+  },
+  "sendToProject": {
+    "title": "Send to project",
+    "subtitle": "Move \"{{name}}\" into a project folder.",
+    "pickProject": "Project",
+    "pickFolder": "Destination folder",
+    "noProjects": "Add a project first to move files into it.",
+    "confirm": "Send",
+    "moving": "Moving…"
   },
   "welcome": {
     "eyebrow": "Welcome",
@@ -27,6 +44,7 @@
       "github": "Clone from GitHub…"
     },
     "openTerminal": "Open terminal",
+    "openFile": "Open a file",
     "localFirstLabel": "Local first",
     "localFirstBody": "Projects stay on disk. metacodex only stores workspace metadata.",
     "realPtyLabel": "Real PTY",
@@ -226,6 +244,7 @@
     "goToFile": "Go to file…",
     "newTerminal": "New terminal",
     "openFolder": "Open folder…",
+    "openFilePreview": "Open file for preview…",
     "searchFiles": "Search in files…",
     "settings": "Settings…",
     "closeTab": "Close active tab",

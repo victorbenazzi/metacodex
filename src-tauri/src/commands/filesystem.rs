@@ -59,6 +59,33 @@ pub async fn read_icon_image(path: String) -> AppResult<BytesFile> {
     fs_ops::read_icon_image(&path)
 }
 
+/// Preview reads/writes. These intentionally bypass the project-root check — the
+/// file lives outside any project and the OS open action is the consent boundary.
+/// See the `// SECURITY:` blocks in `fs_ops`.
+#[tauri::command]
+pub async fn read_preview_text(path: String, max_bytes: Option<u64>) -> AppResult<TextFile> {
+    fs_ops::read_preview_text(&path, max_bytes)
+}
+
+#[tauri::command]
+pub async fn read_preview_bytes(path: String, max_bytes: Option<u64>) -> AppResult<BytesFile> {
+    fs_ops::read_preview_bytes(&path, max_bytes)
+}
+
+#[tauri::command]
+pub async fn write_preview_text(path: String, content: String) -> AppResult<()> {
+    fs_ops::write_preview_text(&path, &content)
+}
+
+/// Move a previewed file into a chosen project folder ("send to project"). `from`
+/// is the previewed file (unowned), `to_dir` must be within a registered root.
+#[tauri::command]
+pub async fn move_into_project(from: String, to_dir: String, app: AppHandle) -> AppResult<String> {
+    let new_path = fs_ops::move_into_project(&app, &from, &to_dir)?;
+    emit_renamed(&app, &from, &new_path);
+    Ok(new_path)
+}
+
 #[tauri::command]
 pub async fn write_file_text(path: String, content: String, app: AppHandle) -> AppResult<()> {
     fs_ops::write_file_text(&app, &path, &content)

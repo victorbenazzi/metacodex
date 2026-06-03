@@ -1,6 +1,6 @@
 [package]
 name = "metacodex"
-version = "0.0.7"
+version = "0.0.8"
 description = "metacodex — premium local-first developer workspace"
 authors = ["Victor"]
 edition = "2021"
@@ -14,6 +14,7 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = [] }
+tauri-plugin-single-instance = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
 tauri-plugin-os = "2"

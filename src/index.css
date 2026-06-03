@@ -42,6 +42,20 @@
     user-select: text;
   }
 
+  /* Rendered markdown is a reading surface — text must be selectable/copyable
+     despite the global `user-select: none`. Interactive children keep a pointer
+     cursor. */
+  .md-prose,
+  .md-prose * {
+    user-select: text;
+    cursor: text;
+  }
+  .md-prose a,
+  .md-prose button,
+  .md-prose summary {
+    cursor: pointer;
+  }
+
   ::selection {
     background-color: rgba(38, 37, 30, 0.16);
   }

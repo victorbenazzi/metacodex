@@ -15,7 +15,24 @@
     "imagesFilter": "Imagens",
     "closeDialog": "Fechar",
     "close": "Fechar",
-    "dismiss": "Dispensar"
+    "dismiss": "Dispensar",
+    "expand": "Expandir",
+    "collapse": "Recolher"
+  },
+  "preview": {
+    "badge": "Preview",
+    "sendToProject": "Enviar para projeto",
+    "openTitle": "Abrir um arquivo para visualizar",
+    "dropHint": "Solte para visualizar"
+  },
+  "sendToProject": {
+    "title": "Enviar para projeto",
+    "subtitle": "Mover \"{{name}}\" para uma pasta do projeto.",
+    "pickProject": "Projeto",
+    "pickFolder": "Pasta de destino",
+    "noProjects": "Adicione um projeto antes para mover arquivos para ele.",
+    "confirm": "Enviar",
+    "moving": "Movendo…"
   },
   "welcome": {
     "eyebrow": "Bem-vindo",
@@ -27,6 +44,7 @@
       "github": "Clonar do GitHub…"
     },
     "openTerminal": "Abrir terminal",
+    "openFile": "Abrir um arquivo",
     "localFirstLabel": "Local first",
     "localFirstBody": "Os projetos ficam no disco. O metacodex só guarda metadados do workspace.",
     "realPtyLabel": "PTY de verdade",
@@ -226,6 +244,7 @@
     "goToFile": "Ir para arquivo…",
     "newTerminal": "Novo terminal",
     "openFolder": "Abrir pasta…",
+    "openFilePreview": "Abrir arquivo para visualizar…",
     "searchFiles": "Buscar nos arquivos…",
     "settings": "Configurações…",
     "closeTab": "Fechar aba ativa",

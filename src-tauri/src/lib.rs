@@ -4,6 +4,7 @@ pub mod error;
 pub mod events;
 pub mod fs_ops;
 pub mod git;
+pub mod open_files;
 pub mod projects;
 pub mod pty;
 pub mod search;
@@ -12,6 +13,7 @@ pub mod watcher;
 
 use std::sync::Arc;
 
+use open_files::PendingOpenFiles;
 use projects::ProjectsCache;
 use pty::PtyManager;
 use tauri::{Emitter, Manager};
@@ -20,6 +22,17 @@ use watcher::WatcherManager;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // single-instance MUST be the first plugin registered. A second launch of
+        // the binary (e.g. `open -n`, or file args on a fresh exec) routes here
+        // instead of spawning a duplicate process with its own PTYs / shared state.
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            if let Some(win) = app.get_webview_window("main") {
+                let _ = win.set_focus();
+            }
+            // argv[0] is the binary path; the rest may be file paths to open.
+            let paths: Vec<String> = argv.into_iter().skip(1).collect();
+            open_files::deliver(app, paths);
+        }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_os::init())
@@ -54,6 +67,7 @@ pub fn run() {
             app.manage(pty_mgr);
             app.manage(Arc::new(ProjectsCache::default()));
             app.manage(Arc::new(WatcherManager::new(app.handle().clone())));
+            app.manage(Arc::new(PendingOpenFiles::default()));
             // Ensure the ~/.metacodex tree exists before anything reads from it.
             if let Err(e) = config_paths::ensure_dirs() {
                 eprintln!("[metacodex] config_paths::ensure_dirs failed: {e}");
@@ -86,11 +100,16 @@ pub fn run() {
             commands::projects::get_active_project_id,
             commands::projects::reveal_in_finder,
             commands::system::open_external_url,
+            commands::system::take_pending_open_files,
             commands::filesystem::read_dir,
             commands::filesystem::stat,
             commands::filesystem::read_file_text,
             commands::filesystem::read_file_bytes,
             commands::filesystem::read_icon_image,
+            commands::filesystem::read_preview_text,
+            commands::filesystem::read_preview_bytes,
+            commands::filesystem::write_preview_text,
+            commands::filesystem::move_into_project,
             commands::filesystem::write_file_text,
             commands::filesystem::delete_path,
             commands::filesystem::rename_path,
@@ -122,6 +141,19 @@ pub fn run() {
             commands::diagnostics::write_session_log,
             commands::diagnostics::write_crash,
         ])
-        .run(tauri::generate_context!())
-        .expect("metacodex failed to start");
+        .build(tauri::generate_context!())
+        .expect("metacodex failed to start")
+        .run(|app_handle, event| {
+            // macOS delivers Finder "Open With" / double-click opens as an Apple
+            // Event surfaced here as RunEvent::Opened — for both cold start and
+            // warm (already-running) opens.
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Opened { urls } = event {
+                open_files::handle_opened(app_handle, urls);
+            }
+            #[cfg(not(target_os = "macos"))]
+            {
+                let _ = (app_handle, event);
+            }
+        });
 }

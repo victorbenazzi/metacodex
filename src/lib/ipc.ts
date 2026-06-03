@@ -31,6 +31,7 @@ export const CMD = {
 
   // system
   openExternalUrl: "open_external_url",
+  takePendingOpenFiles: "take_pending_open_files",
 
   // filesystem
   readDir: "read_dir",
@@ -44,6 +45,12 @@ export const CMD = {
   createFile: "create_file",
   createDir: "create_dir",
   movePath: "move_path",
+
+  // filesystem — preview mode (files outside any project root)
+  readPreviewText: "read_preview_text",
+  readPreviewBytes: "read_preview_bytes",
+  writePreviewText: "write_preview_text",
+  moveIntoProject: "move_into_project",
 
   // workspace
   saveWorkspaceState: "save_workspace_state",

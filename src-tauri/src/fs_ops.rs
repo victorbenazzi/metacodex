@@ -15,6 +15,41 @@ const DEFAULT_TEXT_LIMIT: u64 = 25 * 1024 * 1024; // 25 MiB
 const DEFAULT_BYTES_LIMIT: u64 = 50 * 1024 * 1024; // 50 MiB
 const ICON_IMAGE_LIMIT: u64 = 16 * 1024 * 1024; // 16 MiB — user-picked project icon
 
+/// Extensions the preview mode may open from OUTSIDE any registered project root.
+/// Read side: text/code/markdown. Kept broad because preview is a viewer, but every
+/// entry is a format the editor actually renders.
+const PREVIEW_TEXT_EXTS: &[&str] = &[
+    "md", "markdown", "mdx", "txt", "text", "log", "rst", "adoc", "json", "jsonc", "toml", "yaml",
+    "yml", "ini", "conf", "env", "csv", "tsv", "xml", "html", "htm", "css", "scss", "sass", "less",
+    "js", "mjs", "cjs", "jsx", "ts", "tsx", "vue", "svelte", "py", "rs", "go", "rb", "php", "java",
+    "kt", "swift", "c", "h", "cpp", "hpp", "cc", "cs", "sh", "bash", "zsh", "fish", "sql", "graphql",
+    "gql", "lua", "r", "dart", "scala", "clj", "ex", "exs", "erl", "hs", "ml",
+];
+
+/// Read side for binary previews (image/pdf). These are never writable.
+const PREVIEW_BINARY_EXTS: &[&str] = &[
+    "png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "ico", "avif", "pdf",
+];
+
+fn ext_lower(path: &str) -> Option<String> {
+    Path::new(path)
+        .extension()
+        .and_then(|s| s.to_str())
+        .map(|s| s.to_lowercase())
+}
+
+fn preview_ext_allowed(path: &str, set: &[&str]) -> bool {
+    ext_lower(path)
+        .map(|e| set.contains(&e.as_str()))
+        .unwrap_or(false)
+}
+
+/// Union of the text + binary preview allowlists. Used to filter OS-opened files
+/// (Finder "Open With" / drag-drop) before they ever reach the UI.
+pub(crate) fn preview_ext_allowed_any(path: &str) -> bool {
+    preview_ext_allowed(path, PREVIEW_TEXT_EXTS) || preview_ext_allowed(path, PREVIEW_BINARY_EXTS)
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DirEntry {
@@ -73,6 +108,40 @@ fn mtime_ms(meta: &fs::Metadata) -> i64 {
         .unwrap_or(0)
 }
 
+/// Read up to `limit` bytes of `path`, reporting whether it was truncated and the
+/// full on-disk size. Shared by the roots-checked and preview read commands.
+fn read_capped(path: &str, ctx: &'static str, limit: u64) -> AppResult<(Vec<u8>, bool, u64)> {
+    let meta = Path::new(path).metadata().map_err(|e| io_error(ctx, e))?;
+    let truncated = meta.len() > limit;
+    let bytes = if truncated {
+        let mut f = fs::File::open(path).map_err(|e| io_error("open", e))?;
+        let mut buf = vec![0u8; limit as usize];
+        use std::io::Read;
+        let n = f.read(&mut buf).map_err(|e| io_error("read", e))?;
+        buf.truncate(n);
+        buf
+    } else {
+        fs::read(path).map_err(|e| io_error("read", e))?
+    };
+    Ok((bytes, truncated, meta.len()))
+}
+
+fn bytes_to_text(bytes: Vec<u8>, truncated: bool, size: u64) -> TextFile {
+    let (content, encoding) = match String::from_utf8(bytes) {
+        Ok(s) => (s, "utf-8".to_string()),
+        Err(e) => (
+            String::from_utf8_lossy(e.as_bytes()).into_owned(),
+            "lossy".to_string(),
+        ),
+    };
+    TextFile {
+        content,
+        encoding,
+        truncated,
+        size,
+    }
+}
+
 pub fn read_dir(app: &AppHandle, path: &str) -> AppResult<Vec<DirEntry>> {
     require_within_roots(app, path)?;
     let p = Path::new(path);
@@ -127,30 +196,8 @@ pub fn stat(app: &AppHandle, path: &str) -> AppResult<FileMeta> {
 pub fn read_file_text(app: &AppHandle, path: &str, max_bytes: Option<u64>) -> AppResult<TextFile> {
     require_within_roots(app, path)?;
     let limit = max_bytes.unwrap_or(DEFAULT_TEXT_LIMIT);
-    let meta = Path::new(path)
-        .metadata()
-        .map_err(|e| io_error("read_file_text", e))?;
-    let truncated = meta.len() > limit;
-    let bytes = if truncated {
-        let mut f = fs::File::open(path).map_err(|e| io_error("open", e))?;
-        let mut buf = vec![0u8; limit as usize];
-        use std::io::Read;
-        let n = f.read(&mut buf).map_err(|e| io_error("read", e))?;
-        buf.truncate(n);
-        buf
-    } else {
-        fs::read(path).map_err(|e| io_error("read", e))?
-    };
-    let (content, encoding) = match String::from_utf8(bytes.clone()) {
-        Ok(s) => (s, "utf-8".to_string()),
-        Err(_) => (String::from_utf8_lossy(&bytes).into_owned(), "lossy".to_string()),
-    };
-    Ok(TextFile {
-        content,
-        encoding,
-        truncated,
-        size: meta.len(),
-    })
+    let (bytes, truncated, size) = read_capped(path, "read_file_text", limit)?;
+    Ok(bytes_to_text(bytes, truncated, size))
 }
 
 pub fn read_file_bytes(
@@ -160,25 +207,50 @@ pub fn read_file_bytes(
 ) -> AppResult<BytesFile> {
     require_within_roots(app, path)?;
     let limit = max_bytes.unwrap_or(DEFAULT_BYTES_LIMIT);
-    let meta = Path::new(path)
-        .metadata()
-        .map_err(|e| io_error("read_file_bytes", e))?;
-    let truncated = meta.len() > limit;
-    let bytes = if truncated {
-        let mut f = fs::File::open(path).map_err(|e| io_error("open", e))?;
-        let mut buf = vec![0u8; limit as usize];
-        use std::io::Read;
-        let n = f.read(&mut buf).map_err(|e| io_error("read", e))?;
-        buf.truncate(n);
-        buf
-    } else {
-        fs::read(path).map_err(|e| io_error("read", e))?
-    };
+    let (bytes, truncated, size) = read_capped(path, "read_file_bytes", limit)?;
     Ok(BytesFile {
         b64: STANDARD.encode(&bytes),
         mime: guess_mime(path),
         truncated,
-        size: meta.len(),
+        size,
+    })
+}
+
+/// Read a user-opened preview file as text (OS "Open With" / native dialog / drag-drop).
+///
+/// SECURITY: like `read_icon_image`, this deliberately does NOT call
+/// `require_within_roots`. A previewed file is, by definition, opened from outside
+/// any registered project root, and the OS-level open action (Finder double-click,
+/// native open dialog, or drag-drop onto the window) is the user's consent boundary.
+/// The exception stays narrow: a text/code/markdown extension allowlist + the same
+/// 25 MiB cap as `read_file_text`.
+pub fn read_preview_text(path: &str, max_bytes: Option<u64>) -> AppResult<TextFile> {
+    if !preview_ext_allowed(path, PREVIEW_TEXT_EXTS) {
+        return Err(AppError::Other(format!(
+            "unsupported preview text type: {path:?}"
+        )));
+    }
+    let limit = max_bytes.unwrap_or(DEFAULT_TEXT_LIMIT);
+    let (bytes, truncated, size) = read_capped(path, "read_preview_text", limit)?;
+    Ok(bytes_to_text(bytes, truncated, size))
+}
+
+/// Read a user-opened preview file as base64 bytes (image/pdf preview).
+///
+/// SECURITY: same carve-out as `read_preview_text`; allowlist = image/pdf, cap = 50 MiB.
+pub fn read_preview_bytes(path: &str, max_bytes: Option<u64>) -> AppResult<BytesFile> {
+    if !preview_ext_allowed(path, PREVIEW_BINARY_EXTS) {
+        return Err(AppError::Other(format!(
+            "unsupported preview binary type: {path:?}"
+        )));
+    }
+    let limit = max_bytes.unwrap_or(DEFAULT_BYTES_LIMIT);
+    let (bytes, truncated, size) = read_capped(path, "read_preview_bytes", limit)?;
+    Ok(BytesFile {
+        b64: STANDARD.encode(&bytes),
+        mime: guess_mime(path),
+        truncated,
+        size,
     })
 }
 
@@ -390,6 +462,41 @@ pub fn create_dir(app: &AppHandle, parent: &str, name: &str) -> AppResult<String
     Ok(target_str)
 }
 
+fn is_cross_device(e: &std::io::Error) -> bool {
+    // EXDEV (cross-device link) is raw os error 18 on macOS/Linux. We match the raw
+    // code rather than ErrorKind::CrossesDevices, which isn't stable on all toolchains.
+    e.raw_os_error() == Some(18)
+}
+
+/// Move a file, falling back to copy + remove when `from` and `to` live on
+/// different volumes (`rename` returns EXDEV across mounts — a previewed file may
+/// sit on an external drive while the project is on the internal disk).
+fn move_file_cross_device(from: &Path, to: &Path) -> AppResult<()> {
+    match fs::rename(from, to) {
+        Ok(()) => Ok(()),
+        Err(e) if is_cross_device(&e) => {
+            fs::copy(from, to).map_err(|e| io_error("move: copy (cross-device)", e))?;
+            fs::remove_file(from).map_err(|e| {
+                // Don't leave a half-move behind.
+                let _ = fs::remove_file(to);
+                io_error("move: remove src (cross-device)", e)
+            })
+        }
+        Err(e) => Err(io_error("move", e)),
+    }
+}
+
+fn ensure_is_dir(path: &Path, ctx: &str) -> AppResult<()> {
+    match path.symlink_metadata() {
+        Ok(m) if m.is_dir() => Ok(()),
+        Ok(_) => Err(AppError::Other(format!(
+            "{ctx}: not a folder: {}",
+            path.display()
+        ))),
+        Err(e) => Err(io_error(ctx, e)),
+    }
+}
+
 /// Move `from` into directory `to_dir`, preserving the basename.
 /// Returns the new absolute path.
 ///
@@ -449,35 +556,82 @@ pub fn move_path(app: &AppHandle, from: &str, to_dir: &str) -> AppResult<String>
     }
 
     // The destination dir must actually be a directory.
-    match to_dir_path.symlink_metadata() {
-        Ok(m) if m.is_dir() => {}
-        Ok(_) => {
-            return Err(AppError::Other(format!(
-                "destination is not a folder: {to_dir}"
-            )))
-        }
-        Err(e) => return Err(io_error("move: stat dest dir", e)),
-    }
+    ensure_is_dir(to_dir_path, "move: dest dir")?;
 
-    fs::rename(from_path, &dest).map_err(|e| io_error("move", e))?;
+    move_file_cross_device(from_path, &dest)?;
     Ok(dest_str)
 }
 
-/// Atomic write: write to <path>.tmp, then rename over the target.
-pub fn write_file_text(app: &AppHandle, path: &str, content: &str) -> AppResult<()> {
-    require_within_roots(app, path)?;
-    let p = Path::new(path);
-    let tmp = p.with_extension(format!(
+/// Move a user-opened preview file (`from`, outside any project root) INTO a
+/// project directory (`to_dir`, which MUST be within a registered root).
+/// Returns the new absolute path.
+///
+/// SECURITY: `from` is NOT roots-checked — it is a previewed file whose consent
+/// boundary is the OS open action (same as `read_preview_*`). It is still validated
+/// against the preview extension allowlist so this can't be repurposed to import
+/// arbitrary files. `to_dir` IS fully roots-checked, so the file can only ever land
+/// inside a registered project. Refuse-on-conflict; cross-volume safe.
+pub fn move_into_project(app: &AppHandle, from: &str, to_dir: &str) -> AppResult<String> {
+    if !preview_ext_allowed_any(from) {
+        return Err(AppError::Other(format!("unsupported preview type: {from:?}")));
+    }
+    require_within_roots(app, to_dir)?;
+
+    let from_path = Path::new(from);
+    let to_dir_path = Path::new(to_dir);
+    ensure_is_dir(to_dir_path, "move_into_project: dest dir")?;
+
+    let base = from_path
+        .file_name()
+        .ok_or_else(|| AppError::Other(format!("cannot move path without a name: {from}")))?;
+    let dest = to_dir_path.join(base);
+    let dest_str = dest.to_string_lossy().to_string();
+    require_within_roots(app, &dest_str)?;
+
+    if dest.symlink_metadata().is_ok() {
+        return Err(AppError::Other(format!(
+            "destination already exists: {dest_str}"
+        )));
+    }
+
+    move_file_cross_device(from_path, &dest)?;
+    Ok(dest_str)
+}
+
+/// Atomic write primitive: write to `<path>.<ext>.metacodex.tmp`, then rename over
+/// the target. The tmp lands next to the target (same volume) so the rename is atomic.
+fn atomic_write(path: &Path, bytes: &[u8]) -> AppResult<()> {
+    let tmp = path.with_extension(format!(
         "{}.metacodex.tmp",
-        p.extension().and_then(|s| s.to_str()).unwrap_or("")
+        path.extension().and_then(|s| s.to_str()).unwrap_or("")
     ));
-    fs::write(&tmp, content.as_bytes()).map_err(|e| io_error("write tmp", e))?;
-    fs::rename(&tmp, p).map_err(|e| {
+    fs::write(&tmp, bytes).map_err(|e| io_error("write tmp", e))?;
+    fs::rename(&tmp, path).map_err(|e| {
         // best-effort cleanup
         let _ = fs::remove_file(&tmp);
         io_error("rename", e)
     })?;
     Ok(())
+}
+
+/// Atomic write: write to <path>.tmp, then rename over the target.
+pub fn write_file_text(app: &AppHandle, path: &str, content: &str) -> AppResult<()> {
+    require_within_roots(app, path)?;
+    atomic_write(Path::new(path), content.as_bytes())
+}
+
+/// Atomically overwrite a user-opened preview file in place (edit + save).
+///
+/// SECURITY: same carve-out as `read_preview_text`, WRITE variant. Restricted to the
+/// text/code allowlist only — we never write binary/image/pdf previews back, so the
+/// writable surface is strictly the text set.
+pub fn write_preview_text(path: &str, content: &str) -> AppResult<()> {
+    if !preview_ext_allowed(path, PREVIEW_TEXT_EXTS) {
+        return Err(AppError::Other(format!(
+            "unsupported preview text type: {path:?}"
+        )));
+    }
+    atomic_write(Path::new(path), content.as_bytes())
 }
 
 fn guess_mime(path: &str) -> Option<String> {

@@ -38,6 +38,7 @@ interface WorkAreaProps {
   onNewWorktree?: () => void;
   onOpenFolder: () => void;
   onCloneFromGithub: () => void;
+  onOpenPreviewFile: () => void;
   project: Project | null;
 }
 
@@ -60,6 +61,7 @@ export function WorkArea({
   onNewWorktree,
   onOpenFolder,
   onCloneFromGithub,
+  onOpenPreviewFile,
   project,
 }: WorkAreaProps) {
   // TabContent always lives at the same JSX position regardless of whether the
@@ -126,6 +128,7 @@ export function WorkArea({
                 onOpenFolder={onOpenFolder}
                 onCloneFromGithub={onCloneFromGithub}
                 onOpenTerminal={onNewTerminal}
+                onOpenPreviewFile={onOpenPreviewFile}
               />
             )}
           </div>

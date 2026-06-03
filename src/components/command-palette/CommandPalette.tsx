@@ -37,6 +37,7 @@ interface MetacodexApi {
   openFolder?: () => void;
   closeActiveTab?: () => void;
   openFile?: (path: string, name: string) => void;
+  pickPreviewFile?: () => void;
 }
 function api(): MetacodexApi {
   return ((window as unknown as { __metacodex?: MetacodexApi }).__metacodex) ?? {};
@@ -52,6 +53,7 @@ const COMMAND_DEFS: { id: string; titleKey: string; hint?: string; run: () => vo
   { id: "go-to-file", titleKey: "commandPalette.goToFile", hint: "⌘P", run: () => useCommandPaletteStore.getState().openFiles() },
   { id: "new-terminal", titleKey: "commandPalette.newTerminal", hint: "⌘T", run: () => api().newTerminal?.() },
   { id: "open-folder", titleKey: "commandPalette.openFolder", hint: "⌘O", run: () => api().openFolder?.() },
+  { id: "open-file-preview", titleKey: "commandPalette.openFilePreview", run: () => api().pickPreviewFile?.() },
   { id: "search", titleKey: "commandPalette.searchFiles", hint: "⇧⌘F", run: () => useSearchUiStore.getState().setOpen(true) },
   { id: "settings", titleKey: "commandPalette.settings", hint: "⌘,", run: () => useSettingsStore.getState().setOpen(true) },
   { id: "close-tab", titleKey: "commandPalette.closeTab", hint: "⌘W", run: () => api().closeActiveTab?.() },

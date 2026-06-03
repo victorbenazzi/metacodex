@@ -6,6 +6,7 @@ pub const EV_FS_ERROR: &str = "fs://error";
 pub const EV_FS_RENAMED: &str = "fs://renamed";
 pub const EV_BEFORE_QUIT: &str = "app://before-quit";
 pub const EV_GIT_CLONE_PROGRESS: &str = "git://clone-progress";
+pub const EV_OPEN_FILE: &str = "app://open-file";
 
 use serde::Serialize;
 
@@ -47,4 +48,12 @@ pub struct GitCloneProgressPayload {
     pub op_id: String,
     pub phase: String,
     pub percent: u32,
+}
+
+/// Files the OS asked us to open (Finder "Open With" / double-click / drag-drop),
+/// delivered to the frontend to open in preview mode.
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenFilePayload {
+    pub paths: Vec<String>,
 }

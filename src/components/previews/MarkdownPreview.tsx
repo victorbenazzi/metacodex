@@ -1,13 +1,16 @@
 import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Pencil, Eye } from "lucide-react";
+import { Pencil, Eye, Copy, Check } from "lucide-react";
+import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { useTranslation } from "react-i18next";
 
 import { fsApi } from "@/features/filesystem/filesystem.service";
-import { useTabsStore, WORKSPACE_NULL } from "@/components/tabs/tabsStore";
+import { useTabsStore } from "@/components/tabs/tabsStore";
 import { EditorTab } from "@/components/editor/EditorTab";
+import { SendToProjectButton } from "@/components/previews/PreviewToolbar";
 import { Icon } from "@/components/ui/Icon";
+import { CMD, invoke } from "@/lib/ipc";
 import { cn } from "@/lib/cn";
 import { useThemeStore } from "@/features/theme/theme.store";
 import { highlightToHtml } from "@/features/theme/shikiHighlighter";
@@ -16,10 +19,19 @@ interface MarkdownPreviewProps {
   tabId: string;
   path: string;
   projectId: string;
+  projectKey: string;
   mode: "preview" | "source";
+  preview?: boolean;
 }
 
-export function MarkdownPreview({ tabId, path, projectId, mode }: MarkdownPreviewProps) {
+export function MarkdownPreview({
+  tabId,
+  path,
+  projectId,
+  projectKey,
+  mode,
+  preview = false,
+}: MarkdownPreviewProps) {
   const { t } = useTranslation();
   const [content, setContent] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +46,9 @@ export function MarkdownPreview({ tabId, path, projectId, mode }: MarkdownPrevie
     setError(null);
     (async () => {
       try {
-        const text = await fsApi.readFileText(path);
+        const text = preview
+          ? await fsApi.readPreviewText(path)
+          : await fsApi.readFileText(path);
         if (!cancelled) setContent(text.content);
       } catch (err: any) {
         if (!cancelled) setError(err?.message ?? String(err));
@@ -43,10 +57,10 @@ export function MarkdownPreview({ tabId, path, projectId, mode }: MarkdownPrevie
     return () => {
       cancelled = true;
     };
-  }, [path, mode]);
+  }, [path, mode, preview]);
 
   const toggleMode = () => {
-    updateTab(projectId ?? WORKSPACE_NULL, tabId, {
+    updateTab(projectKey, tabId, {
       mode: mode === "preview" ? "source" : "preview",
     } as any);
   };
@@ -57,7 +71,14 @@ export function MarkdownPreview({ tabId, path, projectId, mode }: MarkdownPrevie
         data-tauri-drag-region
         className="flex h-[34px] shrink-0 items-center justify-between border-b border-hairline-soft px-[14px]"
       >
-        <span aria-hidden className="flex-1" />
+        <div className="flex items-center gap-[6px]">
+          {preview ? (
+            <>
+              <span className="editorial-caps text-muted">{t("preview.badge")}</span>
+              <SendToProjectButton path={path} />
+            </>
+          ) : null}
+        </div>
         <button
           type="button"
           onClick={toggleMode}
@@ -81,7 +102,14 @@ export function MarkdownPreview({ tabId, path, projectId, mode }: MarkdownPrevie
           className="absolute inset-0"
           style={{ display: mode === "source" ? "block" : "none" }}
         >
-          <EditorTab tabId={tabId} path={path} projectId={projectId} />
+          <EditorTab
+            tabId={tabId}
+            path={path}
+            projectId={projectId}
+            projectKey={projectKey}
+            preview={preview}
+            embedded
+          />
         </div>
 
         {mode === "preview" ? (
@@ -97,7 +125,7 @@ export function MarkdownPreview({ tabId, path, projectId, mode }: MarkdownPrevie
               </p>
             ) : (
               <article
-                className="prose prose-neutral mx-auto max-w-[720px] px-[28px] py-[28px] text-[14px] leading-[1.65] text-body"
+                className="md-prose prose prose-neutral mx-auto max-w-[720px] px-[28px] py-[28px] text-[14px] leading-[1.65] text-body"
                 style={{ fontFamily: "var(--font-sans)" }}
               >
                 <MarkdownBody source={content} />
@@ -134,16 +162,31 @@ function MarkdownBody({ source }: { source: string }) {
           <h3 className="mt-[22px] text-[15px] font-semibold text-ink">{p.children}</h3>
         ),
         p: (p) => <p className="my-[12px] text-body">{p.children}</p>,
-        a: (p) => (
-          <a
-            href={p.href}
-            target="_blank"
-            rel="noreferrer"
-            className="text-ink underline decoration-hairline-strong underline-offset-2 hover:decoration-ink"
-          >
-            {p.children}
-          </a>
-        ),
+        a: (p) => {
+          const href = (p.href as string | undefined) ?? "";
+          return (
+            <a
+              href={href}
+              onClick={(e) => {
+                e.preventDefault();
+                if (href.startsWith("#")) {
+                  // Internal anchor — smooth-scroll within the rendered doc.
+                  const id = decodeURIComponent(href.slice(1));
+                  const el =
+                    document.getElementById(id) ??
+                    document.querySelector(`[name="${CSS.escape(id)}"]`);
+                  el?.scrollIntoView({ behavior: "smooth", block: "start" });
+                } else if (/^https?:\/\//i.test(href)) {
+                  // External link — hand off to the OS browser via the opener.
+                  void invoke(CMD.openExternalUrl, { url: href });
+                }
+              }}
+              className="cursor-pointer text-ink underline decoration-hairline-strong underline-offset-2 hover:decoration-ink"
+            >
+              {p.children}
+            </a>
+          );
+        },
         code: (p: any) => {
           if (p.inline) {
             return (
@@ -218,17 +261,55 @@ function ShikiCode({ code, lang, themeId }: { code: string; lang: string | undef
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [code, lang, themeId]);
 
-  if (html) {
-    return (
-      <div
-        className="my-[16px] overflow-x-auto rounded-sm border border-hairline font-mono text-[12px] leading-[1.5] [&_pre]:m-0 [&_pre]:px-[14px] [&_pre]:py-[12px]"
-        dangerouslySetInnerHTML={{ __html: html }}
-      />
-    );
-  }
   return (
-    <pre className="my-[16px] overflow-x-auto rounded-sm border border-hairline bg-canvas-soft px-[14px] py-[12px] font-mono text-[12px] leading-[1.5] text-body">
-      <code>{code}</code>
-    </pre>
+    <div className="group relative my-[16px]">
+      <CopyCodeButton code={code} />
+      {html ? (
+        <div
+          className="overflow-x-auto rounded-sm border border-hairline font-mono text-[12px] leading-[1.5] [&_pre]:m-0 [&_pre]:px-[14px] [&_pre]:py-[12px]"
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
+      ) : (
+        <pre className="overflow-x-auto rounded-sm border border-hairline bg-canvas-soft px-[14px] py-[12px] font-mono text-[12px] leading-[1.5] text-body">
+          <code>{code}</code>
+        </pre>
+      )}
+    </div>
+  );
+}
+
+/** Hover-revealed copy button pinned to the top-right of a code block. */
+function CopyCodeButton({ code }: { code: string }) {
+  const { t } = useTranslation();
+  const [copied, setCopied] = useState(false);
+
+  const copy = async () => {
+    try {
+      await writeText(code);
+    } catch {
+      try {
+        await navigator.clipboard.writeText(code);
+      } catch {
+        return;
+      }
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1200);
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={copy}
+      aria-label={t("common.copy")}
+      className={cn(
+        "absolute right-[8px] top-[8px] z-10 inline-flex h-[24px] items-center gap-[5px] rounded-xs px-[7px] text-[11px]",
+        "border border-hairline bg-surface-card text-muted opacity-0 transition-opacity",
+        "hover:text-ink group-hover:opacity-100 focus-visible:opacity-100",
+      )}
+    >
+      <Icon icon={copied ? Check : Copy} size={11} />
+      {copied ? t("common.copied") : t("common.copy")}
+    </button>
   );
 }
