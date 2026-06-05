@@ -29,11 +29,16 @@ export function FileExplorer({
   onMove,
 }: FileExplorerProps) {
   const { t } = useTranslation();
-  const bucket = useExplorerStore((s) => s.byProject[projectId]);
   const loadIfNeeded = useExplorerStore((s) => s.loadIfNeeded);
   const refresh = useExplorerStore((s) => s.refresh);
   const beginCreate = useExplorerStore((s) => s.beginCreate);
   const setSelected = useExplorerStore((s) => s.setSelected);
+  // Fine-grained: re-render the root list only when the root's children or the
+  // inline-create state change, not on every mutation deeper in the tree.
+  const rootChildren = useExplorerStore(
+    (s) => s.byProject[projectId]?.children[rootPath],
+  );
+  const creating = useExplorerStore((s) => s.byProject[projectId]?.creating);
 
   const [rootDropTarget, setRootDropTarget] = useState(false);
 
@@ -42,8 +47,6 @@ export function FileExplorer({
     void loadIfNeeded(projectId, rootPath);
   }, [projectId, rootPath, loadIfNeeded]);
 
-  const rootChildren = bucket?.children[rootPath];
-  const creating = bucket?.creating;
   const creatingAtRoot = creating?.parentPath === rootPath;
 
   // Determine where a New File/Folder lands: inside the selected folder, the

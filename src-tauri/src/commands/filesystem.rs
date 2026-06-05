@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use tauri::{AppHandle, Emitter, Manager};
 
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 use crate::events::{FsRenamedPayload, EV_FS_RENAMED};
 use crate::fs_ops::{self, BytesFile, DirEntry, FileMeta, TextFile};
 use crate::projects::ProjectsCache;
@@ -26,7 +26,13 @@ fn emit_renamed(app: &AppHandle, old_path: &str, new_path: &str) {
 
 #[tauri::command]
 pub async fn read_dir(path: String, app: AppHandle) -> AppResult<Vec<DirEntry>> {
-    fs_ops::read_dir(&app, &path)
+    // read_dir does a blocking std::fs walk plus a per-entry symlink_metadata.
+    // Run it on the blocking pool so a directory read can't stall a Tauri async
+    // IPC worker (which also pumps PTY data and other commands) while an agent
+    // is bursting files into the project.
+    tokio::task::spawn_blocking(move || fs_ops::read_dir(&app, &path))
+        .await
+        .map_err(|e| AppError::Other(format!("join: {e}")))?
 }
 
 #[tauri::command]

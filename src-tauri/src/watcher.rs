@@ -62,6 +62,18 @@ impl WatcherManager {
 
         let app = self.app_handle.clone();
         let pid = project_id.clone();
+        // FSEvents on macOS always reports *canonicalized* paths (symlinks and
+        // firmlinks resolved, e.g. iCloud-synced `~/Documents`, `/var` ->
+        // `/private/var`, a project added through a symlinked path). The
+        // explorer, however, caches directories under the path we were *asked*
+        // to watch (the raw project root from `projects.json`). If the two
+        // forms differ, an emitted event path can never string-match a cached
+        // dir key, so `AppShell`'s listener skips every refresh and the
+        // explorer silently never updates. Capture both forms and rewrite each
+        // emitted path's canonical prefix back to the requested root so the
+        // frontend's exact-prefix matching works regardless of symlinks.
+        let requested_root = path.clone();
+        let canonical_root = path.canonicalize().unwrap_or_else(|_| path.clone());
         // 80ms keeps fs events feeling near-instant in the explorer (the IA
         // creates files via the terminal and the user expects them to pop in
         // immediately). Below ~50ms we'd start seeing redundant churn for
@@ -81,7 +93,12 @@ impl WatcherManager {
                 }
                 let mut paths: Vec<String> = events
                     .iter()
-                    .map(|e| e.path.display().to_string())
+                    .map(|e| match e.path.strip_prefix(&canonical_root) {
+                        // Re-root canonical event paths under the requested
+                        // root so they line up with the explorer's cache keys.
+                        Ok(rel) => requested_root.join(rel).display().to_string(),
+                        Err(_) => e.path.display().to_string(),
+                    })
                     // Drop `.metacodex/worktrees/*` — those are parallel
                     // checkouts of THIS repo; the main project's git status
                     // is unaffected by edits inside them, and forwarding the

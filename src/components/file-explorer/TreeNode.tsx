@@ -81,19 +81,29 @@ export const TreeNode = memo(function TreeNode({
   onMove,
 }: TreeNodeProps) {
   const { t } = useTranslation();
-  const bucket = useExplorerStore((s) => s.byProject[entry ? projectId : "_"]);
-  const expandedSet = bucket?.expanded;
-  const isOpen = expandedSet?.has(entry.path) ?? false;
-  const children: ChildrenState | undefined = bucket?.children[entry.path];
-  const isSelected = bucket?.selected?.path === entry.path;
+  // Fine-grained subscriptions: each TreeNode re-renders only when *its own*
+  // expanded / children / selection / recent state changes. Subscribing to the
+  // whole bucket made every node in the tree re-render on every watcher
+  // refresh, which is a big part of what made the explorer feel sluggish while
+  // an agent wrote a burst of files.
+  const isOpen = useExplorerStore(
+    (s) => s.byProject[projectId]?.expanded.has(entry.path) ?? false,
+  );
+  const children: ChildrenState | undefined = useExplorerStore(
+    (s) => s.byProject[projectId]?.children[entry.path],
+  );
+  const isSelected = useExplorerStore(
+    (s) => s.byProject[projectId]?.selected?.path === entry.path,
+  );
+  // Tint entries that appeared on disk in the last few seconds (created by the
+  // IA in a terminal tab, by another process, or via inline-create). The
+  // animation drives both the held tint and the final fade-out.
+  const isRecent = useExplorerStore(
+    (s) => s.byProject[projectId]?.recentlyAdded?.[entry.path] !== undefined,
+  );
   const toggle = useExplorerStore((s) => s.toggleExpand);
   const setSelected = useExplorerStore((s) => s.setSelected);
   const gitStatus = useGitStore((s) => s.byProject[projectId]?.statuses?.[entry.path]);
-  // Tint entries that appeared on disk in the last few seconds (created by
-  // the IA in a terminal tab, by another process, or via inline-create).
-  // The animation drives both the held tint and the final fade-out.
-  const recentTimestamp = bucket?.recentlyAdded?.[entry.path];
-  const isRecent = recentTimestamp !== undefined;
 
   const [editing, setEditing] = useState(false);
   const [isDropTarget, setIsDropTarget] = useState(false);

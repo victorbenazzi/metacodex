@@ -286,6 +286,31 @@ export function AppShell() {
   useEffect(() => {
     let unlisten: (() => void) | undefined;
     let unlistenRenamed: (() => void) | undefined;
+    // Throttle git-status refreshes. An agent writing a burst of files would
+    // otherwise fire one full `git status` (libgit2 walk + untracked-content
+    // diff) per 80ms watcher tick, stacking expensive work on the blocking
+    // pool and competing with the explorer's own reads. Leading-edge + at most
+    // one run per interval keeps the Source Control panel fresh without the
+    // flood. The explorer refresh below stays per-event (it's now cheap).
+    const gitThrottleLast = new Map<string, number>();
+    const gitThrottleTimer = new Map<string, ReturnType<typeof setTimeout>>();
+    const GIT_THROTTLE_MS = 400;
+    const scheduleGitRefresh = (pid: string, root: string) => {
+      const run = () => {
+        gitThrottleLast.set(pid, Date.now());
+        void useGitStore.getState().refresh(pid, root);
+      };
+      const since = Date.now() - (gitThrottleLast.get(pid) ?? 0);
+      if (since >= GIT_THROTTLE_MS) {
+        run();
+      } else if (!gitThrottleTimer.has(pid)) {
+        const tm = setTimeout(() => {
+          gitThrottleTimer.delete(pid);
+          run();
+        }, GIT_THROTTLE_MS - since);
+        gitThrottleTimer.set(pid, tm);
+      }
+    };
     (async () => {
       const off = await listenTo<FsChangedPayload>(EV.fsChanged, async (e) => {
         const { projectId, paths } = e.payload;
@@ -317,11 +342,12 @@ export function AppShell() {
           }
         }
         // Refresh git status — file changes typically alter git state.
+        // Throttled so a file burst doesn't fire one full status per tick.
         const proj = useProjectsStore
           .getState()
           .projects.find((p) => p.id === projectId);
         if (proj) {
-          void useGitStore.getState().refresh(projectId, proj.path);
+          scheduleGitRefresh(projectId, proj.path);
         }
         // External rm / external rename: stat each touched path. Anything
         // that no longer exists AND is currently open as a file-backed tab
@@ -359,6 +385,7 @@ export function AppShell() {
       unlistenRenamed = offRen;
     })();
     return () => {
+      for (const tm of gitThrottleTimer.values()) clearTimeout(tm);
       unlisten?.();
       unlistenRenamed?.();
     };

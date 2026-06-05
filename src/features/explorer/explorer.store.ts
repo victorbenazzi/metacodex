@@ -168,20 +168,48 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
     const beforePaths =
       Array.isArray(before) ? new Set(before.map((e) => e.path)) : null;
 
-    const nextChildren = { ...cur.children };
-    delete nextChildren[path];
-    set((state) => ({
-      byProject: {
-        ...state.byProject,
-        [projectId]: { ...cur, children: nextChildren },
-      },
-    }));
-    await get().loadIfNeeded(projectId, path);
+    // Read fresh WITHOUT clearing the current listing first. The old code did
+    // delete -> "loading" -> load, which made an expanded folder flash to a
+    // spinner (its contents momentarily vanished) on every single watcher tick
+    // while an agent wrote files into it. We instead keep the last good listing
+    // on screen and swap it atomically once the new read resolves.
+    let entries: DirEntry[];
+    try {
+      entries = await fsApi.readDir(path);
+    } catch (err: any) {
+      const message = err?.message ?? String(err);
+      set((state) => {
+        const b = state.byProject[projectId] ?? emptyBucket();
+        // Keep the last good listing rather than blanking it on a transient
+        // read failure; only surface an error if we had nothing before.
+        if (Array.isArray(b.children[path])) return state;
+        return {
+          byProject: {
+            ...state.byProject,
+            [projectId]: {
+              ...b,
+              children: { ...b.children, [path]: { error: message } },
+            },
+          },
+        };
+      });
+      return;
+    }
+
+    // Swap atomically against the *current* state (not the stale `cur`
+    // snapshot) so concurrent refreshes of sibling dirs don't clobber it.
+    set((state) => {
+      const b = state.byProject[projectId] ?? emptyBucket();
+      return {
+        byProject: {
+          ...state.byProject,
+          [projectId]: { ...b, children: { ...b.children, [path]: entries } },
+        },
+      };
+    });
 
     if (!beforePaths) return;
-    const after = get().byProject[projectId]?.children[path];
-    if (!Array.isArray(after)) return;
-    const created = after
+    const created = entries
       .map((e) => e.path)
       .filter((p) => !beforePaths.has(p));
     if (created.length === 0) return;
