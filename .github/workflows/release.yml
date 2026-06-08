@@ -16,6 +16,10 @@ jobs:
     permissions:
       contents: write
     runs-on: macos-latest
+    # Signing turns on automatically once the APPLE_CERTIFICATE secret exists.
+    # Until then the build falls back to ad-hoc signing (the previous behavior).
+    env:
+      SIGN: ${{ secrets.APPLE_CERTIFICATE != '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -45,12 +49,55 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
+      # Option B signing: import a STABLE self-signed cert into a dedicated
+      # keychain and trust it for code signing, so every release shares one code
+      # identity. macOS TCC then keeps granted permissions across auto-updates.
+      # This does NOT notarize; the Gatekeeper "unidentified developer" warning
+      # (and the one-time `xattr -cr`) still applies.
+      - name: Set up self-signed signing keychain
+        if: ${{ env.SIGN == 'true' }}
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          CERT_P12="$RUNNER_TEMP/metacodex-signing.p12"
+          CERT_CRT="$RUNNER_TEMP/metacodex-signing.pem"
+          KEYCHAIN="$RUNNER_TEMP/metacodex-signing.keychain-db"
+          KEYCHAIN_PWD="$(openssl rand -hex 20)"
+
+          # The secret is single-line base64 (openssl base64 -A) of the .p12.
+          printf '%s' "$APPLE_CERTIFICATE" | openssl base64 -d -A -out "$CERT_P12"
+
+          # Dedicated keychain, unlocked and kept unlocked for the whole job.
+          security create-keychain -p "$KEYCHAIN_PWD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PWD" "$KEYCHAIN"
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | xargs)
+          security default-keychain -s "$KEYCHAIN"
+
+          # Import the identity and let codesign use the key non-interactively.
+          security import "$CERT_P12" -k "$KEYCHAIN" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PWD" "$KEYCHAIN" >/dev/null
+
+          # A self-signed cert isn't chain-trusted, so codesign rejects it as a
+          # valid identity until we trust it as a code-signing root. Pull the
+          # public cert straight from the keychain (no openssl pkcs12 needed).
+          security find-certificate -c "metacodex self-signed" -p "$KEYCHAIN" > "$CERT_CRT"
+          sudo security add-trusted-cert -d -r trustRoot -p codeSign \
+            -k /Library/Keychains/System.keychain "$CERT_CRT"
+
+          echo "Valid code-signing identities:"
+          security find-identity -v -p codesigning "$KEYCHAIN"
+
       - name: Build & publish to GitHub Release
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # Empty when the secret is absent => tauri-action falls back to ad-hoc.
+          APPLE_SIGNING_IDENTITY: ${{ env.SIGN == 'true' && 'metacodex self-signed' || '' }}
         with:
           tagName: ${{ github.event.inputs.tag || github.ref_name }}
           releaseName: "metacodex ${{ github.event.inputs.tag || github.ref_name }}"
@@ -66,13 +113,13 @@ jobs:
             Already running a previous version? metacodex will check for this release on next launch and show an **Update** pill in the top bar. One click — download, install, relaunch. No reinstall.
 
             ### macOS signature notice
-            These builds are unsigned. After dragging metacodex into `/Applications`, run once in Terminal:
+            These builds are signed with a stable self-signed certificate, so macOS keeps the permissions you grant across auto-updates. They are NOT notarized by Apple, so on first install macOS still quarantines them. After dragging metacodex into `/Applications`, run once in Terminal:
 
             ```bash
             sudo xattr -cr /Applications/metacodex.app
             ```
 
-            > _Yes, we know — Apple charges $99/year to make this message go away. The day metacodex pays its own credit card, we'll sign it. Until then: terminal._
+            > _Notarization (what removes this step entirely) needs Apple's $99/year Developer Program. Until metacodex pays its own bill, it's one terminal command on first install. Your granted permissions now survive updates._
 
             Full instructions: [README → macOS signature error](https://github.com/victorbenazzi/metacodex#macos-signature-error-app-is-damaged--cannot-be-opened).
           releaseDraft: true
