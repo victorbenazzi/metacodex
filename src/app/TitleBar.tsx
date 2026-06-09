@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
-import { GitBranch, ArrowUp, ArrowDown } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { GitBranch, ArrowUp, ArrowDown, Sparkles, Code2 } from "lucide-react";
 
 import { cn } from "@/lib/cn";
 import { isMac } from "@/lib/platform";
 import { useGitStore } from "@/features/git/git.store";
 import { useProjectsStore } from "@/features/projects/project.store";
+import { useViewStore } from "@/features/ui/view.store";
 import { Icon } from "@/components/ui/Icon";
+import { Segmented } from "@/components/ui/Segmented";
 import { useSaveStatusStore } from "@/features/workspace/saveStatus.store";
 import { useDiagnosticsStore } from "@/features/diagnostics/diagnostics.store";
 import { UpdatePill } from "@/components/updates/UpdatePill";
@@ -24,8 +27,11 @@ interface TitleBarProps {
  * recognized as a drag and the window can't be moved.
  */
 export function TitleBar({ workspaceName, className }: TitleBarProps) {
+  const { t } = useTranslation();
   const activeId = useProjectsStore((s) => s.activeProjectId);
   const git = useGitStore((s) => (activeId ? s.byProject[activeId] : null));
+  const view = useViewStore((s) => s.view);
+  const setView = useViewStore((s) => s.setView);
 
   return (
     <header
@@ -36,30 +42,37 @@ export function TitleBar({ workspaceName, className }: TitleBarProps) {
         className,
       )}
     >
-      {/* Brand wordmark — anchored to the leading edge (after the macOS traffic
-          lights' clearance) as a quiet signature. Idle opacity reads as
-          "decoration"; on hover it firms up so users discover it's
-          interactive-feeling without being a target. */}
-      <span
-        data-tauri-drag-region
-        className="justify-self-start font-display text-[14px] text-muted opacity-70 transition-opacity duration-150 hover:opacity-100"
-      >
-        metacodex
-      </span>
+      {/* Top-level view switch — sits where the wordmark used to, just past the
+          macOS traffic lights. NOT a drag region (it's an interactive control);
+          the rest of the header still drags the window. */}
+      <div className="justify-self-start">
+        <Segmented
+          size="sm"
+          ariaLabel={t("agent.viewToggle.label")}
+          value={view}
+          onChange={setView}
+          options={[
+            { value: "agent", label: t("agent.viewToggle.agent"), icon: Sparkles },
+            { value: "code", label: t("agent.viewToggle.code"), icon: Code2 },
+          ]}
+        />
+      </div>
 
       <div
         data-tauri-drag-region
         className="flex items-center justify-self-center gap-[12px]"
       >
-        {workspaceName ? (
+        {/* Project + branch are redundant in Agent mode (shown under the
+            composer), so the topbar only carries them in Code view. */}
+        {view !== "agent" && workspaceName ? (
           <span data-tauri-drag-region className="font-mono text-[11px] text-ink">
             {workspaceName}
           </span>
         ) : null}
-        {workspaceName && git && git.branch ? (
+        {view !== "agent" && workspaceName && git && git.branch ? (
           <span data-tauri-drag-region className="h-[10px] w-px bg-hairline-strong" />
         ) : null}
-        {git && git.branch ? (
+        {view !== "agent" && git && git.branch ? (
           <span
             data-tauri-drag-region
             className="inline-flex items-center gap-[5px] font-mono text-[11px] text-muted"

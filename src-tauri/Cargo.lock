@@ -2471,6 +2471,8 @@ dependencies = [
  "notify-debouncer-mini",
  "parking_lot",
  "portable-pty",
+ "reqwest",
+ "rustls",
  "serde",
  "serde_json",
  "tauri",

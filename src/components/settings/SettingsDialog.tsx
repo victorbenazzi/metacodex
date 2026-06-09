@@ -13,6 +13,7 @@ import {
   Info,
   LayoutPanelLeft,
   Bell,
+  Bot,
   X,
   Sun,
   Moon,
@@ -48,6 +49,7 @@ import {
   type CliDetectionStatus,
 } from "@/features/terminal/cli-detection";
 import { useSettingsDataStore } from "@/features/settings/settings.data.store";
+import { useAgentRuntimeStore } from "@/features/agent/runtime.store";
 import {
   DEFAULT_TERMINAL_FONT_FAMILY,
   type ExplorerIconStyle,
@@ -83,6 +85,7 @@ type CategoryId =
   | "notifications"
   | "shortcuts"
   | "advanced"
+  | "agent"
   | "cli"
   | "about";
 
@@ -101,6 +104,7 @@ const CATEGORIES: Category[] = [
   { id: "notifications", labelKey: "settings.nav.notifications", icon: Bell },
   { id: "shortcuts", labelKey: "settings.nav.shortcuts", icon: Keyboard },
   { id: "advanced", labelKey: "settings.nav.advanced", icon: Gauge },
+  { id: "agent", labelKey: "agent.settings.navLabel", icon: Bot },
   { id: "cli", labelKey: "settings.nav.cli", icon: Terminal },
   { id: "about", labelKey: "settings.nav.about", icon: Info },
 ];
@@ -190,6 +194,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               {selected === "notifications" && <NotificationsPane />}
               {selected === "shortcuts" && <ShortcutsPane />}
               {selected === "advanced" && <AdvancedPane />}
+              {selected === "agent" && <AgentPane />}
               {selected === "cli" && <CliRegistryPane />}
               {selected === "about" && <AboutPane />}
             </section>
@@ -818,6 +823,130 @@ function RangeShortcutRow({ command }: { command: CommandDef }) {
         <Kbd keys={["Mod", "9"]} />
       </span>
     </li>
+  );
+}
+
+function AgentPane() {
+  const { t } = useTranslation();
+  const status = useAgentRuntimeStore((s) => s.status);
+  const providers = useAgentRuntimeStore((s) => s.providers);
+  const starting = useAgentRuntimeStore((s) => s.starting);
+  const loadingModels = useAgentRuntimeStore((s) => s.loadingModels);
+  const runtimeError = useAgentRuntimeStore((s) => s.error);
+  const start = useAgentRuntimeStore((s) => s.start);
+  const loadModels = useAgentRuntimeStore((s) => s.loadModels);
+  const setCredentials = useAgentRuntimeStore((s) => s.setCredentials);
+
+  const agent = useSettingsDataStore((s) => s.settings.agent);
+  const update = useSettingsDataStore((s) => s.update);
+
+  const [key, setKey] = useState("");
+  const [savingKey, setSavingKey] = useState(false);
+
+  // Spin up the runtime + load the model catalog when this pane opens.
+  useEffect(() => {
+    void (async () => {
+      await start();
+      await loadModels();
+    })();
+  }, [start, loadModels]);
+
+  const provider = providers.find((p) => p.id === agent.providerId) ?? providers[0] ?? null;
+  const modelOptions: SelectOption[] = (provider?.models ?? []).map((m) => ({
+    value: m.id,
+    label: m.name,
+  }));
+  const selectedModel = agent.modelId || provider?.defaultModel || "";
+
+  const saveKey = async () => {
+    if (!key) return;
+    setSavingKey(true);
+    try {
+      await setCredentials(agent.providerId || "opencode-go", key);
+      setKey("");
+      await loadModels();
+    } finally {
+      setSavingKey(false);
+    }
+  };
+
+  return (
+    <div>
+      <PaneHeader title={t("agent.settings.title")} description={t("agent.settings.description")} />
+
+      <Row
+        label={t("agent.settings.runtime")}
+        hint={
+          status.running
+            ? t("agent.settings.runtimeHealthy", { version: status.version ?? "" })
+            : starting
+              ? t("agent.settings.runtimeStarting")
+              : t("agent.settings.runtimeStopped")
+        }
+      >
+        <div className="flex items-center gap-[8px]">
+          <span
+            className={cn(
+              "inline-block h-[8px] w-[8px] rounded-full",
+              status.running ? "bg-success" : "bg-muted-soft",
+            )}
+          />
+          <button
+            type="button"
+            onClick={() => void start()}
+            disabled={starting}
+            className="inline-flex h-[30px] items-center gap-[6px] rounded-sm border border-hairline-strong px-[10px] text-[12px] text-ink hover:bg-surface-strong/45 disabled:opacity-50"
+          >
+            <Icon
+              icon={starting ? Loader2 : RefreshCw}
+              size={13}
+              className={starting ? "animate-spin" : ""}
+            />
+            {t("agent.settings.restart")}
+          </button>
+        </div>
+      </Row>
+
+      <Row label={t("agent.settings.apiKey")} hint={t("agent.settings.apiKeyHint")}>
+        <div className="flex items-center gap-[6px]">
+          <input
+            type="password"
+            value={key}
+            onChange={(e) => setKey(e.target.value)}
+            placeholder="sk-..."
+            autoComplete="off"
+            className="h-[30px] w-[200px] rounded-sm border border-hairline-strong bg-surface-card px-[8px] text-[12px] text-ink outline-none focus:border-ink"
+          />
+          <button
+            type="button"
+            onClick={() => void saveKey()}
+            disabled={!key || savingKey}
+            className="inline-flex h-[30px] items-center rounded-sm border border-ink bg-ink px-[12px] text-[12px] text-on-primary disabled:opacity-50"
+          >
+            {t("agent.settings.save")}
+          </button>
+        </div>
+      </Row>
+
+      <Row label={t("agent.settings.defaultModel")} hint={t("agent.settings.defaultModelHint")}>
+        {modelOptions.length > 0 ? (
+          <Select
+            value={selectedModel}
+            options={modelOptions}
+            ariaLabel={t("agent.settings.defaultModel")}
+            onValueChange={(v) =>
+              update("agent", { providerId: provider?.id ?? "opencode-go", modelId: v })
+            }
+          />
+        ) : (
+          <span className="text-[12px] text-muted">
+            {loadingModels ? t("agent.settings.loadingModels") : t("agent.settings.noModels")}
+          </span>
+        )}
+      </Row>
+
+      {runtimeError ? <p className="mt-[12px] text-[12px] text-danger">{runtimeError}</p> : null}
+    </div>
   );
 }
 

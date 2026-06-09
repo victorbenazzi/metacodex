@@ -1,4 +1,166 @@
 {
+  "agent": {
+    "viewToggle": {
+      "label": "Trocar de visão",
+      "agent": "Agent",
+      "code": "Code"
+    },
+    "sidebar": {
+      "paneLabel": "Trabalho ou chat",
+      "work": "Trabalho",
+      "chat": "Chat",
+      "newTask": "Nova Tarefa",
+      "skills": "Skills",
+      "scheduledTasks": "Tarefas Agendadas",
+      "webBridge": "WebBridge",
+      "project": "Projeto",
+      "projectEmpty": "Crie ou selecione um arquivo para começar",
+      "tasks": "Tarefas",
+      "tasksEmpty": "Suas tarefas aparecerão aqui",
+      "newChat": "Novo chat",
+      "chats": "Conversas",
+      "chatsEmpty": "Suas conversas aparecerão aqui",
+      "untitledChat": "Novo chat"
+    },
+    "hero": {
+      "title": "Vamos tirar algo da sua lista",
+      "beta": "Prévia Beta"
+    },
+    "composer": {
+      "placeholder": "Digite \"/\" para acessar skills rapidamente",
+      "attach": "Adicionar anexo",
+      "askPermissions": "Pedir permissões",
+      "modeLabel": "Agente ou swarm",
+      "agent": "Agent",
+      "agentSwarm": "Agent Swarm",
+      "send": "Enviar",
+      "stop": "Parar",
+      "workInProject": "Trabalhar em um projeto",
+      "modelLabel": "Escolher modelo",
+      "modelEmpty": "Selecionar modelo",
+      "projectLabel": "Projeto de trabalho",
+      "globalScope": "Sem projeto"
+    },
+    "chat": {
+      "thinking": "Pensando",
+      "reasoning": "Raciocínio",
+      "thoughtFor": "Pensou {{sec}}s"
+    },
+    "tool": {
+      "read": "Leu",
+      "write": "Criou",
+      "edit": "Editou",
+      "editing": "Editando",
+      "bash": "Rodou",
+      "search": "Buscou",
+      "searchFiles": "Buscou arquivos",
+      "list": "Listou",
+      "fetch": "Buscou",
+      "plan": "Atualizou o plano",
+      "skill": "Carregou skill"
+    },
+    "swarm": {
+      "subagents": "Subagentes",
+      "started": "{{count}} subagentes iniciados",
+      "running": "Trabalhando",
+      "starting": "Iniciando",
+      "done": "Concluído",
+      "activity": {
+        "exploring": "Explorando",
+        "editing": "Editando arquivos",
+        "running": "Rodando comandos",
+        "searching": "Buscando na web"
+      }
+    },
+    "skills": {
+      "title": "Skills",
+      "subtitle": "Skills reutilizáveis que o agente carrega sob demanda, descobertas do opencode, Claude e metacodex.",
+      "loading": "Carregando skills",
+      "emptyTitle": "Nenhuma skill encontrada",
+      "emptyBody": "Adicione Agent Skills em ~/.config/opencode/skills ou ~/.claude/skills e elas aparecem aqui."
+    },
+    "scheduled": {
+      "title": "Tarefas Agendadas",
+      "subtitle": "Cron jobs que rodam um prompt em um cronograma. Disparam enquanto o metacodex está aberto.",
+      "emptyTitle": "Nenhuma tarefa agendada ainda",
+      "emptyBody": "Crie uma acima para rodar um prompt de forma recorrente.",
+      "titlePlaceholder": "Nome da tarefa",
+      "promptPlaceholder": "O que o agente deve fazer a cada execução?",
+      "every": "A cada",
+      "minutes": "minutos",
+      "create": "Criar tarefa",
+      "runsEvery": "A cada {{count}} min",
+      "lastRun": "última {{time}}",
+      "enabled": "On",
+      "disabled": "Off",
+      "runNow": "Rodar agora",
+      "delete": "Excluir"
+    },
+    "webbridge": {
+      "title": "WebBridge",
+      "subtitle": "Automação de browser: deixe os agentes dirigirem um navegador real.",
+      "emptyTitle": "WebBridge está a caminho",
+      "emptyBody": "Conecte um navegador para os agentes navegarem, clicarem e extraírem da web."
+    },
+    "settings": {
+      "navLabel": "Agent",
+      "title": "Runtime do agente",
+      "description": "O motor opencode por trás do Agent View, e os modelos da sua subscription.",
+      "runtime": "Runtime",
+      "runtimeHealthy": "Rodando, opencode v{{version}}",
+      "runtimeStarting": "Iniciando o motor",
+      "runtimeStopped": "Parado",
+      "restart": "Reiniciar",
+      "apiKey": "Chave GO do opencode",
+      "apiKeyHint": "Cole a chave da sua subscription opencode para listar e usar todos os modelos. Guardada pelo motor, nunca no navegador.",
+      "save": "Salvar",
+      "defaultModel": "Modelo padrão",
+      "defaultModelHint": "Usado em novos chats e tarefas.",
+      "loadingModels": "Carregando modelos",
+      "noModels": "Sem modelos ainda. Adicione sua chave GO acima."
+    },
+    "permission": {
+      "ask": "Sempre perguntar",
+      "askDesc": "Aprova cada edição, comando e acesso à rede.",
+      "auto-edit": "Auto-aprovar edições",
+      "auto-editDesc": "Edições rodam livres; comandos e rede ainda perguntam.",
+      "full-auto": "Tudo liberado",
+      "full-autoDesc": "Roda tudo sem perguntar. Use com cuidado.",
+      "requestTitle": "Permissão solicitada",
+      "requestBody": "O agente quer executar",
+      "moreTargets": "+{{count}} outros",
+      "deny": "Negar",
+      "allowOnce": "Permitir uma vez",
+      "allowAlways": "Permitir sempre"
+    },
+    "project": {
+      "startScratch": "Começar do zero",
+      "useExisting": "Usar pasta existente",
+      "noFolder": "Trabalhar sem pasta"
+    },
+    "createProject": {
+      "title": "Criar projeto",
+      "nameLabel": "Nome do projeto",
+      "namePlaceholder": "Digite um nome de pasta",
+      "dirLabel": "Selecione o diretório do projeto",
+      "dirPlaceholder": "Escolha uma pasta",
+      "dirDialogTitle": "Selecionar diretório do projeto",
+      "create": "Salvar",
+      "creating": "Salvando",
+      "nameInvalid": "O nome da pasta não pode conter / \\ nem ser . ou ..",
+      "errExists": "Já existe uma pasta chamada \"{{name}}\" ali."
+    },
+    "branch": {
+      "switchLabel": "Trocar de branch",
+      "createNew": "Criar nova branch",
+      "createTitle": "Criar branch",
+      "nameLabel": "Nome da branch",
+      "namePlaceholder": "feature/minha-branch",
+      "create": "Criar",
+      "creating": "Criando",
+      "nameInvalid": "Use letras, números e / _ - . (sem traço no início, sem \"..\")."
+    }
+  },
   "common": {
     "cancel": "Cancelar",
     "confirm": "Confirmar",

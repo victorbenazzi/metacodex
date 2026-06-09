@@ -8,6 +8,17 @@ pub async fn add_project(path: String, app: AppHandle) -> AppResult<Project> {
     projects::add(&app, path)
 }
 
+/// Create a new project folder (`directory/name`) and register it. Backs the
+/// Agent View's "Start from scratch" flow.
+#[tauri::command]
+pub async fn create_project(
+    directory: String,
+    name: String,
+    app: AppHandle,
+) -> AppResult<Project> {
+    projects::create(&app, directory, name)
+}
+
 #[tauri::command]
 pub async fn remove_project(id: String, app: AppHandle) -> AppResult<()> {
     projects::remove(&app, &id)

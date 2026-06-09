@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { homeDir } from "@tauri-apps/api/path";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
@@ -7,6 +7,13 @@ import { MiniProjectSidebar } from "@/components/project-rail/MiniProjectSidebar
 import { ExplorerPanel } from "@/components/file-explorer/ExplorerPanel";
 import { WorkArea } from "@/components/tabs/WorkArea";
 import { TitleBar } from "@/app/TitleBar";
+import { useViewStore } from "@/features/ui/view.store";
+
+// Lazy-loaded so the Agent View's heavier deps (streamdown/shiki/katex/mermaid)
+// stay out of the Code View bundle and only load when the user enters Agent mode.
+const AgentView = lazy(() =>
+  import("@/components/agent/AgentView").then((m) => ({ default: m.AgentView })),
+);
 import {
   useTabsStore,
   WORKSPACE_NULL,
@@ -1203,6 +1210,11 @@ export function AppShell() {
     ? `56px ${explorerWidth}px minmax(0,1fr) ${sourceControlWidth}px`
     : `56px ${explorerWidth}px minmax(0,1fr)`;
 
+  // Agent View renders as an opaque overlay below the titlebar so the Code
+  // panels (and their live terminals) stay mounted underneath while in Agent
+  // mode — switching back is instant and lossless.
+  const agentMode = useViewStore((s) => s.view) === "agent";
+
   return (
     <div
       className="relative grid h-screen w-screen grid-rows-[36px_minmax(0,1fr)] bg-canvas text-ink"
@@ -1356,6 +1368,16 @@ export function AppShell() {
         }}
         onSent={handleSentToProject}
       />
+
+      {agentMode ? (
+        <Suspense
+          fallback={
+            <div className="absolute inset-x-0 bottom-0 top-[36px] z-30 bg-canvas" />
+          }
+        >
+          <AgentView className="absolute inset-x-0 bottom-0 top-[36px] z-30" />
+        </Suspense>
+      ) : null}
     </div>
   );
 }

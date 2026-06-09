@@ -1,3 +1,4 @@
+pub mod agent;
 pub mod commands;
 pub mod config_paths;
 pub mod error;
@@ -21,18 +22,37 @@ use watcher::WatcherManager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
-        // single-instance MUST be the first plugin registered. A second launch of
-        // the binary (e.g. `open -n`, or file args on a fresh exec) routes here
-        // instead of spawning a duplicate process with its own PTYs / shared state.
-        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+    // reqwest 0.13 + rustls 0.23 (pulled in via tauri-plugin-updater and the
+    // AgentRuntime HTTP client) require a process-wide crypto provider to be
+    // installed before any reqwest::Client is built — otherwise the client
+    // constructor panics "No provider set" at launch. Install ring's provider
+    // once, here, before the Tauri builder spins anything up. Idempotent: a
+    // second call returns Err with the already-installed provider; we ignore it.
+    let _ = rustls::crypto::ring::default_provider().install_default();
+
+    // `mut` is used only in release (the single-instance block below); debug skips it.
+    #[allow(unused_mut)]
+    let mut builder = tauri::Builder::default();
+    // single-instance MUST be the first plugin registered. A second launch of the
+    // binary (e.g. `open -n`, or file args on a fresh exec) routes here instead of
+    // spawning a duplicate process with its own PTYs / shared state.
+    //
+    // Skipped in DEBUG builds so a `pnpm tauri dev` window can run ALONGSIDE an
+    // installed metacodex — otherwise the dev launch is routed into the installed
+    // app (which focuses it) and no dev window ever appears. Pair this with
+    // `METACODEX_HOME` for an isolated dev state dir.
+    #[cfg(not(debug_assertions))]
+    {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             if let Some(win) = app.get_webview_window("main") {
                 let _ = win.set_focus();
             }
             // argv[0] is the binary path; the rest may be file paths to open.
             let paths: Vec<String> = argv.into_iter().skip(1).collect();
             open_files::deliver(app, paths);
-        }))
+        }));
+    }
+    builder
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_os::init())
@@ -58,6 +78,10 @@ pub fn run() {
                     if let Some(mgr) = app.try_state::<pty::PtyManager>() {
                         mgr.kill_all().await;
                     }
+                    // Reap the opencode runtime sidecar so it doesn't outlive the app.
+                    if let Some(rt) = app.try_state::<agent::AgentRuntime>() {
+                        rt.stop();
+                    }
                     app.exit(0);
                 });
             }
@@ -68,6 +92,10 @@ pub fn run() {
             app.manage(Arc::new(ProjectsCache::default()));
             app.manage(Arc::new(WatcherManager::new(app.handle().clone())));
             app.manage(Arc::new(PendingOpenFiles::default()));
+            // opencode runtime sidecar (Agent View). Spawned lazily on first use.
+            app.manage(agent::AgentRuntime::new());
+            // Scheduled-task (cron) registry, hydrated from disk.
+            app.manage(agent::scheduler::CronStore::load());
             // Ensure the ~/.metacodex tree exists before anything reads from it.
             if let Err(e) = config_paths::ensure_dirs() {
                 eprintln!("[metacodex] config_paths::ensure_dirs failed: {e}");
@@ -79,6 +107,9 @@ pub fn run() {
             // Trim resume entries older than 30 days. Best-effort: corrupt
             // files are ignored so this never blocks startup.
             commands::resume::prune_blocking(30);
+            // Start the Agent View cron scheduler (fires due tasks once a minute
+            // while the app is open).
+            agent::scheduler::start(app.handle().clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -91,6 +122,7 @@ pub fn run() {
             commands::terminal::pty_update_cwd,
             commands::cli::cli_detect,
             commands::projects::add_project,
+            commands::projects::create_project,
             commands::projects::remove_project,
             commands::projects::rename_project,
             commands::projects::update_project_meta,
@@ -128,6 +160,9 @@ pub fn run() {
             commands::search::list_files,
             commands::git::git_status,
             commands::git::git_file_head_content,
+            commands::git::git_branch_list,
+            commands::git::git_checkout,
+            commands::git::git_create_branch,
             commands::git::git_worktree_list,
             commands::git::git_worktree_add,
             commands::git::git_worktree_remove,
@@ -140,6 +175,17 @@ pub fn run() {
             commands::resume::resume_prune,
             commands::diagnostics::write_session_log,
             commands::diagnostics::write_crash,
+            commands::agent::agent_runtime_start,
+            commands::agent::agent_runtime_status,
+            commands::agent::agent_runtime_stop,
+            commands::agent::agent_list_models,
+            commands::agent::agent_set_credentials,
+            commands::agent::agent_list_skills,
+            commands::agent::agent_cron_list,
+            commands::agent::agent_cron_create,
+            commands::agent::agent_cron_delete,
+            commands::agent::agent_cron_set_enabled,
+            commands::agent::agent_cron_run_now,
         ])
         .build(tauri::generate_context!())
         .expect("metacodex failed to start")

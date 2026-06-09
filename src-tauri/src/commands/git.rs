@@ -48,6 +48,99 @@ pub async fn git_file_head_content(app: AppHandle, path: String) -> AppResult<Op
         .map_err(|e| AppError::Other(format!("join: {e}")))?
 }
 
+// -- Branch management ---------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BranchInfo {
+    pub name: String,
+    pub current: bool,
+}
+
+/// Local branches of the repo at `root`, most-recently-committed first. The
+/// current branch is flagged via `%(HEAD)` (`*`).
+#[tauri::command]
+pub async fn git_branch_list(app: AppHandle, root: String) -> AppResult<Vec<BranchInfo>> {
+    ensure_root_allowed(&app, &root)?;
+    tokio::task::spawn_blocking(move || {
+        let out = run_git(
+            &root,
+            &[
+                "for-each-ref",
+                "--sort=-committerdate",
+                "--format=%(HEAD)\t%(refname:short)",
+                "refs/heads/",
+            ],
+        )?;
+        if !out.status.success() {
+            return Err(AppError::Other(format!(
+                "git branch list failed: {}",
+                String::from_utf8_lossy(&out.stderr).trim()
+            )));
+        }
+        let text = String::from_utf8_lossy(&out.stdout);
+        let branches = text
+            .lines()
+            .filter_map(|line| {
+                let mut parts = line.splitn(2, '\t');
+                let head = parts.next().unwrap_or("");
+                let name = parts.next().unwrap_or("").trim();
+                if name.is_empty() {
+                    return None;
+                }
+                Some(BranchInfo {
+                    name: name.to_string(),
+                    current: head == "*",
+                })
+            })
+            .collect();
+        Ok(branches)
+    })
+    .await
+    .map_err(|e| AppError::Other(format!("join: {e}")))?
+}
+
+/// Switch the working tree at `root` to an existing local branch.
+#[tauri::command]
+pub async fn git_checkout(app: AppHandle, root: String, branch: String) -> AppResult<()> {
+    ensure_root_allowed(&app, &root)?;
+    if !valid_branch_name(&branch) {
+        return Err(AppError::Other(format!("invalid branch name: {branch}")));
+    }
+    tokio::task::spawn_blocking(move || {
+        let out = run_git(&root, &["checkout", branch.as_str()])?;
+        if !out.status.success() {
+            return Err(AppError::Other(
+                String::from_utf8_lossy(&out.stderr).trim().to_string(),
+            ));
+        }
+        Ok(())
+    })
+    .await
+    .map_err(|e| AppError::Other(format!("join: {e}")))?
+}
+
+/// Create a new branch off the current HEAD and switch to it.
+#[tauri::command]
+pub async fn git_create_branch(app: AppHandle, root: String, name: String) -> AppResult<()> {
+    ensure_root_allowed(&app, &root)?;
+    let name = name.trim().to_string();
+    if !valid_branch_name(&name) {
+        return Err(AppError::Other(format!("invalid branch name: {name}")));
+    }
+    tokio::task::spawn_blocking(move || {
+        let out = run_git(&root, &["checkout", "-b", name.as_str()])?;
+        if !out.status.success() {
+            return Err(AppError::Other(
+                String::from_utf8_lossy(&out.stderr).trim().to_string(),
+            ));
+        }
+        Ok(())
+    })
+    .await
+    .map_err(|e| AppError::Other(format!("join: {e}")))?
+}
+
 // -- Worktree primitives -------------------------------------------------------
 
 #[derive(Debug, Clone, Serialize)]

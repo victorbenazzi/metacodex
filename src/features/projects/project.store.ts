@@ -16,6 +16,7 @@ interface ProjectsState {
 
   hydrate: () => Promise<void>;
   add: (path: string) => Promise<Project>;
+  create: (directory: string, name: string) => Promise<Project>;
   remove: (id: string) => Promise<void>;
   rename: (id: string, name: string) => Promise<Project>;
   updateMeta: (id: string, patch: { color?: string; icon?: string }) => Promise<Project>;
@@ -24,6 +25,25 @@ interface ProjectsState {
   clearActive: () => void;
 
   activeProject: () => Project | null;
+}
+
+/**
+ * Merge a freshly added/created project into the list and make it active. Shared
+ * by `add` (existing folder) and `create` (new folder) so the registration
+ * bookkeeping lives in one place.
+ */
+async function absorbProject(
+  get: () => ProjectsState,
+  set: (partial: Partial<ProjectsState>) => void,
+  project: Project,
+): Promise<Project> {
+  const cur = get().projects;
+  const next = cur.some((p) => p.id === project.id)
+    ? cur.map((p) => (p.id === project.id ? project : p))
+    : [...cur, project];
+  set({ projects: next, activeProjectId: project.id });
+  await projectsApi.setActive(project.id).catch(() => undefined);
+  return project;
 }
 
 export const useProjectsStore = create<ProjectsState>((set, get) => ({
@@ -46,16 +66,9 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
     }
   },
 
-  add: async (path) => {
-    const project = await projectsApi.add(path);
-    const cur = get().projects;
-    const next = cur.some((p) => p.id === project.id)
-      ? cur.map((p) => (p.id === project.id ? project : p))
-      : [...cur, project];
-    set({ projects: next, activeProjectId: project.id });
-    await projectsApi.setActive(project.id).catch(() => undefined);
-    return project;
-  },
+  add: (path) => projectsApi.add(path).then((p) => absorbProject(get, set, p)),
+  create: (directory, name) =>
+    projectsApi.create(directory, name).then((p) => absorbProject(get, set, p)),
 
   remove: async (id) => {
     // Tear down every live resource attached to this project BEFORE the Rust

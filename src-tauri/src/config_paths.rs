@@ -24,7 +24,17 @@ use serde::Serialize;
 use crate::error::{AppError, AppResult};
 
 /// Root of all metacodex config + state: `~/.metacodex`.
+///
+/// Honors `METACODEX_HOME` when set + non-empty, so a dev build can run with an
+/// isolated state dir (e.g. `METACODEX_HOME=~/.metacodex-dev pnpm tauri dev`)
+/// without clobbering an installed metacodex's projects/settings/workspace.
 pub fn config_root() -> AppResult<PathBuf> {
+    if let Ok(dir) = std::env::var("METACODEX_HOME") {
+        let trimmed = dir.trim();
+        if !trimmed.is_empty() {
+            return Ok(PathBuf::from(trimmed));
+        }
+    }
     dirs::home_dir()
         .map(|h| h.join(".metacodex"))
         .ok_or_else(|| AppError::Other("could not resolve home directory".into()))

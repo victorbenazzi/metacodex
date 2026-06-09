@@ -1,4 +1,166 @@
 {
+  "agent": {
+    "viewToggle": {
+      "label": "Switch view",
+      "agent": "Agent",
+      "code": "Code"
+    },
+    "sidebar": {
+      "paneLabel": "Work or chat",
+      "work": "Work",
+      "chat": "Chat",
+      "newTask": "New Task",
+      "skills": "Skills",
+      "scheduledTasks": "Scheduled Tasks",
+      "webBridge": "WebBridge",
+      "project": "Project",
+      "projectEmpty": "Create or select a file to start",
+      "tasks": "Tasks",
+      "tasksEmpty": "Your tasks will appear here",
+      "newChat": "New chat",
+      "chats": "Chats",
+      "chatsEmpty": "Your chats will appear here",
+      "untitledChat": "New chat"
+    },
+    "hero": {
+      "title": "Let's take something off your plate",
+      "beta": "Beta Preview"
+    },
+    "composer": {
+      "placeholder": "Type \"/\" to quickly access skills",
+      "attach": "Add attachment",
+      "askPermissions": "Ask permissions",
+      "modeLabel": "Agent or swarm",
+      "agent": "Agent",
+      "agentSwarm": "Agent Swarm",
+      "send": "Send",
+      "stop": "Stop",
+      "workInProject": "Work in a project",
+      "modelLabel": "Choose model",
+      "modelEmpty": "Select model",
+      "projectLabel": "Working project",
+      "globalScope": "No project"
+    },
+    "chat": {
+      "thinking": "Thinking",
+      "reasoning": "Reasoning",
+      "thoughtFor": "Thought {{sec}}s"
+    },
+    "tool": {
+      "read": "Read",
+      "write": "Created",
+      "edit": "Edited",
+      "editing": "Editing",
+      "bash": "Ran",
+      "search": "Searched",
+      "searchFiles": "Searched files",
+      "list": "Listed",
+      "fetch": "Fetched",
+      "plan": "Updated plan",
+      "skill": "Loaded skill"
+    },
+    "swarm": {
+      "subagents": "Subagents",
+      "started": "Started {{count}} subagents",
+      "running": "Working",
+      "starting": "Starting up",
+      "done": "Done",
+      "activity": {
+        "exploring": "Exploring",
+        "editing": "Editing files",
+        "running": "Running commands",
+        "searching": "Searching the web"
+      }
+    },
+    "skills": {
+      "title": "Skills",
+      "subtitle": "Reusable skills the agent can load on demand, discovered from opencode, Claude, and metacodex.",
+      "loading": "Loading skills",
+      "emptyTitle": "No skills found",
+      "emptyBody": "Add Agent Skills to ~/.config/opencode/skills or ~/.claude/skills and they show up here."
+    },
+    "scheduled": {
+      "title": "Scheduled Tasks",
+      "subtitle": "Cron jobs that run a prompt on a schedule. They fire while metacodex is open.",
+      "emptyTitle": "No scheduled tasks yet",
+      "emptyBody": "Create one above to run a prompt on a recurring schedule.",
+      "titlePlaceholder": "Task name",
+      "promptPlaceholder": "What should the agent do each run?",
+      "every": "Every",
+      "minutes": "minutes",
+      "create": "Create task",
+      "runsEvery": "Every {{count}} min",
+      "lastRun": "last run {{time}}",
+      "enabled": "On",
+      "disabled": "Off",
+      "runNow": "Run now",
+      "delete": "Delete"
+    },
+    "webbridge": {
+      "title": "WebBridge",
+      "subtitle": "Browser automation: let agents drive a real browser.",
+      "emptyTitle": "WebBridge is on the way",
+      "emptyBody": "Connect a browser so agents can navigate, click, and extract from the web."
+    },
+    "settings": {
+      "navLabel": "Agent",
+      "title": "Agent runtime",
+      "description": "The opencode engine behind the Agent View, plus the models from your subscription.",
+      "runtime": "Runtime",
+      "runtimeHealthy": "Running, opencode v{{version}}",
+      "runtimeStarting": "Starting the engine",
+      "runtimeStopped": "Stopped",
+      "restart": "Restart",
+      "apiKey": "opencode GO key",
+      "apiKeyHint": "Paste your opencode subscription key to list and use every model it includes. Held by the engine, never in the browser.",
+      "save": "Save",
+      "defaultModel": "Default model",
+      "defaultModelHint": "Used for new chats and tasks.",
+      "loadingModels": "Loading models",
+      "noModels": "No models yet. Add your GO key above."
+    },
+    "permission": {
+      "ask": "Always ask",
+      "askDesc": "Approve every edit, command, and network call.",
+      "auto-edit": "Auto-approve edits",
+      "auto-editDesc": "Edits run freely; commands and network still ask.",
+      "full-auto": "Full auto",
+      "full-autoDesc": "Run everything without asking. Use with care.",
+      "requestTitle": "Permission requested",
+      "requestBody": "The agent wants to run",
+      "moreTargets": "+{{count}} more",
+      "deny": "Deny",
+      "allowOnce": "Allow once",
+      "allowAlways": "Allow always"
+    },
+    "project": {
+      "startScratch": "Start from scratch",
+      "useExisting": "Use existing folder",
+      "noFolder": "Work without a folder"
+    },
+    "createProject": {
+      "title": "Create project",
+      "nameLabel": "Project Name",
+      "namePlaceholder": "Please enter a folder name",
+      "dirLabel": "Select project directory",
+      "dirPlaceholder": "Choose a folder",
+      "dirDialogTitle": "Select project directory",
+      "create": "Save",
+      "creating": "Saving",
+      "nameInvalid": "Folder name can't contain / \\ or be . or ..",
+      "errExists": "A folder named \"{{name}}\" already exists there."
+    },
+    "branch": {
+      "switchLabel": "Switch branch",
+      "createNew": "Create new branch",
+      "createTitle": "Create branch",
+      "nameLabel": "Branch name",
+      "namePlaceholder": "feature/my-branch",
+      "create": "Create",
+      "creating": "Creating",
+      "nameInvalid": "Use letters, numbers and / _ - . (no leading dash, no \"..\")."
+    }
+  },
   "common": {
     "cancel": "Cancel",
     "confirm": "Confirm",

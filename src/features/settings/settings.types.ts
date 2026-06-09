@@ -1,6 +1,12 @@
 import { isLanguageId, type LanguageId } from "@/features/i18n/config";
 import type { ThemeMode } from "@/features/theme/theme.store";
 import { DEFAULT_LIGHT_THEME_ID, isThemeId } from "@/features/theme/themes";
+import {
+  AGENT_MODES,
+  PERMISSION_PRESETS,
+  type AgentMode,
+  type PermissionPreset,
+} from "@/features/agent/opencode";
 
 export type TerminalCursorStyle = "bar" | "block" | "underline";
 
@@ -83,6 +89,17 @@ export interface AppSettings {
      *  affected tab is the active one. Default: off (the badge is enough). */
     notifyWhenFocused: boolean;
   };
+  /** Agent View runtime defaults. The opencode GO key itself is held by the
+   *  runtime (opencode's own auth store), never persisted here — this only
+   *  remembers the provider + default model the user picked. */
+  agent: {
+    providerId: string;
+    modelId: string;
+    /** Permission posture applied to new agent sessions. */
+    permissionPreset: PermissionPreset;
+    /** Single primary agent vs an orchestrator that delegates to subagents. */
+    mode: AgentMode;
+  };
 }
 
 /** Slices of `AppSettings` that are nested objects (patchable via `update`). */
@@ -92,7 +109,8 @@ export type SettingsSliceKey =
   | "performance"
   | "interface"
   | "panels"
-  | "notifications";
+  | "notifications"
+  | "agent";
 
 /** Resize bounds for the shell panels. Conventions:
  *  - Explorer: VS Code uses ~170px floor; we sit slightly above so the path
@@ -151,6 +169,12 @@ export const DEFAULT_SETTINGS: AppSettings = {
     soundEnabled: true,
     notifyWhenFocused: false,
   },
+  agent: {
+    providerId: "opencode-go",
+    modelId: "",
+    permissionPreset: "ask",
+    mode: "agent",
+  },
 };
 
 function clampNum(value: unknown, def: number, min: number, max: number): number {
@@ -202,6 +226,7 @@ export function mergeSettings(raw: unknown): AppSettings {
   const iface = asObject(r.interface);
   const panels = asObject(r.panels);
   const notif = asObject(r.notifications);
+  const ag = asObject(r.agent);
   const D = DEFAULT_SETTINGS;
   return {
     theme: oneOf(r.theme, THEME_VALUES, D.theme),
@@ -278,6 +303,12 @@ export function mergeSettings(raw: unknown): AppSettings {
         typeof notif.notifyWhenFocused === "boolean"
           ? notif.notifyWhenFocused
           : D.notifications.notifyWhenFocused,
+    },
+    agent: {
+      providerId: str(ag.providerId, D.agent.providerId),
+      modelId: str(ag.modelId, D.agent.modelId),
+      permissionPreset: oneOf(ag.permissionPreset, PERMISSION_PRESETS, D.agent.permissionPreset),
+      mode: oneOf(ag.mode, AGENT_MODES, D.agent.mode),
     },
   };
 }

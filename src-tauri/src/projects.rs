@@ -211,6 +211,35 @@ pub fn add(app: &AppHandle, path: String) -> AppResult<Project> {
     Ok(project)
 }
 
+/// Create a brand-new project folder under `directory` and register it. `name`
+/// becomes a single new sub-folder; the resulting path is then handed to `add`
+/// (so naming / color / dedup all stay in one place). Refuses to clobber.
+///
+// SECURITY: this creates a directory *outside* the registered roots — a project
+// doesn't exist yet, so it can't go through `ensure_within_roots`. Mitigated by:
+// `directory` comes from the native folder dialog (an explicit OS-level user
+// grant, same trust model as `add`), and `name` must be a single safe path
+// segment (no separators, no `.`/`..`).
+pub fn create(app: &AppHandle, directory: String, name: String) -> AppResult<Project> {
+    let directory = directory.trim_end_matches('/').to_string();
+    let name = name.trim().to_string();
+    if name.is_empty() {
+        return Err(AppError::Other("empty project name".into()));
+    }
+    if name.contains('/') || name.contains('\\') || name == "." || name == ".." {
+        return Err(AppError::Other("invalid project name".into()));
+    }
+    if !std::path::Path::new(&directory).is_dir() {
+        return Err(AppError::NotFound(format!("not a directory: {directory}")));
+    }
+    let full = std::path::Path::new(&directory).join(&name);
+    if full.exists() {
+        return Err(AppError::Other(format!("already exists: {}", full.display())));
+    }
+    std::fs::create_dir(&full).map_err(|e| AppError::Other(format!("create project dir: {e}")))?;
+    add(app, full.to_string_lossy().into_owned())
+}
+
 pub fn remove(app: &AppHandle, id: &str) -> AppResult<()> {
     let mut file = load_file()?;
     let initial = file.projects.len();

@@ -19,6 +19,7 @@ export const CMD = {
 
   // projects
   addProject: "add_project",
+  createProject: "create_project",
   removeProject: "remove_project",
   renameProject: "rename_project",
   updateProjectMeta: "update_project_meta",
@@ -73,6 +74,9 @@ export const CMD = {
   // git
   gitStatus: "git_status",
   gitFileHeadContent: "git_file_head_content",
+  gitBranchList: "git_branch_list",
+  gitCheckout: "git_checkout",
+  gitCreateBranch: "git_create_branch",
   gitWorktreeList: "git_worktree_list",
   gitWorktreeAdd: "git_worktree_add",
   gitWorktreeRemove: "git_worktree_remove",
@@ -91,6 +95,19 @@ export const CMD = {
   // diagnostics
   diagWriteSessionLog: "write_session_log",
   diagWriteCrash: "write_crash",
+
+  // agent runtime (opencode sidecar)
+  agentRuntimeStart: "agent_runtime_start",
+  agentRuntimeStatus: "agent_runtime_status",
+  agentRuntimeStop: "agent_runtime_stop",
+  agentListModels: "agent_list_models",
+  agentSetCredentials: "agent_set_credentials",
+  agentListSkills: "agent_list_skills",
+  agentCronList: "agent_cron_list",
+  agentCronCreate: "agent_cron_create",
+  agentCronDelete: "agent_cron_delete",
+  agentCronSetEnabled: "agent_cron_set_enabled",
+  agentCronRunNow: "agent_cron_run_now",
 } as const;
 
 export type CmdName = (typeof CMD)[keyof typeof CMD];

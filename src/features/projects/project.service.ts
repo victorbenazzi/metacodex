@@ -5,6 +5,9 @@ export const projectsApi = {
   add(path: string): Promise<Project> {
     return invoke<Project>(CMD.addProject, { path });
   },
+  create(directory: string, name: string): Promise<Project> {
+    return invoke<Project>(CMD.createProject, { directory, name });
+  },
   remove(id: string): Promise<void> {
     return invoke<void>(CMD.removeProject, { id });
   },

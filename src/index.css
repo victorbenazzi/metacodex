@@ -44,16 +44,30 @@
 
   /* Rendered markdown is a reading surface — text must be selectable/copyable
      despite the global `user-select: none`. Interactive children keep a pointer
-     cursor. */
+     cursor. `.agent-md` is the Agent View chat markdown. */
   .md-prose,
-  .md-prose * {
+  .md-prose *,
+  .agent-md,
+  .agent-md * {
     user-select: text;
     cursor: text;
   }
   .md-prose a,
   .md-prose button,
-  .md-prose summary {
+  .md-prose summary,
+  .agent-md a,
+  .agent-md button,
+  .agent-md summary {
     cursor: pointer;
+  }
+
+  /* Keep list markers indented inside the bubble/card instead of glued to the
+     left edge (streamdown ships no list padding of its own). */
+  .agent-md :is(ul, ol) {
+    padding-inline-start: 1.5em;
+  }
+  .agent-md :is(ul, ol) :is(ul, ol) {
+    padding-inline-start: 1.25em;
   }
 
   ::selection {
