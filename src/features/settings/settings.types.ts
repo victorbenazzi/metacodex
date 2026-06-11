@@ -111,6 +111,9 @@ export interface AppSettings {
     /** Chosen reasoning variant per model (`providerId/modelId` → variant
      *  name, e.g. "high"). Absent/"" = the model's default effort. */
     variantByModel: Record<string, string>;
+    /** Selected agent entity (slug under `~/.metacodex/agents`). "" = none:
+     *  the plain chat with the user's own model/preset picks. */
+    entityId: string;
   };
 }
 
@@ -207,6 +210,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     visionModelId: "kimi-k2.5",
     enabledModels: {},
     variantByModel: {},
+    entityId: "",
   },
 };
 
@@ -356,6 +360,7 @@ export function mergeSettings(raw: unknown): AppSettings {
       visionModelId: str(ag.visionModelId, D.agent.visionModelId),
       enabledModels: asBoolMap(ag.enabledModels),
       variantByModel: asStringMap(ag.variantByModel),
+      entityId: str(ag.entityId, D.agent.entityId),
     },
   };
 }

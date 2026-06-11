@@ -5,8 +5,9 @@ use tauri::{AppHandle, State};
 
 use crate::agent::scheduler;
 use crate::agent::{
-    AgentRuntime, CronInput, CronStore, CronTask, FeaturedServerDef, McpServerEntry,
-    McpServerInput, McpStore, ProviderModels, RuntimeStatus, SkillInfo,
+    AgentEntity, AgentEntityInput, AgentEntityStore, AgentRuntime, CronInput, CronStore,
+    CronTask, FeaturedServerDef, McpServerEntry, McpServerInput, McpStore, ProviderModels,
+    RuntimeStatus, SkillInfo,
 };
 use crate::error::{AppError, AppResult};
 use crate::projects::ProjectsCache;
@@ -215,6 +216,139 @@ pub async fn agent_mcp_status(
     directory: Option<String>,
 ) -> AppResult<Option<serde_json::Value>> {
     runtime.mcp_status(directory.as_deref()).await
+}
+
+/// Agent entities (persistent agents living in `~/.metacodex/agents/`).
+/// Mutations regenerate the OPENCODE_CONFIG layer; the frontend hot-applies
+/// with `POST /global/dispose` on the sidecar (no restart needed: opencode
+/// re-reads the config file when it builds the next directory instance).
+#[tauri::command]
+pub async fn agent_entity_list(
+    store: State<'_, AgentEntityStore>,
+) -> AppResult<Vec<AgentEntity>> {
+    store.list()
+}
+
+#[tauri::command]
+pub async fn agent_entity_create(
+    store: State<'_, AgentEntityStore>,
+    input: AgentEntityInput,
+) -> AppResult<AgentEntity> {
+    store.create(input)
+}
+
+#[tauri::command]
+pub async fn agent_entity_update(
+    store: State<'_, AgentEntityStore>,
+    id: String,
+    input: AgentEntityInput,
+) -> AppResult<AgentEntity> {
+    store.update(&id, input)
+}
+
+#[tauri::command]
+pub async fn agent_entity_delete(
+    store: State<'_, AgentEntityStore>,
+    id: String,
+) -> AppResult<()> {
+    store.delete(&id)
+}
+
+/// ---- Agent entity life (phases 2-4): memory, activity, proposals ----
+/// All paths derive from `entities::home_dir` (slug-validated), the same
+/// SECURITY posture as `config_paths` (outside project roots by design).
+use crate::agent::life;
+
+/// The memory context block the chat injects as `system` on entity sends.
+#[tauri::command]
+pub async fn agent_entity_memory_context(
+    id: String,
+    directory: Option<String>,
+) -> AppResult<String> {
+    let home = crate::agent::entities::home_dir(&id)?;
+    Ok(life::memory_context(&home, directory.as_deref()))
+}
+
+#[tauri::command]
+pub async fn agent_entity_memory_tree(id: String) -> AppResult<life::MemoryTree> {
+    let home = crate::agent::entities::home_dir(&id)?;
+    Ok(life::memory_tree(&home))
+}
+
+#[tauri::command]
+pub async fn agent_entity_memory_read(id: String, rel_path: String) -> AppResult<String> {
+    let home = crate::agent::entities::home_dir(&id)?;
+    life::memory_read(&home, &rel_path)
+}
+
+#[tauri::command]
+pub async fn agent_entity_memory_write(
+    id: String,
+    rel_path: String,
+    content: String,
+) -> AppResult<()> {
+    let home = crate::agent::entities::home_dir(&id)?;
+    life::memory_write(&home, &rel_path, &content)?;
+    if let Err(e) = crate::agent::entities::checkpoint(&home, "edit memory") {
+        eprintln!("[metacodex] agent git checkpoint failed for {id}: {e}");
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn agent_entity_memory_delete(id: String, rel_path: String) -> AppResult<()> {
+    let home = crate::agent::entities::home_dir(&id)?;
+    life::memory_delete(&home, &rel_path)?;
+    if let Err(e) = crate::agent::entities::checkpoint(&home, "delete memory") {
+        eprintln!("[metacodex] agent git checkpoint failed for {id}: {e}");
+    }
+    Ok(())
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentActivity {
+    pub reports: Vec<life::ReportInfo>,
+    pub runs: Vec<life::RunLogEntry>,
+}
+
+#[tauri::command]
+pub async fn agent_entity_activity(id: String) -> AppResult<AgentActivity> {
+    let home = crate::agent::entities::home_dir(&id)?;
+    Ok(AgentActivity {
+        reports: life::list_reports(&home, 50),
+        runs: life::recent_runs(&home, 50),
+    })
+}
+
+#[tauri::command]
+pub async fn agent_entity_proposals(id: String) -> AppResult<Vec<life::ProposalInfo>> {
+    let home = crate::agent::entities::home_dir(&id)?;
+    Ok(life::list_proposals(&home))
+}
+
+/// Approve / reject a proposal (the human gate of self-improvement). Approving
+/// a persona proposal rewrites AGENT.md, so the opencode config layer must
+/// regenerate (the frontend hot-applies with the usual dispose).
+#[tauri::command]
+pub async fn agent_entity_proposal_resolve(
+    id: String,
+    file: String,
+    approve: bool,
+    reason: Option<String>,
+) -> AppResult<()> {
+    let home = crate::agent::entities::home_dir(&id)?;
+    life::resolve_proposal(&home, &file, approve, reason.as_deref())?;
+    if let Err(e) = crate::agent::entities::checkpoint(
+        &home,
+        if approve { "approve proposal" } else { "reject proposal" },
+    ) {
+        eprintln!("[metacodex] agent git checkpoint failed for {id}: {e}");
+    }
+    if approve {
+        crate::agent::mcp::regenerate_opencode_config()?;
+    }
+    Ok(())
 }
 
 /// Read the Agent View UI state (`state/agent-ui.json`: composer drafts +

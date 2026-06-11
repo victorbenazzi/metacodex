@@ -25,6 +25,8 @@ export interface CronTask {
   prompt: string;
   cron: string;
   directory: string | null;
+  /** Agent entity (slug) this task belongs to; absent = standalone task. */
+  agentId?: string | null;
   providerId: string;
   modelId: string;
   enabled: boolean;
@@ -47,6 +49,8 @@ export interface NewCronInput {
   prompt: string;
   cron: string;
   directory: string | null;
+  /** Assign the task to an agent entity (slug); null/absent = standalone. */
+  agentId?: string | null;
   providerId: string;
   modelId: string;
 }

@@ -56,12 +56,11 @@ function WorkPane() {
           newChat();
         }}
       />
-      {/* Agents: navigation placeholder only; the surface itself lands later. */}
       <SidebarItem
         icon={Bot}
         label={t("agent.sidebar.agents")}
-        badge={t("agent.sidebar.soon")}
-        disabled
+        active={section === "agents"}
+        onClick={() => useAgentNavStore.getState().openAgents()}
       />
       <SidebarItem
         icon={AlarmClock}

@@ -420,6 +420,154 @@ impl AgentRuntime {
         Ok(session_id)
     }
 
+    /// One turn of an ENTITY execution (phase 3): like [`Self::run_prompt`]
+    /// but with the entity's compiled agent name, ITS permission preset
+    /// (decision B: autonomous runs respect the preset instead of forcing
+    /// full-auto), an optional `system` block (memory context + autonomous
+    /// protocol) and the final assistant text extracted for the report /
+    /// continuation parsing. While the turn runs on a non-full-auto preset, a
+    /// watcher polls `GET /permission` and fires `on_permission_pending` once
+    /// if an approval is waiting (the orchestrator notifies the user; the
+    /// existing chat UI recovers the ask when the session is opened). On
+    /// budget expiry the session is aborted and `aborted` comes back true.
+    pub async fn run_entity_turn(&self, req: EntityTurnRequest<'_>) -> AppResult<EntityTurnOutcome> {
+        let base = self.ensure_base().await?;
+        let suffix = req
+            .directory
+            .filter(|d| !d.is_empty())
+            .map(|d| format!("?directory={}", encode_uri_component(d)))
+            .unwrap_or_default();
+
+        let create_resp = self
+            .client
+            .post(format!("{base}/session{suffix}"))
+            .json(&serde_json::json!({
+                "permission": ruleset_for_preset(req.preset),
+                "agent": req.agent_name,
+            }))
+            .timeout(Duration::from_secs(10))
+            .send()
+            .await
+            .map_err(|e| AppError::Other(format!("session create: {e}")))?;
+        if !create_resp.status().is_success() {
+            return Err(AppError::Other(format!(
+                "session create failed: HTTP {}",
+                create_resp.status()
+            )));
+        }
+        let created: serde_json::Value = create_resp
+            .json()
+            .await
+            .map_err(|e| AppError::Other(format!("session decode: {e}")))?;
+        let session_id = created
+            .get("id")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| AppError::Other("session create returned no id".into()))?
+            .to_string();
+
+        // Permission watcher: only meaningful when the preset can ask.
+        let watcher = if req.preset != "full-auto" {
+            let client = self.client.clone();
+            let url = format!("{base}/permission{suffix}");
+            let sid = session_id.clone();
+            let on_pending = req.on_permission_pending.clone();
+            Some(tauri::async_runtime::spawn(async move {
+                let mut notified = false;
+                loop {
+                    tokio::time::sleep(Duration::from_secs(15)).await;
+                    let Ok(resp) = client.get(&url).timeout(Duration::from_secs(8)).send().await
+                    else {
+                        continue;
+                    };
+                    let Ok(v) = resp.json::<serde_json::Value>().await else { continue };
+                    let pending = v
+                        .as_array()
+                        .map(|rows| {
+                            rows.iter().any(|r| {
+                                r.get("sessionID").and_then(serde_json::Value::as_str)
+                                    == Some(sid.as_str())
+                            })
+                        })
+                        .unwrap_or(false);
+                    if pending && !notified {
+                        notified = true;
+                        if let Some(cb) = &on_pending {
+                            cb();
+                        }
+                    }
+                }
+            }))
+        } else {
+            None
+        };
+
+        let mut body = serde_json::json!({
+            "parts": [{ "type": "text", "text": req.prompt }],
+            "model": { "providerID": req.provider_id, "modelID": req.model_id },
+            "agent": req.agent_name,
+        });
+        if let Some(system) = req.system.filter(|s| !s.trim().is_empty()) {
+            body["system"] = serde_json::json!(system);
+        }
+        if let Some(variant) = req.variant.filter(|v| !v.is_empty()) {
+            body["variant"] = serde_json::json!(variant);
+        }
+
+        let send = self
+            .client
+            .post(format!("{base}/session/{session_id}/message{suffix}"))
+            .json(&body)
+            .send();
+        let result = tokio::time::timeout(RUN_PROMPT_BUDGET, send).await;
+        if let Some(w) = watcher {
+            w.abort();
+        }
+        let aborted = match result {
+            Ok(r) => {
+                let resp = r.map_err(|e| AppError::Other(format!("prompt request: {e}")))?;
+                if !resp.status().is_success() {
+                    return Err(AppError::Other(format!("prompt failed: HTTP {}", resp.status())));
+                }
+                false
+            }
+            Err(_) => {
+                let _ = self
+                    .client
+                    .post(format!("{base}/session/{session_id}/abort{suffix}"))
+                    .timeout(Duration::from_secs(5))
+                    .send()
+                    .await;
+                true
+            }
+        };
+
+        // Final assistant text (for the report + continuation marker). Best
+        // effort: a transcript read failure must not turn a finished run into
+        // an error.
+        let final_text = self
+            .client
+            .get(format!("{base}/session/{session_id}/message{suffix}"))
+            .timeout(Duration::from_secs(15))
+            .send()
+            .await
+            .ok();
+        let final_text = match final_text {
+            Some(resp) => resp
+                .json::<serde_json::Value>()
+                .await
+                .ok()
+                .map(|rows| extract_last_assistant_text(&rows))
+                .unwrap_or_default(),
+            None => String::new(),
+        };
+
+        Ok(EntityTurnOutcome {
+            session_id,
+            final_text,
+            aborted,
+        })
+    }
+
     /// Set an API-key credential for a provider (e.g. the opencode GO key) via
     /// `PUT /auth/{providerID}`. opencode persists it in its own auth store.
     pub async fn set_credentials(&self, provider_id: &str, key: &str) -> AppResult<()> {
@@ -451,6 +599,81 @@ impl Default for AgentRuntime {
 
 /// Total wall-clock budget for one headless `run_prompt` turn.
 const RUN_PROMPT_BUDGET: Duration = Duration::from_secs(30 * 60);
+
+/// One turn of an entity execution (see [`AgentRuntime::run_entity_turn`]).
+pub struct EntityTurnRequest<'a> {
+    /// Compiled opencode agent name (`mcx-<slug>`).
+    pub agent_name: &'a str,
+    /// "ask" | "auto-edit" | "full-auto" (the entity's own preset).
+    pub preset: &'a str,
+    pub provider_id: &'a str,
+    pub model_id: &'a str,
+    pub variant: Option<&'a str>,
+    pub directory: Option<&'a str>,
+    /// Memory context + autonomous protocol, sent as the message `system`.
+    pub system: Option<String>,
+    pub prompt: &'a str,
+    /// Fired AT MOST ONCE when a permission ask is pending for this session.
+    pub on_permission_pending: Option<std::sync::Arc<dyn Fn() + Send + Sync>>,
+}
+
+pub struct EntityTurnOutcome {
+    pub session_id: String,
+    pub final_text: String,
+    /// True when the run hit the budget (likely a permission nobody answered)
+    /// and the session was aborted.
+    pub aborted: bool,
+}
+
+/// Rust mirror of the frontend `rulesetForPreset` (opencode.ts) for the three
+/// chat presets. MANUAL MIRROR, pinned by `ruleset_mirrors_frontend_presets`.
+fn ruleset_for_preset(preset: &str) -> serde_json::Value {
+    match preset {
+        "ask" => serde_json::json!([
+            { "permission": "edit", "pattern": "**", "action": "ask" },
+            { "permission": "bash", "pattern": "*", "action": "ask" },
+            { "permission": "webfetch", "pattern": "**", "action": "ask" },
+            { "permission": "websearch", "pattern": "**", "action": "ask" },
+            { "permission": "external_directory", "pattern": "**", "action": "ask" }
+        ]),
+        "auto-edit" => serde_json::json!([
+            { "permission": "edit", "pattern": "**", "action": "allow" },
+            { "permission": "bash", "pattern": "*", "action": "ask" },
+            { "permission": "webfetch", "pattern": "**", "action": "allow" },
+            { "permission": "websearch", "pattern": "**", "action": "allow" },
+            { "permission": "external_directory", "pattern": "**", "action": "ask" }
+        ]),
+        _ => full_auto_ruleset(),
+    }
+}
+
+/// Last assistant text from a stored transcript (`GET /session/{id}/message`):
+/// rows may be `{info: {role}, parts: [...]}` (stored shape) or flat.
+fn extract_last_assistant_text(rows: &serde_json::Value) -> String {
+    let Some(rows) = rows.as_array() else { return String::new() };
+    for row in rows.iter().rev() {
+        let role = row
+            .get("info")
+            .and_then(|i| i.get("role"))
+            .or_else(|| row.get("role"))
+            .and_then(serde_json::Value::as_str);
+        if role != Some("assistant") {
+            continue;
+        }
+        let parts = row.get("parts").and_then(serde_json::Value::as_array);
+        let Some(parts) = parts else { continue };
+        let text: String = parts
+            .iter()
+            .filter(|p| p.get("type").and_then(serde_json::Value::as_str) == Some("text"))
+            .filter_map(|p| p.get("text").and_then(serde_json::Value::as_str))
+            .collect::<Vec<_>>()
+            .join("");
+        if !text.trim().is_empty() {
+            return text;
+        }
+    }
+    String::new()
+}
 
 /// Percent-encode a string for use as a URL query-parameter value, matching
 /// JavaScript's `encodeURIComponent` (the frontend uses it for the same

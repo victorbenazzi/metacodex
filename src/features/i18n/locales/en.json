@@ -80,8 +80,8 @@
       "variantLabel": "Reasoning effort",
       "askPermissions": "Ask permissions",
       "modeLabel": "Agent or swarm",
-      "agent": "Agent",
-      "agentSwarm": "Agent Swarm",
+      "agent": "Solo",
+      "agentSwarm": "Swarm",
       "send": "Send",
       "stop": "Stop",
       "workInProject": "Work in a project",
@@ -102,7 +102,10 @@
         "remove": "Remove from queue",
         "edit": "Edit queued prompt",
         "attachmentsOnly": "(attachments)"
-      }
+      },
+      "noAgent": "No agent",
+      "agentLabel": "Choose agent",
+      "manageAgents": "Manage agents..."
     },
     "chat": {
       "thinking": "Thinking",
@@ -289,7 +292,10 @@
         "fromChatHint": "AI fills the fields below. Review and save.",
         "generate": "Generate",
         "generateError": "Could not read that. Rephrase or fill it in manually.",
-        "runsIn": "Runs in:"
+        "runsIn": "Runs in:",
+        "agent": "Agent",
+        "agentNone": "No agent (standalone task)",
+        "agentHint": "With an agent, the run uses its persona, memory and permission preset, and lands in its activity log."
       },
       "card": {
         "next": "next {{time}}",
@@ -437,6 +443,100 @@
     },
     "todo": {
       "title": "Plan"
+    },
+    "agents": {
+      "title": "Agents",
+      "subtitle": "Reusable agents with their own persona, model and permissions. Each one lives in ~/.metacodex/agents.",
+      "new": "New agent",
+      "emptyTitle": "No agents yet",
+      "emptyBody": "Create an agent with its own persona, model and permissions, then pick it in the composer.",
+      "back": "All agents",
+      "edit": "Edit",
+      "chat": "Chat with agent",
+      "delete": "Delete agent",
+      "deleteConfirmTitle": "Delete this agent?",
+      "deleteConfirmBody": "\"{{name}}\" and its whole home directory (persona, memory, logs) will be permanently deleted.",
+      "personaTitle": "Persona",
+      "personaEmpty": "No persona yet.",
+      "builder": {
+        "newTitle": "New agent",
+        "editTitle": "Edit agent",
+        "describeTitle": "Describe the agent you want",
+        "describePlaceholder": "e.g. A meticulous code reviewer for my TypeScript projects, direct tone, focused on security",
+        "describeHint": "Prefills the form below. Nothing is saved until you hit Create.",
+        "generate": "Generate",
+        "generateError": "Couldn't draft an agent from that. Try rephrasing.",
+        "name": "Name",
+        "namePlaceholder": "e.g. QA Reviewer",
+        "persona": "Persona",
+        "personaPlaceholder": "You are...",
+        "personaHint": "The agent's system prompt: identity, expertise, working style, rules.",
+        "avatarEmoji": "Emoji",
+        "avatarUpload": "Upload photo",
+        "avatarRemove": "Remove avatar",
+        "avatarTooLarge": "Image too large (max 1 MB).",
+        "model": "Model",
+        "modelInherit": "Composer's pick",
+        "permission": "Permissions",
+        "projects": "Projects",
+        "projectsAll": "All registered projects",
+        "projectsEmpty": "No registered projects",
+        "save": "Save",
+        "cancel": "Cancel",
+        "saveFailed": "Couldn't save the agent."
+      },
+      "tabs": {
+        "persona": "Persona",
+        "memory": "Memory",
+        "activity": "Activity",
+        "proposals": "Proposals",
+        "agenda": "Schedule"
+      },
+      "memory": {
+        "loading": "Loading memory",
+        "index": "Index (MEMORY.md)",
+        "delete": "Delete memory",
+        "save": "Save",
+        "pickFile": "Pick a file on the left to read or edit it.",
+        "emptyHint": "Nothing here yet. The agent writes its own memory while it works; you can also edit these files by hand."
+      },
+      "activity": {
+        "loading": "Loading activity",
+        "emptyTitle": "No activity yet",
+        "emptyBody": "Reports and the run log show up here once the agent runs on its own (scheduled tasks, heartbeat, dreams).",
+        "reports": "Reports",
+        "noReports": "No reports yet.",
+        "runs": "Run log",
+        "continuations": "{{count}} continuations",
+        "status": {
+          "ok": "ok",
+          "needs-you": "needs you",
+          "aborted": "aborted",
+          "error": "error"
+        }
+      },
+      "proposals": {
+        "loading": "Loading proposals",
+        "emptyTitle": "No proposals",
+        "emptyBody": "During a dream the agent may propose improvements to its own persona or skills. They wait here for your approval; nothing is ever self-applied.",
+        "approve": "Approve",
+        "reject": "Reject",
+        "confirmReject": "Confirm rejection",
+        "reasonPlaceholder": "Why? (becomes a memory so it won't re-propose)",
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "appliesPersona": "Approving applies the proposed persona to AGENT.md."
+      },
+      "agenda": {
+        "heartbeat": "Heartbeat",
+        "heartbeatHint": "Periodic pulse: the agent checks its HEARTBEAT.md checklist and acts only if something needs it.",
+        "heartbeatInterval": "Interval (minutes)",
+        "dreamAfter": "Dream after N runs",
+        "continuationCap": "Continuation cap per task",
+        "crons": "Scheduled tasks of this agent",
+        "noCrons": "None yet. Assign a task to this agent in Scheduled Tasks.",
+        "manageCrons": "Manage Scheduled Tasks"
+      }
     }
   },
   "common": {

@@ -141,6 +141,20 @@ export interface QueuedPrompt {
  *  model the send uses. */
 export const DEFAULT_MODEL = "deepseek-v4-flash";
 
+/** Minimal slice of an agent entity the send path needs. The full entity
+ *  (persona, avatar, projects) lives in entities.store; the composer's
+ *  AgentPicker mirrors this slice in via `setEntity`. */
+export interface SelectedEntity {
+  id: string;
+  name: string;
+  /** Compiled opencode agent name (`mcx-<slug>`), sent on session + message. */
+  opencodeName: string;
+  permissionPreset: PermissionPreset;
+  providerId?: string;
+  modelId?: string;
+  variant?: string;
+}
+
 export interface ChatState {
   baseUrl: string | null;
   connected: boolean;
@@ -152,6 +166,11 @@ export interface ChatState {
   directory: string | null;
   /** Primary/subagent catalog for the active directory. */
   agents: AgentInfo[];
+  /** Selected agent ENTITY (persistent agent, see entities.store). Mirrored
+   *  here by the composer's AgentPicker so the send path can read it without
+   *  importing entities.store (deps stay periphery -> chat.store, one-way).
+   *  Null = plain chat with the user's own model/preset picks. */
+  entity: SelectedEntity | null;
   /** Live permission requests awaiting allow/deny, for the whole directory
    *  scope; the view filters to the active session + its children. */
   pendingPermissions: PermissionPrompt[];
@@ -199,6 +218,8 @@ export interface ChatState {
   /** Re-point everything at a fresh sidecar base URL after a restart (the
    *  `--port 0` spawn means every restart changes the port). */
   rebindBase: (base: string) => void;
+  /** Select/clear the agent entity driving new turns (composer AgentPicker). */
+  setEntity: (entity: SelectedEntity | null) => void;
   setDirectory: (dir: string | null) => Promise<void>;
   loadAgents: () => Promise<void>;
   newChat: () => void;
@@ -278,13 +299,28 @@ async function ocFetch(
   return fetch(`${base}${path}${qs(get().directory)}`, init);
 }
 
-function agentSettings() {
+function agentSettings(entity?: SelectedEntity | null) {
   const a = useSettingsDataStore.getState().settings.agent;
-  return {
+  const base = {
     providerID: a.providerId || "opencode-go",
     modelID: a.modelId || DEFAULT_MODEL,
     preset: a.permissionPreset,
     mode: a.mode,
+    /** Compiled entity agent name; undefined = plain chat. */
+    agentName: undefined as string | undefined,
+    /** Entity-pinned reasoning variant (wins over variantByModel). */
+    entityVariant: undefined as string | undefined,
+  };
+  if (!entity) return base;
+  // A selected entity pins model + permission posture; the user's own picks
+  // come back the moment the entity is deselected.
+  return {
+    ...base,
+    providerID: entity.providerId || base.providerID,
+    modelID: entity.modelId || base.modelID,
+    preset: entity.permissionPreset,
+    agentName: entity.opencodeName,
+    entityVariant: entity.variant,
   };
 }
 
@@ -292,6 +328,33 @@ function agentSettings() {
 function chatError(key: string, detail?: string): string {
   const label = i18n.t(key);
   return detail ? `${label} (${detail})` : label;
+}
+
+/**
+ * System block for the next turn: the entity's memory context (home location,
+ * memory rules, current indexes; assembled by Rust from the agent home) plus
+ * the swarm orchestration hint. Undefined = plain chat, no system override.
+ * Best-effort: a context read failure must never block a send.
+ */
+async function entitySystem(
+  entity: SelectedEntity | null,
+  directory: string | null,
+  swarm: boolean,
+): Promise<string | undefined> {
+  const blocks: string[] = [];
+  if (entity) {
+    try {
+      const ctx = await invoke<string>(CMD.agentEntityMemoryContext, {
+        id: entity.id,
+        directory,
+      });
+      if (ctx.trim()) blocks.push(ctx);
+    } catch {
+      // memory context is additive; the persona still rides the compiled agent
+    }
+  }
+  if (swarm) blocks.push(SWARM_SYSTEM);
+  return blocks.length ? blocks.join("\n\n") : undefined;
 }
 
 /**
@@ -564,6 +627,7 @@ export const useAgentChatStore = create<ChatState>((set, get) => ({
   connectionError: null,
   directory: null,
   agents: [],
+  entity: null,
   pendingPermissions: [],
   pendingQuestions: [],
   todosBySession: {},
@@ -606,6 +670,16 @@ export const useAgentChatStore = create<ChatState>((set, get) => ({
     useAgentSessionsStore.getState().setBaseUrl(base);
     openEventStream(base, get().directory, set, get);
     void get().loadAgents();
+  },
+
+  setEntity: (entity) => {
+    const changed = (entity?.id ?? null) !== (get().entity?.id ?? null);
+    // Same-id calls still land: an edit may have changed model/preset/variant.
+    set({ entity });
+    // A session is created with its agent + permission posture; switching the
+    // entity mid-thread would silently mix personas, so the next turn starts
+    // a fresh session (same rule as switching the project).
+    if (changed && get().sessionId) get().newChat();
   },
 
   setDirectory: async (dir) => {
@@ -821,8 +895,8 @@ export const useAgentChatStore = create<ChatState>((set, get) => ({
 
     if (!get().connected) await get().connect();
 
-    const cfg = agentSettings();
-    const agent = primaryAgentName(get().agents);
+    const cfg = agentSettings(get().entity);
+    const agent = cfg.agentName ?? primaryAgentName(get().agents);
     const swarm = cfg.mode === "swarm";
     // Swarm runs the orchestrator on a stronger model (only where it exists:
     // the opencode-go provider); other providers keep the user's pick.
@@ -843,7 +917,9 @@ export const useAgentChatStore = create<ChatState>((set, get) => ({
 
     // Reasoning-effort variant for the EFFECTIVE model (swarm may have swapped
     // it); only sent when the catalog confirms the model exposes that variant.
+    // An entity-pinned variant wins over the user's per-model memory.
     const chosenVariant =
+      cfg.entityVariant ||
       useSettingsDataStore.getState().settings.agent.variantByModel[
         `${cfg.providerID}/${modelID}`
       ];
@@ -944,6 +1020,7 @@ export const useAgentChatStore = create<ChatState>((set, get) => ({
     // The POST resolves only at turn end (the reply streams via /event), so it
     // runs detached; `send` resolves as soon as the message is dispatched.
     const directoryAtSend = get().directory;
+    const system = await entitySystem(get().entity, directoryAtSend, swarm);
     void ocFetch(get, `/session/${sessionId}/message`, {
       method: "POST",
       json: {
@@ -954,7 +1031,7 @@ export const useAgentChatStore = create<ChatState>((set, get) => ({
         model: { providerID: cfg.providerID, modelID },
         ...(variant ? { variant } : {}),
         ...(agent ? { agent } : {}),
-        ...(swarm ? { system: SWARM_SYSTEM } : {}),
+        ...(system ? { system } : {}),
       },
     })
       .then(async (res) => {
@@ -978,8 +1055,8 @@ export const useAgentChatStore = create<ChatState>((set, get) => ({
 
     if (!get().connected) await get().connect();
 
-    const cfg = agentSettings();
-    const agent = primaryAgentName(get().agents);
+    const cfg = agentSettings(get().entity);
+    const agent = cfg.agentName ?? primaryAgentName(get().agents);
     const swarm = cfg.mode === "swarm";
     const modelID = effectiveModelId(cfg.providerID, cfg.modelID, cfg.mode);
 
@@ -1134,7 +1211,7 @@ export const useAgentChatStore = create<ChatState>((set, get) => ({
 
   applyPermissionPreset: async () => {
     if (!get().sessionId) return; // next new chat picks it up at create
-    const cfg = agentSettings();
+    const cfg = agentSettings(get().entity);
     try {
       await ocFetch(get, `/session/${get().sessionId}`, {
         method: "PATCH",
@@ -1248,7 +1325,7 @@ export const useAgentChatStore = create<ChatState>((set, get) => ({
       (tk.reasoning ?? 0) +
       (tk.cache?.read ?? 0) +
       (tk.cache?.write ?? 0);
-    const cfg = agentSettings();
+    const cfg = agentSettings(get().entity);
     const modelID =
       lastAssistant?.modelID ?? effectiveModelId(cfg.providerID, cfg.modelID, cfg.mode);
     const limit = findModel(useAgentRuntimeStore.getState().providers, cfg.providerID, modelID)

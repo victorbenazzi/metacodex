@@ -17,6 +17,7 @@ import {
 import { useSettingsDataStore } from "@/features/settings/settings.data.store";
 import type { AgentMode } from "@/features/agent/opencode";
 
+import { AgentPicker } from "./composer/AgentPicker";
 import { ModelPicker } from "./composer/ModelPicker";
 import { VariantPicker } from "./composer/VariantPicker";
 import { ProjectPicker } from "./composer/ProjectPicker";
@@ -53,6 +54,7 @@ export function AgentComposer({
   const stop = useAgentChatStore((s) => s.stop);
   const status = useAgentChatStore((s) => s.status);
   const error = useAgentChatStore((s) => s.error);
+  const entity = useAgentChatStore((s) => s.entity);
   const mode = useSettingsDataStore((s) => s.settings.agent.mode);
   const update = useSettingsDataStore((s) => s.update);
   const directory = useAgentChatStore((s) => s.directory);
@@ -321,9 +323,16 @@ export function AgentComposer({
         >
           <div className="flex min-w-0 flex-1 items-center gap-[8px]">
             <PlusMenu onInsertToken={insertToken} />
-            <ModelPicker />
-            <VariantPicker />
-            <PermissionPicker />
+            <AgentPicker />
+            {/* A selected entity pins model + variant + permissions, so the
+                individual pickers leave; deselecting brings them back. */}
+            {entity ? null : (
+              <>
+                <ModelPicker />
+                <VariantPicker />
+                <PermissionPicker />
+              </>
+            )}
           </div>
 
           <div className="flex shrink-0 items-center gap-[10px]">

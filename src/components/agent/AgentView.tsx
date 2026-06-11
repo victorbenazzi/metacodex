@@ -14,6 +14,7 @@ import { ChatThread } from "@/components/agent/chat/ChatThread";
 import { ContextMeter } from "@/components/agent/chat/ContextMeter";
 import { ScheduledTasksPanel } from "@/components/agent/panels/ScheduledTasksPanel";
 import { CustomizePanel } from "@/components/agent/panels/CustomizePanel";
+import { AgentsPanel } from "@/components/agent/panels/AgentsPanel";
 import { cn } from "@/lib/cn";
 
 interface AgentViewProps {
@@ -94,6 +95,8 @@ export function AgentView({ className }: AgentViewProps) {
           <ScheduledTasksPanel />
         ) : section === "customize" ? (
           <CustomizePanel />
+        ) : section === "agents" ? (
+          <AgentsPanel />
         ) : runtimeBlocked ? (
           // The runtime can't come up (opencode missing from PATH, or the
           // sidecar failed). Only the Agent view depends on opencode, the

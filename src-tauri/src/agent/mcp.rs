@@ -284,7 +284,12 @@ fn apply_upsert(servers: &mut Vec<McpServerEntry>, input: McpServerInput) -> App
 /// Render the enabled entries as an opencode config document. Disabled entries
 /// simply vanish from this layer, emitting `"enabled": false` could disable a
 /// same-named server from the user's own global config through the merge.
-fn render_opencode_config(servers: &[McpServerEntry]) -> serde_json::Value {
+/// `agents` is the compiled `config.agent` section from the agent entities
+/// (see `entities::compiled_agents`); empty maps are omitted entirely.
+fn render_opencode_config(
+    servers: &[McpServerEntry],
+    agents: serde_json::Map<String, serde_json::Value>,
+) -> serde_json::Value {
     let mut mcp = serde_json::Map::new();
     for e in servers.iter().filter(|e| e.enabled) {
         let v = match &e.transport {
@@ -313,20 +318,42 @@ fn render_opencode_config(servers: &[McpServerEntry]) -> serde_json::Value {
         };
         mcp.insert(e.name.clone(), v);
     }
-    serde_json::json!({
-        "$schema": "https://opencode.ai/config.json",
-        "mcp": serde_json::Value::Object(mcp),
-    })
+    let mut doc = serde_json::Map::new();
+    doc.insert(
+        "$schema".into(),
+        serde_json::json!("https://opencode.ai/config.json"),
+    );
+    doc.insert("mcp".into(), serde_json::Value::Object(mcp));
+    if !agents.is_empty() {
+        doc.insert("agent".into(), serde_json::Value::Object(agents));
+    }
+    serde_json::Value::Object(doc)
+}
+
+/// Compiled `config.agent` section from the agent entities on disk. Failure to
+/// resolve the agents dir degrades to "no agents" (the MCP layer must still
+/// regenerate even if the entities feature is broken).
+fn compiled_agents_from_disk() -> serde_json::Map<String, serde_json::Value> {
+    match config_paths::agents_dir() {
+        Ok(dir) => crate::agent::entities::compiled_agents(&dir),
+        Err(e) => {
+            eprintln!("[metacodex] agents dir unavailable: {e}");
+            serde_json::Map::new()
+        }
+    }
 }
 
 fn write_opencode_config(servers: &[McpServerEntry]) -> AppResult<()> {
     let path = config_paths::opencode_config_file()?;
-    config_paths::write_json_atomic_private(&path, &render_opencode_config(servers))
+    config_paths::write_json_atomic_private(
+        &path,
+        &render_opencode_config(servers, compiled_agents_from_disk()),
+    )
 }
 
 /// Standalone regenerate from the store file on disk, the sidecar spawn path
-/// calls this before every spawn so the generated config can never go stale
-/// (cheap, idempotent, heals hand-edits and version upgrades).
+/// and every agent-entity mutation call this so the generated config can never
+/// go stale (cheap, idempotent, heals hand-edits and version upgrades).
 pub fn regenerate_opencode_config() -> AppResult<()> {
     let path = config_paths::agent_mcp_file()?;
     let file: McpFile = config_paths::read_json(&path)?;
@@ -536,7 +563,7 @@ mod tests {
         off.enabled = false;
         apply_upsert(&mut servers, off).unwrap();
 
-        let cfg = render_opencode_config(&servers);
+        let cfg = render_opencode_config(&servers, serde_json::Map::new());
         let mcp = cfg.get("mcp").and_then(|m| m.as_object()).unwrap();
         assert!(mcp.contains_key("on"));
         assert!(!mcp.contains_key("off"));
@@ -544,6 +571,16 @@ mod tests {
         assert_eq!(on.get("type").unwrap(), "local");
         assert_eq!(on.get("enabled").unwrap(), true);
         assert_eq!(on.get("environment").unwrap().get("K").unwrap(), "v");
+        // no agents -> no agent key at all (don't ship an empty override layer)
+        assert!(cfg.get("agent").is_none());
+    }
+
+    #[test]
+    fn render_includes_compiled_agents() {
+        let mut agents = serde_json::Map::new();
+        agents.insert("mcx-qa".into(), serde_json::json!({"mode": "primary"}));
+        let cfg = render_opencode_config(&[], agents);
+        assert_eq!(cfg["agent"]["mcx-qa"]["mode"], "primary");
     }
 
     #[test]

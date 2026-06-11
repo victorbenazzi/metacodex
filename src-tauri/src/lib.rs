@@ -103,6 +103,8 @@ pub fn run() {
             app.manage(agent::scheduler::CronStore::load());
             // MCP server registry; regenerates the opencode config layer on boot.
             app.manage(agent::McpStore::load());
+            // Agent entities (~/.metacodex/agents); reads are stateless scans.
+            app.manage(agent::AgentEntityStore::new());
             // Hydrate the in-memory project cache from the persisted state.
             if let Err(e) = projects::hydrate(app.handle()) {
                 eprintln!("[metacodex] projects::hydrate failed: {e}");
@@ -197,6 +199,18 @@ pub fn run() {
             commands::agent::agent_mcp_delete,
             commands::agent::agent_mcp_set_enabled,
             commands::agent::agent_mcp_status,
+            commands::agent::agent_entity_list,
+            commands::agent::agent_entity_create,
+            commands::agent::agent_entity_update,
+            commands::agent::agent_entity_delete,
+            commands::agent::agent_entity_memory_context,
+            commands::agent::agent_entity_memory_tree,
+            commands::agent::agent_entity_memory_read,
+            commands::agent::agent_entity_memory_write,
+            commands::agent::agent_entity_memory_delete,
+            commands::agent::agent_entity_activity,
+            commands::agent::agent_entity_proposals,
+            commands::agent::agent_entity_proposal_resolve,
             commands::agent::agent_ui_state_read,
             commands::agent::agent_ui_state_write,
         ])

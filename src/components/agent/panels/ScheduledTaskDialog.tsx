@@ -5,7 +5,9 @@ import { Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { DialogContent, DialogRoot } from "@/components/ui/Dialog";
 import { Icon } from "@/components/ui/Icon";
+import { Select } from "@/components/ui/Select";
 import { describeCron } from "@/features/agent/cron.describe";
+import { useAgentEntitiesStore } from "@/features/agent/entities.store";
 import { extractScheduledTask } from "@/features/agent/cron.fromText";
 import { DEFAULT_MODEL, useAgentChatStore } from "@/features/agent/chat.store";
 import { useAgentCronStore, type CronTask } from "@/features/agent/cron.store";
@@ -55,8 +57,18 @@ export function ScheduledTaskDialog({
   const [name, setName] = useState("");
   const [prompt, setPrompt] = useState("");
   const [cron, setCron] = useState(DEFAULT_CRON);
+  const [agentId, setAgentId] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // Agent entities the task can be assigned to (decision C: a task with an
+  // agent runs as that agent's Execution: persona, memory, ITS preset).
+  const agentEntities = useAgentEntitiesStore((s) => s.entities);
+  const entitiesLoaded = useAgentEntitiesStore((s) => s.loaded);
+  const loadEntities = useAgentEntitiesStore((s) => s.load);
+  useEffect(() => {
+    if (open && !entitiesLoaded) void loadEntities();
+  }, [open, entitiesLoaded, loadEntities]);
 
   // Natural-language assist ("Create from chat").
   const [nl, setNl] = useState("");
@@ -69,6 +81,7 @@ export function ScheduledTaskDialog({
     setName(task?.title ?? "");
     setPrompt(task?.prompt ?? "");
     setCron(task?.cron ?? DEFAULT_CRON);
+    setAgentId(task?.agentId ?? "");
     setSubmitError(null);
     setNl("");
     setNlError(null);
@@ -103,6 +116,7 @@ export function ScheduledTaskDialog({
       prompt: prompt.trim(),
       cron: cron.trim(),
       directory,
+      agentId: agentId || null,
       // Same rule as directory: editing keeps the task's stored model.
       providerId: isEdit ? task!.providerId : agent.providerId || "opencode-go",
       modelId: isEdit ? task!.modelId : agent.modelId || DEFAULT_MODEL,
@@ -207,6 +221,28 @@ export function ScheduledTaskDialog({
               className="w-full resize-none rounded-md border border-hairline-strong bg-surface-1 px-[12px] py-[10px] text-ui leading-[1.55] text-ink outline-none transition-colors duration-fast focus:border-ink"
             />
           </Field>
+
+          {agentEntities.length > 0 ? (
+            <div className="flex flex-col gap-[8px]">
+              <span className="text-caption font-medium text-body">
+                {t("agent.scheduled.dialog.agent")}
+              </span>
+              {/* Radix Select forbids an empty item value; "none" is the sentinel. */}
+              <Select
+                value={agentId || "none"}
+                onValueChange={(v) => setAgentId(v === "none" ? "" : v)}
+                ariaLabel={t("agent.scheduled.dialog.agent")}
+                options={[
+                  { value: "none", label: t("agent.scheduled.dialog.agentNone") },
+                  ...agentEntities.map((e) => ({ value: e.id, label: e.name })),
+                ]}
+                className="w-full"
+              />
+              <span className="text-label leading-[1.4] text-muted-soft">
+                {t("agent.scheduled.dialog.agentHint")}
+              </span>
+            </div>
+          ) : null}
 
           {/* Not a <label>: CronField contains its own buttons + input, which
               must not be implicitly associated with a wrapping label. */}

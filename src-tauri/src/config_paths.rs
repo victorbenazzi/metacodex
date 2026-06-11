@@ -55,6 +55,12 @@ pub fn state_dir() -> AppResult<PathBuf> {
     Ok(config_root()?.join("state"))
 }
 
+/// `~/.metacodex/agents`, one subdirectory per agent entity (its "home":
+/// AGENT.md, agent.json, memory, reports, logs; a git repo, see AGENTS_DESIGN.md).
+pub fn agents_dir() -> AppResult<PathBuf> {
+    Ok(config_root()?.join("agents"))
+}
+
 /// `~/.metacodex/state/projects.json`, the projects registry + active id.
 pub fn projects_file() -> AppResult<PathBuf> {
     Ok(state_dir()?.join("projects.json"))

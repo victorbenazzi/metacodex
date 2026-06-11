@@ -80,8 +80,8 @@
       "variantLabel": "Esforço de raciocínio",
       "askPermissions": "Pedir permissões",
       "modeLabel": "Agente ou swarm",
-      "agent": "Agent",
-      "agentSwarm": "Agent Swarm",
+      "agent": "Solo",
+      "agentSwarm": "Swarm",
       "send": "Enviar",
       "stop": "Parar",
       "workInProject": "Trabalhar em um projeto",
@@ -102,7 +102,10 @@
         "remove": "Remover da fila",
         "edit": "Editar prompt da fila",
         "attachmentsOnly": "(anexos)"
-      }
+      },
+      "noAgent": "Sem agente",
+      "agentLabel": "Escolher agente",
+      "manageAgents": "Gerenciar agentes..."
     },
     "chat": {
       "thinking": "Pensando",
@@ -289,7 +292,10 @@
         "fromChatHint": "A IA preenche os campos abaixo. Revise e salve.",
         "generate": "Gerar",
         "generateError": "Não consegui entender. Reformule ou preencha manualmente.",
-        "runsIn": "Roda em:"
+        "runsIn": "Roda em:",
+        "agent": "Agente",
+        "agentNone": "Sem agente (task avulsa)",
+        "agentHint": "Com um agente, a execução usa a persona, a memória e o preset de permissões dele, e entra no registro de atividade dele."
       },
       "card": {
         "next": "próxima {{time}}",
@@ -437,6 +443,100 @@
     },
     "todo": {
       "title": "Plano"
+    },
+    "agents": {
+      "title": "Agentes",
+      "subtitle": "Agentes reutilizáveis com persona, modelo e permissões próprios. Cada um vive em ~/.metacodex/agents.",
+      "new": "Novo agente",
+      "emptyTitle": "Nenhum agente ainda",
+      "emptyBody": "Crie um agente com persona, modelo e permissões próprios e selecione ele no composer.",
+      "back": "Todos os agentes",
+      "edit": "Editar",
+      "chat": "Conversar com o agente",
+      "delete": "Excluir agente",
+      "deleteConfirmTitle": "Excluir este agente?",
+      "deleteConfirmBody": "\"{{name}}\" e todo o diretório dele (persona, memória, logs) serão excluídos permanentemente.",
+      "personaTitle": "Persona",
+      "personaEmpty": "Sem persona ainda.",
+      "builder": {
+        "newTitle": "Novo agente",
+        "editTitle": "Editar agente",
+        "describeTitle": "Descreva o agente que você quer",
+        "describePlaceholder": "ex.: Um revisor de código meticuloso para meus projetos TypeScript, tom direto, focado em segurança",
+        "describeHint": "Pré-preenche o formulário abaixo. Nada é salvo até você criar.",
+        "generate": "Gerar",
+        "generateError": "Não consegui rascunhar um agente com isso. Tente reformular.",
+        "name": "Nome",
+        "namePlaceholder": "ex.: Revisor QA",
+        "persona": "Persona",
+        "personaPlaceholder": "Você é...",
+        "personaHint": "O system prompt do agente: identidade, especialidade, jeito de trabalhar, regras.",
+        "avatarEmoji": "Emoji",
+        "avatarUpload": "Enviar foto",
+        "avatarRemove": "Remover avatar",
+        "avatarTooLarge": "Imagem grande demais (máx. 1 MB).",
+        "model": "Modelo",
+        "modelInherit": "Escolha do composer",
+        "permission": "Permissões",
+        "projects": "Projetos",
+        "projectsAll": "Todos os projetos registrados",
+        "projectsEmpty": "Nenhum projeto registrado",
+        "save": "Salvar",
+        "cancel": "Cancelar",
+        "saveFailed": "Não consegui salvar o agente."
+      },
+      "tabs": {
+        "persona": "Persona",
+        "memory": "Memória",
+        "activity": "Atividade",
+        "proposals": "Propostas",
+        "agenda": "Agenda"
+      },
+      "memory": {
+        "loading": "Carregando memória",
+        "index": "Índice (MEMORY.md)",
+        "delete": "Excluir memória",
+        "save": "Salvar",
+        "pickFile": "Escolha um arquivo à esquerda para ler ou editar.",
+        "emptyHint": "Nada aqui ainda. O agente escreve a própria memória enquanto trabalha; você também pode editar esses arquivos à mão."
+      },
+      "activity": {
+        "loading": "Carregando atividade",
+        "emptyTitle": "Sem atividade ainda",
+        "emptyBody": "Reports e o registro de execuções aparecem aqui quando o agente rodar sozinho (tasks agendadas, heartbeat, dreams).",
+        "reports": "Reports",
+        "noReports": "Nenhum report ainda.",
+        "runs": "Registro de execuções",
+        "continuations": "{{count}} continuações",
+        "status": {
+          "ok": "ok",
+          "needs-you": "precisa de você",
+          "aborted": "abortada",
+          "error": "erro"
+        }
+      },
+      "proposals": {
+        "loading": "Carregando propostas",
+        "emptyTitle": "Sem propostas",
+        "emptyBody": "Durante um dream o agente pode propor melhorias na própria persona ou skills. Elas esperam aqui pela sua aprovação; nada é auto-aplicado.",
+        "approve": "Aprovar",
+        "reject": "Rejeitar",
+        "confirmReject": "Confirmar rejeição",
+        "reasonPlaceholder": "Por quê? (vira memória para não propor de novo)",
+        "approved": "Aprovada",
+        "rejected": "Rejeitada",
+        "appliesPersona": "Aprovar aplica a persona proposta no AGENT.md."
+      },
+      "agenda": {
+        "heartbeat": "Heartbeat",
+        "heartbeatHint": "Pulso periódico: o agente checa a checklist do HEARTBEAT.md e só age se algo precisar.",
+        "heartbeatInterval": "Intervalo (minutos)",
+        "dreamAfter": "Dream após N execuções",
+        "continuationCap": "Limite de continuações por tarefa",
+        "crons": "Tasks agendadas deste agente",
+        "noCrons": "Nenhuma ainda. Atribua uma task a este agente em Scheduled Tasks.",
+        "manageCrons": "Gerenciar Scheduled Tasks"
+      }
     }
   },
   "common": {

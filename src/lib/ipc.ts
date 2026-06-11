@@ -117,6 +117,18 @@ export const CMD = {
   agentMcpStatus: "agent_mcp_status",
   agentUiStateRead: "agent_ui_state_read",
   agentUiStateWrite: "agent_ui_state_write",
+  agentEntityList: "agent_entity_list",
+  agentEntityCreate: "agent_entity_create",
+  agentEntityUpdate: "agent_entity_update",
+  agentEntityDelete: "agent_entity_delete",
+  agentEntityMemoryContext: "agent_entity_memory_context",
+  agentEntityMemoryTree: "agent_entity_memory_tree",
+  agentEntityMemoryRead: "agent_entity_memory_read",
+  agentEntityMemoryWrite: "agent_entity_memory_write",
+  agentEntityMemoryDelete: "agent_entity_memory_delete",
+  agentEntityActivity: "agent_entity_activity",
+  agentEntityProposals: "agent_entity_proposals",
+  agentEntityProposalResolve: "agent_entity_proposal_resolve",
 } as const;
 
 export type CmdName = (typeof CMD)[keyof typeof CMD];
