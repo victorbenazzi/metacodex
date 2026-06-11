@@ -3,32 +3,81 @@
     "viewToggle": {
       "label": "Switch view",
       "agent": "Agent",
-      "code": "Code"
+      "code": "Code",
+      "agentWorking": "Agent working…"
     },
     "sidebar": {
-      "paneLabel": "Work or chat",
-      "work": "Work",
-      "chat": "Chat",
       "newTask": "New Task",
       "skills": "Skills",
       "scheduledTasks": "Scheduled Tasks",
-      "webBridge": "WebBridge",
+      "mcp": "MCP Servers",
+      "agents": "Agents",
+      "customize": "Customize",
+      "soon": "Soon",
+      "settings": "Settings",
       "project": "Project",
       "projectEmpty": "Create or select a file to start",
       "tasks": "Tasks",
       "tasksEmpty": "Your tasks will appear here",
-      "newChat": "New chat",
-      "chats": "Chats",
+      "noRuns": "No runs yet",
       "chatsEmpty": "Your chats will appear here",
-      "untitledChat": "New chat"
+      "untitledChat": "New chat",
+      "noThreads": "No conversations yet",
+      "showAll": "Show {{count}} more",
+      "draft": "Draft",
+      "pin": "Pin",
+      "unpin": "Unpin",
+      "archive": "Archive",
+      "justNow": "now",
+      "newThread": "New conversation",
+      "expandThreads": "Show conversations",
+      "collapseThreads": "Hide conversations",
+      "moreActions": "More actions",
+      "rename": "Rename",
+      "delete": "Delete",
+      "fork": "Duplicate conversation",
+      "archived": "Archived ({{count}})",
+      "unarchive": "Unarchive",
+      "archiveConfirmTitle": "Archive conversation?",
+      "archiveConfirmBody": "\"{{title}}\" moves to this project's Archived group. Nothing is deleted.",
+      "deleteConfirmTitle": "Delete conversation?",
+      "deleteConfirmBody": "\"{{title}}\" will be permanently deleted from the agent's history.",
+      "ago": {
+        "minute": "m",
+        "hour": "h",
+        "day": "d",
+        "week": "w"
+      }
     },
     "hero": {
       "title": "Let's take something off your plate",
       "beta": "Beta Preview"
     },
     "composer": {
-      "placeholder": "Type \"/\" to quickly access skills",
+      "placeholder": "Type \"/\" for skills and commands",
       "attach": "Add attachment",
+      "attachFileOrPhoto": "Attach file or photo",
+      "removeAttachment": "Remove attachment",
+      "attachmentError": "could not read",
+      "attachmentTooLarge": "too large",
+      "attachmentUnsupported": "unsupported file",
+      "dropToAttach": "Drop to attach",
+      "skills": "Skills",
+      "skillsEmpty": "No skills found",
+      "mcpServers": "MCP Servers",
+      "mcpSettings": "MCP settings",
+      "mcpEmpty": "No MCP servers configured",
+      "mentionFiles": "Files",
+      "mentionFilesHint": "Attach project files as context",
+      "mentionBranch": "Branch",
+      "mentionPastChats": "Past chats",
+      "mentionPastChatsHint": "Bring an earlier conversation as context",
+      "mentionSymbols": "Symbols",
+      "mentionSymbolsHint": "Point the agent at a workspace symbol",
+      "mentionSymbolsEmpty": "No symbols found. The language server may still be warming up",
+      "mentionNoResults": "No results",
+      "variantAuto": "Auto",
+      "variantLabel": "Reasoning effort",
       "askPermissions": "Ask permissions",
       "modeLabel": "Agent or swarm",
       "agent": "Agent",
@@ -39,12 +88,99 @@
       "modelLabel": "Choose model",
       "modelEmpty": "Select model",
       "projectLabel": "Working project",
-      "globalScope": "No project"
+      "globalScope": "No project",
+      "mentionLabel": "Suggestions",
+      "mcpRestartToApply": "Restart agent to apply",
+      "originCommand": "command",
+      "originSkill": "skill",
+      "shellHint": "Enter runs this in the project shell; the output stays in the conversation",
+      "shellBusyHint": "The agent is busy: wait for the turn to finish to run a shell command",
+      "queue": {
+        "queued": "Queued ({{count}})",
+        "enqueue": "Add to queue",
+        "hint": "The agent is busy: Enter adds this prompt to the queue",
+        "remove": "Remove from queue",
+        "edit": "Edit queued prompt",
+        "attachmentsOnly": "(attachments)"
+      }
     },
     "chat": {
       "thinking": "Thinking",
       "reasoning": "Reasoning",
-      "thoughtFor": "Thought {{sec}}s"
+      "thoughtFor": "Thought {{sec}}s",
+      "visionRelayNote": "Image described via vision relay",
+      "visionRelayFailed": "Vision relay failed. The image could not be described; try again or pick a vision-capable model.",
+      "visionRelayNoModel": "No vision-capable model available to describe the image. Pick one in Settings or switch the chat model.",
+      "dismissError": "Dismiss error",
+      "errors": {
+        "sessionCreate": "Couldn't start the conversation",
+        "sendFailed": "The message wasn't sent; your text was kept as a draft",
+        "permissionReply": "Couldn't deliver the approval",
+        "questionReply": "Couldn't deliver the answer",
+        "revertFailed": "Could not restore the conversation",
+        "unrevertFailed": "Could not undo the restore",
+        "compactFailed": "Could not compact the conversation",
+        "deleteFailed": "Could not delete the message"
+      },
+      "truncated": "Reply was cut short by the model's length limit",
+      "patch": "Applied a patch",
+      "retried": "Retried after a provider error",
+      "compacted": "Context compacted",
+      "fileFallback": "file",
+      "reconnecting": "Connection to the agent dropped; reconnecting",
+      "filesChanged_one": "{{count}} file changed",
+      "filesChanged_other": "{{count}} files changed",
+      "viewDiff": "View changes",
+      "context": {
+        "usage": "About {{percent}}% of the context window used (estimated from the last turn)",
+        "compact": "Compact conversation",
+        "compacting": "Compacting"
+      },
+      "revert": {
+        "restoreHere": "Restore to here",
+        "confirmTitle": "Restore conversation",
+        "confirmBody": "Messages from this point on will be discarded and the agent's file changes will be rolled back.",
+        "filesAffected_one": "{{count}} file will be restored:",
+        "filesAffected_other": "{{count}} files will be restored:",
+        "noFiles": "No file changes to roll back.",
+        "moreFiles_one": "and {{count}} more file",
+        "moreFiles_other": "and {{count}} more files",
+        "activeBanner_one": "Conversation restored: {{count}} message discarded.",
+        "activeBanner_other": "Conversation restored: {{count}} messages discarded.",
+        "activeBannerNoCount": "Conversation restored to an earlier point.",
+        "undo": "Undo"
+      },
+      "edit": {
+        "action": "Edit and resend",
+        "confirmTitle": "Edit and resend",
+        "confirmBody": "The conversation will be restored to before this message and its text will return to the composer."
+      },
+      "deleteMsg": {
+        "action": "Delete",
+        "confirmTitle": "Delete last exchange",
+        "confirmBody": "This removes your last message and the replies after it. File changes are not rolled back."
+      },
+      "forkFromHere": "Duplicate from here"
+    },
+    "permissions": {
+      "title": "Saved permissions",
+      "subtitle": "Rules created when you answer \"Allow always\" on a request. Revoking one makes the agent ask again.",
+      "loading": "Loading permissions",
+      "loadFailed": "Couldn't load the saved permissions",
+      "emptyTitle": "No saved permissions",
+      "emptyBody": "Answer \"Allow always\" on a permission request and the rule shows up here.",
+      "revoke": "Revoke",
+      "revokeConfirmTitle": "Revoke this permission?",
+      "revokeConfirmBody": "The agent will ask again the next time it needs this.",
+      "savedHint": "Saved as an always-allow rule.",
+      "savedHintAction": "Review in Customize"
+    },
+    "diff": {
+      "title": "Session changes",
+      "empty": "No changes in this session",
+      "failed": "Could not load the changes",
+      "noPatch": "No textual diff for this file",
+      "truncated": "Diff truncated"
     },
     "tool": {
       "read": "Read",
@@ -57,7 +193,8 @@
       "list": "Listed",
       "fetch": "Fetched",
       "plan": "Updated plan",
-      "skill": "Loaded skill"
+      "skill": "Loaded skill",
+      "failed": "{{tool}} failed"
     },
     "swarm": {
       "subagents": "Subagents",
@@ -70,37 +207,116 @@
         "editing": "Editing files",
         "running": "Running commands",
         "searching": "Searching the web"
-      }
+      },
+      "failed": "Failed"
     },
     "skills": {
       "title": "Skills",
       "subtitle": "Reusable skills the agent can load on demand, discovered from opencode, Claude, and metacodex.",
       "loading": "Loading skills",
       "emptyTitle": "No skills found",
-      "emptyBody": "Add Agent Skills to ~/.config/opencode/skills or ~/.claude/skills and they show up here."
+      "emptyBody": "Add Agent Skills to ~/.config/opencode/skills or ~/.claude/skills and they show up here.",
+      "loadFailed": "Couldn't read the skills folders"
+    },
+    "mcp": {
+      "title": "MCP Servers",
+      "subtitle": "Connect Model Context Protocol servers to give the agent extra tools. Changes apply after the agent restarts.",
+      "addServer": "Add server",
+      "featuredTitle": "Web search",
+      "customTitle": "Your servers",
+      "emptyTitle": "No custom servers yet",
+      "emptyBody": "Add a local (command) or remote (URL) MCP server and its tools become available to the agent.",
+      "featured": {
+        "brave": "Web search by Brave. Paste a Brave Search API key to enable it.",
+        "exa": "Semantic web search by Exa. Paste an Exa API key to enable it."
+      },
+      "enable": "Enable",
+      "keySet": "API key set ({{envVar}})",
+      "restartNote": "MCP changes apply after the agent restarts.",
+      "restartButton": "Restart agent",
+      "statusConnected": "Connected",
+      "statusError": "Error",
+      "toggleAria": "Toggle {{name}}",
+      "removeAria": "Remove {{name}}",
+      "removeConfirmTitle": "Remove MCP server?",
+      "removeConfirmBody": "\"{{name}}\" is removed from the agent; any API key stored for it is deleted.",
+      "removeConfirm": "Remove",
+      "addTitle": "Add MCP server",
+      "editTitle": "Edit MCP server",
+      "dialogDescription": "Values shown as {{sentinel}} are stored secrets; leave them as-is to keep them.",
+      "fieldName": "Name",
+      "fieldKind": "Server type",
+      "kindLocal": "Local (command)",
+      "kindRemote": "Remote (URL)",
+      "fieldCommand": "Command",
+      "fieldEnv": "Environment (KEY=value per line)",
+      "fieldUrl": "URL",
+      "fieldHeaders": "Headers (KEY=value per line)",
+      "nameInvalid": "Lowercase letters, digits, '-' and '_' only; must start with a letter or digit."
     },
     "scheduled": {
       "title": "Scheduled Tasks",
-      "subtitle": "Cron jobs that run a prompt on a schedule. They fire while metacodex is open.",
+      "subtitle": "Let the agent run a prompt on a cron schedule. Tasks fire while metacodex is open.",
+      "create": "Create",
       "emptyTitle": "No scheduled tasks yet",
-      "emptyBody": "Create one above to run a prompt on a recurring schedule.",
-      "titlePlaceholder": "Task name",
-      "promptPlaceholder": "What should the agent do each run?",
-      "every": "Every",
-      "minutes": "minutes",
-      "create": "Create task",
-      "runsEvery": "Every {{count}} min",
-      "lastRun": "last run {{time}}",
-      "enabled": "On",
-      "disabled": "Off",
-      "runNow": "Run now",
-      "delete": "Delete"
+      "addManually": "Add manually",
+      "or": "or",
+      "createFromChat": "Create from chat",
+      "presets": {
+        "everyMinute": "Every minute",
+        "every15m": "Every 15 min",
+        "hourly": "Hourly",
+        "daily9": "Daily 9am",
+        "weekdays9": "Weekdays 9am",
+        "weeklyMon": "Mondays 9am",
+        "monthly1": "Monthly (1st)"
+      },
+      "dialog": {
+        "newTitle": "New scheduled task",
+        "editTitle": "Edit scheduled task",
+        "name": "Name",
+        "namePlaceholder": "Enter task name",
+        "requirement": "Requirement",
+        "requirementPlaceholder": "Enter your requirement",
+        "schedule": "Schedule",
+        "cronInvalid": "Not a valid cron expression",
+        "cronHint": "Standard cron expression, in your local time.",
+        "cancel": "Cancel",
+        "save": "Save",
+        "saveFailed": "Could not save:",
+        "fromChatTitle": "Create from chat",
+        "fromChatPlaceholder": "Describe the task and when it should run...",
+        "fromChatHint": "AI fills the fields below. Review and save.",
+        "generate": "Generate",
+        "generateError": "Could not read that. Rephrase or fill it in manually.",
+        "runsIn": "Runs in:"
+      },
+      "card": {
+        "next": "next {{time}}",
+        "lastOk": "last run {{time}}",
+        "lastError": "last run failed",
+        "on": "On",
+        "off": "Off",
+        "runNow": "Run now",
+        "edit": "Edit",
+        "delete": "Delete",
+        "openRun": "Open the last run as a chat"
+      },
+      "deleteTitle": "Delete scheduled task?",
+      "deleteBody": "\"{{name}}\" will be removed. This cannot be undone."
     },
-    "webbridge": {
-      "title": "WebBridge",
-      "subtitle": "Browser automation: let agents drive a real browser.",
-      "emptyTitle": "WebBridge is on the way",
-      "emptyBody": "Connect a browser so agents can navigate, click, and extract from the web."
+    "customize": {
+      "title": "Customize",
+      "subtitle": "Extend what the agent can do: skills, MCP servers, permissions, and tools.",
+      "tabsLabel": "Customize sections",
+      "tools": "Tools",
+      "permissions": "Permissions"
+    },
+    "tools": {
+      "title": "Tools",
+      "subtitle": "Built-in tools the agent can use during a run.",
+      "emptyTitle": "Tool controls are on the way",
+      "emptyBody": "Soon you will be able to enable or disable individual tools for the agent here."
     },
     "settings": {
       "navLabel": "Agent",
@@ -113,11 +329,38 @@
       "restart": "Restart",
       "apiKey": "opencode GO key",
       "apiKeyHint": "Paste your opencode subscription key to list and use every model it includes. Held by the engine, never in the browser.",
+      "apiKeyDetectedHint": "Your existing opencode login was detected automatically. Paste a key only to replace the current credential.",
+      "cliBinary": "opencode CLI",
+      "cliAutoDetected": "Auto-detected",
+      "cliNotFound": "Not found",
+      "cliDetectedNoPath": "Found on your shell PATH.",
+      "cliMissing": "Not found on PATH. Install it with: {{command}}",
+      "cliChecking": "Checking your PATH",
       "save": "Save",
       "defaultModel": "Default model",
       "defaultModelHint": "Used for new chats and tasks.",
       "loadingModels": "Loading models",
-      "noModels": "No models yet. Add your GO key above."
+      "noModels": "No models yet. Add your GO key above.",
+      "visionModel": "Vision model",
+      "visionModelHint": "Describes images for chat models that can't see them (vision relay).",
+      "navModels": "Models",
+      "modelsTitle": "Models",
+      "modelsDescription": "Choose which models appear in the composer's model picker. By default only the opencode GO models show; enable any other model the engine has mapped.",
+      "enableAll": "Enable all",
+      "disableAll": "Disable all",
+      "capVision": "Vision",
+      "capReasoning": "Reasoning",
+      "capVariants": "Effort levels",
+      "toggleModelAria": "Toggle {{name}}"
+    },
+    "onboarding": {
+      "missingTitle": "The Agent runs on opencode",
+      "missingBody": "metacodex drives a local opencode engine for chat, scheduled tasks, and MCP tools. It wasn't found on your PATH. Install it, then try again:",
+      "failedTitle": "The agent engine didn't start",
+      "failedBody": "opencode is installed but the local server failed to start.",
+      "copyInstall": "Copy install command",
+      "codeStillWorks": "The Code view works without it. Already logged into opencode? Your credentials are picked up automatically.",
+      "retry": "Try again"
     },
     "permission": {
       "ask": "Always ask",
@@ -158,7 +401,42 @@
       "namePlaceholder": "feature/my-branch",
       "create": "Create",
       "creating": "Creating",
-      "nameInvalid": "Use letters, numbers and / _ - . (no leading dash, no \"..\")."
+      "nameInvalid": "Use letters, numbers and / _ - . (no leading dash, no \"..\").",
+      "checkoutFailed": "Checkout failed"
+    },
+    "md": {
+      "close": "Close",
+      "copied": "Copied",
+      "copyCode": "Copy code",
+      "copyLink": "Copy link",
+      "copyTable": "Copy table",
+      "copyTableAsCsv": "Copy as CSV",
+      "copyTableAsMarkdown": "Copy as Markdown",
+      "copyTableAsTsv": "Copy as TSV",
+      "downloadFile": "Download file",
+      "downloadImage": "Download image",
+      "downloadTable": "Download table",
+      "downloadTableAsCsv": "Download as CSV",
+      "downloadTableAsMarkdown": "Download as Markdown",
+      "downloadTableAsTsv": "Download as TSV",
+      "exitFullscreen": "Exit full screen",
+      "externalLinkWarning": "You're about to open an external website.",
+      "imageNotAvailable": "Image not available",
+      "openExternalLink": "Open external link?",
+      "openLink": "Open link",
+      "tableFormatCsv": "CSV",
+      "tableFormatMarkdown": "Markdown",
+      "tableFormatTsv": "TSV",
+      "viewFullscreen": "View full screen"
+    },
+    "question": {
+      "title": "The agent has a question",
+      "submit": "Answer",
+      "skip": "Skip",
+      "customPlaceholder": "Or type your own answer"
+    },
+    "todo": {
+      "title": "Plan"
     }
   },
   "common": {
@@ -221,6 +499,10 @@
   "settings": {
     "header": "Settings",
     "close": "Close settings",
+    "tab": {
+      "code": "Code",
+      "agent": "Agent"
+    },
     "nav": {
       "general": "General",
       "appearance": "Appearance",
@@ -309,7 +591,7 @@
       "sound": "Notification sound",
       "soundHint": "Play a short chime alongside the banner.",
       "notifyWhenFocused": "Notify even when focused",
-      "notifyWhenFocusedHint": "Off: when metacodex is active and the affected tab is selected, only the tab dot lights up — no banner. On: always show the banner."
+      "notifyWhenFocusedHint": "Off: when metacodex is active and the affected tab is selected, only the tab dot lights up, no banner. On: always show the banner."
     },
     "shortcuts": {
       "title": "Shortcuts",
@@ -334,7 +616,9 @@
         "fileSave": "Save active file",
         "tabJumpToNextAttention": "Jump to next agent waiting",
         "diagnosticsToggle": "Show diagnostic log",
-        "folderClone": "Clone from GitHub"
+        "folderClone": "Clone from GitHub",
+        "agentNewChat": "New agent chat (Agent view)",
+        "viewToggle": "Switch between Agent and Code"
       }
     },
     "advanced": {
@@ -565,7 +849,7 @@
     "processExited": "[process exited]",
     "exitBanner": {
       "nonzero": "Process exited with code {{code}}.",
-      "readerError": "Terminal I/O failed — output above may be truncated.",
+      "readerError": "Terminal I/O failed: output above may be truncated.",
       "killed": "Process was killed.",
       "openLog": "Open diagnostic log"
     }
@@ -722,7 +1006,7 @@
       "downloading": "Updating… {{percent}}%",
       "downloadingIndeterminate": "Updating…",
       "installing": "Relaunching…",
-      "error": "Update failed — retry"
+      "error": "Update failed; retry"
     }
   }
 }

@@ -6,6 +6,17 @@ import { useSettingsStore } from "@/features/settings/settings.store";
 import { useSearchUiStore } from "@/features/search/search.store";
 import { useCommandPaletteStore } from "@/features/command-palette/command-palette.store";
 import { useDiagnosticsStore } from "@/features/diagnostics/diagnostics.store";
+import { useViewStore } from "@/features/ui/view.store";
+
+/** Commands that still make sense while the Agent overlay covers the Code
+ *  view. Everything else (new terminal, close tab, project switch, palettes)
+ *  mutates or surfaces Code chrome the user cannot see, so it is swallowed. */
+const AGENT_SAFE_COMMANDS = new Set<string>([
+  "settings.open",
+  "diagnostics.toggle",
+  "agent.newChat",
+  "view.toggle",
+]);
 
 interface MetacodexApi {
   newTerminal?: () => void;
@@ -68,6 +79,21 @@ function dispatchCommand(cmd: ResolvedCommand) {
     case "tab.jumpToNextAttention":
       api?.jumpToNextAttention?.();
       break;
+    case "agent.newChat":
+      // Agent-view only: in the Code view Cmd+K stays a no-op rather than
+      // yanking the user into another surface.
+      if (useViewStore.getState().view === "agent") {
+        void import("@/features/agent/nav.store").then(({ useAgentNavStore }) => {
+          useAgentNavStore.getState().setSection("chat");
+        });
+        void import("@/features/agent/chat.store").then(({ useAgentChatStore }) => {
+          useAgentChatStore.getState().newChat();
+        });
+      }
+      break;
+    case "view.toggle":
+      useViewStore.getState().toggleView();
+      break;
     case "diagnostics.toggle":
       useDiagnosticsStore.getState().toggle();
       break;
@@ -90,6 +116,7 @@ export function KeyboardShortcuts() {
       if (!cmd) return;
       if (cmd.passive) return;
       e.preventDefault();
+      if (useViewStore.getState().view === "agent" && !AGENT_SAFE_COMMANDS.has(cmd.id)) return;
       dispatchCommand(cmd);
     };
     window.addEventListener("keydown", handler);

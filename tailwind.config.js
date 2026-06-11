@@ -128,6 +128,14 @@ export default {
           "0%": { transform: "translateX(-100%)" },
           "100%": { transform: "translateX(400%)" },
         },
+        // Inline control reveal — slides sideways into place (e.g. the
+        // reasoning-variant pill appearing beside the model picker). NOT for
+        // popups/overlays (those stay opacity-only; see fade-in above): this
+        // is in-flow content, so the transform can't break modal centering.
+        "slide-in-left": {
+          from: { opacity: "0", transform: "translateX(-8px)" },
+          to: { opacity: "1", transform: "translateX(0)" },
+        },
       },
       animation: {
         // Enter decelerates in (ease-out); exit accelerates out (ease-in) and
@@ -139,6 +147,7 @@ export default {
         "explorer-recent-tint": "explorer-recent-tint 15s linear forwards",
         "tab-status-pulse": "tab-status-pulse 1.6s ease-in-out infinite",
         "progress-indeterminate": "progress-indeterminate 1.4s ease-in-out infinite",
+        "slide-in-left": "slide-in-left 180ms var(--ease-out) both",
       },
     },
   },

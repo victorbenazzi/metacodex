@@ -1,14 +1,19 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { GitBranch, ArrowUp, ArrowDown, Sparkles, Code2 } from "lucide-react";
+import { GitBranch, ArrowUp, ArrowDown, Sparkles, Code2, FolderTree } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 import { cn } from "@/lib/cn";
 import { isMac } from "@/lib/platform";
+import { useAgentOverlayPanelsStore } from "@/features/agent/overlayPanels.store";
+import { useAgentSessionsStore } from "@/features/agent/sessions.store";
 import { useGitStore } from "@/features/git/git.store";
 import { useProjectsStore } from "@/features/projects/project.store";
 import { useViewStore } from "@/features/ui/view.store";
 import { Icon } from "@/components/ui/Icon";
+import { Kbd } from "@/components/ui/Kbd";
 import { Segmented } from "@/components/ui/Segmented";
+import { Tooltip } from "@/components/ui/Tooltip";
 import { useSaveStatusStore } from "@/features/workspace/saveStatus.store";
 import { useDiagnosticsStore } from "@/features/diagnostics/diagnostics.store";
 import { UpdatePill } from "@/components/updates/UpdatePill";
@@ -20,7 +25,7 @@ interface TitleBarProps {
 
 /**
  * Top drag region. macOS Overlay titleBarStyle means traffic lights are inset at
- * top-left — we leave 78px of padding to keep them from overlapping app chrome.
+ * top-left, we leave 78px of padding to keep them from overlapping app chrome.
  *
  * IMPORTANT: `data-tauri-drag-region` must appear on every element along the
  * click path. Without it on the inner spans, mousedown on the labels won't be
@@ -32,6 +37,12 @@ export function TitleBar({ workspaceName, className }: TitleBarProps) {
   const git = useGitStore((s) => (activeId ? s.byProject[activeId] : null));
   const view = useViewStore((s) => s.view);
   const setView = useViewStore((s) => s.setView);
+  const agentBusy = useAgentSessionsStore((s) => Object.keys(s.runningById).length > 0);
+  const explorerOpen = useAgentOverlayPanelsStore((s) => s.explorerOpen);
+  const gitOpen = useAgentOverlayPanelsStore((s) => s.gitOpen);
+  const toggleExplorer = useAgentOverlayPanelsStore((s) => s.toggleExplorer);
+  const toggleGit = useAgentOverlayPanelsStore((s) => s.toggleGit);
+  const changeCount = git ? Object.keys(git.statuses).length : 0;
 
   return (
     <header
@@ -42,20 +53,40 @@ export function TitleBar({ workspaceName, className }: TitleBarProps) {
         className,
       )}
     >
-      {/* Top-level view switch — sits where the wordmark used to, just past the
+      {/* Top-level view switch, sits where the wordmark used to, just past the
           macOS traffic lights. NOT a drag region (it's an interactive control);
           the rest of the header still drags the window. */}
       <div className="justify-self-start">
-        <Segmented
-          size="sm"
-          ariaLabel={t("agent.viewToggle.label")}
-          value={view}
-          onChange={setView}
-          options={[
-            { value: "agent", label: t("agent.viewToggle.agent"), icon: Sparkles },
-            { value: "code", label: t("agent.viewToggle.code"), icon: Code2 },
-          ]}
-        />
+        {/* Pill treatment (sliding thumb) marks this as the app's top-level
+            mode switch, one notch above in-page segmented controls. The plain
+            span wrapper exists because Radix's asChild trigger needs a host
+            that spreads props, which Segmented intentionally doesn't. */}
+        <Tooltip
+          content={t("agent.viewToggle.label")}
+          shortcut={<Kbd keys={["Mod", "E"]} />}
+          side="bottom"
+          align="start"
+        >
+          <span className="inline-flex">
+            <Segmented
+              size="sm"
+              variant="pill"
+              ariaLabel={t("agent.viewToggle.label")}
+              value={view}
+              onChange={setView}
+              options={[
+                {
+                  value: "agent",
+                  label: t("agent.viewToggle.agent"),
+                  icon: Sparkles,
+                  dot: view === "code" && agentBusy,
+                  dotLabel: t("agent.viewToggle.agentWorking"),
+                },
+                { value: "code", label: t("agent.viewToggle.code"), icon: Code2 },
+              ]}
+            />
+          </span>
+        </Tooltip>
       </div>
 
       <div
@@ -98,11 +129,70 @@ export function TitleBar({ workspaceName, className }: TitleBarProps) {
         <UpdatePill />
       </div>
 
-      {/* Right slot: workspace save-status dot (saving / saved / failed). The
-          centered grid column stays balanced because the dot is tiny and the
-          slot is reserved either way. */}
-      <SaveStatusDot />
+      {/* Right slot: in Agent view, ports of the Code panels (file tree drawer
+          + Source Control drawer) as separate toggles, then the workspace
+          save-status dot. In Code view both already live in the workspace
+          chrome (sidebar / tab bar), so only the dot remains. */}
+      <div className="flex items-center gap-[6px] justify-self-end">
+        {view === "agent" && activeId ? (
+          <>
+            <PanelToggle
+              icon={FolderTree}
+              label={t("explorer.title")}
+              pressed={explorerOpen}
+              onClick={toggleExplorer}
+            />
+            <PanelToggle
+              icon={GitBranch}
+              label={t("sourceControl.toggle")}
+              pressed={gitOpen}
+              onClick={toggleGit}
+              badge={changeCount > 0 ? (changeCount > 99 ? "99+" : String(changeCount)) : undefined}
+            />
+          </>
+        ) : null}
+        <SaveStatusDot />
+      </div>
     </header>
+  );
+}
+
+/** Title-bar toggle for an Agent-view inspect drawer. Same visual language as
+ *  the tab bar's Source Control toggle: hairline chip, pressed state lifts
+ *  onto surface-strong, optional mono change-count badge. */
+function PanelToggle({
+  icon,
+  label,
+  pressed,
+  onClick,
+  badge,
+}: {
+  icon: LucideIcon;
+  label: string;
+  pressed: boolean;
+  onClick: () => void;
+  badge?: string;
+}) {
+  return (
+    <Tooltip content={label} side="bottom" align="end">
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label={label}
+        aria-pressed={pressed}
+        className={cn(
+          "inline-flex h-[24px] items-center gap-[5px] rounded-sm border border-hairline px-[7px] font-mono text-[10px] leading-none tabular-nums",
+          "transition-colors duration-[var(--dur-fast)]",
+          "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-hairline-strong",
+          pressed
+            ? "bg-surface-strong/70 text-ink"
+            : "bg-canvas/70 text-muted hover:bg-surface-strong/45 hover:text-body",
+        )}
+      >
+        <Icon icon={icon} size={12} strokeWidth={1.75} />
+        {badge ? <span>{badge}</span> : null}
+      </button>
+    </Tooltip>
   );
 }
 

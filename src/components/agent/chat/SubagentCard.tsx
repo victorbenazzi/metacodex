@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
-import { Check, ChevronDown, ChevronRight, Loader2 } from "lucide-react";
+import { AlertTriangle, Check, ChevronDown, ChevronRight, Loader2 } from "lucide-react";
 
 import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/cn";
@@ -33,10 +33,13 @@ function SubagentCard({ child }: { child: ChildSession }) {
     <div className="overflow-hidden rounded-lg border border-hairline-soft bg-surface-1">
       <button
         type="button"
+        aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
         className="flex w-full items-center gap-[10px] px-[12px] py-[9px] text-left"
       >
-        {child.done ? (
+        {child.error ? (
+          <Icon icon={AlertTriangle} size={14} className="shrink-0 text-danger" />
+        ) : child.done ? (
           <Icon icon={Check} size={14} strokeWidth={2.5} className="shrink-0 text-success" />
         ) : (
           <Icon icon={Loader2} size={14} className="shrink-0 animate-spin text-muted" />
@@ -59,18 +62,24 @@ function SubagentCard({ child }: { child: ChildSession }) {
 
       {open ? (
         <div className="border-t border-hairline-soft px-[14px] py-[12px]">
+          {child.error ? (
+            <div className="mb-[8px] flex items-start gap-[6px] text-[12px] text-danger">
+              <Icon icon={AlertTriangle} size={12} className="mt-[2px] shrink-0" />
+              <span className="min-w-0 break-words">{child.error}</span>
+            </div>
+          ) : null}
           {hasOutput ? (
             <div className="flex flex-col gap-[8px]">
               {messages.map((m) => (
                 <ChatMessage key={m.id} message={m} />
               ))}
             </div>
-          ) : (
+          ) : !child.error ? (
             <div className="flex items-center gap-[8px] text-[12px] text-muted-soft">
               <Icon icon={Loader2} size={12} className="animate-spin" />
               {t("agent.swarm.starting")}
             </div>
-          )}
+          ) : null}
         </div>
       ) : null}
     </div>
@@ -92,6 +101,7 @@ export function SubagentGroup() {
     <div className="flex flex-col gap-[8px]">
       <button
         type="button"
+        aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
         className="flex items-center gap-[6px] self-start text-[13px] text-muted hover:text-body"
       >
@@ -115,6 +125,7 @@ export function SubagentGroup() {
 
 /** Best-effort "what is this subagent doing right now" from its latest tool. */
 function childActivity(child: ChildSession, messages: Msg[], t: TFunction): string {
+  if (child.error) return t("agent.swarm.failed");
   if (child.done) return t("agent.swarm.done");
   for (let i = messages.length - 1; i >= 0; i--) {
     const parts = messages[i].parts;

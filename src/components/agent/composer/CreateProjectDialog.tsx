@@ -17,7 +17,7 @@ interface CreateProjectDialogProps {
   onCreated: (project: Project) => void;
 }
 
-// A project name is a single folder segment — no separators, no dot-only names.
+// A project name is a single folder segment, no separators, no dot-only names.
 const NAME_INVALID = /[/\\\0]|^\.\.?$/;
 
 /**

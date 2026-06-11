@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { ShieldAlert } from "lucide-react";
 
@@ -8,14 +9,19 @@ import type { PermissionPrompt } from "@/features/agent/opencode";
 
 /**
  * Inline approval for a live opencode permission request. Surfaced in the thread
- * when the agent wants to run a gated tool (edit, bash, …). Three replies map to
- * opencode's verbs: Deny → `reject`, Allow once → `once`, Allow always →
+ * when the agent wants to run a gated tool (edit, bash, ...). Three replies map
+ * to opencode's verbs: Deny → `reject`, Allow once → `once`, Allow always →
  * `always`. The card is calm: an amber glyph, the action and its targets, and a
- * clear primary on "Allow once" so the common path is one obvious click.
+ * clear primary on "Allow once" so the common path is one obvious click; the
+ * primary takes focus on mount so Enter answers from the keyboard.
  */
 export function PermissionCard({ prompt }: { prompt: PermissionPrompt }) {
   const { t } = useTranslation();
   const reply = useAgentChatStore((s) => s.replyPermission);
+  const primaryRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    primaryRef.current?.focus();
+  }, []);
 
   const extra = prompt.targets.length - 1;
   const target = prompt.targets[0];
@@ -50,7 +56,12 @@ export function PermissionCard({ prompt }: { prompt: PermissionPrompt }) {
         <Button size="sm" variant="outline" onClick={() => void reply(prompt.id, "always")}>
           {t("agent.permission.allowAlways")}
         </Button>
-        <Button size="sm" variant="primary" onClick={() => void reply(prompt.id, "once")}>
+        <Button
+          size="sm"
+          variant="primary"
+          ref={primaryRef}
+          onClick={() => void reply(prompt.id, "once")}
+        >
           {t("agent.permission.allowOnce")}
         </Button>
       </div>

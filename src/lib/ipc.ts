@@ -28,7 +28,6 @@ export const CMD = {
   setActiveProject: "set_active_project",
   getActiveProjectId: "get_active_project_id",
   revealInFinder: "reveal_in_finder",
-  openFolderDialog: "open_folder_dialog",
 
   // system
   openExternalUrl: "open_external_url",
@@ -105,9 +104,19 @@ export const CMD = {
   agentListSkills: "agent_list_skills",
   agentCronList: "agent_cron_list",
   agentCronCreate: "agent_cron_create",
+  agentCronUpdate: "agent_cron_update",
   agentCronDelete: "agent_cron_delete",
   agentCronSetEnabled: "agent_cron_set_enabled",
   agentCronRunNow: "agent_cron_run_now",
+  agentRuntimeRestart: "agent_runtime_restart",
+  agentMcpList: "agent_mcp_list",
+  agentMcpFeatured: "agent_mcp_featured",
+  agentMcpUpsert: "agent_mcp_upsert",
+  agentMcpDelete: "agent_mcp_delete",
+  agentMcpSetEnabled: "agent_mcp_set_enabled",
+  agentMcpStatus: "agent_mcp_status",
+  agentUiStateRead: "agent_ui_state_read",
+  agentUiStateWrite: "agent_ui_state_write",
 } as const;
 
 export type CmdName = (typeof CMD)[keyof typeof CMD];

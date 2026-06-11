@@ -24,7 +24,7 @@ use watcher::WatcherManager;
 pub fn run() {
     // reqwest 0.13 + rustls 0.23 (pulled in via tauri-plugin-updater and the
     // AgentRuntime HTTP client) require a process-wide crypto provider to be
-    // installed before any reqwest::Client is built — otherwise the client
+    // installed before any reqwest::Client is built, otherwise the client
     // constructor panics "No provider set" at launch. Install ring's provider
     // once, here, before the Tauri builder spins anything up. Idempotent: a
     // second call returns Err with the already-installed provider; we ignore it.
@@ -38,7 +38,7 @@ pub fn run() {
     // spawning a duplicate process with its own PTYs / shared state.
     //
     // Skipped in DEBUG builds so a `pnpm tauri dev` window can run ALONGSIDE an
-    // installed metacodex — otherwise the dev launch is routed into the installed
+    // installed metacodex, otherwise the dev launch is routed into the installed
     // app (which focuses it) and no dev window ever appears. Pair this with
     // `METACODEX_HOME` for an isolated dev state dir.
     #[cfg(not(debug_assertions))]
@@ -73,7 +73,7 @@ pub fn run() {
                 tauri::async_runtime::spawn(async move {
                     let _ = win.emit(events::EV_BEFORE_QUIT, ());
                     // Frontend flush budget. If the listener takes longer the
-                    // app still exits — we don't risk hanging the user on quit.
+                    // app still exits, we don't risk hanging the user on quit.
                     tokio::time::sleep(std::time::Duration::from_millis(300)).await;
                     if let Some(mgr) = app.try_state::<pty::PtyManager>() {
                         mgr.kill_all().await;
@@ -87,6 +87,11 @@ pub fn run() {
             }
         })
         .setup(|app| {
+            // Ensure the ~/.metacodex tree exists before anything reads from or
+            // writes to it (CronStore::load persists a refreshed snapshot).
+            if let Err(e) = config_paths::ensure_dirs() {
+                eprintln!("[metacodex] config_paths::ensure_dirs failed: {e}");
+            }
             let pty_mgr = PtyManager::new(app.handle().clone());
             app.manage(pty_mgr);
             app.manage(Arc::new(ProjectsCache::default()));
@@ -96,10 +101,8 @@ pub fn run() {
             app.manage(agent::AgentRuntime::new());
             // Scheduled-task (cron) registry, hydrated from disk.
             app.manage(agent::scheduler::CronStore::load());
-            // Ensure the ~/.metacodex tree exists before anything reads from it.
-            if let Err(e) = config_paths::ensure_dirs() {
-                eprintln!("[metacodex] config_paths::ensure_dirs failed: {e}");
-            }
+            // MCP server registry; regenerates the opencode config layer on boot.
+            app.manage(agent::McpStore::load());
             // Hydrate the in-memory project cache from the persisted state.
             if let Err(e) = projects::hydrate(app.handle()) {
                 eprintln!("[metacodex] projects::hydrate failed: {e}");
@@ -183,15 +186,25 @@ pub fn run() {
             commands::agent::agent_list_skills,
             commands::agent::agent_cron_list,
             commands::agent::agent_cron_create,
+            commands::agent::agent_cron_update,
             commands::agent::agent_cron_delete,
             commands::agent::agent_cron_set_enabled,
             commands::agent::agent_cron_run_now,
+            commands::agent::agent_runtime_restart,
+            commands::agent::agent_mcp_list,
+            commands::agent::agent_mcp_featured,
+            commands::agent::agent_mcp_upsert,
+            commands::agent::agent_mcp_delete,
+            commands::agent::agent_mcp_set_enabled,
+            commands::agent::agent_mcp_status,
+            commands::agent::agent_ui_state_read,
+            commands::agent::agent_ui_state_write,
         ])
         .build(tauri::generate_context!())
         .expect("metacodex failed to start")
         .run(|app_handle, event| {
             // macOS delivers Finder "Open With" / double-click opens as an Apple
-            // Event surfaced here as RunEvent::Opened — for both cold start and
+            // Event surfaced here as RunEvent::Opened, for both cold start and
             // warm (already-running) opens.
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Opened { urls } = event {

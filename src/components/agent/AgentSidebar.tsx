@@ -1,55 +1,38 @@
-import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { LucideIcon } from "lucide-react";
-import {
-  AlarmClock,
-  BookOpen,
-  CirclePlus,
-  Globe,
-  MessageSquare,
-  Monitor,
-  SquarePen,
-} from "lucide-react";
+import { AlarmClock, Blocks, Bot, CirclePlus, Settings } from "lucide-react";
 
 import { Icon } from "@/components/ui/Icon";
-import { Segmented } from "@/components/ui/Segmented";
 import { useAgentChatStore } from "@/features/agent/chat.store";
 import { useAgentNavStore } from "@/features/agent/nav.store";
+import { useSettingsStore } from "@/features/settings/settings.store";
 import { ProjectSection } from "@/components/agent/ProjectSection";
+import { SidebarTasks } from "@/components/agent/SidebarTasks";
 import { cn } from "@/lib/cn";
 
-type Pane = "work" | "chat";
-
 /**
- * Left rail of the Agent View. Mirrors the Kimi structure (Work | Chat) but is
- * reskinned to metacodex tokens. Drives which surface the main area shows via
- * the nav store; the Chat pane is wired to the chat store (new chat + history).
+ * Left rail of the Agent View. A single Work surface (the standalone Chat pane
+ * was removed: chatting is just sending a message inside Work). Drives which
+ * surface the main area shows via the nav store.
  */
 export function AgentSidebar() {
   const { t } = useTranslation();
-  const [pane, setPane] = useState<Pane>("work");
-  const setSection = useAgentNavStore((s) => s.setSection);
 
   return (
     <aside className="flex h-full w-[264px] shrink-0 flex-col border-r border-hairline bg-canvas-soft">
-      <div className="px-[12px] pb-[8px] pt-[12px]">
-        <Segmented
-          ariaLabel={t("agent.sidebar.paneLabel")}
-          value={pane}
-          onChange={(p) => {
-            setPane(p);
-            if (p === "chat") setSection("chat");
-          }}
-          className="w-full [&>button]:flex-1"
-          options={[
-            { value: "work", label: t("agent.sidebar.work"), icon: Monitor },
-            { value: "chat", label: t("agent.sidebar.chat"), icon: MessageSquare },
-          ]}
-        />
+      <div className="min-h-0 flex-1 overflow-y-auto px-[8px] pb-[12px] pt-[12px]">
+        <WorkPane />
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-[8px] pb-[12px]">
-        {pane === "work" ? <WorkPane /> : <ChatPane />}
+      <div className="border-t border-hairline-soft px-[8px] py-[6px]">
+        <button
+          type="button"
+          onClick={() => useSettingsStore.getState().openTab("agent")}
+          className="flex w-full items-center gap-[10px] rounded-sm px-[10px] py-[7px] text-left text-[13px] text-body transition-colors hover:bg-surface-strong/40 hover:text-ink"
+        >
+          <Icon icon={Settings} size={13} className="text-muted" />
+          {t("agent.sidebar.settings")}
+        </button>
       </div>
     </aside>
   );
@@ -73,11 +56,12 @@ function WorkPane() {
           newChat();
         }}
       />
+      {/* Agents: navigation placeholder only; the surface itself lands later. */}
       <SidebarItem
-        icon={BookOpen}
-        label={t("agent.sidebar.skills")}
-        active={section === "skills"}
-        onClick={() => setSection("skills")}
+        icon={Bot}
+        label={t("agent.sidebar.agents")}
+        badge={t("agent.sidebar.soon")}
+        disabled
       />
       <SidebarItem
         icon={AlarmClock}
@@ -86,56 +70,16 @@ function WorkPane() {
         onClick={() => setSection("scheduled")}
       />
       <SidebarItem
-        icon={Globe}
-        label={t("agent.sidebar.webBridge")}
-        active={section === "webbridge"}
-        onClick={() => setSection("webbridge")}
+        icon={Blocks}
+        label={t("agent.sidebar.customize")}
+        active={section === "customize"}
+        onClick={() => setSection("customize")}
       />
 
       <ProjectSection />
 
       <SectionLabel>{t("agent.sidebar.tasks")}</SectionLabel>
-      <EmptyHint>{t("agent.sidebar.tasksEmpty")}</EmptyHint>
-    </nav>
-  );
-}
-
-function ChatPane() {
-  const { t } = useTranslation();
-  const sessions = useAgentChatStore((s) => s.sessions);
-  const sessionId = useAgentChatStore((s) => s.sessionId);
-  const newChat = useAgentChatStore((s) => s.newChat);
-  const selectSession = useAgentChatStore((s) => s.selectSession);
-  const setSection = useAgentNavStore((s) => s.setSection);
-
-  return (
-    <nav className="flex flex-col gap-[1px]">
-      <SidebarItem
-        icon={SquarePen}
-        label={t("agent.sidebar.newChat")}
-        onClick={() => {
-          setSection("chat");
-          newChat();
-        }}
-      />
-
-      <SectionLabel>{t("agent.sidebar.chats")}</SectionLabel>
-      {sessions.length === 0 ? (
-        <EmptyHint>{t("agent.sidebar.chatsEmpty")}</EmptyHint>
-      ) : (
-        sessions.map((s) => (
-          <SidebarItem
-            key={s.id}
-            icon={MessageSquare}
-            label={s.title || t("agent.sidebar.untitledChat")}
-            active={s.id === sessionId}
-            onClick={() => {
-              setSection("chat");
-              void selectSession(s.id);
-            }}
-          />
-        ))
-      )}
+      <SidebarTasks />
     </nav>
   );
 }
@@ -144,27 +88,36 @@ interface SidebarItemProps {
   icon: LucideIcon;
   label: string;
   kbd?: string;
+  badge?: string;
   active?: boolean;
+  disabled?: boolean;
   onClick?: () => void;
 }
 
-function SidebarItem({ icon, label, kbd, active, onClick }: SidebarItemProps) {
+function SidebarItem({ icon, label, kbd, badge, active, disabled, onClick }: SidebarItemProps) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       className={cn(
         "group flex w-full items-center gap-[10px] rounded-md px-[10px] py-[7px] text-[13px] transition-colors duration-150",
         active ? "bg-surface-2 text-ink" : "text-body hover:bg-surface-1",
+        disabled && "cursor-default text-muted-soft hover:bg-transparent",
       )}
     >
       <Icon
         icon={icon}
         size={16}
         strokeWidth={1.75}
-        className={active ? "text-ink" : "text-muted"}
+        className={active ? "text-ink" : disabled ? "text-muted-soft" : "text-muted"}
       />
       <span className="flex-1 truncate text-left">{label}</span>
+      {badge ? (
+        <span className="rounded-pill bg-surface-1 px-[7px] py-[1px] text-[10px] uppercase tracking-[0.05em] text-muted-soft">
+          {badge}
+        </span>
+      ) : null}
       {kbd ? (
         <kbd className="rounded-sm border border-hairline-soft bg-surface-1 px-[5px] py-[1px] font-mono text-[10px] text-muted-soft">
           {kbd}
@@ -180,8 +133,4 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
       {children}
     </p>
   );
-}
-
-function EmptyHint({ children }: { children: React.ReactNode }) {
-  return <p className="px-[10px] py-[4px] text-[12px] leading-[1.5] text-muted">{children}</p>;
 }

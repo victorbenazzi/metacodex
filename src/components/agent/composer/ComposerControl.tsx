@@ -11,7 +11,7 @@ interface ComposerControlProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   label: string;
   /** Leading accent dot (e.g. project color) shown instead of the icon. */
   dot?: string;
-  /** Tone of the leading icon — `danger` signals a risk-bearing selection. */
+  /** Tone of the leading icon, `danger` signals a risk-bearing selection. */
   tone?: "default" | "danger";
 }
 

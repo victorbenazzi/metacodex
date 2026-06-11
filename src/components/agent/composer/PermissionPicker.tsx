@@ -30,8 +30,8 @@ const PRESETS: PresetMeta[] = [
 /**
  * Permission posture for the agent. Each preset maps to an opencode
  * `PermissionRuleset` applied when a session is created (and PATCHed onto the
- * live session when changed mid-chat). "Full auto" carries a quiet danger tone —
- * a red glyph, never a shout — so the risk reads without alarming.
+ * live session when changed mid-chat). "Full auto" carries a quiet danger tone , 
+ * a red glyph, never a shout, so the risk reads without alarming.
  */
 export function PermissionPicker() {
   const { t } = useTranslation();

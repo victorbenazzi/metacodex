@@ -8,6 +8,7 @@ import { ExplorerPanel } from "@/components/file-explorer/ExplorerPanel";
 import { WorkArea } from "@/components/tabs/WorkArea";
 import { TitleBar } from "@/app/TitleBar";
 import { useViewStore } from "@/features/ui/view.store";
+import { useAgentComposerStore } from "@/features/agent/composer.store";
 
 // Lazy-loaded so the Agent View's heavier deps (streamdown/shiki/katex/mermaid)
 // stay out of the Code View bundle and only load when the user enters Agent mode.
@@ -38,6 +39,7 @@ import {
 } from "@/features/projects/workspace.service";
 import { watcherApi } from "@/features/filesystem/watcher.service";
 import { useGitStore } from "@/features/git/git.store";
+import { useAgentOverlayPanelsStore } from "@/features/agent/overlayPanels.store";
 import { useSourceControlStore } from "@/features/source-control/sourceControl.store";
 import { useTerminalStore } from "@/features/terminal/terminal.store";
 import { ptyApi } from "@/features/terminal/terminal.service";
@@ -97,7 +99,7 @@ interface PendingMove {
 }
 
 /** Heuristic: dropped paths with a file extension are previewed; extensionless
- *  paths (folders, `Makefile`, …) route to "add project". Stat can't help here —
+ *  paths (folders, `Makefile`, …) route to "add project". Stat can't help here , 
  *  a dropped path lives outside any root, so the roots-checked stat would reject
  *  it. The extension test is good enough; an add-project on a non-folder just
  *  errors and is swallowed. */
@@ -168,7 +170,7 @@ export function AppShell() {
   }, [keybindingsHydrated, hydrateKeybindings]);
 
   // Hydrate the resume registry from ~/.metacodex/state/resume.json. We pull
-  // the last 30 days — older entries already pruned at startup by Rust.
+  // the last 30 days, older entries already pruned at startup by Rust.
   useEffect(() => {
     void useResumeStore.getState().hydrate();
   }, []);
@@ -214,7 +216,7 @@ export function AppShell() {
 
   // Tabs store keyed per project.
   const projectKey = project?.id ?? WORKSPACE_NULL;
-  // Subscribe to ALL buckets — TabContent mounts every project's tabs so PTYs
+  // Subscribe to ALL buckets, TabContent mounts every project's tabs so PTYs
   // and editor buffers survive a project switch (hidden via display:none for
   // anything other than the active project's active tab).
   const allBuckets = useTabsStore((s) => s.byProject);
@@ -254,7 +256,7 @@ export function AppShell() {
   const refreshGit = useGitStore((s) => s.refresh);
   const panelOpen = useSourceControlStore((s) => s.open);
 
-  // Resizable panel widths — driven by settings, persisted to ~/.metacodex.
+  // Resizable panel widths, driven by settings, persisted to ~/.metacodex.
   const explorerWidth = useSettingsDataStore((s) => s.settings.panels.explorerWidth);
   const sourceControlWidth = useSettingsDataStore(
     (s) => s.settings.panels.sourceControlWidth,
@@ -326,7 +328,7 @@ export function AppShell() {
         // event path. A plain `dirname(p)` is NOT enough: on macOS the notify
         // FSEvents backend coalesces bursts (e.g. an agent creating many files
         // at once via the terminal) into a single *directory-level* event whose
-        // path is the directory itself — sometimes an ancestor — carrying a
+        // path is the directory itself, sometimes an ancestor, carrying a
         // "rescan subtree" hint, NOT the individual file paths. So for each
         // event path we refresh: its parent dir (normal file-level event), the
         // path itself when it's a cached dir (coalesced dir-level event), and
@@ -348,7 +350,7 @@ export function AppShell() {
             if (bucket.children[d]) void explorer.refresh(projectId, d);
           }
         }
-        // Refresh git status — file changes typically alter git state.
+        // Refresh git status, file changes typically alter git state.
         // Throttled so a file burst doesn't fire one full status per tick.
         const proj = useProjectsStore
           .getState()
@@ -369,7 +371,7 @@ export function AppShell() {
               openFilePaths.add((t as { path: string }).path);
             }
           }
-          // Only stat paths that match an open tab — keeps the IPC blast
+          // Only stat paths that match an open tab, keeps the IPC blast
           // small even when the watcher fires for hundreds of changes.
           const candidates = paths.filter((p) => openFilePaths.has(p));
           for (const p of candidates) {
@@ -407,18 +409,18 @@ export function AppShell() {
 
   // -- Workspace persistence ----------------------------------------------------
   // Tri-state per project:
-  //   "pending" — load issued, not yet resolved. Saves are blocked.
-  //   "loaded"  — load succeeded; saves are allowed.
-  //   "failed"  — load errored or returned corrupt data. Saves stay BLOCKED for
+  //   "pending", load issued, not yet resolved. Saves are blocked.
+  //   "loaded" , load succeeded; saves are allowed.
+  //   "failed" , load errored or returned corrupt data. Saves stay BLOCKED for
   //               the rest of the session so a stale empty bucket can't clobber
   //               the file on disk. User sees a save-status dot in red.
   //
   // The old single-Set design called .add() synchronously BEFORE awaiting
   // workspaceApi.load(), which meant a failed/empty load was indistinguishable
-  // from a successful one — the next save fired and overwrote disk with {tabs:[]}.
+  // from a successful one, the next save fired and overwrote disk with {tabs:[]}.
   const hydrationStatus = useRef<Map<string, "pending" | "loaded" | "failed">>(new Map());
 
-  // Forget hydration marks for projects that no longer exist — otherwise
+  // Forget hydration marks for projects that no longer exist, otherwise
   // re-adding a folder with the same id (Rust hashes by path) would skip
   // the workspace reload and ship a stale bucket.
   useEffect(() => {
@@ -470,7 +472,7 @@ export function AppShell() {
         // their state mutations don't trigger a premature save effect run.
         hydrationStatus.current.set(projectId, "loaded");
       } catch (err) {
-        // Refuse to save for this project this session — disk file stays as-is.
+        // Refuse to save for this project this session, disk file stays as-is.
         hydrationStatus.current.set(projectId, "failed");
         recordDiag("workspace.load.fail", {
           projectId,
@@ -493,7 +495,7 @@ export function AppShell() {
     const expandedPaths = explorerBucket ? Array.from(explorerBucket.expanded) : [];
     const persistTabs: SerializedTab[] = (cur?.tabs ?? [])
       .map((t): SerializedTab | null => {
-        // Preview tabs (projectId null) are ephemeral — never persisted, like
+        // Preview tabs (projectId null) are ephemeral, never persisted, like
         // terminals. They'd otherwise rehydrate as project tabs pointing outside
         // the project root.
         if (t.projectId == null) return null;
@@ -529,7 +531,7 @@ export function AppShell() {
   // Global PTY observability: forward backpressure + exit events into the
   // diagnostics ring buffer so Cmd+Shift+D shows them regardless of which tab
   // is active. Per-tab UX (banners, status dot) is handled separately in
-  // TerminalTab — this is observability only.
+  // TerminalTab, this is observability only.
   useEffect(() => {
     let offBp: (() => void) | undefined;
     let offExit: (() => void) | undefined;
@@ -564,7 +566,7 @@ export function AppShell() {
     let cancelled = false;
     (async () => {
       const off = await listenTo<unknown>(EV.beforeQuit, async () => {
-        // Cancel all pending debounce timers — we're about to save explicitly.
+        // Cancel all pending debounce timers, we're about to save explicitly.
         for (const timer of saveTimers.current.values()) clearTimeout(timer);
         saveTimers.current.clear();
         const loadedProjects = Array.from(hydrationStatus.current.entries())
@@ -581,7 +583,7 @@ export function AppShell() {
             payload: useDiagnosticsStore.getState().serialize(),
           });
         } catch {
-          // ignore — disk dump is observability, not load-bearing
+          // ignore, disk dump is observability, not load-bearing
         }
       });
       if (cancelled) {
@@ -612,7 +614,7 @@ export function AppShell() {
     }, saveDebounceMs);
     saveTimers.current.set(projectId, handle);
     // On unmount / project switch: flush immediately INSTEAD of dropping the
-    // pending save — guarantees the bucket we're leaving lands on disk even if
+    // pending save, guarantees the bucket we're leaving lands on disk even if
     // the user switched within the debounce window.
     return () => {
       const pending = saveTimers.current.get(projectId);
@@ -656,7 +658,7 @@ export function AppShell() {
 
   // Send text (an editor selection) to the terminal: the last-focused terminal
   // in this project, falling back to any running one, else open a new terminal
-  // pre-filled with the text (no trailing Enter — the user reviews and submits).
+  // pre-filled with the text (no trailing Enter, the user reviews and submits).
   const sendToTerminal = useCallback(
     (text: string) => {
       const payload = text.replace(/\s+$/, "");
@@ -803,7 +805,7 @@ export function AppShell() {
     [bucket.tabs],
   );
 
-  // Manual rename. Empty / whitespace-only input clears the user override —
+  // Manual rename. Empty / whitespace-only input clears the user override , 
   // the tab falls back to agentTitle / default. Otherwise we cap to a hard
   // limit so a stuffed string can't blow up the tab width.
   const handleRenameTab = useCallback(
@@ -822,7 +824,7 @@ export function AppShell() {
     [moveTabStore, projectKey],
   );
 
-  // Triggered by F2 — finds the active tab and enters inline rename mode.
+  // Triggered by F2, finds the active tab and enters inline rename mode.
   // No-op if the active tab isn't renamable (file tabs) or there's no
   // active tab.
   const renameActiveTab = useCallback(() => {
@@ -834,7 +836,7 @@ export function AppShell() {
     setEditingTabId(id);
   }, [bucket.activeTabId, bucket.tabs, setEditingTabId]);
 
-  // Triggered by Alt+←/Alt+→ — keyboard equivalent of the drag-reorder, so
+  // Triggered by Alt+←/Alt+→, keyboard equivalent of the drag-reorder, so
   // users who can't (or don't want to) drag can still rearrange tabs.
   const moveActiveTab = useCallback(
     (delta: -1 | 1) => {
@@ -882,7 +884,7 @@ export function AppShell() {
     async (path: string, newName: string, _isDir: boolean): Promise<string> => {
       if (!project) throw new Error("no active project");
       // The Rust command emits `fs://renamed` synchronously after the rename
-      // succeeds — the global listener calls tabsStore.remapForRename, so we
+      // succeeds, the global listener calls tabsStore.remapForRename, so we
       // don't need a local call here (would be a redundant no-op).
       return useExplorerStore
         .getState()
@@ -896,7 +898,7 @@ export function AppShell() {
       if (!project) return;
       try {
         // Same as handleRename: Rust emits fs://renamed which drives the tab
-        // remap centrally — no local call needed.
+        // remap centrally, no local call needed.
         await useExplorerStore
           .getState()
           .moveNode(project.id, from, toDir);
@@ -915,7 +917,7 @@ export function AppShell() {
   const handleMove = useCallback(
     async (from: string, toDir: string): Promise<void> => {
       if (!project) return;
-      // No-op moves (drop into current parent) skip the dialog — almost always
+      // No-op moves (drop into current parent) skip the dialog, almost always
       // an accidental drag the user just dropped right back where it started.
       if (dirname(from) === toDir) return;
       if (skipMoveRef.current) {
@@ -985,7 +987,7 @@ export function AppShell() {
 
   // Open a file for preview, with NO project required. The tab carries
   // `projectId: null` (the preview invariant) and lands in whatever bucket is
-  // currently visible so it shows in context. Ephemeral — never persisted.
+  // currently visible so it shows in context. Ephemeral, never persisted.
   const handleOpenPreviewFile = useCallback(
     (path: string) => {
       const name = basename(path);
@@ -1093,22 +1095,32 @@ export function AppShell() {
 
   // Global file drag-drop onto the window: files → preview, folders → add as a
   // project. The drop target is webview-wide; the DropOverlay is purely visual.
+  // With the Agent view overlay active, a drop means "attach to the composer"
+  // instead, one window-global handler that branches, never two listeners.
   useEffect(() => {
     let un: (() => void) | undefined;
     let cancelled = false;
     (async () => {
       const unlisten = await getCurrentWebview().onDragDropEvent((event) => {
         const payload = event.payload;
+        const agentView = useViewStore.getState().view === "agent";
         if (payload.type === "enter" || payload.type === "over") {
-          setDropActive(true);
+          if (agentView) useAgentComposerStore.getState().setDragHover(true);
+          else setDropActive(true);
         } else if (payload.type === "drop") {
           setDropActive(false);
+          useAgentComposerStore.getState().setDragHover(false);
+          if (agentView) {
+            useAgentComposerStore.getState().addPaths(payload.paths);
+            return;
+          }
           for (const path of payload.paths) {
             if (looksLikeFile(path)) handleOpenPreviewFile(path);
             else void addProject(path).catch(() => undefined);
           }
         } else {
           setDropActive(false);
+          useAgentComposerStore.getState().setDragHover(false);
         }
       });
       if (cancelled) {
@@ -1152,7 +1164,7 @@ export function AppShell() {
   );
 
   // Cmd+Shift+U: walk through tabs that are flagged needs-attention (then done)
-  // in the CURRENT project's bucket. Wrap around — if we're already on the
+  // in the CURRENT project's bucket. Wrap around, if we're already on the
   // most-urgent tab, the next press goes to the second-most-urgent. If nothing
   // is waiting, do nothing visible (a toast would itself become a distraction).
   const jumpToNextAttention = useCallback(() => {
@@ -1204,7 +1216,7 @@ export function AppShell() {
 
   // CSS-grid template: the variable-width columns interpolate the current
   // settings so resizing rerenders only this style + the dragged column.
-  // The right panel currently hosts Source Control only — see
+  // The right panel currently hosts Source Control only, see
   // `SourceControlPanel.tsx`.
   const gridTemplateColumns = panelOpen
     ? `56px ${explorerWidth}px minmax(0,1fr) ${sourceControlWidth}px`
@@ -1212,8 +1224,24 @@ export function AppShell() {
 
   // Agent View renders as an opaque overlay below the titlebar so the Code
   // panels (and their live terminals) stay mounted underneath while in Agent
-  // mode — switching back is instant and lossless.
+  // mode; switching back is instant and lossless.
   const agentMode = useViewStore((s) => s.view) === "agent";
+  // Inspect drawers over the Agent overlay (toggled from the title bar): the
+  // Code view's explorer and Source Control, docked side by side on the right
+  // edge at z-40. They
+  // share the persisted panel widths with their Code counterparts. Anything
+  // that opens a Code tab (file, diff, terminal, CLI) also reveals the Code
+  // view, otherwise the tab would open unseen under the overlay.
+  const agentExplorerOpen = useAgentOverlayPanelsStore((s) => s.explorerOpen);
+  const agentGitOpen = useAgentOverlayPanelsStore((s) => s.gitOpen);
+  const revealCode = useCallback(() => useViewStore.getState().setView("code"), []);
+  // After the first activation the AgentView stays mounted and merely hidden
+  // (visibility), so toggling Agent -> Code -> Agent keeps sidebar pane,
+  // scroll positions and expansion state instead of paying a full remount.
+  const [agentEverOpened, setAgentEverOpened] = useState(false);
+  useEffect(() => {
+    if (agentMode) setAgentEverOpened(true);
+  }, [agentMode]);
 
   return (
     <div
@@ -1223,6 +1251,10 @@ export function AppShell() {
       <DropOverlay active={dropActive} />
       <TitleBar workspaceName={project?.name} className="col-span-full" />
 
+      {/* `contents` keeps these as direct grid items; `inert` while the Agent
+          overlay is up removes the hidden Code view from the tab order and the
+          accessibility tree (the opaque overlay already blocks pointers). */}
+      <div className="contents" inert={agentMode || undefined}>
       <MiniProjectSidebar
         onOpenFolder={handleOpenFolder}
         onCloneFromGithub={handleCloneFromGithub}
@@ -1298,7 +1330,7 @@ export function AppShell() {
             value={sourceControlWidth}
             min={PANEL_LIMITS.sourceControl.min}
             max={PANEL_LIMITS.sourceControl.max}
-            // Panel sits on the right edge of the window — dragging RIGHT
+            // Panel sits on the right edge of the window: dragging RIGHT
             // shrinks it, dragging LEFT grows it. Invert the pointer delta.
             toDelta={(dx) => -dx}
             onChange={handleSourceControlWidthChange}
@@ -1307,6 +1339,7 @@ export function AppShell() {
           />
         </div>
       ) : null}
+      </div>
 
       <CloseTabsConfirm
         state={pendingClose}
@@ -1369,14 +1402,104 @@ export function AppShell() {
         onSent={handleSentToProject}
       />
 
-      {agentMode ? (
+      {agentEverOpened ? (
         <Suspense
           fallback={
-            <div className="absolute inset-x-0 bottom-0 top-[36px] z-30 bg-canvas" />
+            agentMode ? (
+              <div className="absolute inset-x-0 bottom-0 top-[36px] z-30 bg-canvas" />
+            ) : null
           }
         >
-          <AgentView className="absolute inset-x-0 bottom-0 top-[36px] z-30" />
+          {/* visibility (not display) hides it: scroll positions survive, and
+              the hidden subtree leaves the focus order / a11y tree. */}
+          <AgentView
+            className={
+              agentMode
+                ? "visible absolute inset-x-0 bottom-0 top-[36px] z-30"
+                : "invisible absolute inset-x-0 bottom-0 top-[36px] z-30"
+            }
+          />
         </Suspense>
+      ) : null}
+
+      {/* Both inspect drawers dock on the RIGHT edge as one cluster, file tree
+          beside the git panel (mirroring the title-bar button order). The
+          explorer's own border-r is stripped: the seam between the two panels
+          comes from SourceControlPanel's border-l, and the cluster's outer
+          edge from the wrapper's border-l, so hairlines never double up. */}
+      {agentMode && (agentExplorerOpen || agentGitOpen) ? (
+        <div className="absolute bottom-0 right-0 top-[36px] z-40 flex shadow-elevated">
+          {agentExplorerOpen ? (
+            <div
+              className="relative border-l border-hairline [&>nav]:border-r-0"
+              style={{ width: explorerWidth }}
+            >
+              <ExplorerPanel
+                hasProject={!!project}
+                projectId={project?.id}
+                projectName={project?.name}
+                projectPath={project?.path}
+                onOpenFolder={handleOpenFolder}
+                onOpenFile={(path, name, edit) => {
+                  handleOpenFile(path, name, edit);
+                  revealCode();
+                }}
+                onRequestDelete={handleRequestDelete}
+                onRename={handleRename}
+                onOpenInTerminal={(path, name) => {
+                  handleOpenInTerminal(path, name);
+                  revealCode();
+                }}
+                onLaunchCliInPath={(cli, path, name) => {
+                  handleLaunchCliInPath(cli, path, name);
+                  revealCode();
+                }}
+                onMove={handleMove}
+              />
+              <ResizeHandle
+                side="left"
+                value={explorerWidth}
+                min={PANEL_LIMITS.explorer.min}
+                max={PANEL_LIMITS.explorer.max}
+                toDelta={(dx) => -dx}
+                onChange={handleExplorerWidthChange}
+                onReset={resetExplorerWidth}
+                ariaLabel={t("appShell.resizeExplorer")}
+              />
+            </div>
+          ) : null}
+          {agentGitOpen ? (
+            <div className="relative" style={{ width: sourceControlWidth }}>
+              {project ? (
+                <SourceControlPanel
+                  projectId={project.id}
+                  projectPath={project.path}
+                  onOpenDiff={(path, status) => {
+                    handleOpenDiff(path, status);
+                    revealCode();
+                  }}
+                />
+              ) : (
+                <aside
+                  className="h-full min-h-0 border-l border-hairline bg-canvas"
+                  aria-label={t("sourceControl.title")}
+                >
+                  <EmptyState body={t("sourceControl.noProject")} />
+                </aside>
+              )}
+              <ResizeHandle
+                side="left"
+                value={sourceControlWidth}
+                min={PANEL_LIMITS.sourceControl.min}
+                max={PANEL_LIMITS.sourceControl.max}
+                toDelta={(dx) => -dx}
+                onChange={handleSourceControlWidthChange}
+                onReset={resetSourceControlWidth}
+                ariaLabel={t("appShell.resizeSourceControl")}
+              />
+            </div>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );

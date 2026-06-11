@@ -94,3 +94,10 @@ export function useCliDetections(registry: CliTool[] = DEFAULT_CLI_REGISTRY): Cl
 export function cliDetectionFor(cli: CliTool, detections: CliDetections): CliDetectionState {
   return detections[cli.id] ?? checkingState;
 }
+
+/** Drop the cached result and probe again — for "try again" flows after the
+ *  user installs a CLI mid-session (the cache is otherwise session-long). */
+export function refreshCliDetection(cli: CliTool): void {
+  cache.delete(cli.id);
+  ensureDetected(cli);
+}

@@ -84,7 +84,7 @@ async function ensureTheme(h: Highlighter, theme: Theme): Promise<string> {
 
 /**
  * Render `code` to a coloured HTML string for `theme`. Returns null while the
- * engine is still loading on the very first call — the caller should fall back
+ * engine is still loading on the very first call; the caller should fall back
  * to plain `<pre>` text in that window (sub-second on a warm cache).
  */
 export async function highlightToHtml(
@@ -97,4 +97,31 @@ export async function highlightToHtml(
   await ensureLang(h, lang);
   const themeName = await ensureTheme(h, theme);
   return h.codeToHtml(code, { lang, theme: themeName });
+}
+
+/**
+ * Token-level variant of `highlightToHtml` for consumers that render their own
+ * DOM (the agent chat's streamdown code plugin). Shares the same engine,
+ * language cache and token-driven theme.
+ */
+export async function highlightToTokens(
+  code: string,
+  langHint: string | undefined,
+  theme: Theme,
+): Promise<import("shiki").TokensResult> {
+  const h = await ensureHighlighter();
+  const lang = normalizeLang(langHint);
+  await ensureLang(h, lang);
+  const themeName = await ensureTheme(h, theme);
+  return h.codeToTokens(code, { lang, theme: themeName });
+}
+
+/** Whether a fence language will get real colours (vs the `text` fallback). */
+export function isHighlightableLang(lang: string | undefined): boolean {
+  return normalizeLang(lang) !== "text";
+}
+
+/** The canonical language list (for plugin capability reporting). */
+export function supportedHighlightLangs(): string[] {
+  return [...KNOWN_LANGS];
 }

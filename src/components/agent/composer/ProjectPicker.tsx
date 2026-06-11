@@ -23,7 +23,7 @@ import { ProjectActionItems } from "./ProjectActions";
  * under the composer (folder glyph + name + chevron). The menu leads with the
  * three ways to start (create / use existing / no folder), then lists existing
  * projects to switch between. The chosen path rides every opencode call as
- * `?directory=` — without it the agent runs in the sidecar's launch cwd.
+ * `?directory=`, without it the agent runs in the sidecar's launch cwd.
  */
 export function ProjectPicker() {
   const { t } = useTranslation();

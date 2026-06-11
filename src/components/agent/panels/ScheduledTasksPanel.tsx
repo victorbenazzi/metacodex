@@ -1,173 +1,291 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { AlarmClock, Play, Trash2 } from "lucide-react";
+import { CalendarClock, Loader2, Pencil, Play, Plus, Trash2 } from "lucide-react";
 
+import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Icon } from "@/components/ui/Icon";
-import { EmptyState } from "@/components/ui/EmptyState";
+import { describeCron } from "@/features/agent/cron.describe";
+import { useAgentChatStore } from "@/features/agent/chat.store";
 import { useAgentCronStore, type CronTask } from "@/features/agent/cron.store";
-import { useSettingsDataStore } from "@/features/settings/settings.data.store";
+import { useAgentNavStore } from "@/features/agent/nav.store";
 import { cn } from "@/lib/cn";
 import { PanelShell } from "./PanelShell";
-
-const DEFAULT_MODEL = "deepseek-v4-flash";
+import { ScheduledTaskDialog } from "./ScheduledTaskDialog";
 
 /**
- * Scheduled Tasks: create cron jobs that fire a prompt on the opencode runtime
- * every N minutes. The scheduler runs in Rust and fires while the app is open.
+ * Scheduled Tasks: create cron jobs that fire a prompt on the opencode runtime.
+ * The schedule is a standard cron expression evaluated in local time by the Rust
+ * scheduler while the app is open. Layout follows the Kimi reference, reskinned
+ * to metacodex tokens.
  */
 export function ScheduledTasksPanel() {
   const { t } = useTranslation();
   const tasks = useAgentCronStore((s) => s.tasks);
   const load = useAgentCronStore((s) => s.load);
-  const createTask = useAgentCronStore((s) => s.create);
   const remove = useAgentCronStore((s) => s.remove);
   const setEnabled = useAgentCronStore((s) => s.setEnabled);
   const runNow = useAgentCronStore((s) => s.runNow);
   const error = useAgentCronStore((s) => s.error);
-  const agentSettings = useSettingsDataStore((s) => s.settings.agent);
 
-  const [title, setTitle] = useState("");
-  const [prompt, setPrompt] = useState("");
-  const [intervalMin, setIntervalMin] = useState(60);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editTask, setEditTask] = useState<CronTask | null>(null);
+  const [focusChat, setFocusChat] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<CronTask | null>(null);
+  // A Set: two Run now's in flight must each keep their own spinner.
+  const [runningIds, setRunningIds] = useState<ReadonlySet<string>>(new Set());
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  const canSubmit = title.trim().length > 0 && prompt.trim().length > 0;
-
-  const submit = async () => {
-    if (!canSubmit) return;
-    await createTask({
-      title: title.trim(),
-      prompt: prompt.trim(),
-      intervalMinutes: Math.max(1, Math.floor(intervalMin)),
-      providerId: agentSettings.providerId || "opencode-go",
-      modelId: agentSettings.modelId || DEFAULT_MODEL,
-    });
-    setTitle("");
-    setPrompt("");
-    setIntervalMin(60);
+  const openCreate = () => {
+    setEditTask(null);
+    setFocusChat(false);
+    setDialogOpen(true);
+  };
+  const openFromChat = () => {
+    setEditTask(null);
+    setFocusChat(true);
+    setDialogOpen(true);
+  };
+  const openEdit = (task: CronTask) => {
+    setEditTask(task);
+    setFocusChat(false);
+    setDialogOpen(true);
+  };
+  const handleRun = async (id: string) => {
+    setRunningIds((prev) => new Set(prev).add(id));
+    try {
+      await runNow(id);
+    } finally {
+      setRunningIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
   };
 
   return (
-    <PanelShell title={t("agent.scheduled.title")} subtitle={t("agent.scheduled.subtitle")}>
-      <div className="rounded-lg border border-hairline-soft bg-surface-card p-[16px]">
-        <div className="flex flex-col gap-[10px]">
-          <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder={t("agent.scheduled.titlePlaceholder")}
-            className="h-[34px] rounded-sm border border-hairline-strong bg-canvas px-[10px] text-[13px] text-ink outline-none focus:border-ink"
-          />
-          <textarea
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            rows={3}
-            placeholder={t("agent.scheduled.promptPlaceholder")}
-            className="resize-none rounded-sm border border-hairline-strong bg-canvas px-[10px] py-[8px] text-[13px] leading-[1.5] text-ink outline-none focus:border-ink"
-          />
-          <div className="flex items-center justify-between gap-[10px]">
-            <label className="flex items-center gap-[8px] text-[13px] text-body">
-              {t("agent.scheduled.every")}
-              <input
-                type="number"
-                min={1}
-                value={intervalMin}
-                onChange={(e) => setIntervalMin(Number(e.target.value) || 1)}
-                className="h-[30px] w-[72px] rounded-sm border border-hairline-strong bg-canvas px-[8px] text-[13px] text-ink outline-none focus:border-ink"
-              />
-              {t("agent.scheduled.minutes")}
-            </label>
+    <PanelShell
+      title={t("agent.scheduled.title")}
+      subtitle={t("agent.scheduled.subtitle")}
+      action={
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={openCreate}
+          className="gap-[6px] rounded-pill px-[14px]"
+        >
+          <Icon icon={Plus} size={14} />
+          {t("agent.scheduled.create")}
+        </Button>
+      }
+    >
+      {tasks.length === 0 ? (
+        <div className="flex min-h-[52vh] flex-col items-center justify-center text-center">
+          <span className="flex h-[64px] w-[64px] items-center justify-center rounded-xl bg-surface-strong/45">
+            <Icon icon={CalendarClock} size={28} className="text-muted-soft" strokeWidth={1.5} />
+          </span>
+          <p className="mt-[16px] font-display text-[16px] text-body">
+            {t("agent.scheduled.emptyTitle")}
+          </p>
+          <p className="mt-[8px] text-[13px] text-muted">
             <button
               type="button"
-              onClick={() => void submit()}
-              disabled={!canSubmit}
-              className="inline-flex h-[32px] items-center rounded-sm border border-ink bg-ink px-[14px] text-[13px] text-on-primary disabled:opacity-50"
+              onClick={openCreate}
+              className="font-medium text-ink underline-offset-2 hover:underline"
             >
-              {t("agent.scheduled.create")}
+              {t("agent.scheduled.addManually")}
+            </button>{" "}
+            {t("agent.scheduled.or")}{" "}
+            <button
+              type="button"
+              onClick={openFromChat}
+              className="font-medium text-ink underline-offset-2 hover:underline"
+            >
+              {t("agent.scheduled.createFromChat")}
             </button>
-          </div>
+          </p>
         </div>
-      </div>
-
-      <div className="mt-[18px] flex flex-col gap-[10px]">
-        {tasks.length === 0 ? (
-          <EmptyState
-            variant="panel"
-            icon={AlarmClock}
-            title={t("agent.scheduled.emptyTitle")}
-            body={t("agent.scheduled.emptyBody")}
-          />
-        ) : (
-          tasks.map((task) => (
-            <TaskRow
+      ) : (
+        <div className="flex flex-col gap-[10px]">
+          {tasks.map((task) => (
+            <TaskCard
               key={task.id}
               task={task}
+              running={runningIds.has(task.id)}
+              onRun={() => void handleRun(task.id)}
+              onEdit={() => openEdit(task)}
+              onDelete={() => setPendingDelete(task)}
               onToggle={() => void setEnabled(task.id, !task.enabled)}
-              onRun={() => void runNow(task.id)}
-              onDelete={() => void remove(task.id)}
             />
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      )}
 
-      {error ? <p className="mt-[12px] text-[12px] text-danger">{error}</p> : null}
+      {error ? <p className="mt-[14px] text-[12px] text-danger">{error}</p> : null}
+
+      <ScheduledTaskDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        task={editTask}
+        focusChat={focusChat}
+      />
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        onOpenChange={(o) => !o && setPendingDelete(null)}
+        tone="destructive"
+        title={t("agent.scheduled.deleteTitle")}
+        description={t("agent.scheduled.deleteBody", { name: pendingDelete?.title ?? "" })}
+        confirmLabel={t("agent.scheduled.card.delete")}
+        onConfirm={() => {
+          if (pendingDelete) void remove(pendingDelete.id);
+          setPendingDelete(null);
+        }}
+      />
     </PanelShell>
   );
 }
 
-function TaskRow({
+function TaskCard({
   task,
-  onToggle,
+  running,
   onRun,
+  onEdit,
   onDelete,
+  onToggle,
 }: {
   task: CronTask;
-  onToggle: () => void;
+  running: boolean;
   onRun: () => void;
+  onEdit: () => void;
   onDelete: () => void;
+  onToggle: () => void;
 }) {
-  const { t } = useTranslation();
-  const meta = [t("agent.scheduled.runsEvery", { count: task.intervalMinutes })];
-  if (task.lastRunAt) {
-    meta.push(t("agent.scheduled.lastRun", { time: new Date(task.lastRunAt).toLocaleString() }));
-  }
+  const { t, i18n } = useTranslation();
+  const desc = describeCron(task.cron, i18n.language);
+  const scheduleLabel = desc.valid ? desc.text : task.cron;
+  const isError = task.lastStatus?.startsWith("error") ?? false;
+
+  // The last run's transcript is one click away (that session IS the output of
+  // a headless run); the full error detail rides the hover title.
+  const openLastRun = async () => {
+    if (!task.lastSessionId) return;
+    useAgentNavStore.getState().setSection("chat");
+    await useAgentChatStore.getState().setDirectory(task.directory ?? null);
+    await useAgentChatStore.getState().selectSession(task.lastSessionId);
+  };
 
   return (
-    <div className="flex items-center justify-between gap-[12px] rounded-lg border border-hairline-soft bg-surface-card p-[12px]">
-      <div className="min-w-0">
-        <div className="truncate text-[13px] font-medium text-ink">{task.title}</div>
-        <div className="mt-[2px] truncate text-[12px] text-muted">{meta.join(" · ")}</div>
+    <div
+      className={cn(
+        "flex items-center gap-[12px] rounded-lg border border-hairline-soft bg-surface-card p-[14px]",
+        !task.enabled && "opacity-70",
+      )}
+    >
+      <span className="flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-md bg-surface-strong/45">
+        <Icon icon={CalendarClock} size={17} className="text-muted" strokeWidth={1.75} />
+      </span>
+
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-[8px]">
+          <span className="truncate text-[13px] font-medium text-ink">{task.title}</span>
+          {!task.enabled ? (
+            <span className="shrink-0 rounded-pill bg-surface-strong/60 px-[7px] py-[1px] text-[10px] font-medium text-muted">
+              {t("agent.scheduled.card.off")}
+            </span>
+          ) : null}
+        </div>
+        <div className="mt-[2px] truncate text-[12px] text-muted">{scheduleLabel}</div>
+        <div className="mt-[4px] flex items-center gap-[8px] overflow-hidden text-[11.5px] text-muted-soft">
+          <span className="shrink-0 rounded-sm bg-surface-strong/40 px-[5px] py-[1px] font-mono tracking-[0.02em]">
+            {task.cron}
+          </span>
+          {task.enabled && task.nextRunAt ? (
+            <span className="truncate">{t("agent.scheduled.card.next", { time: fmtTime(task.nextRunAt, i18n.language) })}</span>
+          ) : null}
+          {task.lastRunAt ? (
+            <button
+              type="button"
+              onClick={() => void openLastRun()}
+              disabled={!task.lastSessionId}
+              title={isError ? (task.lastStatus ?? undefined) : t("agent.scheduled.card.openRun")}
+              className={cn(
+                "inline-flex shrink-0 items-center gap-[5px]",
+                task.lastSessionId && "hover:text-ink hover:underline underline-offset-2",
+              )}
+            >
+              <span
+                aria-hidden
+                className={cn("h-[6px] w-[6px] rounded-full", isError ? "bg-danger" : "bg-success")}
+              />
+              {isError
+                ? t("agent.scheduled.card.lastError")
+                : t("agent.scheduled.card.lastOk", { time: fmtTime(task.lastRunAt, i18n.language) })}
+            </button>
+          ) : null}
+        </div>
       </div>
-      <div className="flex shrink-0 items-center gap-[6px]">
+
+      <div className="flex shrink-0 items-center gap-[4px]">
         <button
           type="button"
           onClick={onToggle}
           className={cn(
-            "inline-flex h-[28px] items-center rounded-pill border border-hairline-strong px-[10px] text-[11px]",
-            task.enabled ? "text-success" : "text-muted",
+            "h-[28px] rounded-pill border px-[11px] text-[11px] font-medium transition-colors duration-150",
+            task.enabled
+              ? "border-success/40 text-success hover:bg-success/10"
+              : "border-hairline-strong text-muted hover:bg-surface-strong/45",
           )}
         >
-          {task.enabled ? t("agent.scheduled.enabled") : t("agent.scheduled.disabled")}
+          {task.enabled ? t("agent.scheduled.card.on") : t("agent.scheduled.card.off")}
         </button>
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={onRun}
-          aria-label={t("agent.scheduled.runNow")}
-          className="inline-flex h-[28px] w-[28px] items-center justify-center rounded-sm border border-hairline-strong text-muted hover:text-ink"
+          disabled={running}
+          aria-label={t("agent.scheduled.card.runNow")}
+          title={t("agent.scheduled.card.runNow")}
         >
-          <Icon icon={Play} size={13} />
-        </button>
-        <button
-          type="button"
+          <Icon icon={running ? Loader2 : Play} size={14} className={cn(running && "animate-spin")} />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onEdit}
+          aria-label={t("agent.scheduled.card.edit")}
+          title={t("agent.scheduled.card.edit")}
+        >
+          <Icon icon={Pencil} size={14} />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={onDelete}
-          aria-label={t("agent.scheduled.delete")}
-          className="inline-flex h-[28px] w-[28px] items-center justify-center rounded-sm border border-hairline-strong text-muted hover:text-danger"
+          aria-label={t("agent.scheduled.card.delete")}
+          title={t("agent.scheduled.card.delete")}
+          className="hover:text-danger"
         >
-          <Icon icon={Trash2} size={13} />
-        </button>
+          <Icon icon={Trash2} size={14} />
+        </Button>
       </div>
     </div>
   );
+}
+
+function fmtTime(ms: number, language: string): string {
+  try {
+    return new Date(ms).toLocaleString(language, {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return new Date(ms).toLocaleString();
+  }
 }

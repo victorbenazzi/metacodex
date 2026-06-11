@@ -99,7 +99,34 @@ export interface AppSettings {
     permissionPreset: PermissionPreset;
     /** Single primary agent vs an orchestrator that delegates to subagents. */
     mode: AgentMode;
+    /** Vision relay: model that describes images for non-vision chat models.
+     *  Empty = auto (first attachment-capable model in the catalog). */
+    visionProviderId: string;
+    visionModelId: string;
+    /** Which catalog models show in the composer's model picker, keyed
+     *  `providerId/modelId`. ABSENT key = the default rule (enabled only for
+     *  the opencode-go provider), so new GO models appear without migration
+     *  and everything else stays opt-in. See `isModelEnabled`. */
+    enabledModels: Record<string, boolean>;
+    /** Chosen reasoning variant per model (`providerId/modelId` → variant
+     *  name, e.g. "high"). Absent/"" = the model's default effort. */
+    variantByModel: Record<string, string>;
   };
+}
+
+/** Catalog key for the per-model settings records. */
+export function modelKey(providerId: string, modelId: string): string {
+  return `${providerId}/${modelId}`;
+}
+
+/** Composer visibility rule: explicit user choice wins; otherwise only the
+ *  opencode-go provider's models are shown by default. */
+export function isModelEnabled(
+  enabledModels: Record<string, boolean>,
+  providerId: string,
+  modelId: string,
+): boolean {
+  return enabledModels[modelKey(providerId, modelId)] ?? providerId === "opencode-go";
 }
 
 /** Slices of `AppSettings` that are nested objects (patchable via `update`). */
@@ -174,6 +201,12 @@ export const DEFAULT_SETTINGS: AppSettings = {
     modelId: "",
     permissionPreset: "ask",
     mode: "agent",
+    // Vision relay default: Kimi K2.5 on the GO provider (cheap, sees images).
+    // The relay falls back to auto-pick if this id ever leaves the catalog.
+    visionProviderId: "opencode-go",
+    visionModelId: "kimi-k2.5",
+    enabledModels: {},
+    variantByModel: {},
   },
 };
 
@@ -203,6 +236,16 @@ function asBoolMap(value: unknown): Record<string, boolean> {
   const out: Record<string, boolean> = {};
   for (const [k, v] of Object.entries(raw)) {
     if (typeof v === "boolean") out[k] = v;
+  }
+  return out;
+}
+
+/** Same contract as [`asBoolMap`] for `Record<string, string>` bags. */
+function asStringMap(value: unknown): Record<string, string> {
+  const raw = asObject(value);
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(raw)) {
+    if (typeof v === "string") out[k] = v;
   }
   return out;
 }
@@ -309,6 +352,10 @@ export function mergeSettings(raw: unknown): AppSettings {
       modelId: str(ag.modelId, D.agent.modelId),
       permissionPreset: oneOf(ag.permissionPreset, PERMISSION_PRESETS, D.agent.permissionPreset),
       mode: oneOf(ag.mode, AGENT_MODES, D.agent.mode),
+      visionProviderId: str(ag.visionProviderId, D.agent.visionProviderId),
+      visionModelId: str(ag.visionModelId, D.agent.visionModelId),
+      enabledModels: asBoolMap(ag.enabledModels),
+      variantByModel: asStringMap(ag.variantByModel),
     },
   };
 }

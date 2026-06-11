@@ -1,7 +1,7 @@
 use std::path::Path;
 
 /// Detect the user's login shell and the args needed for an interactive login session.
-/// On macOS/Linux: `/bin/zsh -l` (login) — the PTY itself makes it interactive.
+/// On macOS/Linux: `/bin/zsh -l` (login), the PTY itself makes it interactive.
 /// On Windows: prefer PowerShell, fall back to cmd.
 pub fn detect_login_shell() -> (String, Vec<String>) {
     #[cfg(unix)]
@@ -48,7 +48,7 @@ pub fn cli_launch_args(command: &str) -> (String, Vec<String>) {
 }
 
 /// Build a curated env for the spawned shell. We pass through PATH/HOME etc. so the
-/// user's actual environment is preserved — the GUI process inherits a sparse PATH
+/// user's actual environment is preserved, the GUI process inherits a sparse PATH
 /// on macOS, but `-l` will re-source the user's RC files and rebuild PATH from there.
 pub fn build_env(project_path: &Path) -> Vec<(String, String)> {
     let mut env: Vec<(String, String)> = vec![

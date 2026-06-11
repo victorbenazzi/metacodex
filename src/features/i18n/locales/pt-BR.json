@@ -3,32 +3,81 @@
     "viewToggle": {
       "label": "Trocar de visão",
       "agent": "Agent",
-      "code": "Code"
+      "code": "Code",
+      "agentWorking": "Agente trabalhando…"
     },
     "sidebar": {
-      "paneLabel": "Trabalho ou chat",
-      "work": "Trabalho",
-      "chat": "Chat",
       "newTask": "Nova Tarefa",
       "skills": "Skills",
       "scheduledTasks": "Tarefas Agendadas",
-      "webBridge": "WebBridge",
+      "mcp": "Servidores MCP",
+      "agents": "Agentes",
+      "customize": "Personalizar",
+      "soon": "Em breve",
+      "settings": "Configurações",
       "project": "Projeto",
       "projectEmpty": "Crie ou selecione um arquivo para começar",
       "tasks": "Tarefas",
       "tasksEmpty": "Suas tarefas aparecerão aqui",
-      "newChat": "Novo chat",
-      "chats": "Conversas",
+      "noRuns": "Nenhuma execução ainda",
       "chatsEmpty": "Suas conversas aparecerão aqui",
-      "untitledChat": "Novo chat"
+      "untitledChat": "Novo chat",
+      "noThreads": "Nenhuma conversa ainda",
+      "showAll": "Mostrar mais {{count}}",
+      "draft": "Rascunho",
+      "pin": "Fixar",
+      "unpin": "Desafixar",
+      "archive": "Arquivar",
+      "justNow": "agora",
+      "newThread": "Nova conversa",
+      "expandThreads": "Mostrar conversas",
+      "collapseThreads": "Ocultar conversas",
+      "moreActions": "Mais ações",
+      "rename": "Renomear",
+      "delete": "Apagar",
+      "fork": "Duplicar conversa",
+      "archived": "Arquivadas ({{count}})",
+      "unarchive": "Desarquivar",
+      "archiveConfirmTitle": "Arquivar conversa?",
+      "archiveConfirmBody": "\"{{title}}\" vai para o grupo Arquivadas deste projeto. Nada é apagado.",
+      "deleteConfirmTitle": "Apagar conversa?",
+      "deleteConfirmBody": "\"{{title}}\" será apagada permanentemente do histórico do agente.",
+      "ago": {
+        "minute": "m",
+        "hour": "h",
+        "day": "d",
+        "week": "sem"
+      }
     },
     "hero": {
       "title": "Vamos tirar algo da sua lista",
       "beta": "Prévia Beta"
     },
     "composer": {
-      "placeholder": "Digite \"/\" para acessar skills rapidamente",
+      "placeholder": "Digite \"/\" para skills e comandos",
       "attach": "Adicionar anexo",
+      "attachFileOrPhoto": "Anexar arquivo ou foto",
+      "removeAttachment": "Remover anexo",
+      "attachmentError": "falha na leitura",
+      "attachmentTooLarge": "muito grande",
+      "attachmentUnsupported": "arquivo não suportado",
+      "dropToAttach": "Solte para anexar",
+      "skills": "Skills",
+      "skillsEmpty": "Nenhuma skill encontrada",
+      "mcpServers": "Servidores MCP",
+      "mcpSettings": "Configurar MCP",
+      "mcpEmpty": "Nenhum servidor MCP configurado",
+      "mentionFiles": "Arquivos",
+      "mentionFilesHint": "Anexar arquivos do projeto como contexto",
+      "mentionBranch": "Branch",
+      "mentionPastChats": "Conversas anteriores",
+      "mentionPastChatsHint": "Trazer uma conversa anterior como contexto",
+      "mentionSymbols": "Símbolos",
+      "mentionSymbolsHint": "Apontar o agente para um símbolo do workspace",
+      "mentionSymbolsEmpty": "Nenhum símbolo encontrado. O language server pode estar aquecendo",
+      "mentionNoResults": "Nenhum resultado",
+      "variantAuto": "Auto",
+      "variantLabel": "Esforço de raciocínio",
       "askPermissions": "Pedir permissões",
       "modeLabel": "Agente ou swarm",
       "agent": "Agent",
@@ -39,12 +88,99 @@
       "modelLabel": "Escolher modelo",
       "modelEmpty": "Selecionar modelo",
       "projectLabel": "Projeto de trabalho",
-      "globalScope": "Sem projeto"
+      "globalScope": "Sem projeto",
+      "mentionLabel": "Sugestões",
+      "mcpRestartToApply": "Reiniciar o agente pra aplicar",
+      "originCommand": "comando",
+      "originSkill": "skill",
+      "shellHint": "Enter executa no shell do projeto; a saída fica na conversa",
+      "shellBusyHint": "O agente está ocupado: espere o turno terminar para rodar um comando de shell",
+      "queue": {
+        "queued": "Na fila ({{count}})",
+        "enqueue": "Adicionar à fila",
+        "hint": "O agente está ocupado: Enter adiciona este prompt à fila",
+        "remove": "Remover da fila",
+        "edit": "Editar prompt da fila",
+        "attachmentsOnly": "(anexos)"
+      }
     },
     "chat": {
       "thinking": "Pensando",
       "reasoning": "Raciocínio",
-      "thoughtFor": "Pensou {{sec}}s"
+      "thoughtFor": "Pensou {{sec}}s",
+      "visionRelayNote": "Imagem descrita via vision relay",
+      "visionRelayFailed": "O vision relay falhou. A imagem não pôde ser descrita; tente de novo ou escolha um modelo com visão.",
+      "visionRelayNoModel": "Nenhum modelo com visão disponível para descrever a imagem. Escolha um nas Configurações ou troque o modelo do chat.",
+      "dismissError": "Fechar erro",
+      "errors": {
+        "sessionCreate": "Não deu pra iniciar a conversa",
+        "sendFailed": "A mensagem não foi enviada; seu texto ficou guardado como rascunho",
+        "permissionReply": "Não deu pra entregar a aprovação",
+        "questionReply": "Não deu pra entregar a resposta",
+        "revertFailed": "Não foi possível restaurar a conversa",
+        "unrevertFailed": "Não foi possível desfazer a restauração",
+        "compactFailed": "Não foi possível compactar a conversa",
+        "deleteFailed": "Não foi possível apagar a mensagem"
+      },
+      "truncated": "A resposta foi cortada pelo limite de tamanho do modelo",
+      "patch": "Aplicou um patch",
+      "retried": "Tentou de novo após um erro do provider",
+      "compacted": "Contexto compactado",
+      "fileFallback": "arquivo",
+      "reconnecting": "A conexão com o agente caiu; reconectando",
+      "filesChanged_one": "{{count}} arquivo alterado",
+      "filesChanged_other": "{{count}} arquivos alterados",
+      "viewDiff": "Ver alterações",
+      "context": {
+        "usage": "Cerca de {{percent}}% da janela de contexto usada (estimado pelo último turno)",
+        "compact": "Compactar conversa",
+        "compacting": "Compactando"
+      },
+      "revert": {
+        "restoreHere": "Restaurar até aqui",
+        "confirmTitle": "Restaurar conversa",
+        "confirmBody": "As mensagens a partir deste ponto serão descartadas e as alterações de arquivos do agente serão desfeitas.",
+        "filesAffected_one": "{{count}} arquivo será restaurado:",
+        "filesAffected_other": "{{count}} arquivos serão restaurados:",
+        "noFiles": "Nenhuma alteração de arquivo para desfazer.",
+        "moreFiles_one": "e mais {{count}} arquivo",
+        "moreFiles_other": "e mais {{count}} arquivos",
+        "activeBanner_one": "Conversa restaurada: {{count}} mensagem descartada.",
+        "activeBanner_other": "Conversa restaurada: {{count}} mensagens descartadas.",
+        "activeBannerNoCount": "Conversa restaurada para um ponto anterior.",
+        "undo": "Desfazer"
+      },
+      "edit": {
+        "action": "Editar e reenviar",
+        "confirmTitle": "Editar e reenviar",
+        "confirmBody": "A conversa será restaurada para antes desta mensagem e o texto dela voltará ao composer."
+      },
+      "deleteMsg": {
+        "action": "Apagar",
+        "confirmTitle": "Apagar última troca",
+        "confirmBody": "Isso remove sua última mensagem e as respostas depois dela. Alterações de arquivos não são desfeitas."
+      },
+      "forkFromHere": "Duplicar a partir daqui"
+    },
+    "permissions": {
+      "title": "Permissões salvas",
+      "subtitle": "Regras criadas quando você responde \"Sempre permitir\" numa solicitação. Revogar faz o agente perguntar de novo.",
+      "loading": "Carregando permissões",
+      "loadFailed": "Não foi possível carregar as permissões salvas",
+      "emptyTitle": "Nenhuma permissão salva",
+      "emptyBody": "Responda \"Sempre permitir\" numa solicitação de permissão e a regra aparece aqui.",
+      "revoke": "Revogar",
+      "revokeConfirmTitle": "Revogar esta permissão?",
+      "revokeConfirmBody": "O agente vai perguntar de novo na próxima vez que precisar disso.",
+      "savedHint": "Salvo como regra de sempre permitir.",
+      "savedHintAction": "Revisar em Personalizar"
+    },
+    "diff": {
+      "title": "Alterações da sessão",
+      "empty": "Nenhuma alteração nesta sessão",
+      "failed": "Não foi possível carregar as alterações",
+      "noPatch": "Sem diff textual para este arquivo",
+      "truncated": "Diff truncado"
     },
     "tool": {
       "read": "Leu",
@@ -57,7 +193,8 @@
       "list": "Listou",
       "fetch": "Buscou",
       "plan": "Atualizou o plano",
-      "skill": "Carregou skill"
+      "skill": "Carregou skill",
+      "failed": "{{tool}} falhou"
     },
     "swarm": {
       "subagents": "Subagentes",
@@ -70,37 +207,116 @@
         "editing": "Editando arquivos",
         "running": "Rodando comandos",
         "searching": "Buscando na web"
-      }
+      },
+      "failed": "Falhou"
     },
     "skills": {
       "title": "Skills",
       "subtitle": "Skills reutilizáveis que o agente carrega sob demanda, descobertas do opencode, Claude e metacodex.",
       "loading": "Carregando skills",
       "emptyTitle": "Nenhuma skill encontrada",
-      "emptyBody": "Adicione Agent Skills em ~/.config/opencode/skills ou ~/.claude/skills e elas aparecem aqui."
+      "emptyBody": "Adicione Agent Skills em ~/.config/opencode/skills ou ~/.claude/skills e elas aparecem aqui.",
+      "loadFailed": "Não deu pra ler as pastas de skills"
+    },
+    "mcp": {
+      "title": "Servidores MCP",
+      "subtitle": "Conecte servidores Model Context Protocol para dar ferramentas extras ao agente. Mudanças aplicam após reiniciar o agente.",
+      "addServer": "Adicionar servidor",
+      "featuredTitle": "Busca na web",
+      "customTitle": "Seus servidores",
+      "emptyTitle": "Nenhum servidor próprio ainda",
+      "emptyBody": "Adicione um servidor MCP local (comando) ou remoto (URL) e as ferramentas dele ficam disponíveis para o agente.",
+      "featured": {
+        "brave": "Busca na web do Brave. Cole uma API key do Brave Search para habilitar.",
+        "exa": "Busca semântica na web da Exa. Cole uma API key da Exa para habilitar."
+      },
+      "enable": "Habilitar",
+      "keySet": "API key configurada ({{envVar}})",
+      "restartNote": "Mudanças de MCP aplicam após reiniciar o agente.",
+      "restartButton": "Reiniciar agente",
+      "statusConnected": "Conectado",
+      "statusError": "Erro",
+      "toggleAria": "Alternar {{name}}",
+      "removeAria": "Remover {{name}}",
+      "removeConfirmTitle": "Remover servidor MCP?",
+      "removeConfirmBody": "\"{{name}}\" é removido do agente; qualquer API key guardada para ele é apagada.",
+      "removeConfirm": "Remover",
+      "addTitle": "Adicionar servidor MCP",
+      "editTitle": "Editar servidor MCP",
+      "dialogDescription": "Valores exibidos como {{sentinel}} são segredos armazenados; deixe como estão para mantê-los.",
+      "fieldName": "Nome",
+      "fieldKind": "Tipo de servidor",
+      "kindLocal": "Local (comando)",
+      "kindRemote": "Remoto (URL)",
+      "fieldCommand": "Comando",
+      "fieldEnv": "Ambiente (KEY=valor por linha)",
+      "fieldUrl": "URL",
+      "fieldHeaders": "Headers (KEY=valor por linha)",
+      "nameInvalid": "Só letras minúsculas, dígitos, '-' e '_'; começa com letra ou dígito."
     },
     "scheduled": {
       "title": "Tarefas Agendadas",
-      "subtitle": "Cron jobs que rodam um prompt em um cronograma. Disparam enquanto o metacodex está aberto.",
+      "subtitle": "Deixe o agente rodar um prompt em um cronograma cron. As tarefas disparam enquanto o metacodex está aberto.",
+      "create": "Criar",
       "emptyTitle": "Nenhuma tarefa agendada ainda",
-      "emptyBody": "Crie uma acima para rodar um prompt de forma recorrente.",
-      "titlePlaceholder": "Nome da tarefa",
-      "promptPlaceholder": "O que o agente deve fazer a cada execução?",
-      "every": "A cada",
-      "minutes": "minutos",
-      "create": "Criar tarefa",
-      "runsEvery": "A cada {{count}} min",
-      "lastRun": "última {{time}}",
-      "enabled": "On",
-      "disabled": "Off",
-      "runNow": "Rodar agora",
-      "delete": "Excluir"
+      "addManually": "Adicionar manualmente",
+      "or": "ou",
+      "createFromChat": "Criar pelo chat",
+      "presets": {
+        "everyMinute": "A cada minuto",
+        "every15m": "A cada 15 min",
+        "hourly": "De hora em hora",
+        "daily9": "Diário 9h",
+        "weekdays9": "Dias úteis 9h",
+        "weeklyMon": "Segundas 9h",
+        "monthly1": "Mensal (dia 1)"
+      },
+      "dialog": {
+        "newTitle": "Nova tarefa agendada",
+        "editTitle": "Editar tarefa agendada",
+        "name": "Nome",
+        "namePlaceholder": "Digite o nome da tarefa",
+        "requirement": "Requisito",
+        "requirementPlaceholder": "Descreva o que a tarefa deve fazer",
+        "schedule": "Agendamento",
+        "cronInvalid": "Expressão cron inválida",
+        "cronHint": "Expressão cron padrão, no seu horário local.",
+        "cancel": "Cancelar",
+        "save": "Salvar",
+        "saveFailed": "Não foi possível salvar:",
+        "fromChatTitle": "Criar pelo chat",
+        "fromChatPlaceholder": "Descreva a tarefa e quando ela deve rodar...",
+        "fromChatHint": "A IA preenche os campos abaixo. Revise e salve.",
+        "generate": "Gerar",
+        "generateError": "Não consegui entender. Reformule ou preencha manualmente.",
+        "runsIn": "Roda em:"
+      },
+      "card": {
+        "next": "próxima {{time}}",
+        "lastOk": "última {{time}}",
+        "lastError": "última falhou",
+        "on": "On",
+        "off": "Off",
+        "runNow": "Rodar agora",
+        "edit": "Editar",
+        "delete": "Excluir",
+        "openRun": "Abrir a última execução como chat"
+      },
+      "deleteTitle": "Excluir tarefa agendada?",
+      "deleteBody": "\"{{name}}\" será removida. Isso não pode ser desfeito."
     },
-    "webbridge": {
-      "title": "WebBridge",
-      "subtitle": "Automação de browser: deixe os agentes dirigirem um navegador real.",
-      "emptyTitle": "WebBridge está a caminho",
-      "emptyBody": "Conecte um navegador para os agentes navegarem, clicarem e extraírem da web."
+    "customize": {
+      "title": "Personalizar",
+      "subtitle": "Amplie o que o agente pode fazer: skills, servidores MCP, permissões e ferramentas.",
+      "tabsLabel": "Seções de personalização",
+      "tools": "Ferramentas",
+      "permissions": "Permissões"
+    },
+    "tools": {
+      "title": "Ferramentas",
+      "subtitle": "Ferramentas internas que o agente pode usar durante uma execução.",
+      "emptyTitle": "Controle de ferramentas está a caminho",
+      "emptyBody": "Em breve você poderá ativar ou desativar ferramentas individuais do agente por aqui."
     },
     "settings": {
       "navLabel": "Agent",
@@ -111,13 +327,40 @@
       "runtimeStarting": "Iniciando o motor",
       "runtimeStopped": "Parado",
       "restart": "Reiniciar",
+      "apiKeyDetectedHint": "Seu login do opencode foi detectado automaticamente. Cole uma key apenas para substituir a credencial atual.",
+      "cliBinary": "CLI do opencode",
+      "cliAutoDetected": "Detectado automaticamente",
+      "cliNotFound": "Não encontrado",
+      "cliDetectedNoPath": "Encontrado no PATH do seu shell.",
+      "cliMissing": "Não encontrado no PATH. Instale com: {{command}}",
+      "cliChecking": "Verificando seu PATH",
       "apiKey": "Chave GO do opencode",
       "apiKeyHint": "Cole a chave da sua subscription opencode para listar e usar todos os modelos. Guardada pelo motor, nunca no navegador.",
       "save": "Salvar",
       "defaultModel": "Modelo padrão",
       "defaultModelHint": "Usado em novos chats e tarefas.",
       "loadingModels": "Carregando modelos",
-      "noModels": "Sem modelos ainda. Adicione sua chave GO acima."
+      "noModels": "Sem modelos ainda. Adicione sua chave GO acima.",
+      "visionModel": "Modelo de visão",
+      "visionModelHint": "Descreve imagens para modelos de chat que não enxergam (vision relay).",
+      "navModels": "Modelos",
+      "modelsTitle": "Modelos",
+      "modelsDescription": "Escolha quais modelos aparecem no seletor do composer. Por padrão só os modelos do opencode GO aparecem; habilite qualquer outro modelo que a engine tiver mapeado.",
+      "enableAll": "Habilitar todos",
+      "disableAll": "Desabilitar todos",
+      "capVision": "Visão",
+      "capReasoning": "Raciocínio",
+      "capVariants": "Níveis de esforço",
+      "toggleModelAria": "Alternar {{name}}"
+    },
+    "onboarding": {
+      "missingTitle": "O Agent roda no opencode",
+      "missingBody": "O metacodex usa uma engine opencode local para chat, tarefas agendadas e ferramentas MCP. Ela não foi encontrada no seu PATH. Instale e tente de novo:",
+      "failedTitle": "A engine do agente não iniciou",
+      "failedBody": "O opencode está instalado, mas o servidor local falhou ao iniciar.",
+      "copyInstall": "Copiar comando de instalação",
+      "codeStillWorks": "A view Code funciona sem ele. Já logado no opencode? Suas credenciais são detectadas automaticamente.",
+      "retry": "Tentar de novo"
     },
     "permission": {
       "ask": "Sempre perguntar",
@@ -158,7 +401,42 @@
       "namePlaceholder": "feature/minha-branch",
       "create": "Criar",
       "creating": "Criando",
-      "nameInvalid": "Use letras, números e / _ - . (sem traço no início, sem \"..\")."
+      "nameInvalid": "Use letras, números e / _ - . (sem traço no início, sem \"..\").",
+      "checkoutFailed": "Checkout falhou"
+    },
+    "md": {
+      "close": "Fechar",
+      "copied": "Copiado",
+      "copyCode": "Copiar código",
+      "copyLink": "Copiar link",
+      "copyTable": "Copiar tabela",
+      "copyTableAsCsv": "Copiar como CSV",
+      "copyTableAsMarkdown": "Copiar como Markdown",
+      "copyTableAsTsv": "Copiar como TSV",
+      "downloadFile": "Baixar arquivo",
+      "downloadImage": "Baixar imagem",
+      "downloadTable": "Baixar tabela",
+      "downloadTableAsCsv": "Baixar como CSV",
+      "downloadTableAsMarkdown": "Baixar como Markdown",
+      "downloadTableAsTsv": "Baixar como TSV",
+      "exitFullscreen": "Sair da tela cheia",
+      "externalLinkWarning": "Você está prestes a abrir um site externo.",
+      "imageNotAvailable": "Imagem indisponível",
+      "openExternalLink": "Abrir link externo?",
+      "openLink": "Abrir link",
+      "tableFormatCsv": "CSV",
+      "tableFormatMarkdown": "Markdown",
+      "tableFormatTsv": "TSV",
+      "viewFullscreen": "Ver em tela cheia"
+    },
+    "question": {
+      "title": "O agente tem uma pergunta",
+      "submit": "Responder",
+      "skip": "Pular",
+      "customPlaceholder": "Ou escreva sua própria resposta"
+    },
+    "todo": {
+      "title": "Plano"
     }
   },
   "common": {
@@ -221,6 +499,10 @@
   "settings": {
     "header": "Configurações",
     "close": "Fechar configurações",
+    "tab": {
+      "code": "Code",
+      "agent": "Agente"
+    },
     "nav": {
       "general": "Geral",
       "appearance": "Aparência",
@@ -334,7 +616,9 @@
         "fileSave": "Salvar arquivo ativo",
         "tabJumpToNextAttention": "Pular para o próximo agente aguardando",
         "diagnosticsToggle": "Abrir log de diagnóstico",
-        "folderClone": "Clonar do GitHub"
+        "folderClone": "Clonar do GitHub",
+        "agentNewChat": "Novo chat do agente (vista Agent)",
+        "viewToggle": "Alternar entre Agent e Code"
       }
     },
     "advanced": {
@@ -565,7 +849,7 @@
     "processExited": "[processo encerrado]",
     "exitBanner": {
       "nonzero": "O processo saiu com código {{code}}.",
-      "readerError": "Falha de I/O no terminal — a saída acima pode estar truncada.",
+      "readerError": "Falha de I/O no terminal: a saída acima pode estar truncada.",
       "killed": "O processo foi encerrado.",
       "openLog": "Abrir log de diagnóstico"
     }
@@ -722,7 +1006,7 @@
       "downloading": "Atualizando… {{percent}}%",
       "downloadingIndeterminate": "Atualizando…",
       "installing": "Reiniciando…",
-      "error": "Falha ao atualizar — tentar de novo"
+      "error": "Falha ao atualizar; tentar de novo"
     }
   }
 }

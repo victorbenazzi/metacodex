@@ -96,6 +96,18 @@ export const COMMANDS: CommandDef[] = [
     category: "navigation",
   },
   {
+    id: "agent.newChat",
+    defaultBinding: ["mod+k"],
+    descriptionKey: "settings.shortcuts.cmd.agentNewChat",
+    category: "general",
+  },
+  {
+    id: "view.toggle",
+    defaultBinding: ["mod+e"],
+    descriptionKey: "settings.shortcuts.cmd.viewToggle",
+    category: "view",
+  },
+  {
     id: "diagnostics.toggle",
     defaultBinding: ["mod+shift+d"],
     descriptionKey: "settings.shortcuts.cmd.diagnosticsToggle",

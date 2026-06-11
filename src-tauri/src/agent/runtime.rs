@@ -1,15 +1,14 @@
-use std::io::{BufRead, BufReader, Read};
+use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
-use std::sync::mpsc;
 use std::time::Duration;
 
 use parking_lot::Mutex;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::error::{AppError, AppResult};
 use crate::pty::shell::cli_launch_args;
 
-/// Owns the lifecycle of the local `opencode serve` sidecar — the engine that
+/// Owns the lifecycle of the local `opencode serve` sidecar, the engine that
 /// powers the Agent View. Spawned lazily on first use, reused while healthy, and
 /// reaped on quit. The opencode HTTP API is local-only (127.0.0.1); the GO
 /// subscription key lives inside opencode's own auth store, never in the webview.
@@ -23,9 +22,26 @@ pub struct AgentRuntime {
 
 #[derive(Default)]
 struct RuntimeState {
+    /// Set when we spawned the sidecar ourselves (we own and reap it directly).
     child: Option<Child>,
+    /// Set when we adopted a sidecar from a previous run (no Child handle, so we
+    /// reap it by pid). Mutually exclusive with `child`.
+    adopted_pid: Option<u32>,
     base_url: Option<String>,
     version: Option<String>,
+    /// True while `ensure_base` is bringing a sidecar up. Lets `requiresRestart`
+    /// stay honest for config mutations that land mid-spawn (the booting sidecar
+    /// may have already read the previous config).
+    starting: bool,
+}
+
+/// Drop guard that clears `RuntimeState.starting` on every `ensure_base` exit
+/// path (success, error, panic).
+struct StartingFlag<'a>(&'a Mutex<RuntimeState>);
+impl Drop for StartingFlag<'_> {
+    fn drop(&mut self) {
+        self.0.lock().starting = false;
+    }
 }
 
 #[derive(Serialize, Clone)]
@@ -36,11 +52,29 @@ pub struct RuntimeStatus {
     pub version: Option<String>,
 }
 
+/// Token windows of a model (`limit` in the opencode catalog). `context` is
+/// what the frontend's context meter divides by; absent = no meter.
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelLimit {
+    pub context: Option<u64>,
+    pub output: Option<u64>,
+}
+
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelInfo {
     pub id: String,
     pub name: String,
+    /// Model accepts file/image attachments (vision), gates the composer's
+    /// image handling and picks the vision-relay default on the frontend.
+    pub attachment: bool,
+    pub reasoning: bool,
+    /// Reasoning-effort variant names (e.g. "low" / "medium" / "high" / "max")
+    /// the model exposes; empty = no variant selector. The name is sent back
+    /// verbatim as `variant` on the message POST.
+    pub variants: Vec<String>,
+    pub limit: Option<ModelLimit>,
 }
 
 #[derive(Serialize, Clone)]
@@ -70,6 +104,11 @@ impl AgentRuntime {
         }
     }
 
+    /// True while a spawn is in flight (see `RuntimeState::starting`).
+    pub fn is_starting(&self) -> bool {
+        self.inner.lock().starting
+    }
+
     pub async fn start(&self) -> AppResult<RuntimeStatus> {
         self.ensure_base().await?;
         Ok(self.status())
@@ -78,24 +117,77 @@ impl AgentRuntime {
     /// Ensure the server is running and return its base URL.
     pub async fn ensure_base(&self) -> AppResult<String> {
         let _guard = self.start_lock.lock().await;
+        self.inner.lock().starting = true;
+        let _starting = StartingFlag(&self.inner);
 
-        // Reuse an already-live, healthy instance.
+        // 1. Reuse our own live, healthy instance. The health check retries a
+        //    few times: one slow response (a busy Bun process mid-turn) must not
+        //    get a live sidecar SIGKILLed under an active chat stream.
         if let Some(base) = self.live_base() {
-            if self.health(&base).await.is_ok() {
-                return Ok(base);
+            for attempt in 0..3 {
+                if self.health(&base).await.is_ok() {
+                    return Ok(base);
+                }
+                if attempt < 2 {
+                    tokio::time::sleep(Duration::from_millis(400)).await;
+                }
             }
             self.stop();
         }
 
-        let (child, base) = tauri::async_runtime::spawn_blocking(spawn_opencode)
+        // 2. Adopt a sidecar a previous run left behind (e.g. a dev restart that
+        //    wasn't a clean quit) instead of spawning another. This is what keeps
+        //    `opencode serve` processes from piling up. Guards: the pointer must
+        //    belong to THIS config root (dev and installed app must not steal
+        //    each other's sidecar), and the pid must still look like opencode
+        //    (pid recycling must never get an innocent process killed later).
+        if let Some(saved) = load_runtime() {
+            let same_root = saved.root.as_deref().is_none_or(|r| {
+                crate::config_paths::config_root()
+                    .map(|c| c.to_string_lossy() == r)
+                    .unwrap_or(false)
+            });
+            if same_root && pid_alive(saved.pid) && pid_is_opencode(saved.pid) {
+                if let Ok(version) = self.health(&saved.base_url).await {
+                    let mut st = self.inner.lock();
+                    st.child = None;
+                    st.adopted_pid = Some(saved.pid);
+                    st.base_url = Some(saved.base_url.clone());
+                    st.version = Some(version);
+                    return Ok(saved.base_url);
+                }
+            }
+            if same_root {
+                clear_runtime(); // stale pointer: drop it before spawning fresh.
+            }
+        }
+
+        // 3. Spawn a fresh one and record it so the next run can adopt it.
+        let (mut child, base) = tauri::async_runtime::spawn_blocking(spawn_opencode)
             .await
             .map_err(|e| AppError::Other(format!("opencode spawn join: {e}")))??;
-        let version = self.probe_health(&base).await?;
+        // A failed probe must reap the child we just spawned: dropping a
+        // std::process::Child neither kills nor waits it, so without this the
+        // process would leak untracked (and unadoptable, since save_runtime
+        // never ran).
+        let version = match self.probe_health(&base).await {
+            Ok(v) => v,
+            Err(e) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(e);
+            }
+        };
+        let pid = child.id();
 
-        let mut st = self.inner.lock();
-        st.child = Some(child);
-        st.base_url = Some(base.clone());
-        st.version = Some(version);
+        {
+            let mut st = self.inner.lock();
+            st.child = Some(child);
+            st.adopted_pid = None;
+            st.base_url = Some(base.clone());
+            st.version = Some(version);
+        }
+        save_runtime(pid, &base);
         Ok(base)
     }
 
@@ -113,14 +205,77 @@ impl AgentRuntime {
         st.base_url.clone()
     }
 
+    /// Stop the sidecar. SIGTERM first so opencode can shut down the MCP child
+    /// processes it spawned (a straight SIGKILL orphans every `npx ...` server),
+    /// escalating to SIGKILL after a bounded wait. The state lock is NOT held
+    /// while waiting, so `status()` callers never block on a stop.
     pub fn stop(&self) {
-        let mut st = self.inner.lock();
-        if let Some(mut child) = st.child.take() {
-            let _ = child.kill();
-            let _ = child.wait();
+        let (child, adopted) = {
+            let mut st = self.inner.lock();
+            let child = st.child.take();
+            let adopted = st.adopted_pid.take();
+            st.base_url = None;
+            st.version = None;
+            (child, adopted)
+        };
+        if let Some(mut child) = child {
+            terminate_child(&mut child);
+        } else if let Some(pid) = adopted {
+            // Adopted instance: no Child handle, so reap by pid, but only after
+            // re-verifying the pid still looks like opencode (pid recycling).
+            if pid_is_opencode(pid) {
+                kill_pid_graceful(pid);
+            }
         }
-        st.base_url = None;
-        st.version = None;
+        clear_runtime();
+    }
+
+    /// `stop()` serialized against an in-flight `ensure_base`, so a Stop pressed
+    /// during a spawn actually stops the freshly spawned sidecar instead of
+    /// no-opping against empty state.
+    pub async fn stop_locked(&self) {
+        let _guard = self.start_lock.lock().await;
+        self.stop();
+    }
+
+    /// Kill + respawn the sidecar so config changes (MCP servers) take effect.
+    /// NEVER called automatically: the frontend owns the moment, because a
+    /// restart drops live SSE streams and `--port 0` changes the base URL.
+    pub async fn restart(&self) -> AppResult<RuntimeStatus> {
+        {
+            let _guard = self.start_lock.lock().await;
+            self.stop();
+        }
+        self.start().await
+    }
+
+    /// `GET /mcp` server status, whitelist-sanitized. `None` when the sidecar
+    /// isn't running (never forces a start) or the endpoint is missing (older
+    /// opencode without MCP status support). `directory` scopes the status to
+    /// the active project instance, like every other opencode call.
+    pub async fn mcp_status(&self, directory: Option<&str>) -> AppResult<Option<serde_json::Value>> {
+        let base = { self.inner.lock().base_url.clone() };
+        let Some(base) = base else { return Ok(None) };
+        let suffix = directory
+            .filter(|d| !d.is_empty())
+            .map(|d| format!("?directory={}", encode_uri_component(d)))
+            .unwrap_or_default();
+        let resp = self
+            .client
+            .get(format!("{base}/mcp{suffix}"))
+            .timeout(Duration::from_secs(3))
+            .send()
+            .await;
+        match resp {
+            Ok(r) if r.status().is_success() => {
+                let v: serde_json::Value = r
+                    .json()
+                    .await
+                    .map_err(|e| AppError::Other(format!("mcp status decode: {e}")))?;
+                Ok(Some(crate::agent::mcp::sanitize_mcp_status(&v)))
+            }
+            _ => Ok(None),
+        }
     }
 
     async fn health(&self, base: &str) -> AppResult<String> {
@@ -166,6 +321,7 @@ impl AgentRuntime {
         let resp = self
             .client
             .get(format!("{base}/config/providers"))
+            .timeout(Duration::from_secs(10))
             .send()
             .await
             .map_err(|e| AppError::Other(format!("providers request: {e}")))?;
@@ -178,20 +334,48 @@ impl AgentRuntime {
 
     /// Fire-and-complete a one-shot prompt in a fresh session. Used by the
     /// scheduler to run cron tasks headlessly. Returns the new session id.
+    ///
+    /// Two things make a *headless* run actually do work, mirroring the chat path:
+    /// - `directory` is threaded as `?directory=` on every call. Without it
+    ///   opencode runs in the sidecar's launch cwd, not the user's project (this
+    ///   is what dumped earlier cron output into `src-tauri/`).
+    /// - the session is created with a fully-permissive ruleset. A scheduled run
+    ///   is unattended, so any tool that would normally prompt for approval (edit,
+    ///   bash, network, escaping the root) must be pre-allowed or the turn stalls
+    ///   forever waiting for a click no one will make.
+    ///
+    /// Bounded by [`RUN_PROMPT_BUDGET`]; on expiry the session is aborted and the
+    /// run records an error instead of hanging the scheduler task forever.
     pub async fn run_prompt(
         &self,
         prompt: &str,
         provider_id: &str,
         model_id: &str,
+        directory: Option<&str>,
     ) -> AppResult<String> {
         let base = self.ensure_base().await?;
-        let created: serde_json::Value = self
+        // `?directory=` built by hand (mirrors the frontend's encodeURIComponent,
+        // so opencode decodes it identically) rather than reqwest's query builder.
+        let suffix = directory
+            .filter(|d| !d.is_empty())
+            .map(|d| format!("?directory={}", encode_uri_component(d)))
+            .unwrap_or_default();
+
+        let create_resp = self
             .client
-            .post(format!("{base}/session"))
-            .json(&serde_json::json!({}))
+            .post(format!("{base}/session{suffix}"))
+            .json(&serde_json::json!({ "permission": full_auto_ruleset() }))
+            .timeout(Duration::from_secs(10))
             .send()
             .await
-            .map_err(|e| AppError::Other(format!("session create: {e}")))?
+            .map_err(|e| AppError::Other(format!("session create: {e}")))?;
+        if !create_resp.status().is_success() {
+            return Err(AppError::Other(format!(
+                "session create failed: HTTP {}",
+                create_resp.status()
+            )));
+        }
+        let created: serde_json::Value = create_resp
             .json()
             .await
             .map_err(|e| AppError::Other(format!("session decode: {e}")))?;
@@ -205,13 +389,31 @@ impl AgentRuntime {
             "parts": [{ "type": "text", "text": prompt }],
             "model": { "providerID": provider_id, "modelID": model_id },
         });
-        let resp = self
+        // The POST resolves only when the turn finishes, so the timeout is the
+        // run's total budget. Without one, a wedged turn (hung tool, stuck
+        // model) pins the scheduler task forever and the run history records
+        // nothing at all; bounded, it lands as an error row and the session is
+        // best-effort aborted.
+        let send = self
             .client
-            .post(format!("{base}/session/{session_id}/message"))
+            .post(format!("{base}/session/{session_id}/message{suffix}"))
             .json(&body)
-            .send()
-            .await
-            .map_err(|e| AppError::Other(format!("prompt request: {e}")))?;
+            .send();
+        let resp = match tokio::time::timeout(RUN_PROMPT_BUDGET, send).await {
+            Ok(r) => r.map_err(|e| AppError::Other(format!("prompt request: {e}")))?,
+            Err(_) => {
+                let _ = self
+                    .client
+                    .post(format!("{base}/session/{session_id}/abort{suffix}"))
+                    .timeout(Duration::from_secs(5))
+                    .send()
+                    .await;
+                return Err(AppError::Other(format!(
+                    "run timed out after {} minutes (session aborted)",
+                    RUN_PROMPT_BUDGET.as_secs() / 60
+                )));
+            }
+        };
         if !resp.status().is_success() {
             return Err(AppError::Other(format!("prompt failed: HTTP {}", resp.status())));
         }
@@ -225,8 +427,9 @@ impl AgentRuntime {
         let body = serde_json::json!({ "type": "api_key", "key": key });
         let resp = self
             .client
-            .put(format!("{base}/auth/{provider_id}"))
+            .put(format!("{base}/auth/{}", encode_uri_component(provider_id)))
             .json(&body)
+            .timeout(Duration::from_secs(10))
             .send()
             .await
             .map_err(|e| AppError::Other(format!("auth request: {e}")))?;
@@ -244,6 +447,51 @@ impl Default for AgentRuntime {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Total wall-clock budget for one headless `run_prompt` turn.
+const RUN_PROMPT_BUDGET: Duration = Duration::from_secs(30 * 60);
+
+/// Percent-encode a string for use as a URL query-parameter value, matching
+/// JavaScript's `encodeURIComponent` (the frontend uses it for the same
+/// `?directory=`), so opencode decodes the path identically on both paths.
+fn encode_uri_component(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for b in s.bytes() {
+        match b {
+            b'A'..=b'Z'
+            | b'a'..=b'z'
+            | b'0'..=b'9'
+            | b'-'
+            | b'_'
+            | b'.'
+            | b'!'
+            | b'~'
+            | b'*'
+            | b'\''
+            | b'('
+            | b')' => out.push(b as char),
+            _ => out.push_str(&format!("%{b:02X}")),
+        }
+    }
+    out
+}
+
+/// A fully-permissive opencode `PermissionRuleset` for unattended scheduled
+/// runs: the Rust mirror of the frontend's `full-auto` chat preset
+/// (`rulesetForPreset("full-auto")` in `src/features/agent/opencode.ts`).
+/// Pre-allows every consequential tool so a headless turn never blocks on an
+/// approval card. MANUAL MIRROR: if you change one side, change the other; the
+/// `full_auto_ruleset_mirrors_frontend_preset` test pins this JSON.
+fn full_auto_ruleset() -> serde_json::Value {
+    serde_json::json!([
+        { "permission": "edit", "pattern": "**", "action": "allow" },
+        { "permission": "bash", "pattern": "*", "action": "allow" },
+        { "permission": "webfetch", "pattern": "**", "action": "allow" },
+        { "permission": "websearch", "pattern": "**", "action": "allow" },
+        { "permission": "external_directory", "pattern": "**", "action": "allow" },
+        { "permission": "task", "pattern": "**", "action": "allow" }
+    ])
 }
 
 fn parse_providers(v: &serde_json::Value) -> Vec<ProviderModels> {
@@ -278,9 +526,45 @@ fn parse_providers(v: &serde_json::Value) -> Vec<ProviderModels> {
                     .and_then(serde_json::Value::as_str)
                     .unwrap_or(mid)
                     .to_string();
+                // opencode >= 1.16 nests these under `capabilities`; older
+                // builds had them at the top level. Check both.
+                let caps = mval.get("capabilities");
+                let cap = |key: &str| {
+                    caps.and_then(|c| c.get(key))
+                        .or_else(|| mval.get(key))
+                        .and_then(serde_json::Value::as_bool)
+                        .unwrap_or(false)
+                };
+                // "Vision" needs both: file parts accepted AND image input
+                // understood (e.g. deepseek-reasoner attaches text files but
+                // can't see images; image-only `attachment` would mislead the
+                // relay). When `capabilities.input` is absent (old schema),
+                // fall back to the attachment flag alone.
+                let image_input = caps
+                    .and_then(|c| c.get("input"))
+                    .and_then(|i| i.get("image"))
+                    .and_then(serde_json::Value::as_bool);
+                let variants = mval
+                    .get("variants")
+                    .and_then(|v| v.as_object())
+                    .map(|m| m.keys().cloned().collect::<Vec<_>>())
+                    .unwrap_or_default();
+                let limit = mval.get("limit").and_then(|l| {
+                    let context = l.get("context").and_then(serde_json::Value::as_u64);
+                    let output = l.get("output").and_then(serde_json::Value::as_u64);
+                    if context.is_none() && output.is_none() {
+                        None
+                    } else {
+                        Some(ModelLimit { context, output })
+                    }
+                });
                 models.push(ModelInfo {
                     id: mid.clone(),
                     name: mname,
+                    attachment: cap("attachment") && image_input.unwrap_or(true),
+                    reasoning: cap("reasoning"),
+                    variants,
+                    limit,
                 });
             }
             models.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
@@ -296,51 +580,220 @@ fn parse_providers(v: &serde_json::Value) -> Vec<ProviderModels> {
 }
 
 /// Spawn `opencode serve` through a login+interactive shell so the GUI process's
-/// sparse PATH is re-sourced (mise/nvm/bun resolve), then read the
-/// `listening on http://127.0.0.1:PORT` line it prints. `exec` replaces the
-/// shell with opencode so killing the child kills the server (no orphan shell).
+/// sparse PATH is re-sourced (mise/nvm/bun resolve). `exec` replaces the shell
+/// with opencode so killing the child kills the server (no orphan shell).
+///
+/// stdout/stderr go to a LOG FILE, not pipes. A piped child whose parent dies
+/// (e.g. `pnpm tauri dev` killed without a clean quit) hits a broken pipe and
+/// spins writing to it; that broken pipe (made worse by `--print-logs`) is what
+/// pinned orphaned sidecars at 100% CPU. A file sink never breaks; we poll it for
+/// the listening URL, and drop `--print-logs` (the URL still prints without it).
 fn spawn_opencode() -> AppResult<(Child, String)> {
-    let (shell, args) = cli_launch_args("exec opencode serve --port 0 --print-logs");
-    let mut child = Command::new(&shell)
-        .args(&args)
+    let log_path =
+        log_file_path().ok_or_else(|| AppError::Other("no state dir for the opencode log".into()))?;
+    // 0600: the log captures uncontrolled sidecar/MCP-child output, keep it
+    // owner-only like the rest of the secret-adjacent state files.
+    let mut open = std::fs::OpenOptions::new();
+    open.create(true).write(true).truncate(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        open.mode(0o600);
+    }
+    let file = open
+        .open(&log_path)
+        .map_err(|e| AppError::Other(format!("opencode log create: {e}")))?;
+    let file_err = file
+        .try_clone()
+        .map_err(|e| AppError::Other(format!("opencode log clone: {e}")))?;
+
+    // Regenerate the metacodex-managed opencode config layer (enabled MCP
+    // servers) before every spawn so it can never go stale, and point the
+    // sidecar at it. opencode MERGES this on top of the user's global config.
+    // A generate failure only loses MCP, never block the agent itself on it.
+    if let Err(e) = crate::agent::mcp::regenerate_opencode_config() {
+        eprintln!("[metacodex] opencode config regenerate failed: {e}");
+    }
+
+    let (shell, args) = cli_launch_args("exec opencode serve --port 0");
+    let mut cmd = Command::new(&shell);
+    cmd.args(&args)
         .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+        .stdout(Stdio::from(file))
+        .stderr(Stdio::from(file_err));
+    // `.env()` survives the `$SHELL -l -i -c "exec opencode ..."` hop (rc files
+    // don't unset unknown vars) and avoids quoting issues vs inlining it.
+    if let Ok(cfg) = crate::config_paths::opencode_config_file() {
+        if cfg.exists() {
+            cmd.env("OPENCODE_CONFIG", &cfg);
+        }
+    }
+    let mut child = cmd
         .spawn()
         .map_err(|e| AppError::Other(format!("spawn opencode ({shell}): {e}")))?;
 
-    let (tx, rx) = mpsc::channel::<String>();
-    if let Some(out) = child.stdout.take() {
-        scan_for_url(out, tx.clone());
-    }
-    if let Some(err) = child.stderr.take() {
-        scan_for_url(err, tx);
-    }
-
-    match rx.recv_timeout(Duration::from_secs(25)) {
-        Ok(url) => Ok((child, url)),
-        Err(_) => {
+    let deadline = std::time::Instant::now() + Duration::from_secs(25);
+    loop {
+        if let Some(url) = read_url_from_log(&log_path) {
+            return Ok((child, url));
+        }
+        if std::time::Instant::now() >= deadline {
             let _ = child.kill();
             let _ = child.wait();
-            Err(AppError::Other(
+            return Err(AppError::Other(
                 "opencode server did not report a listening URL (is `opencode` installed and on PATH?)"
                     .into(),
-            ))
+            ));
         }
+        std::thread::sleep(Duration::from_millis(150));
     }
 }
 
-/// Drain a child pipe line by line, forwarding the first listening URL it finds.
-/// Keeps reading after the match so opencode never blocks on a full pipe.
-fn scan_for_url<R: Read + Send + 'static>(reader: R, tx: mpsc::Sender<String>) {
-    std::thread::spawn(move || {
-        for line in BufReader::new(reader).lines() {
-            let Ok(line) = line else { break };
-            if let Some(url) = extract_url(&line) {
-                let _ = tx.send(url);
+fn read_url_from_log(path: &Path) -> Option<String> {
+    let content = std::fs::read_to_string(path).ok()?;
+    // Only scan newline-terminated (complete) lines, so a URL caught mid-flush
+    // isn't parsed with a truncated port.
+    let idx = content.rfind('\n')?;
+    let complete = &content[..idx];
+    // The spawn goes through `$SHELL -l -i -c`, so rc-file noise (banners, dev
+    // server URLs) can land in the log BEFORE opencode's announce line. Prefer
+    // the line opencode actually prints; fall back to the LAST local URL seen.
+    if let Some(url) = complete
+        .lines()
+        .filter(|l| l.contains("server listening"))
+        .find_map(extract_url)
+    {
+        return Some(url);
+    }
+    complete.lines().filter_map(extract_url).next_back()
+}
+
+// ---- sidecar reuse + reaping across runs ------------------------------------
+
+/// Persisted pointer to the running sidecar so a later launch (notably a dev
+/// restart) ADOPTS it instead of spawning yet another `opencode serve`.
+/// `root` records which config root (`~/.metacodex` vs a `METACODEX_HOME` dev
+/// dir) owns the sidecar, so dev and installed apps never steal each other's.
+#[derive(Serialize, Deserialize)]
+struct PersistedRuntime {
+    pid: u32,
+    base_url: String,
+    #[serde(default)]
+    root: Option<String>,
+}
+
+fn runtime_file_path() -> Option<PathBuf> {
+    crate::config_paths::state_dir()
+        .ok()
+        .map(|d| d.join("opencode-runtime.json"))
+}
+
+fn log_file_path() -> Option<PathBuf> {
+    crate::config_paths::state_dir()
+        .ok()
+        .map(|d| d.join("opencode.log"))
+}
+
+fn save_runtime(pid: u32, base_url: &str) {
+    if let Some(p) = runtime_file_path() {
+        let _ = crate::config_paths::write_json_atomic(
+            &p,
+            &PersistedRuntime {
+                pid,
+                base_url: base_url.to_string(),
+                root: crate::config_paths::config_root()
+                    .ok()
+                    .map(|r| r.to_string_lossy().to_string()),
+            },
+        );
+    }
+}
+
+fn load_runtime() -> Option<PersistedRuntime> {
+    let p = runtime_file_path()?;
+    crate::config_paths::read_json_opt::<PersistedRuntime>(&p)
+        .ok()
+        .flatten()
+}
+
+fn clear_runtime() {
+    if let Some(p) = runtime_file_path() {
+        let _ = std::fs::remove_file(p);
+    }
+}
+
+/// `kill -0`: is a process with this pid alive and ours to signal?
+fn pid_alive(pid: u32) -> bool {
+    Command::new("kill")
+        .arg("-0")
+        .arg(pid.to_string())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+}
+
+/// SIGTERM (the bare `kill` default), so the target can clean up its children.
+fn kill_pid(pid: u32) {
+    let _ = Command::new("kill")
+        .arg(pid.to_string())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
+}
+
+/// Does the process's command name look like the opencode sidecar? Used before
+/// adopting or killing a persisted pid: after a reboot the pid may have been
+/// recycled by an unrelated process, which must never receive our signals.
+fn pid_is_opencode(pid: u32) -> bool {
+    Command::new("ps")
+        .args(["-p", &pid.to_string(), "-o", "comm="])
+        .output()
+        .ok()
+        .map(|o| {
+            let comm = String::from_utf8_lossy(&o.stdout).to_lowercase();
+            comm.contains("opencode") || comm.contains("bun")
+        })
+        .unwrap_or(false)
+}
+
+/// SIGTERM an owned child so opencode can reap its MCP children, escalating to
+/// SIGKILL after a bounded wait.
+fn terminate_child(child: &mut Child) {
+    kill_pid(child.id());
+    let deadline = std::time::Instant::now() + Duration::from_millis(1500);
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => return,
+            Ok(None) => {
+                if std::time::Instant::now() >= deadline {
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(100));
             }
+            Err(_) => break,
         }
-    });
+    }
+    let _ = child.kill();
+    let _ = child.wait();
+}
+
+/// SIGTERM-then-SIGKILL for an adopted pid (no `Child` handle to wait on).
+fn kill_pid_graceful(pid: u32) {
+    kill_pid(pid);
+    let deadline = std::time::Instant::now() + Duration::from_millis(1500);
+    while pid_alive(pid) {
+        if std::time::Instant::now() >= deadline {
+            let _ = Command::new("kill")
+                .args(["-9", &pid.to_string()])
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status();
+            return;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
 }
 
 fn extract_url(line: &str) -> Option<String> {
@@ -348,10 +801,98 @@ fn extract_url(line: &str) -> Option<String> {
     let rest = &line[start..];
     let end = rest.find(char::is_whitespace).unwrap_or(rest.len());
     let url = rest[..end].trim_end_matches('/');
-    let port = url.rsplit(':').next().unwrap_or("");
-    if !port.is_empty() && port.bytes().all(|b| b.is_ascii_digit()) {
-        Some(url.to_string())
-    } else {
-        None
+    // Take the longest digit run after the final colon, dropping trailing junk
+    // glued to the port (ANSI resets, punctuation) instead of rejecting outright.
+    let colon = url.rfind(':')?;
+    let digits = url[colon + 1..]
+        .bytes()
+        .take_while(u8::is_ascii_digit)
+        .count();
+    if digits == 0 {
+        return None;
+    }
+    Some(url[..colon + 1 + digits].to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{extract_url, full_auto_ruleset, parse_providers};
+
+    /// Pins the Rust side of the TS/Rust manual mirror: this JSON must equal
+    /// `rulesetForPreset("full-auto")` in `src/features/agent/opencode.ts`
+    /// rule-for-rule. A headless scheduled run with a weaker ruleset hangs
+    /// forever on an approval nobody will give.
+    #[test]
+    fn full_auto_ruleset_mirrors_frontend_preset() {
+        let expected = serde_json::json!([
+            { "permission": "edit", "pattern": "**", "action": "allow" },
+            { "permission": "bash", "pattern": "*", "action": "allow" },
+            { "permission": "webfetch", "pattern": "**", "action": "allow" },
+            { "permission": "websearch", "pattern": "**", "action": "allow" },
+            { "permission": "external_directory", "pattern": "**", "action": "allow" },
+            { "permission": "task", "pattern": "**", "action": "allow" }
+        ]);
+        assert_eq!(full_auto_ruleset(), expected);
+    }
+
+    #[test]
+    fn extract_url_handles_junk_and_plain_lines() {
+        assert_eq!(
+            extract_url("opencode server listening on http://127.0.0.1:4096"),
+            Some("http://127.0.0.1:4096".to_string())
+        );
+        // Trailing junk glued to the port is stripped, not rejected.
+        assert_eq!(
+            extract_url("listening on http://127.0.0.1:4096\u{1b}[0m"),
+            Some("http://127.0.0.1:4096".to_string())
+        );
+        assert_eq!(extract_url("http://127.0.0.1:"), None);
+        assert_eq!(extract_url("no url here"), None);
+    }
+
+    /// Guards the capability-flag regression: opencode >= 1.16 nests
+    /// `attachment`/`reasoning` under `capabilities` (with `input.image`);
+    /// older builds had them at the model's top level. Both must parse.
+    #[test]
+    fn parse_providers_reads_capabilities_old_and_new_schema() {
+        let v = serde_json::json!({
+            "providers": [{
+                "id": "p",
+                "name": "P",
+                "models": {
+                    "new-vision": { "name": "NV", "capabilities": {
+                        "attachment": true, "reasoning": true,
+                        "input": { "image": true }
+                    }, "variants": {
+                        "low": { "reasoningEffort": "low" },
+                        "high": { "reasoningEffort": "high" }
+                    }, "limit": { "context": 200000, "output": 8192 }},
+                    "new-files-only": { "name": "NF", "capabilities": {
+                        "attachment": true,
+                        "input": { "image": false }
+                    }},
+                    "old-vision": { "name": "OV", "attachment": true, "reasoning": false },
+                    "blind": { "name": "B", "capabilities": { "attachment": false } }
+                }
+            }]
+        });
+        let out = parse_providers(&v);
+        let m = |id: &str| out[0].models.iter().find(|m| m.id == id).unwrap();
+        assert!(m("new-vision").attachment);
+        assert!(m("new-vision").reasoning);
+        // Variant NAMES pass through (order normalized on the frontend).
+        let mut variants = m("new-vision").variants.clone();
+        variants.sort();
+        assert_eq!(variants, vec!["high".to_string(), "low".into()]);
+        assert!(m("blind").variants.is_empty());
+        // attachment without image input is NOT vision (text-file attachments only)
+        assert!(!m("new-files-only").attachment);
+        assert!(m("old-vision").attachment);
+        assert!(!m("blind").attachment);
+        // Token windows pass through when present, None when the catalog has none.
+        let limit = m("new-vision").limit.as_ref().unwrap();
+        assert_eq!(limit.context, Some(200_000));
+        assert_eq!(limit.output, Some(8_192));
+        assert!(m("blind").limit.is_none());
     }
 }

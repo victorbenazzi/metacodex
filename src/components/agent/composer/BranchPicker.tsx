@@ -24,6 +24,7 @@ export function BranchPicker({ root }: { root: string }) {
   const { t } = useTranslation();
   const [branches, setBranches] = useState<BranchInfo[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
   const reload = useCallback(() => {
     let cancelled = false;
@@ -46,16 +47,19 @@ export function BranchPicker({ root }: { root: string }) {
 
   const checkout = async (name: string) => {
     if (name === current?.name) return;
+    setCheckoutError(null);
     try {
       await gitApi.checkout(root, name);
     } catch (e) {
-      console.error("[branch-picker] checkout failed", e);
+      // Surface it (dirty tree, conflicts): a silent no-op reads as success.
+      const msg = e && typeof e === "object" && "message" in e ? String((e as { message: unknown }).message) : String(e);
+      setCheckoutError(msg);
     } finally {
       reload();
     }
   };
 
-  // Not a git repo (or unborn HEAD) — nothing to show.
+  // Not a git repo (or unborn HEAD): nothing to show.
   if (branches.length === 0) return null;
 
   return (
@@ -90,6 +94,15 @@ export function BranchPicker({ root }: { root: string }) {
           </DropdownItem>
         </DropdownContent>
       </DropdownRoot>
+
+      {checkoutError ? (
+        <span
+          title={checkoutError}
+          className="min-w-0 max-w-[260px] truncate text-[11px] text-danger"
+        >
+          {t("agent.branch.checkoutFailed")}: {checkoutError}
+        </span>
+      ) : null}
 
       <CreateBranchDialog
         root={root}

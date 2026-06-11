@@ -5,7 +5,7 @@ import { BookOpen, Loader2 } from "lucide-react";
 import { Icon } from "@/components/ui/Icon";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { CMD, invoke } from "@/lib/ipc";
-import { PanelShell } from "./PanelShell";
+import { SectionHeader } from "./PanelShell";
 
 interface SkillInfo {
   name: string;
@@ -17,9 +17,9 @@ interface SkillInfo {
 /**
  * Inventory of Agent Skills discoverable on disk (opencode / claude / agents /
  * metacodex skill dirs). Read-only for now; authoring + linking to agents lands
- * with the harness work.
+ * with the harness work. Rendered as a tab inside the Customize page.
  */
-export function SkillsPanel() {
+export function SkillsSection() {
   const { t } = useTranslation();
   const [skills, setSkills] = useState<SkillInfo[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -39,7 +39,8 @@ export function SkillsPanel() {
   }, []);
 
   return (
-    <PanelShell title={t("agent.skills.title")} subtitle={t("agent.skills.subtitle")}>
+    <section>
+      <SectionHeader title={t("agent.skills.title")} subtitle={t("agent.skills.subtitle")} />
       {skills === null ? (
         <div className="flex items-center gap-[8px] text-[13px] text-muted">
           <Icon icon={Loader2} size={14} className="animate-spin" />
@@ -59,8 +60,12 @@ export function SkillsPanel() {
           ))}
         </div>
       )}
-      {error ? <p className="mt-[12px] text-[12px] text-danger">{error}</p> : null}
-    </PanelShell>
+      {error ? (
+        <p className="mt-[12px] text-[12px] text-danger">
+          {t("agent.skills.loadFailed")} ({error})
+        </p>
+      ) : null}
+    </section>
   );
 }
 

@@ -1,4 +1,5 @@
 import * as RDM from "@radix-ui/react-dropdown-menu";
+import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/cn";
 import type React from "react";
 
@@ -75,6 +76,60 @@ export function DropdownItem({
       <span className="flex items-center gap-[10px] whitespace-nowrap">{children}</span>
       {trailing ? <span className="shrink-0 text-muted">{trailing}</span> : null}
     </RDM.Item>
+  );
+}
+
+export const DropdownSub = RDM.Sub;
+
+/** Submenu trigger row — DropdownItem chrome + a trailing chevron. */
+export function DropdownSubTrigger({
+  children,
+  disabled,
+  className,
+}: {
+  children: React.ReactNode;
+  disabled?: boolean;
+  className?: string;
+}) {
+  return (
+    <RDM.SubTrigger
+      disabled={disabled}
+      className={cn(
+        "flex w-full cursor-pointer items-center justify-between gap-[12px] rounded-sm px-[10px] py-[7px] outline-none",
+        "data-[highlighted]:bg-surface-strong/70 data-[highlighted]:text-ink",
+        "data-[state=open]:bg-surface-strong/70 data-[state=open]:text-ink",
+        "data-[disabled]:cursor-not-allowed data-[disabled]:opacity-40",
+        className,
+      )}
+    >
+      <span className="flex items-center gap-[10px] whitespace-nowrap">{children}</span>
+      <ChevronRight size={13} strokeWidth={2} className="shrink-0 text-muted" />
+    </RDM.SubTrigger>
+  );
+}
+
+export function DropdownSubContent({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <RDM.Portal>
+      <RDM.SubContent
+        sideOffset={6}
+        alignOffset={-5}
+        className={cn(
+          "z-50 min-w-[220px] rounded-md border border-hairline bg-surface-card p-[5px]",
+          "text-[13px] text-ink",
+          "data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out",
+          className,
+        )}
+      >
+        {children}
+      </RDM.SubContent>
+    </RDM.Portal>
   );
 }
 

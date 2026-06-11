@@ -5,6 +5,30 @@ import { CMD, invoke } from "@/lib/ipc";
 export interface AgentModel {
   id: string;
   name: string;
+  /** Accepts file/image attachments (vision). */
+  attachment: boolean;
+  reasoning: boolean;
+  /** Reasoning-effort variant names (sent as `variant` on the message POST).
+   *  Arrives unordered from the catalog; render via `orderedVariants`. */
+  variants: string[];
+  /** Token windows from the catalog; `context` feeds the context meter. */
+  limit?: { context?: number; output?: number } | null;
+}
+
+const VARIANT_RANK: Record<string, number> = {
+  minimal: 0,
+  low: 1,
+  medium: 2,
+  high: 3,
+  max: 4,
+  xhigh: 5,
+};
+
+/** Canonical effort order (minimal → max); unknown names go last, as-is. */
+export function orderedVariants(variants: string[]): string[] {
+  return [...variants].sort(
+    (a, b) => (VARIANT_RANK[a] ?? 99) - (VARIANT_RANK[b] ?? 99) || a.localeCompare(b),
+  );
 }
 
 export interface AgentProvider {
@@ -12,6 +36,31 @@ export interface AgentProvider {
   name: string;
   defaultModel: string | null;
   models: AgentModel[];
+}
+
+/** Look up a model in the catalog; null when the catalog hasn't loaded it. */
+export function findModel(
+  providers: AgentProvider[],
+  providerId: string,
+  modelId: string,
+): AgentModel | null {
+  return providers.find((p) => p.id === providerId)?.models.find((m) => m.id === modelId) ?? null;
+}
+
+/** First attachment-capable model, the vision-relay auto default. Prefers the
+ *  given provider so the relay stays on the user's account when possible. */
+export function firstVisionModel(
+  providers: AgentProvider[],
+  preferProviderId?: string,
+): { providerId: string; modelId: string } | null {
+  const ordered = preferProviderId
+    ? [...providers.filter((p) => p.id === preferProviderId), ...providers.filter((p) => p.id !== preferProviderId)]
+    : providers;
+  for (const p of ordered) {
+    const m = p.models.find((m) => m.attachment);
+    if (m) return { providerId: p.id, modelId: m.id };
+  }
+  return null;
 }
 
 export interface RuntimeStatus {
@@ -91,7 +140,7 @@ export const useAgentRuntimeStore = create<RuntimeState>((set) => ({
     try {
       await invoke(CMD.agentRuntimeStop);
     } catch {
-      // ignore — stopping is best-effort
+      // ignore, stopping is best-effort
     }
     set({ status: IDLE_STATUS });
   },

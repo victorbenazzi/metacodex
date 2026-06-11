@@ -27,7 +27,7 @@ METACODEX_HOME="$HOME/.metacodex-dev" pnpm tauri dev   # estado isolado, janela 
 3. Volta pro Agent, escreve no composer e envia: deve aparecer sua mensagem e o reply em streaming (texto + bloco de reasoning colapsável).
 4. Sidebar **Chat**: New chat + histórico de sessões.
 5. **Work → Skills**: lista real das skills do disco.
-6. **Work → Scheduled Tasks**: cria uma (intervalo 1 min, prompt "diga oi"), clica **Run now**; deve rodar e mostrar "última execução".
+6. **Work → Scheduled Tasks**: **Create** abre o modal (Name + Requirement + Schedule). Em Schedule, clica um preset (ex.: "Every minute" = `* * * * *`) ou digita um cron; a descrição legível confirma. Salva, depois **Run now** no card; deve rodar e mostrar "última execução" com bolinha verde. Para ver o disparo automático, use `* * * * *` e espere o próximo minuto.
 7. Toggle **Code**: os terminais continuam vivos (o Agent View é overlay, o Code fica montado por baixo).
 
 Se algo travar, o terminal do `pnpm tauri dev` mostra o erro (Rust no stderr; erros de front no devtools do webview).
@@ -40,7 +40,7 @@ Se algo travar, o terminal do `pnpm tauri dev` mostra o erro (Rust no stderr; er
 - **Provider = opencode-go** (subscription GO). Chave guardada pelo opencode (auth store dele), nunca no webview.
 - **Chat = webview fala direto com o opencode** (CORS é permissivo): `EventSource` no `/event` + `fetch` nos POSTs. **Não** usamos AI SDK `useChat`/transport (a via direta é mais robusta). **streamdown** renderiza as respostas.
 - **Rust é o broker** só onde precisa: ciclo de vida do sidecar, listagem de modelos com chaves removidas, e o cron.
-- **Cron em Rust** (tokio, tick de 1 min), dispara sessões opencode; roda só com o app aberto (always-on fica pro Railway depois).
+- **Cron em Rust** baseado em **expressão cron padrão de 5 campos** (avaliador próprio em `agent/cron.rs`, sem dependência). Tick tokio de 20s avalia contra o relógio local e dispara no minuto que casa (dedupe por minuto via `last_fired_minute`); a string cron é o artefato portável que um trigger.dev/Railway consome depois. As sessões headless rodam com `?directory=<raiz>` e ruleset `full-auto` (senão travam esperando aprovação). Roda só com o app aberto.
 
 ### Fatos do opencode HTTP (confirmados em spike)
 - Sobe com `opencode serve --port 0 --print-logs` → imprime `opencode server listening on http://127.0.0.1:PORT`.
@@ -63,7 +63,7 @@ Se algo travar, o terminal do `pnpm tauri dev` mostra o erro (Rust no stderr; er
 - **Fase 1 (runtime):** `AgentRuntime` (spawn/health/reuse/kill do `opencode serve`); `agent_list_models` com chaves removidas; Settings → Agent (status + chave GO + modelo default).
 - **Fase 2 (chat):** `chat.store` (EventSource + fetch) monta a thread dos eventos; composer funcional (Enter envia, Shift+Enter quebra, stop); render com streamdown + reasoning colapsável + tool chips; histórico de sessões. AgentView é **lazy-loaded** (streamdown/shiki/mermaid fora do bundle do Code View).
 - **Fase 3 (work/harness):** Skills browser **real** (Rust lê `~/.config/opencode/skills`, `~/.claude/skills`, `~/.agents/skills`, `~/.metacodex/skills`, parse de frontmatter); navegação das abas Work; projeto ativo exibido.
-- **Fase 4 (cron):** scheduler tokio **real** + persistência (`~/.metacodex/state/agent-cron.json`) + CRUD + Run now + notificação; UI de Scheduled Tasks com formulário e lista. **WebBridge** é scaffold premium (placeholder).
+- **Fase 4 (cron):** scheduler tokio **real** por expressão cron + persistência (`~/.metacodex/state/agent-cron.json`) + CRUD (create/update/delete/enable) + Run now + notificação + `last_status`. UI Scheduled Tasks reskin do Kimi (header+Create, empty state, cards) com modal (Name/Requirement/Schedule) e campo de cron (presets + descrição via `cronstrue` en/pt-BR). **WebBridge** foi removido (2026-06-10): automação de browser entra via MCP (ex.: Playwright), não como superfície própria.
 
 ---
 
@@ -76,13 +76,24 @@ Composer agora dirige o harness de verdade (antes era visual). Núcleo em `src/f
 - **Permissões reais (3 presets + aprovação ao vivo):** `composer/PermissionPicker.tsx` (Sempre perguntar / Auto-aprovar edições / Tudo liberado) → `PermissionRuleset` na criação da sessão e PATCH na sessão viva. Pedidos ao vivo: eventos SSE `permission.asked` / `permission.v2.asked` viram card em `chat/PermissionCard.tsx`; resposta via `POST /session/{id}/permissions/{id}` `{response}` (v1) ou `POST /permission/{id}/reply` `{reply}` (v2).
 - **Agent / Agent Swarm (single vs orquestrador):** toggle persiste em `settings.agent.mode`. Ambos mandam `agent` (primário, prefere `build`, de `GET /agent`); swarm adiciona `system` (SWARM_SYSTEM) que instrui decompor e delegar em subagents via tool `task`. Não há primário "swarm" nativo no opencode, então a diferença real é o system hint + a delegação visível.
 
+## Histórico de conversas por projeto (sidebar), IMPLEMENTADO 2026-06-09 (builds verdes, falta verificação viva)
+
+Referência visual: Cursor (projeto pai > threads aninhadas). Tudo parte do opencode; nada de registry paralelo de sessões.
+
+- **Fonte de dados:** `GET /session?directory=<raiz>` por projeto (filhas de swarm filtradas por `parentID`, arquivadas por `time.archived`). Store novo `src/features/agent/sessions.store.ts` (`byDirectory`, `runningById`, `drafts`); o `chat.store` empurra `baseUrl` e encaminha os eventos SSE (`session.created|updated|deleted|status|idle`) pra ele, dependência só numa direção.
+- **Status ao vivo:** bolinha `--warn` pulsando enquanto o harness roda a sessão (`session.status`/`session.idle` + poll de `GET /session/status` a cada 10s, que pega runs headless de cron em outros projetos), cinza quando terminou. Lista completa re-busca a cada 30s.
+- **Pin / arquivar (nativos do opencode):** hover na thread troca o timestamp pelos botões; pin = `PATCH /session/{id}` `{metadata:{pinned:true}}` (ordena primeiro, mostra o glifo de pin), arquivar = `{time:{archived:<ms>}}` (some da lista; desarquivar seria `archived: 0`, sem UI por ora).
+- **Rascunhos (linha do lápis):** prompt digitado e não enviado persiste por projeto em `~/.metacodex/state/agent-ui.json` (comandos `agent_ui_state_read|write`, mesmo padrão opaco do settings.json). Só o composer de chat novo participa (digitar no meio de uma thread não é rascunho). Clicar na linha do lápis abre o composer naquele projeto com o texto.
+- **Expansão dos grupos:** projeto vazio começa fechado (abrindo, mostra "Nenhuma conversa ainda"); ao entrar a primeira conversa/rascunho abre sozinho. Toggle manual do usuário vira escolha explícita, persiste no mesmo `agent-ui.json` (`expanded`) e ganha do derivado dali em diante.
+- **UI:** `ProjectSection.tsx` reescrito (linha do projeto com chevron + `+` no hover; `+` abre composer já no projeto), `SidebarThreads.tsx` novo (`ProjectThreads`, compartilhado com o pane Chat, que agora lista o histórico real do diretório ativo). Bucket "Trabalhar sem pasta" (sessões do cwd default do sidecar) aparece no topo quando tem conteúdo.
+
 ## O que falta / próximos passos (deferido)
 
 1. **Verificação viva na GUI** (não foi possível clicar nesta sessão): selecionar modelo, trocar projeto, alternar preset de permissão e aprovar um card ao vivo, alternar Agent/Swarm.
 2. **Agent builder** (meta-agente que cria agentes por linguagem natural; portar `generate-agent-config` do VensyAgents em `/Users/victor/Documents/VensyAgentsApp/packages/ai`).
 3. **Guardrail de roots** via plugin opencode (`@opencode-ai/plugin`): negar caminhos fora das raízes registradas (replica `ensure_within_roots`, já que as tools do opencode rodam no processo Bun, não no sandbox Rust). Os presets de permissão já cobrem `external_directory`, mas não substituem o sandbox lexical do Rust.
 4. **Gestão de MCPs** na UI (`GET/POST /mcp`).
-5. **WebBridge real** (automação de browser; sugestão: Playwright via MCP de browser, JS-nativo, sem Python).
+5. **Automação de browser** via MCP (sugestão: Playwright MCP, JS-nativo, sem Python); a superfície WebBridge foi removida da UI em 2026-06-10.
 6. **Tema do markdown (streamdown)** usa o default da lib; afinar pros tokens do metacodex.
 7. **Tasks** (a seção Tasks na sidebar Work ainda é placeholder).
 
@@ -98,7 +109,7 @@ Composer agora dirige o harness de verdade (antes era visual). Núcleo em `src/f
 
 **Rust editados:** `src-tauri/src/lib.rs` (módulo agent, manage AgentRuntime+CronStore, registro de comandos, start do scheduler, **single-instance pulado em debug**); `src-tauri/src/commands/mod.rs` (`pub mod agent`); `src-tauri/src/config_paths.rs` (override `METACODEX_HOME`); `src-tauri/Cargo.toml` (+reqwest, feature `json`).
 
-**Comandos Tauri adicionados:** `agent_runtime_start|status|stop`, `agent_list_models`, `agent_set_credentials`, `agent_list_skills`, `agent_cron_list|create|delete|set_enabled|run_now`.
+**Comandos Tauri adicionados:** `agent_runtime_start|status|stop`, `agent_list_models`, `agent_set_credentials`, `agent_list_skills`, `agent_cron_list|create|update|delete|set_enabled|run_now`.
 
 ---
 

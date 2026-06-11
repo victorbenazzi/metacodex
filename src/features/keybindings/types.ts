@@ -14,6 +14,8 @@ export type CommandId =
   | "palette.files"
   | "file.save"
   | "tab.jumpToNextAttention"
+  | "agent.newChat"
+  | "view.toggle"
   | "diagnostics.toggle";
 
 export type CommandCategory = "general" | "navigation" | "view" | "editing";

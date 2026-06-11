@@ -40,42 +40,63 @@ pub fn config_root() -> AppResult<PathBuf> {
         .ok_or_else(|| AppError::Other("could not resolve home directory".into()))
 }
 
-/// `~/.metacodex/settings.json` — user preferences, hand-editable.
+/// `~/.metacodex/settings.json`, user preferences, hand-editable.
 pub fn settings_file() -> AppResult<PathBuf> {
     Ok(config_root()?.join("settings.json"))
 }
 
-/// `~/.metacodex/keybindings.json` — keyboard-shortcut overrides.
+/// `~/.metacodex/keybindings.json`, keyboard-shortcut overrides.
 pub fn keybindings_file() -> AppResult<PathBuf> {
     Ok(config_root()?.join("keybindings.json"))
 }
 
-/// `~/.metacodex/state` — app-managed state (not meant for hand-editing).
+/// `~/.metacodex/state`, app-managed state (not meant for hand-editing).
 pub fn state_dir() -> AppResult<PathBuf> {
     Ok(config_root()?.join("state"))
 }
 
-/// `~/.metacodex/state/projects.json` — the projects registry + active id.
+/// `~/.metacodex/state/projects.json`, the projects registry + active id.
 pub fn projects_file() -> AppResult<PathBuf> {
     Ok(state_dir()?.join("projects.json"))
 }
 
-/// `~/.metacodex/state/workspace` — one file per project.
+/// `~/.metacodex/state/workspace`, one file per project.
 pub fn workspace_dir() -> AppResult<PathBuf> {
     Ok(state_dir()?.join("workspace"))
 }
 
-/// `~/.metacodex/state/resume.json` — agent-session resume registry.
+/// `~/.metacodex/state/resume.json`, agent-session resume registry.
 pub fn resume_file() -> AppResult<PathBuf> {
     Ok(state_dir()?.join("resume.json"))
 }
 
-/// `~/.metacodex/state/last-session.log` — diagnostics ring-buffer dump on quit.
+/// `~/.metacodex/state/agent-ui.json`, small Agent View UI state (composer
+/// drafts, sidebar expansion choices), keyed by project directory. Opaque to
+/// Rust (the frontend owns the schema), same contract as settings.json.
+pub fn agent_ui_state_file() -> AppResult<PathBuf> {
+    Ok(state_dir()?.join("agent-ui.json"))
+}
+
+/// `~/.metacodex/state/agent-mcp.json`, MCP server registry for the Agent
+/// View (source of truth; may contain API keys, written 0600 via
+/// [`write_json_atomic_private`]).
+pub fn agent_mcp_file() -> AppResult<PathBuf> {
+    Ok(state_dir()?.join("agent-mcp.json"))
+}
+
+/// `~/.metacodex/state/opencode-config.json`, GENERATED opencode config layer
+/// (enabled MCP servers), passed to the sidecar via `OPENCODE_CONFIG`. Never
+/// hand-edited: regenerated from `agent-mcp.json` before every spawn.
+pub fn opencode_config_file() -> AppResult<PathBuf> {
+    Ok(state_dir()?.join("opencode-config.json"))
+}
+
+/// `~/.metacodex/state/last-session.log`, diagnostics ring-buffer dump on quit.
 pub fn last_session_log_file() -> AppResult<PathBuf> {
     Ok(state_dir()?.join("last-session.log"))
 }
 
-/// `~/.metacodex/state/last-crash.json` — last ErrorBoundary catch.
+/// `~/.metacodex/state/last-crash.json`, last ErrorBoundary catch.
 pub fn last_crash_file() -> AppResult<PathBuf> {
     Ok(state_dir()?.join("last-crash.json"))
 }
@@ -128,6 +149,34 @@ pub fn read_json<T: DeserializeOwned + Default>(path: &Path) -> AppResult<T> {
     }
 }
 
+/// Like [`read_json`], but a corrupt existing file is renamed to
+/// `<file>.corrupt` before defaults are returned. For stores whose boot path
+/// persists right after loading (cron, MCP): without the rename, one bad
+/// hand-edit would get the only copy of the data overwritten with defaults
+/// (and the MCP registry holds API keys the UI can never re-show).
+pub fn read_json_backed<T: DeserializeOwned + Default>(path: &Path) -> AppResult<T> {
+    match fs::read_to_string(path) {
+        Ok(raw) => match serde_json::from_str::<T>(&raw) {
+            Ok(value) => Ok(value),
+            Err(e) => {
+                let backup = path.with_file_name(format!(
+                    "{}.corrupt",
+                    path.file_name().and_then(|s| s.to_str()).unwrap_or("config")
+                ));
+                eprintln!(
+                    "[metacodex] config parse failed for {}: {e}; moving it to {} and using defaults",
+                    path.display(),
+                    backup.display()
+                );
+                let _ = fs::rename(path, &backup);
+                Ok(T::default())
+            }
+        },
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(T::default()),
+        Err(e) => Err(AppError::Io(e)),
+    }
+}
+
 /// Like [`read_json`] but returns `None` for an absent file, matching callers
 /// whose contract is `Option<T>` (e.g. `load_workspace_state`). A corrupt file
 /// is treated as `None` + log.
@@ -164,8 +213,7 @@ pub fn write_json_atomic<T: Serialize>(path: &Path, value: &T) -> AppResult<()> 
     }
     let json = serde_json::to_string_pretty(value)
         .map_err(|e| AppError::Other(format!("serialize config: {e}")))?;
-    let file_name = path.file_name().and_then(|s| s.to_str()).unwrap_or("config");
-    let tmp = path.with_file_name(format!("{file_name}.metacodex.tmp"));
+    let tmp = tmp_path(path);
     fs::write(&tmp, json.as_bytes())?;
     fs::rename(&tmp, path).map_err(|e| {
         // best-effort cleanup of the temp file
@@ -173,4 +221,55 @@ pub fn write_json_atomic<T: Serialize>(path: &Path, value: &T) -> AppResult<()> 
         AppError::Io(e)
     })?;
     Ok(())
+}
+
+/// [`write_json_atomic`] with the temp file CREATED 0600, for files carrying
+/// secrets (the MCP registry holds API keys in plaintext: accepted for a
+/// local-first app, but the perms keep them to the user account). The mode is
+/// set at create time, before any byte is written, so the secret is never
+/// world-readable, even briefly.
+pub fn write_json_atomic_private<T: Serialize>(path: &Path, value: &T) -> AppResult<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let json = serde_json::to_string_pretty(value)
+        .map_err(|e| AppError::Other(format!("serialize config: {e}")))?;
+    let tmp = tmp_path(path);
+    {
+        use std::io::Write;
+        let mut open = fs::OpenOptions::new();
+        open.create(true).write(true).truncate(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            open.mode(0o600);
+        }
+        let mut file = open.open(&tmp)?;
+        file.write_all(json.as_bytes())?;
+        // A pre-existing tmp (crash leftover) keeps its old mode; force it.
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&tmp, fs::Permissions::from_mode(0o600))?;
+        }
+    }
+    fs::rename(&tmp, path).map_err(|e| {
+        let _ = fs::remove_file(&tmp);
+        AppError::Io(e)
+    })?;
+    Ok(())
+}
+
+/// Unique-per-write temp path next to `path`. Uniqueness (pid + counter) keeps
+/// two concurrent writers of the SAME file from clobbering each other's temp
+/// and failing the rename with a spurious NotFound.
+fn tmp_path(path: &Path) -> PathBuf {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+    let n = COUNTER.fetch_add(1, Ordering::Relaxed);
+    let file_name = path.file_name().and_then(|s| s.to_str()).unwrap_or("config");
+    path.with_file_name(format!(
+        "{file_name}.metacodex.tmp.{}.{n}",
+        std::process::id()
+    ))
 }
