@@ -154,7 +154,9 @@ function ArchivedRow({ directory, row }: { directory: string | null; row: Sessio
       >
         {row.title || t("agent.sidebar.untitledChat")}
       </button>
-      <span className="hidden shrink-0 group-focus-within/thread:flex group-hover/thread:flex">
+      {/* invisible (not hidden) so the 18px slot stays in layout at rest and
+          the row height never changes on hover. */}
+      <span className="invisible flex h-[18px] shrink-0 items-center group-focus-within/thread:visible group-hover/thread:visible">
         <HoverAction
           label={t("agent.sidebar.unarchive")}
           onClick={() => void useAgentSessionsStore.getState().unarchive(directory, row.id)}
@@ -278,10 +280,12 @@ const ThreadRow = memo(function ThreadRow({
         </button>
       )}
 
-      {/* Timestamp at rest; pin + archive + more on hover OR keyboard focus. */}
+      {/* Timestamp at rest; pin + archive + more on hover OR keyboard focus.
+          Both states of this trailing slot must be 18px tall (the IconButton
+          height), otherwise the row grows on hover and shifts the rows below. */}
       <span
         className={cn(
-          "shrink-0 font-mono text-[10px] tabular-nums text-muted-soft group-focus-within/thread:hidden group-hover/thread:hidden",
+          "flex h-[18px] shrink-0 items-center font-mono text-[10px] tabular-nums text-muted-soft group-focus-within/thread:hidden group-hover/thread:hidden",
           menuOpen && "hidden",
         )}
       >
