@@ -74,7 +74,7 @@ export function ProjectEmptyState({ project, onNewTerminal, onLaunchCli }: Proje
               {project.name}
             </h1>
             <p
-              className="mt-[4px] truncate font-mono text-[12px] text-muted-soft"
+              className="mt-[4px] truncate font-mono text-caption text-muted-soft"
               title={project.path}
             >
               {project.path}
@@ -82,7 +82,7 @@ export function ProjectEmptyState({ project, onNewTerminal, onLaunchCli }: Proje
           </div>
         </div>
 
-        <p className="mt-[16px] max-w-[520px] font-display text-[17px] leading-[1.5] text-body">
+        <p className="mt-[16px] max-w-[520px] font-display text-[18px] leading-[1.5] text-body">
           {t("projectEmpty.tagline")}
         </p>
 
@@ -103,8 +103,8 @@ export function ProjectEmptyState({ project, onNewTerminal, onLaunchCli }: Proje
             type="button"
             onClick={onNewTerminal}
             className={cn(
-              "inline-flex h-[36px] items-center gap-[8px] rounded-sm bg-ink px-[16px] text-[13px] font-medium text-on-primary",
-              "transition-colors duration-150 hover:bg-primary-active",
+              "press-feedback inline-flex h-[36px] items-center gap-[8px] rounded-sm bg-ink px-[16px] text-ui font-medium text-on-primary",
+              "transition-colors duration-fast hover:bg-primary-active",
               "focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[3px]",
             )}
           >
@@ -129,7 +129,7 @@ export function ProjectEmptyState({ project, onNewTerminal, onLaunchCli }: Proje
                   onClick={() => onLaunchCli(cli)}
                   className={cn(
                     "inline-flex h-[48px] w-full items-center gap-[10px] rounded-sm border border-hairline bg-canvas-soft px-[12px] text-left",
-                    "transition-colors duration-150 hover:border-hairline-strong hover:bg-surface-strong/40",
+                    "transition-colors duration-fast hover:border-hairline-strong hover:bg-surface-strong/40",
                     "focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[2px]",
                   )}
                 >
@@ -138,7 +138,7 @@ export function ProjectEmptyState({ project, onNewTerminal, onLaunchCli }: Proje
                       <BrandIcon size={18} />
                     </span>
                   ) : null}
-                  <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink">
+                  <span className="min-w-0 flex-1 truncate text-ui font-medium text-ink">
                     {cli.label}
                   </span>
                 </button>

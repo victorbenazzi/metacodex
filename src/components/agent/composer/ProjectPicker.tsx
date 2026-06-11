@@ -43,7 +43,7 @@ export function ProjectPicker() {
           <button
             type="button"
             aria-label={t("agent.composer.projectLabel")}
-            className="inline-flex max-w-[340px] items-center gap-[6px] rounded-sm py-[2px] pl-[2px] pr-[4px] text-[12px] text-muted outline-none transition-colors hover:text-body data-[state=open]:text-body focus-visible:ring-2 focus-visible:ring-ink/15"
+            className="inline-flex max-w-[340px] items-center gap-[6px] rounded-sm py-[2px] pl-[2px] pr-[4px] text-caption text-muted outline-none transition-colors hover:text-body data-[state=open]:text-body focus-visible:ring-2 focus-visible:ring-ink/15"
           >
             <Icon icon={FolderClosed} size={14} strokeWidth={2} className="shrink-0" />
             <span className="truncate">
@@ -64,7 +64,7 @@ export function ProjectPicker() {
                 trailing={isActive ? <Icon icon={Check} size={13} className="text-ink" /> : null}
               >
                 <span
-                  className="h-[8px] w-[8px] shrink-0 rounded-full"
+                  className="h-[8px] w-[8px] shrink-0 rounded-pill"
                   style={{ backgroundColor: tileIconColor(p.color, theme) }}
                 />
                 <span className={isActive ? "text-ink" : undefined}>{p.name}</span>

@@ -49,7 +49,7 @@ export function PlusMenu({
         <button
           type="button"
           aria-label={t("agent.composer.attach")}
-          className="inline-flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full border border-hairline text-muted hover:bg-surface-strong/60 hover:text-ink data-[state=open]:bg-surface-strong/60 data-[state=open]:text-ink"
+          className="inline-flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-pill border border-hairline text-muted hover:bg-surface-strong/60 hover:text-ink data-[state=open]:bg-surface-strong/60 data-[state=open]:text-ink"
         >
           <Icon icon={Plus} size={16} strokeWidth={2} />
         </button>
@@ -75,7 +75,7 @@ export function PlusMenu({
           </DropdownSubTrigger>
           <DropdownSubContent className="max-h-[320px] max-w-[300px] overflow-y-auto">
             {skills === null || skills.length === 0 ? (
-              <div className="px-[10px] py-[8px] text-[12px] text-muted">
+              <div className="px-[10px] py-[8px] text-caption text-muted">
                 {skills === null ? t("agent.skills.loading") : t("agent.composer.skillsEmpty")}
               </div>
             ) : (
@@ -84,7 +84,7 @@ export function PlusMenu({
                   <span className="flex min-w-0 flex-col items-start gap-[1px]">
                     <span className="text-ink">{s.name}</span>
                     {s.description ? (
-                      <span className="max-w-[240px] truncate text-[11px] text-muted">
+                      <span className="max-w-[240px] truncate text-label text-muted">
                         {s.description}
                       </span>
                     ) : null}
@@ -119,12 +119,12 @@ function McpSubmenu() {
         <Icon icon={Plug} size={14} className="text-muted" />
         {t("agent.composer.mcpServers")}
         {pendingRestart ? (
-          <span className="ml-auto inline-block h-[6px] w-[6px] rounded-full bg-warn" />
+          <span className="ml-auto inline-block h-[6px] w-[6px] rounded-pill bg-warn" />
         ) : null}
       </DropdownSubTrigger>
       <DropdownSubContent className="max-w-[280px]">
         {entries.length === 0 ? (
-          <div className="px-[10px] py-[8px] text-[12px] text-muted">
+          <div className="px-[10px] py-[8px] text-caption text-muted">
             {loadError ?? t("agent.composer.mcpEmpty")}
           </div>
         ) : (
@@ -177,7 +177,7 @@ function McpDot({
     <span
       title={live?.error}
       className={cn(
-        "inline-block h-[7px] w-[7px] rounded-full",
+        "inline-block h-[7px] w-[7px] rounded-pill",
         !enabled ? "bg-muted-soft" : failed ? "bg-danger" : ok ? "bg-success" : "bg-warn",
       )}
     />

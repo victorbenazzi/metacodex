@@ -379,7 +379,7 @@ export const MentionPopup = forwardRef<
         className="max-h-[280px] overflow-y-auto p-[5px]"
       >
         {rows.length === 0 ? (
-          <div className="px-[10px] py-[8px] text-[12px] text-muted">
+          <div className="px-[10px] py-[8px] text-caption text-muted">
             {section === "symbols"
               ? t("agent.composer.mentionSymbolsEmpty")
               : t("agent.composer.mentionNoResults")}
@@ -394,19 +394,19 @@ export const MentionPopup = forwardRef<
               onMouseMove={() => setActive(i)}
               onClick={row.run}
               className={cn(
-                "flex w-full items-center gap-[10px] rounded-sm px-[10px] py-[7px] text-left text-[13px] text-ink",
+                "flex w-full items-center gap-[10px] rounded-sm px-[10px] py-[7px] text-left text-ui text-ink",
                 i === active && "bg-surface-strong/55",
               )}
             >
               <Icon icon={row.icon} size={14} className="shrink-0 text-muted" />
               <span className="min-w-0 flex-1 truncate">{row.primary}</span>
               {row.secondary ? (
-                <span className="max-w-[45%] shrink-0 truncate text-[11px] text-muted">
+                <span className="max-w-[45%] shrink-0 truncate text-label text-muted">
                   {row.secondary}
                 </span>
               ) : null}
               {row.badge ? (
-                <span className="shrink-0 rounded-full border border-hairline px-[6px] py-[1px] text-[10px] text-muted-soft">
+                <span className="shrink-0 rounded-pill border border-hairline px-[6px] py-[1px] text-[10px] text-muted-soft">
                   {row.badge}
                 </span>
               ) : null}

@@ -39,22 +39,22 @@ export function ContextMeter() {
         aria-valuemax={100}
         aria-valuenow={percent}
         aria-label={t("agent.chat.context.usage", { percent })}
-        className="h-[3px] min-w-0 flex-1 overflow-hidden rounded-full bg-surface-2"
+        className="h-[3px] min-w-0 flex-1 overflow-hidden rounded-pill bg-surface-2"
       >
         <div
           className={cn(
-            "h-full rounded-full transition-[width] duration-300",
+            "h-full rounded-pill transition-[width] duration-slow",
             ratio >= DANGER_AT ? "bg-danger" : ratio >= WARN_AT ? "bg-warn" : "bg-ink/30",
           )}
           style={{ width: `${percent}%` }}
         />
       </div>
-      <span className="shrink-0 text-[11px] tabular-nums text-muted-soft">{percent}%</span>
+      <span className="shrink-0 text-label tabular-nums text-muted-soft">{percent}%</span>
       <button
         type="button"
         disabled={busy || compacting}
         onClick={() => void useAgentChatStore.getState().compact()}
-        className="inline-flex shrink-0 items-center gap-[5px] rounded-md px-[6px] py-[2px] text-[11px] text-muted hover:bg-surface-2 hover:text-ink disabled:opacity-50"
+        className="inline-flex shrink-0 items-center gap-[5px] rounded-md px-[6px] py-[2px] text-label text-muted hover:bg-surface-2 hover:text-ink disabled:opacity-40"
       >
         {compacting ? <Icon icon={Loader2} size={11} className="animate-spin" /> : null}
         {compacting ? t("agent.chat.context.compacting") : t("agent.chat.context.compact")}

@@ -41,15 +41,15 @@ export function QuestionCard({ prompt }: { prompt: QuestionPrompt }) {
   return (
     <div className="rounded-lg border border-hairline bg-surface-card p-[14px] shadow-elevated">
       <div className="flex items-start gap-[10px]">
-        <span className="mt-[1px] flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-surface-2 text-muted">
+        <span className="mt-[1px] flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-pill bg-surface-2 text-muted">
           <Icon icon={MessageCircleQuestion} size={14} strokeWidth={2} />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-[13px] font-medium text-ink">{t("agent.question.title")}</p>
+          <p className="text-ui font-medium text-ink">{t("agent.question.title")}</p>
           <div className="mt-[8px] flex flex-col gap-[12px]">
             {prompt.questions.map((q, qi) => (
               <div key={qi} className="flex flex-col gap-[6px]">
-                <p className="text-[13px] leading-[1.5] text-body">{q.question}</p>
+                <p className="text-ui leading-[1.5] text-body">{q.question}</p>
                 {q.options.length > 0 ? (
                   <div className="flex flex-wrap gap-[6px]">
                     {q.options.map((opt) => {
@@ -62,7 +62,7 @@ export function QuestionCard({ prompt }: { prompt: QuestionPrompt }) {
                           title={opt.description}
                           onClick={() => toggle(qi, opt.label, q.multiple)}
                           className={cn(
-                            "rounded-md border px-[10px] py-[5px] text-[12px] transition-colors duration-100",
+                            "rounded-md border px-[10px] py-[5px] text-caption transition-colors duration-fast",
                             active
                               ? "border-ink/40 bg-surface-2 text-ink"
                               : "border-hairline bg-surface-1 text-body hover:bg-surface-2",
@@ -82,7 +82,7 @@ export function QuestionCard({ prompt }: { prompt: QuestionPrompt }) {
                       setCustom((prev) => prev.map((v, i) => (i === qi ? e.target.value : v)))
                     }
                     placeholder={t("agent.question.customPlaceholder")}
-                    className="w-full rounded-md border border-hairline bg-surface-1 px-[10px] py-[6px] text-[12.5px] text-ink outline-none placeholder:text-muted-soft focus:border-hairline-strong"
+                    className="w-full rounded-md border border-hairline bg-surface-1 px-[10px] py-[6px] text-caption text-ink outline-none placeholder:text-muted-soft focus:border-hairline-strong"
                   />
                 ) : null}
               </div>

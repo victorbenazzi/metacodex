@@ -1572,7 +1572,7 @@ function DeleteNodeConfirm({
       description={description}
       details={
         state ? (
-          <span className="font-mono text-[11px] text-muted-soft">
+          <span className="font-mono text-label text-muted-soft">
             {state.path}
           </span>
         ) : null
@@ -1621,7 +1621,7 @@ function MoveNodeConfirm({
       description={description}
       details={
         state ? (
-          <span className="font-mono text-[11px] text-muted-soft">
+          <span className="font-mono text-label text-muted-soft">
             {state.from}
           </span>
         ) : null
@@ -1651,7 +1651,7 @@ function confirmCopyFor(
     const tab = s.singleTab;
     const details =
       "cwd" in tab && tab.cwd ? (
-        <span className="font-mono text-[11px] text-muted-soft">{tab.cwd}</span>
+        <span className="font-mono text-label text-muted-soft">{tab.cwd}</span>
       ) : null;
     if (tab.kind === "cli") {
       return {

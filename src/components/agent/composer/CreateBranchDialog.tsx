@@ -90,14 +90,14 @@ export function CreateBranchDialog({ root, open, onOpenChange, onCreated }: Crea
             value={name}
             onChange={(e) => setName(e.target.value)}
             disabled={busy}
-            className="block w-full rounded-sm border border-hairline-strong bg-canvas px-[10px] py-[7px] font-mono text-[12px] text-ink outline-none placeholder:text-muted-soft focus:border-ink disabled:opacity-60"
+            className="block w-full rounded-sm border border-hairline-strong bg-canvas px-[10px] py-[7px] font-mono text-caption text-ink outline-none placeholder:text-muted-soft focus:border-ink disabled:opacity-60"
             placeholder={t("agent.branch.namePlaceholder")}
             maxLength={200}
           />
           {invalid ? (
-            <p className="text-[11px] text-danger">{t("agent.branch.nameInvalid")}</p>
+            <p className="text-label text-danger">{t("agent.branch.nameInvalid")}</p>
           ) : null}
-          {err ? <p className="whitespace-pre-wrap text-[12px] text-danger">{err}</p> : null}
+          {err ? <p className="whitespace-pre-wrap text-caption text-danger">{err}</p> : null}
         </form>
       </DialogContent>
     </DialogRoot>

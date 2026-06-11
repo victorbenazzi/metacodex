@@ -25,7 +25,7 @@ export function DropdownContent({
         sideOffset={sideOffset}
         className={cn(
           "z-50 min-w-[220px] rounded-md border border-hairline bg-surface-card p-[5px]",
-          "text-[13px] text-ink",
+          "text-ui text-ink",
           "data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out",
           className,
         )}
@@ -122,7 +122,7 @@ export function DropdownSubContent({
         alignOffset={-5}
         className={cn(
           "z-50 min-w-[220px] rounded-md border border-hairline bg-surface-card p-[5px]",
-          "text-[13px] text-ink",
+          "text-ui text-ink",
           "data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out",
           className,
         )}

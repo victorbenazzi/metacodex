@@ -91,7 +91,7 @@ export function ScheduledTasksPanel() {
           <p className="mt-[16px] font-display text-[16px] text-body">
             {t("agent.scheduled.emptyTitle")}
           </p>
-          <p className="mt-[8px] text-[13px] text-muted">
+          <p className="mt-[8px] text-ui text-muted">
             <button
               type="button"
               onClick={openCreate}
@@ -125,7 +125,7 @@ export function ScheduledTasksPanel() {
         </div>
       )}
 
-      {error ? <p className="mt-[14px] text-[12px] text-danger">{error}</p> : null}
+      {error ? <p className="mt-[14px] text-caption text-danger">{error}</p> : null}
 
       <ScheduledTaskDialog
         open={dialogOpen}
@@ -192,15 +192,15 @@ function TaskCard({
 
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-[8px]">
-          <span className="truncate text-[13px] font-medium text-ink">{task.title}</span>
+          <span className="truncate text-ui font-medium text-ink">{task.title}</span>
           {!task.enabled ? (
             <span className="shrink-0 rounded-pill bg-surface-strong/60 px-[7px] py-[1px] text-[10px] font-medium text-muted">
               {t("agent.scheduled.card.off")}
             </span>
           ) : null}
         </div>
-        <div className="mt-[2px] truncate text-[12px] text-muted">{scheduleLabel}</div>
-        <div className="mt-[4px] flex items-center gap-[8px] overflow-hidden text-[11.5px] text-muted-soft">
+        <div className="mt-[2px] truncate text-caption text-muted">{scheduleLabel}</div>
+        <div className="mt-[4px] flex items-center gap-[8px] overflow-hidden text-label text-muted-soft">
           <span className="shrink-0 rounded-sm bg-surface-strong/40 px-[5px] py-[1px] font-mono tracking-[0.02em]">
             {task.cron}
           </span>
@@ -220,7 +220,7 @@ function TaskCard({
             >
               <span
                 aria-hidden
-                className={cn("h-[6px] w-[6px] rounded-full", isError ? "bg-danger" : "bg-success")}
+                className={cn("h-[6px] w-[6px] rounded-pill", isError ? "bg-danger" : "bg-success")}
               />
               {isError
                 ? t("agent.scheduled.card.lastError")
@@ -235,7 +235,7 @@ function TaskCard({
           type="button"
           onClick={onToggle}
           className={cn(
-            "h-[28px] rounded-pill border px-[11px] text-[11px] font-medium transition-colors duration-150",
+            "h-[28px] rounded-pill border px-[11px] text-label font-medium transition-colors duration-fast",
             task.enabled
               ? "border-success/40 text-success hover:bg-success/10"
               : "border-hairline-strong text-muted hover:bg-surface-strong/45",

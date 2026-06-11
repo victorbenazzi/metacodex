@@ -65,8 +65,8 @@ function ExplorerEmpty({ onOpenFolder }: { onOpenFolder: () => void }) {
         <Icon icon={FolderSearch} size={14} />
       </div>
       <div className="space-y-[4px]">
-        <p className="text-[13px] font-medium text-ink">{t("explorer.noProject")}</p>
-        <p className="text-[12px] leading-[1.5] text-muted">
+        <p className="text-ui font-medium text-ink">{t("explorer.noProject")}</p>
+        <p className="text-caption leading-[1.5] text-muted">
           {t("explorer.noProjectBody")}
         </p>
       </div>
@@ -74,7 +74,7 @@ function ExplorerEmpty({ onOpenFolder }: { onOpenFolder: () => void }) {
         type="button"
         onClick={onOpenFolder}
         className={cn(
-          "mt-[4px] inline-flex h-[28px] items-center gap-[6px] rounded-sm border border-hairline-strong bg-canvas px-[12px] text-[12px] font-medium text-ink",
+          "mt-[4px] inline-flex h-[28px] items-center gap-[6px] rounded-sm border border-hairline-strong bg-canvas px-[12px] text-caption font-medium text-ink",
           "hover:bg-surface-strong/40 transition-colors",
         )}
       >

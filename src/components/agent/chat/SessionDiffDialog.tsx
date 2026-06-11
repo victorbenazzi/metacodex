@@ -58,7 +58,7 @@ export function SessionDiffDialog({
       <DialogContent title={t("agent.diff.title")} width={720}>
         <div className="max-h-[60vh] space-y-[14px] overflow-y-auto">
           {failed ? (
-            <p className="text-[12px] text-danger">{t("agent.diff.failed")}</p>
+            <p className="text-caption text-danger">{t("agent.diff.failed")}</p>
           ) : files === null ? (
             <DiffSkeleton />
           ) : files.length === 0 ? (
@@ -77,20 +77,20 @@ function FileSection({ entry, root }: { entry: SessionFileDiff; root: string | n
   return (
     <section className="overflow-hidden rounded-lg border border-hairline">
       <header className="flex items-center gap-[8px] border-b border-hairline-soft bg-surface-1 px-[12px] py-[7px]">
-        <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-ink">
+        <span className="min-w-0 flex-1 truncate font-mono text-caption text-ink">
           {relPath(entry.file, root)}
         </span>
         {entry.additions > 0 ? (
-          <span className="shrink-0 font-mono text-[11px] text-success">+{entry.additions}</span>
+          <span className="shrink-0 font-mono text-label text-success">+{entry.additions}</span>
         ) : null}
         {entry.deletions > 0 ? (
-          <span className="shrink-0 font-mono text-[11px] text-danger">-{entry.deletions}</span>
+          <span className="shrink-0 font-mono text-label text-danger">-{entry.deletions}</span>
         ) : null}
       </header>
       {entry.patch ? (
         <DiffBlock patch={entry.patch} />
       ) : (
-        <p className="px-[12px] py-[8px] text-[12px] text-muted-soft">
+        <p className="px-[12px] py-[8px] text-caption text-muted-soft">
           {t("agent.diff.noPatch")}
         </p>
       )}
@@ -121,14 +121,14 @@ function DiffBlock({ patch }: { patch: string }) {
   }, [code, theme]);
 
   return (
-    <div className="max-w-full overflow-x-auto text-[11.5px] leading-[1.5] [&_pre]:m-0 [&_pre]:px-[12px] [&_pre]:py-[8px] [&_pre]:font-mono">
+    <div className="max-w-full overflow-x-auto text-label leading-[1.5] [&_pre]:m-0 [&_pre]:px-[12px] [&_pre]:py-[8px] [&_pre]:font-mono">
       {html ? (
         <div dangerouslySetInnerHTML={{ __html: html }} />
       ) : (
         <pre className="whitespace-pre px-[12px] py-[8px] font-mono">{code}</pre>
       )}
       {truncated ? (
-        <p className="px-[12px] py-[6px] text-[11px] text-muted-soft">
+        <p className="px-[12px] py-[6px] text-label text-muted-soft">
           {t("agent.diff.truncated")}
         </p>
       ) : null}

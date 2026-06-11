@@ -74,17 +74,17 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     if (!this.state.error) return this.props.children;
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-canvas px-8 text-ink">
-        <div className="max-w-[560px] rounded-[var(--radius-lg)] border border-hairline bg-surface-card p-8 shadow-elevated">
-          <div className="text-[12px] uppercase tracking-[0.12em] text-muted">metacodex</div>
-          <h1 className="mt-2 text-[22px] font-semibold tracking-tight">
+        <div className="max-w-[560px] rounded-lg border border-hairline bg-surface-card p-8 shadow-elevated">
+          <div className="text-caption uppercase tracking-label text-muted">metacodex</div>
+          <h1 className="mt-2 text-display-s font-semibold tracking-tight">
             Something broke unexpectedly
           </h1>
-          <p className="mt-3 text-[14px] text-body">
+          <p className="mt-3 text-content text-body">
             The interface hit an error and stopped rendering. Reload to recover —
             your open files and projects are safe on disk. A crash report has
-            been saved to <span className="font-mono text-[12px]">~/.metacodex/state/last-crash.json</span>.
+            been saved to <span className="font-mono text-caption">~/.metacodex/state/last-crash.json</span>.
           </p>
-          <pre className="mt-4 max-h-[200px] overflow-auto whitespace-pre-wrap rounded-[var(--radius-sm)] border border-hairline-soft bg-canvas-soft p-3 font-mono text-[11px] text-muted">
+          <pre className="mt-4 max-h-[200px] overflow-auto whitespace-pre-wrap rounded-sm border border-hairline-soft bg-canvas-soft p-3 font-mono text-label text-muted">
             {this.state.error.message}
             {this.state.error.stack ? "\n\n" + this.state.error.stack : ""}
           </pre>
@@ -92,14 +92,14 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             <button
               type="button"
               onClick={this.handleReload}
-              className="inline-flex h-9 items-center rounded-[var(--radius-sm)] bg-primary px-4 text-[13px] font-medium text-on-primary hover:bg-primary-active"
+              className="inline-flex h-9 items-center rounded-sm bg-primary px-4 text-ui font-medium text-on-primary hover:bg-primary-active"
             >
               Reload app
             </button>
             <button
               type="button"
               onClick={this.handleCopy}
-              className="inline-flex h-9 items-center rounded-[var(--radius-sm)] border border-hairline px-4 text-[13px] text-ink hover:border-hairline-strong"
+              className="inline-flex h-9 items-center rounded-sm border border-hairline px-4 text-ui text-ink hover:border-hairline-strong"
             >
               Copy error
             </button>

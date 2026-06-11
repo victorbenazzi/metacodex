@@ -84,7 +84,7 @@ export function ProjectContextMenu({
               <span>{t("projectRail.menu.color")}</span>
               <span
                 aria-hidden
-                className="ml-[6px] inline-block h-[10px] w-[10px] rounded-full border border-hairline"
+                className="ml-[6px] inline-block h-[10px] w-[10px] rounded-pill border border-hairline"
                 style={{ backgroundColor: project.color }}
               />
             </>
@@ -132,7 +132,7 @@ export function ProjectContextMenu({
                 onClick={handlePickIcon}
               />
               <div className="min-w-0 flex-1 leading-tight">
-                <div className="text-[11px] font-medium text-body">
+                <div className="text-label font-medium text-body">
                   {hasCustomIcon ? t("projectRail.menu.changeImage") : t("projectRail.menu.chooseFromComputer")}
                 </div>
                 <div className="text-[10px] text-muted">
@@ -145,7 +145,7 @@ export function ProjectContextMenu({
               <button
                 type="button"
                 onClick={() => updateMeta(project.id, { icon: "Folder" })}
-                className="mt-[8px] flex w-full items-center gap-[6px] rounded-sm px-[6px] py-[5px] text-[11px] text-muted transition-colors hover:bg-surface-strong/40 hover:text-body focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[-1px]"
+                className="mt-[8px] flex w-full items-center gap-[6px] rounded-sm px-[6px] py-[5px] text-label text-muted transition-colors hover:bg-surface-strong/40 hover:text-body focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[-1px]"
               >
                 <Icon icon={ImageOff} size={12} />
                 {t("projectRail.menu.removeImage")}
@@ -196,7 +196,7 @@ function SwatchButton({
     >
       <span
         aria-hidden
-        className="h-[14px] w-[14px] rounded-full"
+        className="h-[14px] w-[14px] rounded-pill"
         style={{ backgroundColor: color }}
       />
     </button>

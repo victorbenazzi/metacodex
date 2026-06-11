@@ -69,7 +69,7 @@ export function BranchPicker({ root }: { root: string }) {
           <button
             type="button"
             aria-label={t("agent.branch.switchLabel")}
-            className="inline-flex max-w-[220px] items-center gap-[6px] rounded-sm py-[2px] pl-[2px] pr-[4px] text-[12px] text-muted outline-none transition-colors hover:text-body data-[state=open]:text-body focus-visible:ring-2 focus-visible:ring-ink/15"
+            className="inline-flex max-w-[220px] items-center gap-[6px] rounded-sm py-[2px] pl-[2px] pr-[4px] text-caption text-muted outline-none transition-colors hover:text-body data-[state=open]:text-body focus-visible:ring-2 focus-visible:ring-ink/15"
           >
             <Icon icon={GitBranch} size={13} strokeWidth={2} className="shrink-0" />
             <span className="truncate font-mono">{current?.name ?? branches[0].name}</span>
@@ -98,7 +98,7 @@ export function BranchPicker({ root }: { root: string }) {
       {checkoutError ? (
         <span
           title={checkoutError}
-          className="min-w-0 max-w-[260px] truncate text-[11px] text-danger"
+          className="min-w-0 max-w-[260px] truncate text-label text-danger"
         >
           {t("agent.branch.checkoutFailed")}: {checkoutError}
         </span>

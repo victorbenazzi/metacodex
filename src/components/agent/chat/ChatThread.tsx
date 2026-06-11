@@ -90,7 +90,7 @@ export function ChatThread({ className }: { className?: string }) {
                 ))}
               </div>
               {permissionSavedHint ? (
-                <div className="flex items-center gap-[6px] text-[11px] text-muted-soft animate-fade-in">
+                <div className="flex items-center gap-[6px] text-label text-muted-soft animate-fade-in">
                   <span>{t("agent.permissions.savedHint")}</span>
                   <button
                     type="button"
@@ -102,8 +102,8 @@ export function ChatThread({ className }: { className?: string }) {
                 </div>
               ) : null}
               {waiting ? (
-                <div className="flex items-center gap-[8px] text-[13px] text-muted">
-                  <span className="inline-block h-[7px] w-[7px] animate-pulse rounded-full bg-muted" />
+                <div className="flex items-center gap-[8px] text-ui text-muted">
+                  <span className="inline-block h-[7px] w-[7px] animate-pulse rounded-pill bg-muted" />
                   {t("agent.chat.thinking")}
                 </div>
               ) : null}
@@ -120,13 +120,13 @@ export function ChatThread({ className }: { className?: string }) {
 function ThreadSkeleton() {
   return (
     <div className="flex flex-col gap-[16px]" aria-hidden>
-      <div className="h-[36px] w-[55%] self-end rounded-2xl bg-surface-2 opacity-60" />
+      <div className="h-[36px] w-[55%] self-end rounded-xl bg-surface-2 opacity-60" />
       <div className="flex flex-col gap-[8px]">
         <div className="h-[12px] w-[80%] rounded-md bg-surface-2 opacity-50" />
         <div className="h-[12px] w-[65%] rounded-md bg-surface-2 opacity-40" />
         <div className="h-[12px] w-[72%] rounded-md bg-surface-2 opacity-30" />
       </div>
-      <div className="h-[36px] w-[40%] self-end rounded-2xl bg-surface-2 opacity-40" />
+      <div className="h-[36px] w-[40%] self-end rounded-xl bg-surface-2 opacity-40" />
       <div className="flex flex-col gap-[8px]">
         <div className="h-[12px] w-[70%] rounded-md bg-surface-2 opacity-30" />
         <div className="h-[12px] w-[50%] rounded-md bg-surface-2 opacity-20" />

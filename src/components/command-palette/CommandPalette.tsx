@@ -214,7 +214,7 @@ export function CommandPalette() {
           </RD.Title>
 
           <header className="flex items-center gap-[10px] border-b border-hairline-soft px-[14px] py-[10px]">
-            <span className="font-mono text-[12px] text-muted-soft">
+            <span className="font-mono text-caption text-muted-soft">
               {mode === "files" ? "›" : "⌘"}
             </span>
             <input
@@ -229,17 +229,17 @@ export function CommandPalette() {
                   : t("commandPalette.placeholderCommand")
               }
               disabled={filesDisabled}
-              className="flex-1 bg-transparent font-mono text-[13px] tracking-tight text-ink outline-none placeholder:text-muted-soft"
+              className="flex-1 bg-transparent font-mono text-ui tracking-tight text-ink outline-none placeholder:text-muted-soft"
             />
           </header>
 
           <ul ref={listRef} className="max-h-[60vh] overflow-y-auto px-[6px] py-[6px]">
             {mode === "files" && loading && items.length === 0 ? (
-              <li className="px-[14px] py-[12px] font-mono text-[11px] text-muted-soft">
+              <li className="px-[14px] py-[12px] font-mono text-label text-muted-soft">
                 {t("common.loading")}
               </li>
             ) : items.length === 0 ? (
-              <li className="px-[14px] py-[12px] text-[12px] text-muted">
+              <li className="px-[14px] py-[12px] text-caption text-muted">
                 {filesDisabled ? t("commandPalette.noProjectOpen") : t("commandPalette.nothingFound")}
               </li>
             ) : (
@@ -259,9 +259,9 @@ export function CommandPalette() {
                       size={12}
                       className="shrink-0 text-muted-soft"
                     />
-                    <span className="truncate text-[13px] text-ink">{it.primary}</span>
+                    <span className="truncate text-ui text-ink">{it.primary}</span>
                     {it.secondary ? (
-                      <span className="ml-auto shrink-0 truncate pl-[12px] font-mono text-[11px] text-muted-soft">
+                      <span className="ml-auto shrink-0 truncate pl-[12px] font-mono text-label text-muted-soft">
                         {it.secondary}
                       </span>
                     ) : null}

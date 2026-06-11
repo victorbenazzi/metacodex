@@ -33,6 +33,7 @@ export default {
         success: "var(--success)",
         danger: "var(--danger)",
         warn: "var(--warn)",
+        "on-update": "var(--on-update)",
 
         // Project palette swatches (warm/neutral)
         "p-1": "#7c7666",
@@ -52,14 +53,34 @@ export default {
         mono: ['"JetBrains Mono"', '"SF Mono"', "ui-monospace", "Menlo", "monospace"],
       },
       fontSize: {
-        // Strict 4-tier UI scale + 2 display tiers. Driven by --fs-* tokens.
-        label: ["var(--fs-label)", { lineHeight: "1.4", letterSpacing: "var(--tracking-label)" }],
+        // Strict 4-tier UI scale + content (prose) + 3 display tiers. Driven
+        // by --fs-* tokens. `label` carries no letter-spacing: uppercase
+        // eyebrows opt in via `tracking-label`.
+        label: ["var(--fs-label)", { lineHeight: "1.4" }],
         caption: ["var(--fs-caption)", { lineHeight: "1.4" }],
         ui: ["var(--fs-ui)", { lineHeight: "1.5" }],
+        content: ["var(--fs-content)", { lineHeight: "1.6" }],
         title: ["var(--fs-title)", { lineHeight: "1.4", letterSpacing: "-0.005em" }],
         "display-s": ["var(--fs-display-s)", { lineHeight: "1.25", letterSpacing: "-0.012em" }],
+        display: ["var(--fs-display)", { lineHeight: "1.1", letterSpacing: "-0.015em" }],
         "display-l": ["var(--fs-display-l)", { lineHeight: "1.02", letterSpacing: "-0.022em" }],
         mono: ["var(--fs-mono)", { lineHeight: "1.5" }],
+      },
+      letterSpacing: {
+        // Uppercase eyebrow tracking. One token, one utility: no more ad-hoc
+        // tracking-[0.0Nem] per component.
+        label: "var(--tracking-label)",
+      },
+      transitionDuration: {
+        // Motion tokens are the single source of truth: bare `transition-*`
+        // utilities default to --dur-fast instead of Tailwind's 150ms.
+        DEFAULT: "var(--dur-fast)",
+        fast: "var(--dur-fast)",
+        base: "var(--dur-base)",
+        slow: "var(--dur-slow)",
+      },
+      transitionTimingFunction: {
+        DEFAULT: "var(--ease-out)",
       },
       borderRadius: {
         xs: "var(--radius-xs)",

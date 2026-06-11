@@ -132,12 +132,12 @@ export function CreateProjectDialog({ open, onOpenChange, onCreated }: CreatePro
               value={name}
               onChange={(e) => setName(e.target.value)}
               disabled={busy}
-              className="block w-full rounded-sm border border-hairline-strong bg-canvas px-[10px] py-[7px] text-[13px] text-ink outline-none placeholder:text-muted-soft focus:border-ink disabled:opacity-60"
+              className="block w-full rounded-sm border border-hairline-strong bg-canvas px-[10px] py-[7px] text-ui text-ink outline-none placeholder:text-muted-soft focus:border-ink disabled:opacity-60"
               placeholder={t("agent.createProject.namePlaceholder")}
               maxLength={200}
             />
             {nameInvalid ? (
-              <p className="text-[11px] text-danger">{t("agent.createProject.nameInvalid")}</p>
+              <p className="text-label text-danger">{t("agent.createProject.nameInvalid")}</p>
             ) : null}
           </div>
 
@@ -153,16 +153,16 @@ export function CreateProjectDialog({ open, onOpenChange, onCreated }: CreatePro
             >
               <Icon icon={FolderClosed} size={14} className="shrink-0 text-muted" />
               {directory ? (
-                <span className="truncate font-mono text-[12px] text-ink">{directory}</span>
+                <span className="truncate font-mono text-caption text-ink">{directory}</span>
               ) : (
-                <span className="text-[12px] text-muted-soft">
+                <span className="text-caption text-muted-soft">
                   {t("agent.createProject.dirPlaceholder")}
                 </span>
               )}
             </button>
           </div>
 
-          {err ? <p className="whitespace-pre-wrap text-[12px] text-danger">{err}</p> : null}
+          {err ? <p className="whitespace-pre-wrap text-caption text-danger">{err}</p> : null}
         </form>
       </DialogContent>
     </DialogRoot>

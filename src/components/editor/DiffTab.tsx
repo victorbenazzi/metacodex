@@ -180,8 +180,8 @@ export function DiffTab({ path, projectId, status }: DiffTabProps) {
         <span className={cn("font-mono text-[10px]", gitColorForBadge(status))}>
           {status}
         </span>
-        <span className="truncate font-mono text-[12px] text-ink">{basename(path)}</span>
-        <span className="shrink-0 text-[11px] text-muted-soft">
+        <span className="truncate font-mono text-caption text-ink">{basename(path)}</span>
+        <span className="shrink-0 text-label text-muted-soft">
           {t("diff.comparedWithHead")}
         </span>
         <span className="ml-auto shrink-0 editorial-caps text-[10px] text-muted-soft">
@@ -221,7 +221,7 @@ export function DiffTab({ path, projectId, status }: DiffTabProps) {
         ) : null}
         {phase !== "ready" ? (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-[24px] text-center">
-            <span className="font-mono text-[12px] text-muted">
+            <span className="font-mono text-caption text-muted">
               {phase === "loading"
                 ? t("common.loading")
                 : phase === "identical"

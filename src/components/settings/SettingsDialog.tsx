@@ -30,6 +30,7 @@ import {
 import { getVersion } from "@tauri-apps/api/app";
 
 import { Icon } from "@/components/ui/Icon";
+import { IconButton } from "@/components/ui/IconButton";
 import { Kbd } from "@/components/ui/Kbd";
 import { Select, type SelectOption } from "@/components/ui/Select";
 import { NumberStepper } from "@/components/ui/NumberStepper";
@@ -181,7 +182,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
           <header className="relative flex h-[48px] items-center justify-between border-b border-hairline-soft px-[20px]">
             <div className="flex items-center gap-[12px]">
               <span className="editorial-caps">{t("settings.header")}</span>
-              <span className="font-mono text-[11px] text-muted-soft">metacodex</span>
+              <span className="font-mono text-label text-muted-soft">metacodex</span>
             </div>
             <div className="absolute left-1/2 -translate-x-1/2">
               <Segmented
@@ -194,13 +195,9 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               />
             </div>
             <RD.Close asChild>
-              <button
-                type="button"
-                aria-label={t("settings.close")}
-                className="inline-flex h-[26px] w-[26px] items-center justify-center rounded-xs text-muted hover:bg-surface-strong/55 hover:text-ink"
-              >
+              <IconButton aria-label={t("settings.close")}>
                 <Icon icon={X} size={13} />
-              </button>
+              </IconButton>
             </RD.Close>
           </header>
 
@@ -259,7 +256,7 @@ function SidebarRow({
       )}
     >
       <Icon icon={category.icon} size={13} className={active ? "text-ink" : "text-muted"} />
-      <span className="text-[13px] font-medium">{t(category.labelKey)}</span>
+      <span className="text-ui font-medium">{t(category.labelKey)}</span>
     </button>
   );
 }
@@ -267,10 +264,10 @@ function SidebarRow({
 function PaneHeader({ title, description }: { title: string; description?: string }) {
   return (
     <header className="mb-[20px]">
-      <h2 className="font-display text-[22px] font-medium tracking-[-0.005em] text-ink">
+      <h2 className="font-display text-display-s font-medium tracking-[-0.005em] text-ink">
         {title}
       </h2>
-      {description ? <p className="mt-[4px] text-[13px] text-muted">{description}</p> : null}
+      {description ? <p className="mt-[4px] text-ui text-muted">{description}</p> : null}
     </header>
   );
 }
@@ -279,8 +276,8 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
   return (
     <div className="flex items-start justify-between gap-[20px] border-b border-hairline-soft py-[14px] last:border-b-0">
       <div className="min-w-0 flex-1">
-        <div className="text-[13px] font-medium text-ink">{label}</div>
-        {hint ? <div className="mt-[2px] text-[12px] text-muted">{hint}</div> : null}
+        <div className="text-ui font-medium text-ink">{label}</div>
+        {hint ? <div className="mt-[2px] text-caption text-muted">{hint}</div> : null}
       </div>
       <div className="shrink-0">{children}</div>
     </div>
@@ -308,7 +305,7 @@ function Segmented<T extends string>({
             onClick={() => onChange(opt.id)}
             aria-pressed={active}
             className={cn(
-              "inline-flex h-[30px] items-center gap-[6px] rounded-sm border px-[10px] text-[12px] transition-colors",
+              "inline-flex h-[30px] items-center gap-[6px] rounded-sm border px-[10px] text-caption transition-colors",
               active
                 ? "border-ink bg-ink text-on-primary"
                 : "border-hairline-strong text-ink hover:bg-surface-strong/45",
@@ -342,7 +339,7 @@ function GeneralPane() {
                 type="button"
                 onClick={() => void i18n.changeLanguage(lang.id)}
                 className={cn(
-                  "inline-flex h-[30px] items-center rounded-sm border px-[12px] text-[12px] transition-colors",
+                  "inline-flex h-[30px] items-center rounded-sm border px-[12px] text-caption transition-colors",
                   active
                     ? "border-ink bg-ink text-on-primary"
                     : "border-hairline-strong text-ink hover:bg-surface-strong/45",
@@ -357,7 +354,7 @@ function GeneralPane() {
       </Row>
 
       <Row label={t("settings.general.projectStorage")} hint={t("settings.general.projectStorageHint")}>
-        <span className="font-mono text-[11px] text-muted">~/.metacodex</span>
+        <span className="font-mono text-label text-muted">~/.metacodex</span>
       </Row>
 
       <Row label={t("settings.general.saveWorkspace")} hint={t("settings.general.saveWorkspaceHint")}>
@@ -459,7 +456,7 @@ function InterfacePane() {
           {t("settings.interface.launcherVisibilityTitle")}
         </h3>
       </div>
-      <p className="mb-[10px] text-[12px] text-muted">
+      <p className="mb-[10px] text-caption text-muted">
         {t("settings.interface.launcherVisibilityHint")}
       </p>
 
@@ -480,12 +477,12 @@ function InterfacePane() {
                 ) : null}
                 <div className="min-w-0">
                   <div className="flex items-center gap-[8px]">
-                    <span className="text-[13px] font-medium text-ink">{cli.label}</span>
+                    <span className="text-ui font-medium text-ink">{cli.label}</span>
                     {cliCategory(cli) === "autonomous" ? (
                       <Badge tone="muted">{t("settings.interface.autonomousTag")}</Badge>
                     ) : null}
                   </div>
-                  <div className="mt-[2px] truncate font-mono text-[11px] text-muted">
+                  <div className="mt-[2px] truncate font-mono text-label text-muted">
                     {cli.command}
                   </div>
                 </div>
@@ -522,7 +519,7 @@ function Switch({
       aria-label={ariaLabel}
       onClick={() => onChange(!checked)}
       className={cn(
-        "relative inline-flex h-[18px] w-[32px] shrink-0 items-center rounded-full border transition-colors",
+        "relative inline-flex h-[18px] w-[32px] shrink-0 items-center rounded-pill border transition-colors",
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[2px]",
         checked
           ? "border-ink bg-ink"
@@ -531,7 +528,7 @@ function Switch({
     >
       <span
         className={cn(
-          "inline-block h-[12px] w-[12px] rounded-full transition-transform",
+          "inline-block h-[12px] w-[12px] rounded-pill transition-transform",
           checked ? "translate-x-[16px] bg-on-primary" : "translate-x-[2px] bg-muted",
         )}
       />
@@ -729,7 +726,7 @@ function ShortcutsPane() {
         <button
           type="button"
           onClick={resetAll}
-          className="mt-[4px] shrink-0 rounded-sm border border-hairline-strong px-[10px] py-[5px] text-[11px] text-body transition-colors hover:bg-surface-strong/45 hover:text-ink"
+          className="mt-[4px] shrink-0 rounded-sm border border-hairline-strong px-[10px] py-[5px] text-label text-body transition-colors hover:bg-surface-strong/45 hover:text-ink"
         >
           {t("settings.shortcuts.resetAll")}
         </button>
@@ -798,9 +795,9 @@ function ShortcutRow({ command }: { command: CommandDef }) {
   return (
     <li className="flex items-center justify-between gap-[16px] border-b border-hairline-soft py-[12px] last:border-b-0">
       <div className="min-w-0 flex-1">
-        <div className="text-[13px] text-ink">{t(command.descriptionKey)}</div>
+        <div className="text-ui text-ink">{t(command.descriptionKey)}</div>
         {conflict ? (
-          <div className="mt-[3px] text-[11px] text-warn">
+          <div className="mt-[3px] text-label text-warn">
             {t("settings.shortcuts.conflictWith", {
               command: t(COMMANDS_BY_ID[conflict].descriptionKey),
             })}
@@ -809,21 +806,19 @@ function ShortcutRow({ command }: { command: CommandDef }) {
       </div>
       <div className="flex shrink-0 items-center gap-[8px]">
         {overridden && !capturing ? (
-          <button
-            type="button"
+          <IconButton
             onClick={() => resetToDefault(command.id)}
             aria-label={t("settings.shortcuts.reset")}
             title={t("settings.shortcuts.reset")}
-            className="inline-flex h-[24px] w-[24px] items-center justify-center rounded-xs text-muted outline-none transition-colors hover:bg-surface-strong/55 hover:text-ink focus-visible:ring-2 focus-visible:ring-ink/25"
           >
             <Icon icon={RotateCcw} size={12} />
-          </button>
+          </IconButton>
         ) : null}
         <button
           type="button"
           onClick={() => setCapturing((c) => !c)}
           className={cn(
-            "inline-flex h-[26px] min-w-[96px] items-center justify-center rounded-sm border px-[8px] text-[11px] outline-none transition-colors",
+            "inline-flex h-[26px] min-w-[96px] items-center justify-center rounded-sm border px-[8px] text-label outline-none transition-colors",
             "focus-visible:ring-2 focus-visible:ring-ink/25",
             capturing
               ? "border-ink bg-surface-strong/40"
@@ -848,10 +843,10 @@ function RangeShortcutRow({ command }: { command: CommandDef }) {
   const { t } = useTranslation();
   return (
     <li className="flex items-center justify-between gap-[16px] border-b border-hairline-soft py-[12px] last:border-b-0">
-      <span className="text-[13px] text-ink">{t(command.descriptionKey)}</span>
+      <span className="text-ui text-ink">{t(command.descriptionKey)}</span>
       <span className="inline-flex items-center gap-[5px]">
         <Kbd keys={["Mod", "1"]} />
-        <span className="text-[11px] text-muted-soft">…</span>
+        <span className="text-label text-muted-soft">…</span>
         <Kbd keys={["Mod", "9"]} />
       </span>
     </li>
@@ -919,7 +914,7 @@ function AgentPane() {
         <div className="flex items-center gap-[8px]">
           <span
             className={cn(
-              "inline-block h-[8px] w-[8px] rounded-full",
+              "inline-block h-[8px] w-[8px] rounded-pill",
               status.running ? "bg-success" : "bg-muted-soft",
             )}
           />
@@ -927,7 +922,7 @@ function AgentPane() {
             type="button"
             onClick={() => void start()}
             disabled={starting}
-            className="inline-flex h-[30px] items-center gap-[6px] rounded-sm border border-hairline-strong px-[10px] text-[12px] text-ink hover:bg-surface-strong/45 disabled:opacity-50"
+            className="inline-flex h-[30px] items-center gap-[6px] rounded-sm border border-hairline-strong px-[10px] text-caption text-ink hover:bg-surface-strong/45 disabled:opacity-40"
           >
             <Icon
               icon={starting ? Loader2 : RefreshCw}
@@ -956,13 +951,13 @@ function AgentPane() {
             onChange={(e) => setKey(e.target.value)}
             placeholder="sk-..."
             autoComplete="off"
-            className="h-[30px] w-[200px] rounded-sm border border-hairline-strong bg-surface-card px-[8px] text-[12px] text-ink outline-none focus:border-ink"
+            className="h-[30px] w-[200px] rounded-sm border border-hairline-strong bg-surface-card px-[8px] text-caption text-ink outline-none focus:border-ink"
           />
           <button
             type="button"
             onClick={() => void saveKey()}
             disabled={!key || savingKey}
-            className="inline-flex h-[30px] items-center rounded-sm border border-ink bg-ink px-[12px] text-[12px] text-on-primary disabled:opacity-50"
+            className="inline-flex h-[30px] items-center rounded-sm border border-ink bg-ink px-[12px] text-caption text-on-primary disabled:opacity-40"
           >
             {t("agent.settings.save")}
           </button>
@@ -980,7 +975,7 @@ function AgentPane() {
             }
           />
         ) : (
-          <span className="text-[12px] text-muted">
+          <span className="text-caption text-muted">
             {loadingModels ? t("agent.settings.loadingModels") : t("agent.settings.noModels")}
           </span>
         )}
@@ -990,7 +985,7 @@ function AgentPane() {
         <VisionModelSelect />
       </Row>
 
-      {runtimeError ? <p className="mt-[12px] text-[12px] text-danger">{runtimeError}</p> : null}
+      {runtimeError ? <p className="mt-[12px] text-caption text-danger">{runtimeError}</p> : null}
     </div>
   );
 }
@@ -1013,13 +1008,13 @@ function OpencodeCliRow() {
 
   return (
     <Row label={t("agent.settings.cliBinary")} hint={hint}>
-      <span className="inline-flex h-[30px] items-center gap-[7px] text-[12px] text-muted">
+      <span className="inline-flex h-[30px] items-center gap-[7px] text-caption text-muted">
         {det.status === "checking" ? (
           <Icon icon={Loader2} size={12} className="animate-spin" />
         ) : (
           <span
             className={cn(
-              "inline-block h-[8px] w-[8px] rounded-full",
+              "inline-block h-[8px] w-[8px] rounded-pill",
               det.status === "installed" ? "bg-success" : "bg-danger",
             )}
           />
@@ -1048,7 +1043,7 @@ function VisionModelSelect() {
       .map((m) => ({ value: modelKey(p.id, m.id), label: `${m.name} (${p.name})` })),
   );
   if (options.length === 0) {
-    return <span className="text-[12px] text-muted">{t("agent.settings.noModels")}</span>;
+    return <span className="text-caption text-muted">{t("agent.settings.noModels")}</span>;
   }
   const current = modelKey(agent.visionProviderId, agent.visionModelId);
   return (
@@ -1108,7 +1103,7 @@ function AgentModelsPane() {
         description={t("agent.settings.modelsDescription")}
       />
       {providers.length === 0 ? (
-        <span className="text-[12px] text-muted">
+        <span className="text-caption text-muted">
           {loadingModels ? t("agent.settings.loadingModels") : t("agent.settings.noModels")}
         </span>
       ) : (
@@ -1121,7 +1116,7 @@ function AgentModelsPane() {
                 <button
                   type="button"
                   onClick={() => setProvider(p.id, !allOn)}
-                  className="text-[11px] text-muted hover:text-ink"
+                  className="text-label text-muted hover:text-ink"
                 >
                   {allOn ? t("agent.settings.disableAll") : t("agent.settings.enableAll")}
                 </button>
@@ -1170,26 +1165,26 @@ function CliRegistryPane() {
             >
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-[8px]">
-                  <span className="text-[13px] font-medium text-ink">{cli.label}</span>
+                  <span className="text-ui font-medium text-ink">{cli.label}</span>
                   <CliStatusBadge status={detection.status} />
                   {cli.dangerLevel === "dangerous" && <Badge tone="warn">{t("cli.dangerous")}</Badge>}
                   {cli.needsConfig && detection.status !== "installed" ? (
                     <Badge tone="muted">{t("cli.needsConfig")}</Badge>
                   ) : null}
                 </div>
-                <div className="mt-[2px] font-mono text-[11px] text-muted">
+                <div className="mt-[2px] font-mono text-label text-muted">
                   {t("settings.cli.command")}: {cli.command}
                 </div>
                 {detection.path ? (
                   <div
-                    className="mt-[2px] truncate font-mono text-[11px] text-muted-soft"
+                    className="mt-[2px] truncate font-mono text-label text-muted-soft"
                     title={detection.path}
                   >
                     {t("settings.cli.detectedPath")}: {detection.path}
                   </div>
                 ) : cli.installCommand ? (
                   <div
-                    className="mt-[2px] truncate font-mono text-[11px] text-muted-soft"
+                    className="mt-[2px] truncate font-mono text-label text-muted-soft"
                     title={cli.installCommand}
                   >
                     {t("settings.cli.install")}: {cli.installCommand}
@@ -1201,7 +1196,7 @@ function CliRegistryPane() {
         })}
       </ul>
 
-      <p className="mt-[16px] rounded-sm border border-hairline-soft bg-canvas-soft px-[12px] py-[10px] text-[12px] text-muted">
+      <p className="mt-[16px] rounded-sm border border-hairline-soft bg-canvas-soft px-[12px] py-[10px] text-caption text-muted">
         <Trans
           i18nKey="settings.cli.overridesNote"
           values={{ file: "~/.metacodex/settings.json" }}
@@ -1288,7 +1283,7 @@ function AboutPane() {
     <div>
       <PaneHeader title={t("settings.about.title")} />
       <h1
-        className="font-display text-[40px] font-medium tracking-[-0.015em] text-ink"
+        className="font-display text-display font-medium tracking-[-0.015em] text-ink"
         style={{ lineHeight: 1.05 }}
       >
         metacodex
@@ -1297,14 +1292,14 @@ function AboutPane() {
         {t("settings.about.tagline")}
       </p>
       <ul className="mt-[20px] flex flex-col gap-[6px]">
-        <li className="font-mono text-[11px] text-muted">
+        <li className="font-mono text-label text-muted">
           {t("settings.about.version")}{" "}
           <span className="text-ink">{version ?? "…"}</span>
         </li>
-        <li className="font-mono text-[11px] text-muted">
+        <li className="font-mono text-label text-muted">
           {t("settings.about.platform")} <span className="text-ink">macOS · Apple Silicon</span>
         </li>
-        <li className="font-mono text-[11px] text-muted">
+        <li className="font-mono text-label text-muted">
           {t("settings.about.stack")}{" "}
           <span className="text-ink">
             Tauri 2 · React 19 · CodeMirror 6 · xterm.js · portable-pty
@@ -1317,7 +1312,7 @@ function AboutPane() {
           <button
             type="button"
             onClick={handleInstall}
-            className="inline-flex items-center gap-[6px] rounded-sm border border-[var(--update-blue-strong)] bg-[var(--update-blue-strong)] px-[10px] py-[5px] font-mono text-[11px] leading-none text-white transition duration-150 hover:brightness-110"
+            className="inline-flex items-center gap-[6px] rounded-sm border border-[var(--update-blue-strong)] bg-[var(--update-blue-strong)] px-[10px] py-[5px] font-mono text-label leading-none text-on-update transition duration-fast hover:brightness-110"
             title={t("updates.pill.available", { version: updateStatus.version })}
           >
             <Icon icon={Download} size={10} strokeWidth={2} />
@@ -1328,7 +1323,7 @@ function AboutPane() {
             type="button"
             onClick={handleCheck}
             disabled={isChecking || isBusy}
-            className="inline-flex items-center gap-[6px] rounded-sm border border-hairline-strong px-[10px] py-[5px] font-mono text-[11px] leading-none text-ink transition-colors duration-150 hover:bg-surface-strong/45 disabled:cursor-default disabled:opacity-50"
+            className="inline-flex items-center gap-[6px] rounded-sm border border-hairline-strong px-[10px] py-[5px] font-mono text-label leading-none text-ink transition-colors duration-fast hover:bg-surface-strong/45 disabled:cursor-default disabled:opacity-40"
           >
             <Icon
               icon={isChecking ? Loader2 : RefreshCw}
@@ -1345,19 +1340,19 @@ function AboutPane() {
         )}
 
         {!isChecking && !isAvailable && lastResult === "up-to-date" && (
-          <span className="inline-flex items-center gap-[4px] font-mono text-[11px] text-success">
+          <span className="inline-flex items-center gap-[4px] font-mono text-label text-success">
             <Icon icon={CheckCircle2} size={10} strokeWidth={2} />
             {t("settings.about.upToDate")}
           </span>
         )}
         {!isChecking && lastResult === "dev" && (
-          <span className="font-mono text-[11px] text-muted">
+          <span className="font-mono text-label text-muted">
             {t("settings.about.devNoUpdates")}
           </span>
         )}
         {!isChecking && !isAvailable && isError && (
           <span
-            className="inline-flex items-center gap-[4px] font-mono text-[11px] text-warn"
+            className="inline-flex items-center gap-[4px] font-mono text-label text-warn"
             title={updateStatus.message}
           >
             <Icon icon={CircleAlert} size={10} strokeWidth={2} />
@@ -1366,21 +1361,21 @@ function AboutPane() {
         )}
       </div>
 
-      <p className="mt-[18px] font-mono text-[11px] text-muted">
+      <p className="mt-[18px] font-mono text-label text-muted">
         {t("settings.about.author")}{" "}
         <button
           type="button"
           onClick={openAuthorSite}
           title="victorbenazzi.com.br"
-          className="group inline-flex items-center gap-[3px] rounded-xs text-ink transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[2px]"
+          className="group inline-flex items-center gap-[3px] rounded-xs text-ink transition-colors duration-fast focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[2px]"
         >
-          <span className="underline decoration-1 decoration-hairline underline-offset-[3px] transition-colors duration-150 group-hover:decoration-muted">
+          <span className="underline decoration-1 decoration-hairline underline-offset-[3px] transition-colors duration-fast group-hover:decoration-muted">
             Victor Benazzi
           </span>
           <Icon
             icon={ArrowUpRight}
             size={10}
-            className="opacity-60 transition-transform duration-150 group-hover:-translate-y-px group-hover:translate-x-px"
+            className="opacity-60 transition-transform duration-fast group-hover:-translate-y-px group-hover:translate-x-px"
           />
         </button>
       </p>
@@ -1406,7 +1401,7 @@ function Badge({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-[4px] rounded-xs border px-[6px] py-[1px] font-mono text-[10px] uppercase tracking-[0.08em]",
+        "inline-flex items-center gap-[4px] rounded-xs border px-[6px] py-[1px] font-mono text-[10px] uppercase tracking-label",
         cls,
       )}
     >

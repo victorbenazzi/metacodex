@@ -136,8 +136,8 @@ const PrimaryAction = forwardRef<HTMLButtonElement, React.ButtonHTMLAttributes<H
         ref={ref}
         type={type}
         className={cn(
-          "press-feedback inline-flex h-[36px] items-center gap-[8px] rounded-sm bg-ink px-[16px] text-[13px] font-medium text-on-primary",
-          "transition-colors duration-150 hover:bg-primary-active focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[3px]",
+          "press-feedback inline-flex h-[36px] items-center gap-[8px] rounded-sm bg-ink px-[16px] text-ui font-medium text-on-primary",
+          "transition-colors duration-fast hover:bg-primary-active focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[3px]",
           className,
         )}
         {...props}
@@ -154,8 +154,8 @@ function SecondaryAction({ onClick, children }: { onClick: () => void; children:
       type="button"
       onClick={onClick}
       className={cn(
-        "inline-flex h-[36px] items-center gap-[8px] rounded-sm border border-hairline-strong bg-canvas px-[16px] text-[13px] font-medium text-ink",
-        "transition-colors duration-150 hover:bg-surface-strong/40",
+        "inline-flex h-[36px] items-center gap-[8px] rounded-sm border border-hairline-strong bg-canvas px-[16px] text-ui font-medium text-ink",
+        "transition-colors duration-fast hover:bg-surface-strong/40",
       )}
     >
       {children}
@@ -167,14 +167,14 @@ function PrincipleCard({ label, body }: { label: string; body: string }) {
   return (
     <article className="bg-canvas-soft px-[18px] py-[20px]">
       <header className="editorial-caps text-muted-soft">{label}</header>
-      <p className="mt-[10px] text-[13px] leading-[1.55] text-body">{body}</p>
+      <p className="mt-[10px] text-ui leading-[1.55] text-body">{body}</p>
     </article>
   );
 }
 
 function FooterMeta() {
   return (
-    <footer className="mt-auto flex flex-wrap items-center gap-x-[14px] gap-y-[4px] pb-[28px] pt-[40px] font-mono text-[11px] text-muted-soft">
+    <footer className="mt-auto flex flex-wrap items-center gap-x-[14px] gap-y-[4px] pb-[28px] pt-[40px] font-mono text-label text-muted-soft">
       <span>v0.0.1</span>
       <span aria-hidden>·</span>
       <span>alpha</span>

@@ -56,7 +56,7 @@ export function NumberStepper({ value, onChange, min, max, step = 1, ariaLabel }
         }}
         className={cn(
           "h-full w-[56px] border-x border-hairline-strong bg-transparent text-center",
-          "font-mono text-[12px] tabular-nums text-ink outline-none",
+          "font-mono text-caption tabular-nums text-ink outline-none",
           "focus-visible:bg-surface-strong/30",
         )}
       />
@@ -87,7 +87,7 @@ function StepBtn({
       className={cn(
         "inline-flex h-full w-[28px] items-center justify-center text-muted outline-none transition-colors",
         "hover:bg-surface-strong/45 hover:text-ink focus-visible:bg-surface-strong/45",
-        "disabled:pointer-events-none disabled:opacity-30",
+        "disabled:pointer-events-none disabled:opacity-40",
       )}
     >
       {children}

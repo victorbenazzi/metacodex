@@ -75,7 +75,7 @@ export function AgentOnboarding() {
           </span>
           {missing ? (
             <span className="flex items-center gap-[6px] rounded-md border border-hairline bg-surface-1 py-[6px] pl-[12px] pr-[6px]">
-              <code className="font-mono text-[12px] text-ink">
+              <code className="font-mono text-caption text-ink">
                 {OPENCODE_CLI.installCommand}
               </code>
               <button
@@ -89,7 +89,7 @@ export function AgentOnboarding() {
             </span>
           ) : null}
           {missing ? (
-            <span className="text-[12px] text-muted-soft">{t("agent.onboarding.codeStillWorks")}</span>
+            <span className="text-caption text-muted-soft">{t("agent.onboarding.codeStillWorks")}</span>
           ) : null}
         </span>
       }

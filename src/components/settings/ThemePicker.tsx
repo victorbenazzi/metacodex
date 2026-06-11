@@ -15,10 +15,10 @@ export function ThemePicker() {
   return (
     <div>
       <div className="mb-[10px] flex items-center justify-between">
-        <span className="text-[12px] font-medium text-ink">
+        <span className="text-caption font-medium text-ink">
           {t("settings.appearance.themeGallery")}
         </span>
-        <span className="text-[11px] text-muted">
+        <span className="text-label text-muted">
           {t("settings.appearance.themeCount", { count: THEMES.length })}
         </span>
       </div>

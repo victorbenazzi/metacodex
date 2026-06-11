@@ -3,6 +3,7 @@ import { X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Icon } from "@/components/ui/Icon";
+import { IconButton } from "@/components/ui/IconButton";
 import { cn } from "@/lib/cn";
 
 export const DialogRoot = RD.Root;
@@ -46,12 +47,12 @@ export function DialogContent({
         {title || description ? (
           <header className="border-b border-hairline-soft px-[18px] pb-[12px] pt-[16px]">
             {title ? (
-              <RD.Title className="text-[13px] font-medium tracking-tight text-ink">
+              <RD.Title className="text-ui font-medium tracking-tight text-ink">
                 {title}
               </RD.Title>
             ) : null}
             {description ? (
-              <RD.Description className="mt-[4px] text-[12px] text-muted">
+              <RD.Description className="mt-[4px] text-caption text-muted">
                 {description}
               </RD.Description>
             ) : null}
@@ -67,13 +68,12 @@ export function DialogContent({
         ) : null}
 
         <RD.Close asChild>
-          <button
-            type="button"
+          <IconButton
             aria-label={t("common.closeDialog")}
-            className="absolute right-[10px] top-[10px] inline-flex h-[22px] w-[22px] items-center justify-center rounded-xs text-muted hover:bg-surface-strong/55 hover:text-ink"
+            className="absolute right-[10px] top-[10px]"
           >
             <Icon icon={X} size={12} />
-          </button>
+          </IconButton>
         </RD.Close>
       </RD.Content>
     </RD.Portal>

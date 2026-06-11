@@ -15,7 +15,7 @@ export function ContextMenuContent({
     <RCM.Portal>
       <RCM.Content
         className={cn(
-          "z-50 min-w-[200px] rounded-md border border-hairline bg-surface-card p-[5px] text-[13px] text-ink",
+          "z-50 min-w-[200px] rounded-md border border-hairline bg-surface-card p-[5px] text-ui text-ink",
           // Tight floating elevation — Linear/Raycast aesthetic, denser than
           // Tailwind's shadow-lg. Layered to read at any background luminance.
           "shadow-elevated",
@@ -105,7 +105,7 @@ export function ContextMenuSub({
       <RCM.Portal>
         <RCM.SubContent
           className={cn(
-            "z-50 min-w-[180px] rounded-md border border-hairline bg-surface-card p-[5px] text-[13px] text-ink",
+            "z-50 min-w-[180px] rounded-md border border-hairline bg-surface-card p-[5px] text-ui text-ink",
             "data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out",
           )}
         >

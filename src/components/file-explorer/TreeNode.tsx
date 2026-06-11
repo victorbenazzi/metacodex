@@ -213,7 +213,7 @@ export const TreeNode = memo(function TreeNode({
           }}
           onClick={handleClick}
           className={cn(
-            "group flex w-full items-center gap-[6px] py-[3px] text-left font-mono text-[12px]",
+            "group flex w-full items-center gap-[6px] py-[3px] text-left font-mono text-caption",
             "focus-visible:outline-none",
             hidden ? "text-muted" : "text-body",
             isSelected
@@ -387,7 +387,7 @@ function RenameRow({ indentPx, entry, isOpen, onCommit, onCancel }: RenameRowPro
 
   return (
     <div
-      className="flex w-full items-center gap-[6px] py-[3px] font-mono text-[12px] text-body"
+      className="flex w-full items-center gap-[6px] py-[3px] font-mono text-caption text-body"
       style={{ paddingLeft: indentPx }}
     >
       {entry.isDir ? <ChevronIcon open={isOpen} /> : <span className="w-[11px] shrink-0" />}
@@ -413,7 +413,7 @@ function RenameRow({ indentPx, entry, isOpen, onCommit, onCancel }: RenameRowPro
         onBlur={() => onCancel()}
         className={cn(
           "min-w-0 flex-1 rounded-xs border border-accent/60 bg-surface-strong/45 px-[6px] py-[1px]",
-          "text-[12px] text-ink outline-none focus:border-accent",
+          "text-caption text-ink outline-none focus:border-accent",
         )}
         spellCheck={false}
         autoComplete="off"
@@ -474,7 +474,7 @@ export function CreateRow({
 
   return (
     <div
-      className="flex w-full items-center gap-[6px] py-[3px] font-mono text-[12px] text-body"
+      className="flex w-full items-center gap-[6px] py-[3px] font-mono text-caption text-body"
       style={{ paddingLeft: indentPx }}
       title={error ?? undefined}
     >
@@ -510,7 +510,7 @@ export function CreateRow({
         }}
         className={cn(
           "min-w-0 flex-1 rounded-xs border bg-surface-strong/45 px-[6px] py-[1px]",
-          "text-[12px] text-ink outline-none",
+          "text-caption text-ink outline-none",
           error ? "border-danger focus:border-danger" : "border-accent/60 focus:border-accent",
         )}
         spellCheck={false}
@@ -559,10 +559,10 @@ function TreeChildren({
       <>
         {createRow}
         <div
-          className="flex items-center gap-[6px] py-[3px] font-mono text-[11px] text-muted-soft"
+          className="flex items-center gap-[6px] py-[3px] font-mono text-label text-muted-soft"
           style={{ paddingLeft: indentPx }}
         >
-          <span className="h-[8px] w-[8px] animate-pulse rounded-full bg-hairline-strong" />
+          <span className="h-[8px] w-[8px] animate-pulse rounded-pill bg-hairline-strong" />
           {t("common.loading")}
         </div>
       </>
@@ -575,7 +575,7 @@ function TreeChildren({
           {createRow}
           {createRow ? null : (
             <div
-              className="py-[3px] font-mono text-[11px] text-muted-soft"
+              className="py-[3px] font-mono text-label text-muted-soft"
               style={{ paddingLeft: indentPx }}
             >
               {t("tree.empty")}
@@ -609,7 +609,7 @@ function TreeChildren({
     <>
       {createRow}
       <div
-        className="py-[3px] font-mono text-[11px] text-danger"
+        className="py-[3px] font-mono text-label text-danger"
         style={{ paddingLeft: indentPx }}
         title={state.error}
       >

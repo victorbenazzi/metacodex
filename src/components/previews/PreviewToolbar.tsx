@@ -26,7 +26,7 @@ export function SendToProjectButton({
       type="button"
       onClick={() => sendToProject(path)}
       className={cn(
-        "inline-flex h-[22px] items-center gap-[6px] rounded-xs px-[8px] text-[11px] text-muted",
+        "inline-flex h-[22px] items-center gap-[6px] rounded-xs px-[8px] text-label text-muted",
         "hover:bg-surface-strong/55 hover:text-ink",
         className,
       )}

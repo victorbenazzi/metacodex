@@ -24,7 +24,7 @@ export function RevertBanner() {
     <div className="border-t border-hairline-soft bg-surface-1 animate-fade-in">
       <div className="mx-auto flex w-full max-w-[760px] items-center gap-[10px] px-[20px] py-[8px]">
         <Icon icon={RotateCcw} size={13} className="shrink-0 text-warn" />
-        <span className="min-w-0 flex-1 truncate text-[12px] text-muted">
+        <span className="min-w-0 flex-1 truncate text-caption text-muted">
           {count > 0
             ? t("agent.chat.revert.activeBanner", { count })
             : t("agent.chat.revert.activeBannerNoCount")}
@@ -39,7 +39,7 @@ export function RevertBanner() {
               .unrevert()
               .finally(() => setPending(false));
           }}
-          className="inline-flex shrink-0 items-center gap-[6px] rounded-md border border-hairline px-[10px] py-[3px] text-[12px] text-ink hover:bg-surface-2 disabled:opacity-50"
+          className="inline-flex shrink-0 items-center gap-[6px] rounded-md border border-hairline px-[10px] py-[3px] text-caption text-ink hover:bg-surface-2 disabled:opacity-40"
         >
           {pending ? <Icon icon={Loader2} size={12} className="animate-spin" /> : null}
           {t("agent.chat.revert.undo")}

@@ -376,7 +376,7 @@ export function EditorTab({
       <div className="flex h-full items-center justify-center px-[24px]">
         <div className="max-w-[440px] space-y-[8px]">
           <p className="editorial-caps text-danger">{t("editor.couldNotRead")}</p>
-          <p className="font-mono text-[12px] text-body">{loadError}</p>
+          <p className="font-mono text-caption text-body">{loadError}</p>
         </div>
       </div>
     );
@@ -387,10 +387,10 @@ export function EditorTab({
       <div className="flex h-full items-center justify-center px-[24px]">
         <div className="max-w-[440px] space-y-[8px]">
           <p className="editorial-caps">{t("editor.binaryFile")}</p>
-          <p className="font-mono text-[12px] text-body">
+          <p className="font-mono text-caption text-body">
             {t("editor.binaryBody")}
           </p>
-          <p className="font-mono text-[11px] text-muted-soft">{path}</p>
+          <p className="font-mono text-label text-muted-soft">{path}</p>
         </div>
       </div>
     );
@@ -425,7 +425,7 @@ export function EditorTab({
         <div
           className={cn(
             "pointer-events-none absolute bottom-[32px] right-[14px]",
-            "rounded-sm border border-hairline bg-surface-card px-[10px] py-[4px] font-mono text-[11px] text-ink",
+            "rounded-sm border border-hairline bg-surface-card px-[10px] py-[4px] font-mono text-label text-ink",
           )}
         >
           {savingNotice}
@@ -455,7 +455,7 @@ function ExternalChangeBar({
   const deleted = state === "deleted";
   return (
     <div className="flex shrink-0 items-center justify-between gap-[12px] border-b border-hairline bg-surface-card px-[14px] py-[6px]">
-      <span className="truncate font-mono text-[11px] text-body">
+      <span className="truncate font-mono text-label text-body">
         {deleted ? t("editor.externalDeleted") : t("editor.externalChanged")}
       </span>
       <div className="flex shrink-0 items-center gap-[6px]">
@@ -493,7 +493,7 @@ function BarButton({
       type="button"
       onClick={onClick}
       className={cn(
-        "inline-flex h-[22px] items-center rounded-xs px-[8px] text-[11px] transition-colors",
+        "inline-flex h-[22px] items-center rounded-xs px-[8px] text-label transition-colors",
         tone === "primary" && "bg-surface-strong/60 text-ink hover:bg-surface-strong",
         tone === "danger" && "text-danger hover:bg-surface-strong/45",
         tone === "secondary" && "text-muted hover:bg-surface-strong/55 hover:text-ink",

@@ -42,7 +42,7 @@ export function SkillsSection() {
     <section>
       <SectionHeader title={t("agent.skills.title")} subtitle={t("agent.skills.subtitle")} />
       {skills === null ? (
-        <div className="flex items-center gap-[8px] text-[13px] text-muted">
+        <div className="flex items-center gap-[8px] text-ui text-muted">
           <Icon icon={Loader2} size={14} className="animate-spin" />
           {t("agent.skills.loading")}
         </div>
@@ -61,7 +61,7 @@ export function SkillsSection() {
         </div>
       )}
       {error ? (
-        <p className="mt-[12px] text-[12px] text-danger">
+        <p className="mt-[12px] text-caption text-danger">
           {t("agent.skills.loadFailed")} ({error})
         </p>
       ) : null}
@@ -73,12 +73,12 @@ function SkillCard({ skill }: { skill: SkillInfo }) {
   return (
     <div className="rounded-lg border border-hairline-soft bg-surface-card p-[14px] transition-colors hover:border-hairline-strong">
       <div className="flex items-center justify-between gap-[8px]">
-        <h3 className="truncate text-[13px] font-medium text-ink">{skill.name}</h3>
-        <span className="shrink-0 rounded-pill bg-surface-1 px-[7px] py-[1px] text-[10px] uppercase tracking-[0.05em] text-muted-soft">
+        <h3 className="truncate text-ui font-medium text-ink">{skill.name}</h3>
+        <span className="shrink-0 rounded-pill bg-surface-1 px-[7px] py-[1px] text-[10px] uppercase tracking-label text-muted-soft">
           {skill.source}
         </span>
       </div>
-      <p className="mt-[6px] line-clamp-3 text-[12px] leading-[1.5] text-muted">
+      <p className="mt-[6px] line-clamp-3 text-caption leading-[1.5] text-muted">
         {skill.description}
       </p>
     </div>

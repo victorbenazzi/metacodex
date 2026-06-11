@@ -117,7 +117,7 @@ export function WorktreeCreateDialog({
               value={branchName}
               onChange={(e) => setBranchName(e.target.value)}
               autoFocus
-              className="w-full rounded-sm border border-hairline-strong bg-canvas px-[10px] py-[7px] font-mono text-[12px] text-ink outline-none focus-visible:border-ink"
+              className="w-full rounded-sm border border-hairline-strong bg-canvas px-[10px] py-[7px] font-mono text-caption text-ink outline-none focus-visible:border-ink"
             />
           </Field>
           <Field
@@ -128,11 +128,11 @@ export function WorktreeCreateDialog({
               type="text"
               value={baseRef}
               onChange={(e) => setBaseRef(e.target.value)}
-              className="w-full rounded-sm border border-hairline-strong bg-canvas px-[10px] py-[7px] font-mono text-[12px] text-ink outline-none focus-visible:border-ink"
+              className="w-full rounded-sm border border-hairline-strong bg-canvas px-[10px] py-[7px] font-mono text-caption text-ink outline-none focus-visible:border-ink"
             />
           </Field>
           {error ? (
-            <p className="text-[12px] text-danger" role="alert">
+            <p className="text-caption text-danger" role="alert">
               {error}
             </p>
           ) : null}
@@ -145,9 +145,9 @@ export function WorktreeCreateDialog({
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
     <label className="flex flex-col gap-[5px]">
-      <span className="text-[12px] font-medium text-ink">{label}</span>
+      <span className="text-caption font-medium text-ink">{label}</span>
       {children}
-      {hint ? <span className="text-[11px] text-muted">{hint}</span> : null}
+      {hint ? <span className="text-label text-muted">{hint}</span> : null}
     </label>
   );
 }

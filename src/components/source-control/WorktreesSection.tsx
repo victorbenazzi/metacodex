@@ -137,7 +137,7 @@ export function WorktreesSection({
       {expanded ? (
         <ul className="pb-[6px]">
           {visible.length === 0 ? (
-            <li className="px-[12px] pb-[8px] text-[11px] text-muted-soft">
+            <li className="px-[12px] pb-[8px] text-label text-muted-soft">
               {t("sourceControl.worktrees.empty")}
             </li>
           ) : (
@@ -151,19 +151,19 @@ export function WorktreesSection({
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-[6px]">
                       <Icon icon={GitBranch} size={11} className="text-muted" />
-                      <span className="truncate font-mono text-[12px] text-ink">
+                      <span className="truncate font-mono text-caption text-ink">
                         {w.branch ?? basename(w.path)}
                       </span>
                       {occupants.length > 0 ? (
                         <span
-                          className="inline-flex h-[6px] w-[6px] shrink-0 rounded-full bg-success"
+                          className="inline-flex h-[6px] w-[6px] shrink-0 rounded-pill bg-success"
                           aria-label={t("sourceControl.worktrees.occupiedBy", {
                             count: occupants.length,
                           })}
                         />
                       ) : null}
                       {w.locked ? (
-                        <span className="rounded-xs border border-hairline px-[4px] py-0 font-mono text-[9px] uppercase text-muted">
+                        <span className="rounded-xs border border-hairline px-[4px] py-0 font-mono text-[10px] uppercase text-muted">
                           {t("sourceControl.worktrees.locked")}
                         </span>
                       ) : null}

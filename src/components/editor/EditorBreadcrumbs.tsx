@@ -15,7 +15,7 @@ export function EditorBreadcrumbs({ tabId, fileName }: { tabId: string; fileName
   const crumbs = useEditorStatusStore((s) => s.byTab[tabId]?.crumbs) ?? EMPTY;
   const parts = [fileName, ...crumbs];
   return (
-    <div className="flex h-[24px] shrink-0 items-center overflow-hidden border-b border-hairline-soft bg-canvas px-[12px] text-[11px] text-muted">
+    <div className="flex h-[24px] shrink-0 items-center overflow-hidden border-b border-hairline-soft bg-canvas px-[12px] text-label text-muted">
       {parts.map((p, i) => (
         <span key={i} className="flex shrink-0 items-center">
           {i > 0 ? (

@@ -78,12 +78,12 @@ export function RenameProjectDialog({ project, open, onOpenChange }: RenameProje
             autoFocus
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            className="block w-full rounded-sm border border-hairline-strong bg-canvas px-[10px] py-[7px] text-[13px] text-ink outline-none placeholder:text-muted-soft focus:border-ink"
+            className="block w-full rounded-sm border border-hairline-strong bg-canvas px-[10px] py-[7px] text-ui text-ink outline-none placeholder:text-muted-soft focus:border-ink"
             placeholder={project.name}
             maxLength={120}
           />
-          <p className="font-mono text-[11px] text-muted-soft">{project.path}</p>
-          {err ? <p className="text-[12px] text-danger">{err}</p> : null}
+          <p className="font-mono text-label text-muted-soft">{project.path}</p>
+          {err ? <p className="text-caption text-danger">{err}</p> : null}
         </form>
       </DialogContent>
     </DialogRoot>

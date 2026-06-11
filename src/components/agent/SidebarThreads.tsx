@@ -19,6 +19,7 @@ import {
   DropdownTrigger,
 } from "@/components/ui/DropdownMenu";
 import { Icon } from "@/components/ui/Icon";
+import { IconButton } from "@/components/ui/IconButton";
 import { useAgentChatStore } from "@/features/agent/chat.store";
 import { useAgentNavStore } from "@/features/agent/nav.store";
 import { dirKey, useAgentSessionsStore, type SessionRow } from "@/features/agent/sessions.store";
@@ -67,7 +68,7 @@ export function ProjectThreads({
 
   if (!draft && list.length === 0 && archivedCount === 0) {
     return showEmptyHint && loaded ? (
-      <p className="px-[10px] py-[3px] text-[12px] leading-[1.5] text-muted-soft">
+      <p className="px-[10px] py-[3px] text-caption leading-[1.5] text-muted-soft">
         {t("agent.sidebar.noThreads")}
       </p>
     ) : null;
@@ -88,7 +89,7 @@ export function ProjectThreads({
         <button
           type="button"
           onClick={() => setShowAll(true)}
-          className="rounded-md px-[10px] py-[4px] text-left text-[11.5px] text-muted-soft transition-colors duration-150 hover:bg-surface-1 hover:text-muted"
+          className="rounded-md px-[10px] py-[4px] text-left text-label text-muted-soft transition-colors duration-fast hover:bg-surface-1 hover:text-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-hairline-strong"
         >
           {t("agent.sidebar.showAll", { count: hiddenCount })}
         </button>
@@ -115,12 +116,12 @@ function ArchivedThreads({ directory }: { directory: string | null }) {
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        className="flex items-center gap-[6px] rounded-md px-[10px] py-[4px] text-left text-[11.5px] text-muted-soft transition-colors duration-150 hover:bg-surface-1 hover:text-muted"
+        className="flex items-center gap-[6px] rounded-md px-[10px] py-[4px] text-left text-label text-muted-soft transition-colors duration-fast hover:bg-surface-1 hover:text-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-hairline-strong"
       >
         <Icon
           icon={ChevronRight}
           size={11}
-          className={cn("shrink-0 transition-transform duration-150", open && "rotate-90")}
+          className={cn("shrink-0 transition-transform duration-fast", open && "rotate-90")}
         />
         {t("agent.sidebar.archived", { count: list.length })}
       </button>
@@ -143,7 +144,7 @@ function ArchivedRow({ directory, row }: { directory: string | null; row: Sessio
   };
 
   return (
-    <div className="group/thread flex w-full items-center gap-[8px] rounded-md py-[5px] pl-[24px] pr-[10px] text-[12.5px] text-muted transition-colors duration-150 hover:bg-surface-1">
+    <div className="group/thread flex w-full items-center gap-[8px] rounded-md py-[5px] pl-[24px] pr-[10px] text-caption text-muted transition-colors duration-fast hover:bg-surface-1">
       <Icon icon={Archive} size={11} strokeWidth={1.75} className="shrink-0 text-muted-soft" />
       <button
         type="button"
@@ -183,7 +184,7 @@ function DraftRow({ directory, text }: { directory: string | null; text: string 
       type="button"
       onClick={() => void open()}
       aria-label={t("agent.sidebar.draft")}
-      className="group/thread flex w-full items-center gap-[8px] rounded-md px-[10px] py-[5px] text-[12.5px] text-muted transition-colors duration-150 hover:bg-surface-1 hover:text-body"
+      className="group/thread flex w-full items-center gap-[8px] rounded-md px-[10px] py-[5px] text-caption text-muted transition-colors duration-fast hover:bg-surface-1 hover:text-body focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-hairline-strong"
     >
       <Icon icon={Pencil} size={12} strokeWidth={1.75} className="shrink-0 text-muted-soft" />
       <span className="flex-1 truncate text-left italic">{firstLine(text)}</span>
@@ -244,14 +245,14 @@ const ThreadRow = memo(function ThreadRow({
   return (
     <div
       className={cn(
-        "group/thread flex w-full items-center gap-[8px] rounded-md px-[10px] py-[5px] text-[12.5px] transition-colors duration-150",
+        "group/thread flex w-full items-center gap-[8px] rounded-md px-[10px] py-[5px] text-caption transition-colors duration-fast",
         active ? "bg-surface-2 text-ink" : "text-body hover:bg-surface-1",
       )}
     >
       <span
         aria-hidden
         className={cn(
-          "h-[6px] w-[6px] shrink-0 rounded-full",
+          "h-[6px] w-[6px] shrink-0 rounded-pill",
           running ? "bg-warn animate-tab-status-pulse" : "bg-hairline-strong",
         )}
       />
@@ -315,14 +316,14 @@ const ThreadRow = memo(function ThreadRow({
         </HoverAction>
         <DropdownRoot open={menuOpen} onOpenChange={setMenuOpen}>
           <DropdownTrigger asChild>
-            <button
-              type="button"
+            <IconButton
+              size="sm"
               aria-label={t("agent.sidebar.moreActions")}
               onClick={(e) => e.stopPropagation()}
-              className="flex h-[18px] w-[18px] items-center justify-center rounded-sm text-muted-soft transition-colors duration-150 hover:bg-surface-2 hover:text-ink data-[state=open]:bg-surface-2 data-[state=open]:text-ink"
+              className="text-muted-soft"
             >
               <Icon icon={MoreHorizontal} size={12} strokeWidth={2} />
-            </button>
+            </IconButton>
           </DropdownTrigger>
           <DropdownContent align="end" className="min-w-[160px]">
             <DropdownItem onSelect={() => setRenaming(true)}>
@@ -401,7 +402,7 @@ function RenameInput({
         else if (e.key === "Escape") onCancel();
         e.stopPropagation();
       }}
-      className="min-w-0 flex-1 rounded-sm border border-hairline bg-surface-1 px-[6px] py-[1px] text-[12px] text-ink outline-none"
+      className="min-w-0 flex-1 rounded-sm border border-hairline bg-surface-1 px-[6px] py-[1px] text-caption text-ink outline-none"
     />
   );
 }
@@ -416,17 +417,17 @@ function HoverAction({
   children: React.ReactNode;
 }) {
   return (
-    <button
-      type="button"
+    <IconButton
+      size="sm"
       aria-label={label}
       onClick={(e) => {
         e.stopPropagation();
         onClick();
       }}
-      className="flex h-[18px] w-[18px] items-center justify-center rounded-sm text-muted-soft transition-colors duration-150 hover:bg-surface-2 hover:text-ink"
+      className="text-muted-soft"
     >
       {children}
-    </button>
+    </IconButton>
   );
 }
 

@@ -95,7 +95,7 @@ export function ConfirmDialog({
             <span
               aria-hidden
               className={cn(
-                "mt-[1px] flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full",
+                "mt-[1px] flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-pill",
                 tone === "destructive" && "bg-danger/10",
                 tone === "warning" && "bg-warn/10",
                 tone === "neutral" && "bg-surface-strong/60",
@@ -106,17 +106,17 @@ export function ConfirmDialog({
           ) : null}
           <div className="flex-1 space-y-[8px]">
             {description ? (
-              <p className="text-[13px] leading-relaxed text-body">
+              <p className="text-ui leading-relaxed text-body">
                 {description}
               </p>
             ) : null}
             {details ? (
-              <div className="text-[12px] text-muted">{details}</div>
+              <div className="text-caption text-muted">{details}</div>
             ) : null}
             {skipOption ? (
               <label
                 className={cn(
-                  "mt-[4px] flex cursor-pointer items-center gap-[8px] text-[12px] text-muted",
+                  "mt-[4px] flex cursor-pointer items-center gap-[8px] text-caption text-muted",
                   "select-none hover:text-body",
                 )}
               >

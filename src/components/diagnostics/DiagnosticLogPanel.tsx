@@ -7,6 +7,7 @@ import {
   type DiagEntry,
   type DiagKind,
 } from "@/features/diagnostics/diagnostics.store";
+import { IconButton } from "@/components/ui/IconButton";
 import { cn } from "@/lib/cn";
 
 /** Map each kind to a 1-letter glyph + token-driven swatch. Keeps the list
@@ -55,7 +56,7 @@ function DiagRow({ entry, onPickSession }: DiagRowProps) {
   const meta = KIND_META[entry.kind];
   const detailStr = entry.detail ? JSON.stringify(entry.detail) : "";
   return (
-    <div className="grid grid-cols-[14px_72px_minmax(0,1fr)] gap-[var(--space-xs)] border-b border-hairline-soft py-[6px] px-[var(--space-sm)] text-[12px] leading-[1.4]">
+    <div className="grid grid-cols-[14px_72px_minmax(0,1fr)] gap-[var(--space-xs)] border-b border-hairline-soft py-[6px] px-[var(--space-sm)] text-caption leading-[1.4]">
       <span className={cn("font-mono font-semibold text-center", TONE_CLASSES[meta.tone])}>
         {meta.letter}
       </span>
@@ -85,7 +86,7 @@ function DiagRow({ entry, onPickSession }: DiagRowProps) {
           ) : null}
         </div>
         {detailStr ? (
-          <div className="font-mono text-[11px] text-body break-all whitespace-pre-wrap">
+          <div className="font-mono text-label text-body break-all whitespace-pre-wrap">
             {detailStr}
           </div>
         ) : null}
@@ -141,36 +142,26 @@ export function DiagnosticLogPanel() {
       className="fixed right-0 top-0 z-[60] flex h-screen w-[480px] flex-col border-l border-hairline bg-canvas-soft shadow-elevated"
     >
       <div className="flex h-[44px] flex-none items-center justify-between gap-[var(--space-sm)] border-b border-hairline px-[var(--space-base)]">
-        <div className="flex items-center gap-[var(--space-xs)] text-[13px] font-medium text-ink">
+        <div className="flex items-center gap-[var(--space-xs)] text-ui font-medium text-ink">
           <FileBadge size={14} className="text-muted" />
           {t("diagnostics.title")}
-          <span className="font-mono text-[11px] text-muted-soft">{filtered.length}/{entries.length}</span>
+          <span className="font-mono text-label text-muted-soft">{filtered.length}/{entries.length}</span>
         </div>
         <div className="flex items-center gap-[2px]">
-          <button
-            type="button"
-            onClick={clear}
-            title={t("diagnostics.clear")}
-            className="flex h-7 w-7 items-center justify-center rounded-[var(--radius-sm)] text-muted hover:bg-surface-strong hover:text-ink"
-          >
+          <IconButton size="lg" onClick={clear} title={t("diagnostics.clear")} aria-label={t("diagnostics.clear")}>
             <Trash2 size={14} />
-          </button>
-          <button
-            type="button"
+          </IconButton>
+          <IconButton
+            size="lg"
             onClick={handleCopy}
             title={t("diagnostics.copyToClipboard")}
-            className="flex h-7 w-7 items-center justify-center rounded-[var(--radius-sm)] text-muted hover:bg-surface-strong hover:text-ink"
+            aria-label={t("diagnostics.copyToClipboard")}
           >
             <Copy size={14} />
-          </button>
-          <button
-            type="button"
-            onClick={() => setOpen(false)}
-            title={t("common.close")}
-            className="flex h-7 w-7 items-center justify-center rounded-[var(--radius-sm)] text-muted hover:bg-surface-strong hover:text-ink"
-          >
+          </IconButton>
+          <IconButton size="lg" onClick={() => setOpen(false)} title={t("common.close")} aria-label={t("common.close")}>
             <X size={14} />
-          </button>
+          </IconButton>
         </div>
       </div>
 
@@ -180,13 +171,13 @@ export function DiagnosticLogPanel() {
           value={filters.kindFilter}
           onChange={(e) => setKindFilter(e.target.value)}
           placeholder={t("diagnostics.filterPlaceholder")}
-          className="h-7 min-w-0 flex-1 rounded-[var(--radius-sm)] border border-hairline bg-surface-card px-2 text-[12px] text-ink outline-none placeholder:text-muted-soft focus:border-hairline-strong"
+          className="h-7 min-w-0 flex-1 rounded-sm border border-hairline bg-surface-card px-2 text-caption text-ink outline-none placeholder:text-muted-soft focus:border-hairline-strong"
         />
         {filters.sessionIdFilter ? (
           <button
             type="button"
             onClick={() => setSessionIdFilter(null)}
-            className="flex h-7 items-center gap-1 rounded-[var(--radius-sm)] border border-hairline px-2 font-mono text-[11px] text-muted hover:border-hairline-strong hover:text-ink"
+            className="flex h-7 items-center gap-1 rounded-sm border border-hairline px-2 font-mono text-label text-muted hover:border-hairline-strong hover:text-ink"
             title={filters.sessionIdFilter}
           >
             s:{filters.sessionIdFilter.slice(0, 6)}
@@ -197,7 +188,7 @@ export function DiagnosticLogPanel() {
 
       <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto">
         {filtered.length === 0 ? (
-          <div className="flex h-full items-center justify-center px-[var(--space-base)] text-center text-[12px] text-muted-soft">
+          <div className="flex h-full items-center justify-center px-[var(--space-base)] text-center text-caption text-muted-soft">
             {t("diagnostics.empty")}
           </div>
         ) : (

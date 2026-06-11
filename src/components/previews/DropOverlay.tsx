@@ -18,13 +18,13 @@ export function DropOverlay({ active }: { active: boolean }) {
       className={cn(
         "pointer-events-none absolute inset-[10px] z-[80] flex items-center justify-center",
         "rounded-lg border-2 border-dashed border-hairline-strong bg-scrim/40 backdrop-blur-[1px]",
-        "transition-opacity duration-150",
+        "transition-opacity duration-fast",
         active ? "opacity-100" : "opacity-0",
       )}
     >
       <div className="flex flex-col items-center gap-[8px] text-ink">
         <Icon icon={FileDown} size={26} strokeWidth={1.5} />
-        <span className="text-[13px] font-medium tracking-tight">{t("preview.dropHint")}</span>
+        <span className="text-ui font-medium tracking-tight">{t("preview.dropHint")}</span>
       </div>
     </div>
   );

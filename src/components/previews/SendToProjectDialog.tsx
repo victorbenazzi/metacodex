@@ -103,7 +103,7 @@ export function SendToProjectDialog({ path, onOpenChange, onSent }: SendToProjec
         }
       >
         {projects.length === 0 ? (
-          <p className="text-[12px] text-muted">{t("sendToProject.noProjects")}</p>
+          <p className="text-caption text-muted">{t("sendToProject.noProjects")}</p>
         ) : (
           <div className="space-y-[14px]">
             <div className="space-y-[6px]">
@@ -124,7 +124,7 @@ export function SendToProjectDialog({ path, onOpenChange, onSent }: SendToProjec
               <div className="space-y-[6px]">
                 <div className="flex items-baseline justify-between gap-[8px]">
                   <p className="editorial-caps text-muted">{t("sendToProject.pickFolder")}</p>
-                  <p className="truncate font-mono text-[11px] text-muted-soft">
+                  <p className="truncate font-mono text-label text-muted-soft">
                     {selectedProject.name}
                     {relDest ? `/${relDest}` : ""}
                   </p>
@@ -138,7 +138,7 @@ export function SendToProjectDialog({ path, onOpenChange, onSent }: SendToProjec
               </div>
             ) : null}
 
-            {error ? <p className="text-[12px] text-danger">{error}</p> : null}
+            {error ? <p className="text-caption text-danger">{error}</p> : null}
           </div>
         )}
       </DialogContent>
@@ -166,7 +166,7 @@ function ProjectChip({
       type="button"
       onClick={onClick}
       className={cn(
-        "inline-flex h-[28px] items-center gap-[6px] rounded-sm border px-[8px] text-[12px] transition-colors",
+        "inline-flex h-[28px] items-center gap-[6px] rounded-sm border px-[8px] text-caption transition-colors",
         active
           ? "border-hairline-strong bg-surface-strong/50 text-ink"
           : "border-hairline text-body hover:bg-surface-strong/30",
@@ -182,7 +182,7 @@ function ProjectChip({
       ) : LucideIcon ? (
         <LucideIcon size={13} strokeWidth={1.7} color={accent} aria-hidden />
       ) : (
-        <span className="font-display text-[12px] leading-none" style={{ color: accent }}>
+        <span className="font-display text-caption leading-none" style={{ color: accent }}>
           {project.name.slice(0, 1).toUpperCase()}
         </span>
       )}

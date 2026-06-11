@@ -28,7 +28,7 @@ export function AgentSidebar() {
         <button
           type="button"
           onClick={() => useSettingsStore.getState().openTab("agent")}
-          className="flex w-full items-center gap-[10px] rounded-sm px-[10px] py-[7px] text-left text-[13px] text-body transition-colors hover:bg-surface-strong/40 hover:text-ink"
+          className="flex w-full items-center gap-[10px] rounded-sm px-[10px] py-[7px] text-left text-ui text-body transition-colors hover:bg-surface-strong/40 hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-hairline-strong"
         >
           <Icon icon={Settings} size={13} className="text-muted" />
           {t("agent.sidebar.settings")}
@@ -101,7 +101,7 @@ function SidebarItem({ icon, label, kbd, badge, active, disabled, onClick }: Sid
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "group flex w-full items-center gap-[10px] rounded-md px-[10px] py-[7px] text-[13px] transition-colors duration-150",
+        "group flex w-full items-center gap-[10px] rounded-md px-[10px] py-[7px] text-ui transition-colors duration-fast",
         active ? "bg-surface-2 text-ink" : "text-body hover:bg-surface-1",
         disabled && "cursor-default text-muted-soft hover:bg-transparent",
       )}
@@ -114,7 +114,7 @@ function SidebarItem({ icon, label, kbd, badge, active, disabled, onClick }: Sid
       />
       <span className="flex-1 truncate text-left">{label}</span>
       {badge ? (
-        <span className="rounded-pill bg-surface-1 px-[7px] py-[1px] text-[10px] uppercase tracking-[0.05em] text-muted-soft">
+        <span className="rounded-pill bg-surface-1 px-[7px] py-[1px] text-[10px] uppercase tracking-label text-muted-soft">
           {badge}
         </span>
       ) : null}
@@ -129,7 +129,7 @@ function SidebarItem({ icon, label, kbd, badge, active, disabled, onClick }: Sid
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="px-[10px] pb-[4px] pt-[16px] text-[11px] font-medium uppercase tracking-[0.06em] text-muted-soft">
+    <p className="px-[10px] pb-[4px] pt-[16px] text-label font-medium uppercase tracking-label text-muted-soft">
       {children}
     </p>
   );

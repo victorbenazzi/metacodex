@@ -55,15 +55,15 @@ export function ThemeCard({ theme, selected, onSelect }: ThemeCardProps) {
           }}
         >
           <span
-            className="h-[5px] w-[5px] rounded-full"
+            className="h-[5px] w-[5px] rounded-pill"
             style={{ backgroundColor: chrome.danger }}
           />
           <span
-            className="h-[5px] w-[5px] rounded-full"
+            className="h-[5px] w-[5px] rounded-pill"
             style={{ backgroundColor: chrome.warn }}
           />
           <span
-            className="h-[5px] w-[5px] rounded-full"
+            className="h-[5px] w-[5px] rounded-pill"
             style={{ backgroundColor: chrome.success }}
           />
         </div>
@@ -98,8 +98,8 @@ export function ThemeCard({ theme, selected, onSelect }: ThemeCardProps) {
           backgroundColor: "var(--surface-card)",
         }}
       >
-        <span className="text-[12px] font-medium text-ink">{theme.name}</span>
-        <span className="font-mono text-[10px] uppercase tracking-[0.06em] text-muted-soft">
+        <span className="text-caption font-medium text-ink">{theme.name}</span>
+        <span className="font-mono text-[10px] uppercase tracking-label text-muted-soft">
           {theme.kind}
         </span>
       </div>

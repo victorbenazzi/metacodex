@@ -65,7 +65,7 @@ export function TabStatusDot({ tabId }: TabStatusDotProps) {
         aria-label={t(labelKey)}
         aria-live="polite"
         className={cn(
-          "inline-block h-[6px] w-[6px] shrink-0 rounded-full",
+          "inline-block h-[6px] w-[6px] shrink-0 rounded-pill",
           toneClass,
           pulse && "animate-tab-status-pulse",
         )}

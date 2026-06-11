@@ -35,7 +35,7 @@ export function CustomizePanel() {
           <h1 className="font-display text-[24px] tracking-[-0.01em] text-ink">
             {t("agent.customize.title")}
           </h1>
-          <p className="mt-[4px] text-[13px] text-muted">{t("agent.customize.subtitle")}</p>
+          <p className="mt-[4px] text-ui text-muted">{t("agent.customize.subtitle")}</p>
         </header>
 
         <div className="flex items-start gap-[28px]">
@@ -50,7 +50,7 @@ export function CustomizePanel() {
                 aria-current={tab === id ? "page" : undefined}
                 onClick={() => openCustomize(id)}
                 className={cn(
-                  "flex w-full items-center gap-[10px] rounded-md px-[10px] py-[7px] text-[13px] transition-colors duration-150",
+                  "flex w-full items-center gap-[10px] rounded-md px-[10px] py-[7px] text-ui transition-colors duration-fast",
                   tab === id ? "bg-surface-2 text-ink" : "text-body hover:bg-surface-1",
                 )}
               >

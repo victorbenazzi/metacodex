@@ -41,21 +41,21 @@ export function CliMissingPanel({ cli, onRetry, onOpenInTerminal }: CliMissingPa
         </div>
 
         <h1
-          className="font-display text-[40px] font-medium tracking-[-0.015em] text-ink"
+          className="font-display text-display font-medium tracking-[-0.015em] text-ink"
           style={{ lineHeight: 1.05 }}
         >
           {cli.label}
         </h1>
 
-        <p className="max-w-[520px] text-[14px] leading-[1.55] text-body">{cli.description}</p>
+        <p className="max-w-[520px] text-content leading-[1.55] text-body">{cli.description}</p>
 
         {needsConfig ? (
           <div className="rounded-sm border border-hairline-soft bg-canvas-soft px-[16px] py-[14px]">
-            <p className="text-[13px] text-body">
+            <p className="text-ui text-body">
               <span className="font-medium text-ink">{t("terminal.piNotConfigured")}</span>
               {t("terminal.piNotConfiguredBody")}
             </p>
-            <p className="mt-[6px] font-mono text-[11px] text-muted-soft">
+            <p className="mt-[6px] font-mono text-label text-muted-soft">
               metacodex.store.json · cliRegistryOverrides
             </p>
           </div>
@@ -93,7 +93,7 @@ export function CliMissingPanel({ cli, onRetry, onOpenInTerminal }: CliMissingPa
               target="_blank"
               rel="noreferrer"
               className={cn(
-                "inline-flex h-[32px] items-center gap-[6px] rounded-sm border border-hairline-strong bg-canvas px-[14px] text-[13px] font-medium text-ink",
+                "inline-flex h-[32px] items-center gap-[6px] rounded-sm border border-hairline-strong bg-canvas px-[14px] text-ui font-medium text-ink",
                 "hover:bg-surface-strong/40 transition-colors",
               )}
             >
@@ -103,7 +103,7 @@ export function CliMissingPanel({ cli, onRetry, onOpenInTerminal }: CliMissingPa
           ) : null}
         </div>
 
-        <p className="mt-auto pb-[24px] pt-[28px] font-mono text-[11px] text-muted-soft">
+        <p className="mt-auto pb-[24px] pt-[28px] font-mono text-label text-muted-soft">
           <Trans
             i18nKey="terminal.lookup"
             values={{ command: cli.command, detect: cli.detectCommand }}
@@ -132,7 +132,7 @@ function InstallBlock({ command, secondary }: { command: string; secondary?: boo
   return (
     <div
       className={cn(
-        "relative flex items-center gap-[10px] rounded-sm border px-[12px] py-[10px] font-mono text-[12px] leading-[1.5]",
+        "relative flex items-center gap-[10px] rounded-sm border px-[12px] py-[10px] font-mono text-caption leading-[1.5]",
         secondary
           ? "border-hairline bg-canvas-soft text-body"
           : "border-hairline-strong bg-canvas text-ink",
@@ -144,7 +144,7 @@ function InstallBlock({ command, secondary }: { command: string; secondary?: boo
         type="button"
         onClick={copy}
         className={cn(
-          "inline-flex h-[22px] items-center gap-[4px] rounded-xs border border-hairline-soft px-[8px] text-[11px] text-muted",
+          "inline-flex h-[22px] items-center gap-[4px] rounded-xs border border-hairline-soft px-[8px] text-label text-muted",
           "hover:bg-surface-strong/55 hover:text-ink",
         )}
         aria-label={t("terminal.copyInstall")}

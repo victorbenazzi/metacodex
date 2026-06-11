@@ -50,13 +50,13 @@ export function TabTooltip({ tab }: TabTooltipProps) {
 
   return (
     <div className="flex max-w-[320px] flex-col gap-[6px]">
-      <span className="text-[12px] font-medium text-ink truncate">{resolveTabTitle(tab)}</span>
+      <span className="text-caption font-medium text-ink truncate">{resolveTabTitle(tab)}</span>
       {titleOrigin ? (
         <span className="text-[10px] text-muted-soft">{t(titleOrigin)}</span>
       ) : null}
 
       {meta?.branch ? (
-        <span className="flex items-center gap-[5px] text-[11px] text-body">
+        <span className="flex items-center gap-[5px] text-label text-body">
           <Icon icon={GitBranch} size={11} className="text-muted" />
           <span className="font-mono">{meta.branch}</span>
         </span>

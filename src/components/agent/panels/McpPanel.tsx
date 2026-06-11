@@ -101,7 +101,7 @@ export function McpSection() {
         </div>
       )}
 
-      {store.error ? <p className="mt-[12px] text-[12px] text-danger">{store.error}</p> : null}
+      {store.error ? <p className="mt-[12px] text-caption text-danger">{store.error}</p> : null}
 
       <ServerDialog
         open={dialogOpen}
@@ -124,7 +124,7 @@ function RestartBar() {
   const streaming = useAgentChatStore((s) => s.status !== "idle");
   return (
     <div className="mb-[16px] flex items-center justify-between gap-[12px] rounded-md border border-hairline bg-surface-2 px-[14px] py-[10px]">
-      <p className="text-[12px] text-body">{t("agent.mcp.restartNote")}</p>
+      <p className="text-caption text-body">{t("agent.mcp.restartNote")}</p>
       <Button
         variant="primary"
         size="sm"
@@ -150,7 +150,7 @@ function StatusDot({ name }: { name: string }) {
       title={st.error ?? st.status ?? ""}
       aria-label={ok ? t("agent.mcp.statusConnected") : t("agent.mcp.statusError")}
       className={cn(
-        "inline-block h-[7px] w-[7px] shrink-0 rounded-full",
+        "inline-block h-[7px] w-[7px] shrink-0 rounded-pill",
         ok ? "bg-success" : st.error ? "bg-danger" : "bg-muted-soft",
       )}
     />
@@ -186,7 +186,7 @@ function FeaturedCard({ def, entry }: { def: FeaturedServerDef; entry: McpServer
       <div className="flex items-center justify-between gap-[8px]">
         <div className="flex min-w-0 items-center gap-[8px]">
           <Icon icon={Search} size={14} className="shrink-0 text-muted" />
-          <h3 className="truncate text-[13px] font-medium text-ink">{def.displayName}</h3>
+          <h3 className="truncate text-ui font-medium text-ink">{def.displayName}</h3>
           {entry ? <StatusDot name={def.name} /> : null}
         </div>
         {entry ? (
@@ -221,9 +221,9 @@ function FeaturedCard({ def, entry }: { def: FeaturedServerDef; entry: McpServer
           }}
         />
       ) : null}
-      <p className="mt-[6px] text-[12px] leading-[1.5] text-muted">{t(def.descriptionKey)}</p>
+      <p className="mt-[6px] text-caption leading-[1.5] text-muted">{t(def.descriptionKey)}</p>
       {entry ? (
-        <p className="mt-[8px] text-[11px] text-muted-soft">
+        <p className="mt-[8px] text-label text-muted-soft">
           {t("agent.mcp.keySet", { envVar: def.envVar })}
         </p>
       ) : (
@@ -236,7 +236,7 @@ function FeaturedCard({ def, entry }: { def: FeaturedServerDef; entry: McpServer
               if (e.key === "Enter") void enable();
             }}
             placeholder={def.envVar}
-            className="h-[28px] min-w-0 flex-1 rounded-sm border border-hairline bg-surface-1 px-[8px] text-[12px] text-ink outline-none placeholder:text-muted-soft focus:border-hairline-strong"
+            className="h-[28px] min-w-0 flex-1 rounded-sm border border-hairline bg-surface-1 px-[8px] text-caption text-ink outline-none placeholder:text-muted-soft focus:border-hairline-strong"
           />
           <Button variant="primary" size="sm" disabled={!key.trim() || saving} onClick={() => void enable()}>
             {t("agent.mcp.enable")}
@@ -259,10 +259,10 @@ function ServerRow({ entry, onEdit }: { entry: McpServerEntry; onEdit: () => voi
       <Icon icon={entry.kind === "local" ? Terminal : Globe} size={14} className="shrink-0 text-muted" />
       <button type="button" onClick={onEdit} className="min-w-0 flex-1 text-left">
         <span className="flex items-center gap-[8px]">
-          <span className="truncate text-[13px] font-medium text-ink">{entry.name}</span>
+          <span className="truncate text-ui font-medium text-ink">{entry.name}</span>
           <StatusDot name={entry.name} />
         </span>
-        <span className="block truncate font-mono text-[11px] text-muted">{summary}</span>
+        <span className="block truncate font-mono text-label text-muted">{summary}</span>
       </button>
       <Switch
         checked={entry.enabled}
@@ -379,9 +379,9 @@ function ServerDialog({
   };
 
   const inputCls =
-    "h-[28px] w-full rounded-sm border border-hairline bg-surface-1 px-[8px] text-[12px] text-ink outline-none placeholder:text-muted-soft focus:border-hairline-strong";
+    "h-[28px] w-full rounded-sm border border-hairline bg-surface-1 px-[8px] text-caption text-ink outline-none placeholder:text-muted-soft focus:border-hairline-strong";
   const areaCls =
-    "min-h-[60px] w-full resize-y rounded-sm border border-hairline bg-surface-1 px-[8px] py-[6px] font-mono text-[12px] text-ink outline-none placeholder:text-muted-soft focus:border-hairline-strong";
+    "min-h-[60px] w-full resize-y rounded-sm border border-hairline bg-surface-1 px-[8px] py-[6px] font-mono text-caption text-ink outline-none placeholder:text-muted-soft focus:border-hairline-strong";
 
   return (
     <DialogRoot open={open} onOpenChange={onOpenChange}>
@@ -402,7 +402,7 @@ function ServerDialog({
       >
         <div className="flex flex-col gap-[12px]">
           <label className="flex flex-col gap-[5px]">
-            <span className="text-[12px] text-muted">{t("agent.mcp.fieldName")}</span>
+            <span className="text-caption text-muted">{t("agent.mcp.fieldName")}</span>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -411,7 +411,7 @@ function ServerDialog({
               className={inputCls}
             />
             {name.length > 0 && !nameValid ? (
-              <span className="text-[11px] text-danger">{t("agent.mcp.nameInvalid")}</span>
+              <span className="text-label text-danger">{t("agent.mcp.nameInvalid")}</span>
             ) : null}
           </label>
 
@@ -429,7 +429,7 @@ function ServerDialog({
           {kind === "local" ? (
             <>
               <label className="flex flex-col gap-[5px]">
-                <span className="text-[12px] text-muted">{t("agent.mcp.fieldCommand")}</span>
+                <span className="text-caption text-muted">{t("agent.mcp.fieldCommand")}</span>
                 <input
                   value={command}
                   onChange={(e) => setCommand(e.target.value)}
@@ -438,7 +438,7 @@ function ServerDialog({
                 />
               </label>
               <label className="flex flex-col gap-[5px]">
-                <span className="text-[12px] text-muted">{t("agent.mcp.fieldEnv")}</span>
+                <span className="text-caption text-muted">{t("agent.mcp.fieldEnv")}</span>
                 <textarea
                   value={env}
                   onChange={(e) => setEnv(e.target.value)}
@@ -450,7 +450,7 @@ function ServerDialog({
           ) : (
             <>
               <label className="flex flex-col gap-[5px]">
-                <span className="text-[12px] text-muted">{t("agent.mcp.fieldUrl")}</span>
+                <span className="text-caption text-muted">{t("agent.mcp.fieldUrl")}</span>
                 <input
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
@@ -459,7 +459,7 @@ function ServerDialog({
                 />
               </label>
               <label className="flex flex-col gap-[5px]">
-                <span className="text-[12px] text-muted">{t("agent.mcp.fieldHeaders")}</span>
+                <span className="text-caption text-muted">{t("agent.mcp.fieldHeaders")}</span>
                 <textarea
                   value={headers}
                   onChange={(e) => setHeaders(e.target.value)}
@@ -471,7 +471,7 @@ function ServerDialog({
           )}
 
           {saveError ? (
-            <p className="text-[12px] leading-[1.5] text-danger">{saveError}</p>
+            <p className="text-caption leading-[1.5] text-danger">{saveError}</p>
           ) : null}
         </div>
       </DialogContent>
@@ -496,7 +496,7 @@ function Switch({
       aria-label={ariaLabel}
       onClick={() => onChange(!checked)}
       className={cn(
-        "relative inline-flex h-[18px] w-[32px] shrink-0 items-center rounded-full border transition-colors",
+        "relative inline-flex h-[18px] w-[32px] shrink-0 items-center rounded-pill border transition-colors",
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[2px]",
         checked
           ? "border-ink bg-ink"
@@ -505,7 +505,7 @@ function Switch({
     >
       <span
         className={cn(
-          "inline-block h-[12px] w-[12px] rounded-full transition-transform",
+          "inline-block h-[12px] w-[12px] rounded-pill transition-transform",
           checked ? "translate-x-[16px] bg-on-primary" : "translate-x-[2px] bg-muted",
         )}
       />

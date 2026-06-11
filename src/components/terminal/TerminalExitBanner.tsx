@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { X, AlertTriangle } from "lucide-react";
 
+import { IconButton } from "@/components/ui/IconButton";
 import { useDiagnosticsStore } from "@/features/diagnostics/diagnostics.store";
 import type { PtyExitReason } from "@/lib/events";
 
@@ -34,7 +35,7 @@ export function TerminalExitBanner({ exitCode, reason, sessionId, onDismiss }: T
   return (
     <div
       role="status"
-      className="flex flex-none items-start gap-[var(--space-xs)] border-b border-hairline bg-[color:rgba(207,45,86,0.06)] px-[var(--space-base)] py-[8px] text-[12px] text-ink"
+      className="flex flex-none items-start gap-[var(--space-xs)] border-b border-hairline bg-[color:rgba(207,45,86,0.06)] px-[var(--space-base)] py-[8px] text-caption text-ink"
     >
       <AlertTriangle size={14} className="mt-[2px] flex-none text-[var(--danger)]" />
       <div className="flex-1 leading-[1.5]">
@@ -47,14 +48,15 @@ export function TerminalExitBanner({ exitCode, reason, sessionId, onDismiss }: T
           {t("terminal.exitBanner.openLog")}
         </button>
       </div>
-      <button
-        type="button"
+      <IconButton
+        size="sm"
         onClick={onDismiss}
         title={t("common.dismiss")}
-        className="ml-1 flex h-5 w-5 flex-none items-center justify-center rounded-[var(--radius-xs)] text-muted hover:bg-surface-strong hover:text-ink"
+        aria-label={t("common.dismiss")}
+        className="ml-1 flex-none"
       >
         <X size={12} />
-      </button>
+      </IconButton>
     </div>
   );
 }

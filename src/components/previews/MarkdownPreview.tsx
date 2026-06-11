@@ -83,7 +83,7 @@ export function MarkdownPreview({
           type="button"
           onClick={toggleMode}
           className={cn(
-            "inline-flex h-[22px] items-center gap-[6px] rounded-xs px-[8px] text-[11px] text-muted",
+            "inline-flex h-[22px] items-center gap-[6px] rounded-xs px-[8px] text-label text-muted",
             "hover:bg-surface-strong/55 hover:text-ink",
           )}
         >
@@ -117,15 +117,15 @@ export function MarkdownPreview({
             {error ? (
               <div className="px-[24px] py-[20px]">
                 <p className="editorial-caps text-danger">{t("editor.couldNotRead")}</p>
-                <p className="mt-[4px] font-mono text-[12px] text-body">{error}</p>
+                <p className="mt-[4px] font-mono text-caption text-body">{error}</p>
               </div>
             ) : content === null ? (
-              <p className="px-[24px] py-[20px] font-mono text-[11px] text-muted-soft">
+              <p className="px-[24px] py-[20px] font-mono text-label text-muted-soft">
                 {t("common.loading")}
               </p>
             ) : (
               <article
-                className="md-prose prose prose-neutral mx-auto max-w-[720px] px-[28px] py-[28px] text-[14px] leading-[1.65] text-body"
+                className="md-prose prose prose-neutral mx-auto max-w-[720px] px-[28px] py-[28px] text-content leading-[1.65] text-body"
                 style={{ fontFamily: "var(--font-sans)" }}
               >
                 <MarkdownBody source={content} />
@@ -154,12 +154,12 @@ function MarkdownBody({ source }: { source: string }) {
           </h1>
         ),
         h2: (p) => (
-          <h2 className="mt-[28px] font-display text-[22px] font-medium tracking-[-0.005em] text-ink">
+          <h2 className="mt-[28px] font-display text-display-s font-medium tracking-[-0.005em] text-ink">
             {p.children}
           </h2>
         ),
         h3: (p) => (
-          <h3 className="mt-[22px] text-[15px] font-semibold text-ink">{p.children}</h3>
+          <h3 className="mt-[22px] text-title font-medium text-ink">{p.children}</h3>
         ),
         p: (p) => <p className="my-[12px] text-body">{p.children}</p>,
         a: (p) => {
@@ -190,7 +190,7 @@ function MarkdownBody({ source }: { source: string }) {
         code: (p: any) => {
           if (p.inline) {
             return (
-              <code className="rounded-xs bg-surface-strong/50 px-[5px] py-[1px] font-mono text-[12px] text-ink">
+              <code className="rounded-xs bg-surface-strong/50 px-[5px] py-[1px] font-mono text-caption text-ink">
                 {p.children}
               </code>
             );
@@ -214,11 +214,11 @@ function MarkdownBody({ source }: { source: string }) {
         ),
         table: (p) => (
           <div className="my-[16px] overflow-x-auto">
-            <table className="w-full border-collapse text-[13px]">{p.children}</table>
+            <table className="w-full border-collapse text-ui">{p.children}</table>
           </div>
         ),
         th: (p) => (
-          <th className="border-b border-hairline-strong px-[10px] py-[6px] text-left text-[12px] font-semibold text-ink">
+          <th className="border-b border-hairline-strong px-[10px] py-[6px] text-left text-caption font-semibold text-ink">
             {p.children}
           </th>
         ),
@@ -266,11 +266,11 @@ function ShikiCode({ code, lang, themeId }: { code: string; lang: string | undef
       <CopyCodeButton code={code} />
       {html ? (
         <div
-          className="overflow-x-auto rounded-sm border border-hairline font-mono text-[12px] leading-[1.5] [&_pre]:m-0 [&_pre]:px-[14px] [&_pre]:py-[12px]"
+          className="overflow-x-auto rounded-sm border border-hairline font-mono text-caption leading-[1.5] [&_pre]:m-0 [&_pre]:px-[14px] [&_pre]:py-[12px]"
           dangerouslySetInnerHTML={{ __html: html }}
         />
       ) : (
-        <pre className="overflow-x-auto rounded-sm border border-hairline bg-canvas-soft px-[14px] py-[12px] font-mono text-[12px] leading-[1.5] text-body">
+        <pre className="overflow-x-auto rounded-sm border border-hairline bg-canvas-soft px-[14px] py-[12px] font-mono text-caption leading-[1.5] text-body">
           <code>{code}</code>
         </pre>
       )}
@@ -303,7 +303,7 @@ function CopyCodeButton({ code }: { code: string }) {
       onClick={copy}
       aria-label={t("common.copy")}
       className={cn(
-        "absolute right-[8px] top-[8px] z-10 inline-flex h-[24px] items-center gap-[5px] rounded-xs px-[7px] text-[11px]",
+        "absolute right-[8px] top-[8px] z-10 inline-flex h-[24px] items-center gap-[5px] rounded-xs px-[7px] text-label",
         "border border-hairline bg-surface-card text-muted opacity-0 transition-opacity",
         "hover:text-ink group-hover:opacity-100 focus-visible:opacity-100",
       )}

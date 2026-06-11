@@ -169,7 +169,7 @@ export function ResizeHandle({
               : // center: position rail at the geometric middle of the 8px hit
                 // zone (left: 50%, translateX(-50%) below).
                 "left-1/2 -translate-x-1/2",
-          "transition-colors duration-150 ease-out",
+          "transition-colors duration-fast ease-out",
           dragging
             ? "bg-[var(--primary)]"
             : hovering

@@ -15,6 +15,7 @@ import {
 } from "@/features/terminal/cli-detection";
 import { cn } from "@/lib/cn";
 import { Button } from "@/components/ui/Button";
+import { IconButton } from "@/components/ui/IconButton";
 import type { ResumeEntry } from "@/features/resume/resume.service";
 
 interface ResumeCardsProps {
@@ -76,7 +77,7 @@ export function ResumeCards({ projectId, title, limit = 5 }: ResumeCardsProps) {
               </span>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-[8px]">
-                  <span className="truncate text-[13px] font-medium text-ink">
+                  <span className="truncate text-ui font-medium text-ink">
                     {cli?.label ?? entry.cliId}
                   </span>
                   {entry.branch ? (
@@ -103,14 +104,9 @@ export function ResumeCards({ projectId, title, limit = 5 }: ResumeCardsProps) {
                     {t("resume.cliUnavailable", { cli: cli?.label ?? entry.cliId })}
                   </span>
                 )}
-                <button
-                  type="button"
-                  onClick={() => void discard(entry.id)}
-                  aria-label={t("resume.discardButton")}
-                  className="inline-flex h-[22px] w-[22px] items-center justify-center rounded-xs text-muted hover:bg-surface-strong/55 hover:text-ink"
-                >
+                <IconButton onClick={() => void discard(entry.id)} aria-label={t("resume.discardButton")}>
                   <Icon icon={Trash2} size={11} />
-                </button>
+                </IconButton>
               </div>
             </li>
           );

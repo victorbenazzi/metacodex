@@ -96,7 +96,7 @@ export function TabTrailingActions({
               aria-label={t("sourceControl.toggle")}
               aria-pressed={panelOpen}
               className={cn(
-                "inline-flex items-center gap-[5px] px-[8px] font-mono text-[10px] leading-none tabular-nums transition-colors duration-[var(--dur-fast)]",
+                "inline-flex items-center gap-[5px] px-[8px] font-mono text-[10px] leading-none tabular-nums transition-colors duration-fast",
                 "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-hairline-strong",
                 panelOpen
                   ? "bg-surface-strong/70 text-ink"

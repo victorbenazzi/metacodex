@@ -29,7 +29,7 @@ export function Tooltip({
             sideOffset={8}
             className={cn(
               "z-50 rounded-sm border border-hairline bg-surface-card px-[8px] py-[5px]",
-              "text-[12px] text-ink font-medium tracking-tight",
+              "text-caption text-ink font-medium tracking-tight",
               "data-[state=delayed-open]:animate-fade-in data-[state=instant-open]:animate-fade-in data-[state=closed]:animate-fade-out",
             )}
           >

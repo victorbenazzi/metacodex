@@ -33,17 +33,17 @@ export function TodoCard() {
         <Icon
           icon={ChevronRight}
           size={13}
-          className={cn("shrink-0 text-muted-soft transition-transform duration-150", open && "rotate-90")}
+          className={cn("shrink-0 text-muted-soft transition-transform duration-fast", open && "rotate-90")}
         />
-        <span className="text-[12.5px] font-medium text-ink">{t("agent.todo.title")}</span>
-        <span className="text-[12px] text-muted-soft">
+        <span className="text-caption font-medium text-ink">{t("agent.todo.title")}</span>
+        <span className="text-caption text-muted-soft">
           {done}/{todos.length}
         </span>
       </button>
       {open ? (
         <ul className="flex flex-col gap-[4px] px-[14px] pb-[10px]">
           {todos.map((td, i) => (
-            <li key={`${i}-${td.content.slice(0, 24)}`} className="flex items-start gap-[8px] text-[12.5px]">
+            <li key={`${i}-${td.content.slice(0, 24)}`} className="flex items-start gap-[8px] text-caption">
               <TodoIcon status={td.status} />
               <span
                 className={cn(

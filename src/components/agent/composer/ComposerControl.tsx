@@ -29,7 +29,7 @@ export const ComposerControl = forwardRef<HTMLButtonElement, ComposerControlProp
       type="button"
       className={cn(
         "inline-flex h-[30px] min-w-0 max-w-[190px] items-center gap-[6px] rounded-pill border px-[10px]",
-        "text-[12px] leading-none outline-none transition-colors duration-150",
+        "text-caption leading-none outline-none transition-colors duration-fast",
         "border-hairline text-body hover:bg-surface-strong/40",
         "data-[state=open]:border-ink data-[state=open]:bg-surface-strong/40",
         "focus-visible:ring-2 focus-visible:ring-ink/20",
@@ -39,7 +39,7 @@ export const ComposerControl = forwardRef<HTMLButtonElement, ComposerControlProp
     >
       {dot ? (
         <span
-          className="h-[8px] w-[8px] shrink-0 rounded-full"
+          className="h-[8px] w-[8px] shrink-0 rounded-pill"
           style={{ backgroundColor: dot }}
         />
       ) : (

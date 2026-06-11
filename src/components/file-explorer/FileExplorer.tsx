@@ -140,14 +140,14 @@ export function FileExplorer({
 
         {rootChildren === undefined || rootChildren === "loading" ? (
           creatingAtRoot ? null : (
-            <p className="px-[16px] py-[10px] font-mono text-[11px] text-muted-soft">
+            <p className="px-[16px] py-[10px] font-mono text-label text-muted-soft">
               {t("common.loading")}
             </p>
           )
         ) : Array.isArray(rootChildren) ? (
           rootChildren.length === 0 ? (
             creatingAtRoot ? null : (
-              <p className="px-[16px] py-[10px] font-mono text-[11px] text-muted-soft">
+              <p className="px-[16px] py-[10px] font-mono text-label text-muted-soft">
                 {t("explorer.emptyFolder")}
               </p>
             )
@@ -169,7 +169,7 @@ export function FileExplorer({
           )
         ) : (
           <div className="px-[16px] py-[10px]">
-            <p className="font-mono text-[11px] text-danger">
+            <p className="font-mono text-label text-danger">
               {t("explorer.couldNotReadFolder")}
             </p>
             <p className="mt-[2px] font-mono text-[10px] text-muted-soft" title={rootChildren.error}>
@@ -178,7 +178,7 @@ export function FileExplorer({
             <button
               type="button"
               onClick={() => void refresh(projectId, rootPath)}
-              className="mt-[8px] inline-flex h-[24px] items-center rounded-sm border border-hairline-strong px-[10px] text-[12px] text-ink hover:bg-surface-strong/40"
+              className="mt-[8px] inline-flex h-[24px] items-center rounded-sm border border-hairline-strong px-[10px] text-caption text-ink hover:bg-surface-strong/40"
             >
               {t("common.retry")}
             </button>

@@ -137,7 +137,7 @@ export function ScheduledTaskDialog({
         <div className="flex flex-col gap-[18px]">
           {!isEdit ? (
             <div className="rounded-lg border border-hairline-strong bg-surface-1 p-[12px]">
-              <div className="mb-[8px] flex items-center gap-[6px] text-[12px] font-medium text-body">
+              <div className="mb-[8px] flex items-center gap-[6px] text-caption font-medium text-body">
                 <Icon icon={Sparkles} size={13} className="text-muted" />
                 {t("agent.scheduled.dialog.fromChatTitle")}
               </div>
@@ -153,12 +153,12 @@ export function ScheduledTaskDialog({
                     void generate();
                   }
                 }}
-                className="w-full resize-none rounded-md border border-hairline-soft bg-canvas px-[10px] py-[8px] text-[13px] leading-[1.5] text-ink outline-none transition-colors duration-150 focus:border-ink"
+                className="w-full resize-none rounded-md border border-hairline-soft bg-canvas px-[10px] py-[8px] text-ui leading-[1.5] text-ink outline-none transition-colors duration-fast focus:border-ink"
               />
               <div className="mt-[8px] flex items-center justify-between gap-[10px]">
                 <span
                   className={cn(
-                    "text-[11.5px] leading-[1.4]",
+                    "text-label leading-[1.4]",
                     nlError ? "text-danger" : "text-muted-soft",
                   )}
                 >
@@ -190,9 +190,9 @@ export function ScheduledTaskDialog({
                 onChange={(e) => setName(e.target.value)}
                 placeholder={t("agent.scheduled.dialog.namePlaceholder")}
                 autoFocus={!focusChat}
-                className="h-[38px] w-full rounded-md border border-hairline-strong bg-surface-1 pl-[12px] pr-[52px] text-[13px] text-ink outline-none transition-colors duration-150 focus:border-ink"
+                className="h-[38px] w-full rounded-md border border-hairline-strong bg-surface-1 pl-[12px] pr-[52px] text-ui text-ink outline-none transition-colors duration-fast focus:border-ink"
               />
-              <span className="pointer-events-none absolute right-[12px] top-1/2 -translate-y-1/2 font-mono text-[11px] tabular-nums text-muted-soft">
+              <span className="pointer-events-none absolute right-[12px] top-1/2 -translate-y-1/2 font-mono text-label tabular-nums text-muted-soft">
                 {name.length}/{NAME_MAX}
               </span>
             </div>
@@ -204,14 +204,14 @@ export function ScheduledTaskDialog({
               onChange={(e) => setPrompt(e.target.value)}
               rows={4}
               placeholder={t("agent.scheduled.dialog.requirementPlaceholder")}
-              className="w-full resize-none rounded-md border border-hairline-strong bg-surface-1 px-[12px] py-[10px] text-[13px] leading-[1.55] text-ink outline-none transition-colors duration-150 focus:border-ink"
+              className="w-full resize-none rounded-md border border-hairline-strong bg-surface-1 px-[12px] py-[10px] text-ui leading-[1.55] text-ink outline-none transition-colors duration-fast focus:border-ink"
             />
           </Field>
 
           {/* Not a <label>: CronField contains its own buttons + input, which
               must not be implicitly associated with a wrapping label. */}
           <div className="flex flex-col gap-[8px]">
-            <span className="text-[12px] font-medium text-body">
+            <span className="text-caption font-medium text-body">
               {t("agent.scheduled.dialog.schedule")}
               <span className="ml-[3px] text-danger">*</span>
             </span>
@@ -220,7 +220,7 @@ export function ScheduledTaskDialog({
 
           {/* Where the unattended run executes; surfaced so an edit can never
               silently point elsewhere. */}
-          <p className="text-[11.5px] leading-[1.5] text-muted-soft">
+          <p className="text-label leading-[1.5] text-muted-soft">
             {t("agent.scheduled.dialog.runsIn")}{" "}
             <span className="font-mono text-muted">
               {directory ?? t("agent.project.noFolder")}
@@ -228,7 +228,7 @@ export function ScheduledTaskDialog({
           </p>
 
           {submitError ? (
-            <p className="text-[12px] leading-[1.5] text-danger">
+            <p className="text-caption leading-[1.5] text-danger">
               {t("agent.scheduled.dialog.saveFailed")} {submitError}
             </p>
           ) : null}
@@ -249,7 +249,7 @@ function Field({
 }) {
   return (
     <label className="flex flex-col gap-[8px]">
-      <span className={cn("text-[12px] font-medium text-body")}>
+      <span className={cn("text-caption font-medium text-body")}>
         {label}
         {required ? <span className="ml-[3px] text-danger">*</span> : null}
       </span>

@@ -20,7 +20,7 @@ export function PanelShell({
         <header className="mb-[20px] flex items-start justify-between gap-[16px]">
           <div className="min-w-0">
             <h1 className="font-display text-[24px] tracking-[-0.01em] text-ink">{title}</h1>
-            {subtitle ? <p className="mt-[4px] text-[13px] text-muted">{subtitle}</p> : null}
+            {subtitle ? <p className="mt-[4px] text-ui text-muted">{subtitle}</p> : null}
           </div>
           {action ? <div className="shrink-0">{action}</div> : null}
         </header>
@@ -45,7 +45,7 @@ export function SectionHeader({
     <header className="mb-[18px] flex items-start justify-between gap-[16px]">
       <div className="min-w-0">
         <h2 className="font-display text-[18px] tracking-[-0.01em] text-ink">{title}</h2>
-        {subtitle ? <p className="mt-[4px] text-[13px] text-muted">{subtitle}</p> : null}
+        {subtitle ? <p className="mt-[4px] text-ui text-muted">{subtitle}</p> : null}
       </div>
       {action ? <div className="shrink-0">{action}</div> : null}
     </header>

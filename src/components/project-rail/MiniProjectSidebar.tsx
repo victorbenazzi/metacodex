@@ -251,9 +251,9 @@ export function MiniProjectSidebar({ onOpenFolder, onCloneFromGithub }: MiniProj
               className="pointer-events-none absolute left-[6px] right-[6px] flex items-center"
               style={{ top: `${indicatorY - 1}px`, height: "3px" }}
             >
-              <span className="h-[6px] w-[6px] -ml-[1px] rounded-full bg-ink" />
+              <span className="h-[6px] w-[6px] -ml-[1px] rounded-pill bg-ink" />
               <span className="h-[2px] flex-1 bg-ink" />
-              <span className="h-[6px] w-[6px] -mr-[1px] rounded-full bg-ink" />
+              <span className="h-[6px] w-[6px] -mr-[1px] rounded-pill bg-ink" />
             </span>
           ) : null}
 
@@ -268,7 +268,7 @@ export function MiniProjectSidebar({ onOpenFolder, onCloneFromGithub }: MiniProj
                 // vertical pointer drags as page scroll, which would cancel
                 // pointermove before we cross the drag threshold.
                 className={cn(
-                  "relative touch-none transition-opacity duration-150",
+                  "relative touch-none transition-opacity duration-fast",
                   isBeingDragged ? "opacity-30" : "opacity-100",
                   // cursor: grab signals draggability; switches to grabbing
                   // globally via body.is-reordering-projects.
@@ -407,10 +407,10 @@ export function MiniProjectSidebar({ onOpenFolder, onCloneFromGithub }: MiniProj
             }
           >
             <div className="space-y-[8px]">
-              <p className="text-[13px] text-body">
+              <p className="text-ui text-body">
                 <span className="font-medium text-ink">{removeTarget.name}</span>{t("projectRail.removeBodySuffix")}
               </p>
-              <p className="font-mono text-[11px] text-muted-soft">{removeTarget.path}</p>
+              <p className="font-mono text-label text-muted-soft">{removeTarget.path}</p>
             </div>
           </DialogContent>
         )}

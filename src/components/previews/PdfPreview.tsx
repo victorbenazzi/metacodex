@@ -107,7 +107,7 @@ export function PdfPreview({ path, preview = false }: PdfPreviewProps) {
           >
             <Icon icon={ChevronLeft} size={13} />
           </Button>
-          <span className="font-mono text-[11px] text-muted">
+          <span className="font-mono text-label text-muted">
             {page} / {pageCount || "…"}
           </span>
           <Button
@@ -123,8 +123,11 @@ export function PdfPreview({ path, preview = false }: PdfPreviewProps) {
       </header>
       <div className="flex flex-1 items-start justify-center overflow-auto bg-canvas-soft p-[24px]">
         {error ? (
-          <p className="font-mono text-[12px] text-danger">{error}</p>
+          <p className="font-mono text-caption text-danger">{error}</p>
         ) : (
+          // bg-white is a deliberate token carve-out: PDF pages are white in
+          // both themes, so the placeholder must match the page, not the app
+          // surface.
           <canvas ref={canvasRef} className="border border-hairline bg-white" />
         )}
       </div>

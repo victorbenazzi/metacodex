@@ -26,7 +26,7 @@ export function EditedFilesChip() {
         type="button"
         onClick={() => setOpen(true)}
         title={t("agent.chat.viewDiff")}
-        className="-mx-[4px] flex items-center gap-[6px] self-start rounded-md px-[4px] py-[2px] text-[12.5px] text-muted hover:bg-surface-2 hover:text-ink"
+        className="-mx-[4px] flex items-center gap-[6px] self-start rounded-md px-[4px] py-[2px] text-caption text-muted hover:bg-surface-2 hover:text-ink"
       >
         <Icon icon={FileDiff} size={13} className="shrink-0 text-muted-soft" />
         {t("agent.chat.filesChanged", { count: editedFiles.length })}

@@ -63,6 +63,9 @@
      at AA contrast in both themes (~5:1 light, ~4.7:1 dark). */
   --update-blue: #3b6fb8;
   --update-blue-strong: #3162c9;
+  /* Text over the solid update-blue surface. Stays white in BOTH themes:
+     dark-theme --on-primary is near-black and would fail AA on this blue. */
+  --on-update: #ffffff;
 
   /* Diff / git change gutter */
   --diff-add: #3a9b76;
@@ -107,13 +110,15 @@
   --space-xl: calc(32px * var(--density-multiplier));
 
   /* Type scale. The chrome operates on a strict 4-tier scale (label, caption,
-     ui, title) plus 2 display tiers (display-s, display-l) reserved for hero
-     surfaces. Anything outside this range is a sign the surface drifted out
-     of system. Letter-spacing for `label` is exposed as --tracking-label so
-     uppercase eyebrow rows stay consistent across components. */
+     ui, title) plus a reading tier (content, for chat/markdown prose) and 3
+     display tiers (display-s, display, display-l) reserved for hero surfaces.
+     Anything outside this range is a sign the surface drifted out of system.
+     Letter-spacing for uppercase eyebrows is exposed as --tracking-label
+     (Tailwind `tracking-label`) so eyebrow rows stay consistent. */
   --fs-label: 11px;
   --fs-caption: 12px;
   --fs-ui: 13px;
+  --fs-content: 14px;
   --fs-title: 15px;
   --fs-display-s: 22px;
   --fs-display: 44px;

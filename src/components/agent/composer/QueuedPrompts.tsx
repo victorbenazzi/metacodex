@@ -17,14 +17,14 @@ export function QueuedPrompts() {
 
   return (
     <div className="flex flex-col gap-[4px] px-[12px] pt-[10px]">
-      <span className="text-[10.5px] uppercase tracking-[0.04em] text-muted-soft">
+      <span className="text-[10px] uppercase tracking-label text-muted-soft">
         {t("agent.composer.queue.queued", { count: queue.length })}
       </span>
       <div className="flex flex-wrap gap-[6px]">
         {queue.map((q) => (
           <span
             key={q.id}
-            className="flex max-w-full items-center gap-[6px] rounded-md border border-hairline bg-surface-1 px-[8px] py-[4px] text-[12px]"
+            className="flex max-w-full items-center gap-[6px] rounded-md border border-hairline bg-surface-1 px-[8px] py-[4px] text-caption"
           >
             <button
               type="button"

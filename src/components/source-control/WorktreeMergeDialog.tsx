@@ -73,8 +73,8 @@ export function WorktreeMergeDialog({
                     : "border-hairline-strong hover:bg-surface-strong/25",
                 )}
               >
-                <span className="text-[12px] font-medium text-ink">{t(s.titleKey)}</span>
-                <span className="text-[11px] text-muted">{t(s.hintKey)}</span>
+                <span className="text-caption font-medium text-ink">{t(s.titleKey)}</span>
+                <span className="text-label text-muted">{t(s.hintKey)}</span>
               </button>
             );
           })}

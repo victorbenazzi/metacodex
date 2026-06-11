@@ -108,7 +108,7 @@ export function SearchDialog() {
           aria-describedby={undefined}
           className={cn(
             "fixed left-1/2 top-[12vh] z-[101] -translate-x-1/2",
-            "max-h-[72vh] w-[min(720px,92vw)] overflow-hidden rounded-lg border border-hairline bg-surface-card",
+            "max-h-[72vh] w-[min(720px,92vw)] overflow-hidden rounded-md border border-hairline bg-surface-card",
             "data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out",
           )}
         >
@@ -153,21 +153,21 @@ export function SearchDialog() {
 
           <div className="max-h-[60vh] overflow-y-auto px-[6px] py-[6px]">
             {!project ? (
-              <p className="px-[14px] py-[14px] text-[12px] text-muted">
+              <p className="px-[14px] py-[14px] text-caption text-muted">
                 {t("search.openToSearch")}
               </p>
             ) : err ? (
-              <p className="px-[14px] py-[14px] text-[12px] text-danger">{err}</p>
+              <p className="px-[14px] py-[14px] text-caption text-danger">{err}</p>
             ) : busy && !results ? (
-              <p className="px-[14px] py-[14px] font-mono text-[11px] text-muted-soft">{t("common.searching")}</p>
+              <p className="px-[14px] py-[14px] font-mono text-label text-muted-soft">{t("common.searching")}</p>
             ) : !results ? (
               query.trim() ? null : (
-                <p className="px-[14px] py-[14px] text-[12px] text-muted">
+                <p className="px-[14px] py-[14px] text-caption text-muted">
                   {t("search.typeToSearch")}
                 </p>
               )
             ) : results.totalMatches === 0 ? (
-              <p className="px-[14px] py-[14px] text-[12px] text-muted">{t("search.noMatches")}</p>
+              <p className="px-[14px] py-[14px] text-caption text-muted">{t("search.noMatches")}</p>
             ) : (
               <ResultsList
                 results={results}
@@ -178,7 +178,7 @@ export function SearchDialog() {
           </div>
 
           {results ? (
-            <footer className="flex items-center justify-between border-t border-hairline-soft px-[14px] py-[8px] font-mono text-[11px] text-muted-soft">
+            <footer className="flex items-center justify-between border-t border-hairline-soft px-[14px] py-[8px] font-mono text-label text-muted-soft">
               <span>
                 {t("search.summary", { matches: results.totalMatches, files: results.files.length })}
                 {results.truncated ? t("search.truncated") : ""}
@@ -215,7 +215,7 @@ function SearchInput({
       placeholder={placeholder}
       disabled={disabled}
       className={cn(
-        "flex-1 bg-transparent text-[13px] text-ink outline-none placeholder:text-muted-soft",
+        "flex-1 bg-transparent text-ui text-ink outline-none placeholder:text-muted-soft",
         "font-mono tracking-tight",
       )}
     />
@@ -266,7 +266,7 @@ function ResultsList({
         const rel = relativeTo(file.path, rootPath);
         return (
           <li key={file.path} className="rounded-sm">
-            <header className="px-[10px] py-[6px] font-mono text-[11px] text-muted">
+            <header className="px-[10px] py-[6px] font-mono text-label text-muted">
               <span className="text-ink">{basename(file.path)}</span>{" "}
               <span className="text-muted-soft">{dirOf(rel)}</span>
             </header>
@@ -281,7 +281,7 @@ function ResultsList({
                     <span className="w-[36px] shrink-0 text-right font-mono text-[10px] text-muted-soft">
                       {m.line}
                     </span>
-                    <span className="flex-1 truncate font-mono text-[12px] text-body">
+                    <span className="flex-1 truncate font-mono text-caption text-body">
                       {renderHighlight(m.lineText, m.start, m.end)}
                     </span>
                   </button>

@@ -130,7 +130,7 @@ export function NewTabBody({ actions, C }: { actions: NewTabActions; C: MenuComp
             onSelect={() =>
               updateSettings("interface", { autonomousAgentsExpanded: !autonomousExpanded })
             }
-            className={cn(itemClass, "uppercase tracking-[0.08em]")}
+            className={cn(itemClass, "uppercase tracking-label")}
             trailing={
               <Icon
                 icon={autonomousExpanded ? ChevronDown : ChevronRight}

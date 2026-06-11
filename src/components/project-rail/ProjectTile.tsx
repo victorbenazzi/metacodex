@@ -91,7 +91,7 @@ export const ProjectTile = forwardRef<HTMLButtonElement, ProjectTileProps>(funct
         aria-label={t("projectRail.switchTo", { name: project.name })}
         aria-current={active ? "true" : undefined}
         className={cn(
-          "relative inline-flex h-[40px] w-[40px] items-center justify-center rounded-md border bg-surface-card transition-[border-color,background-color,color,opacity] duration-150 ease-out",
+          "relative inline-flex h-[40px] w-[40px] items-center justify-center rounded-md border bg-surface-card transition-[border-color,background-color,color,opacity] duration-fast ease-out",
           "focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[3px]",
           active
             ? "border-hairline-strong"
@@ -122,7 +122,7 @@ export const ProjectTile = forwardRef<HTMLButtonElement, ProjectTileProps>(funct
         ) : (
           <span
             className={cn(
-              "font-display leading-none transition-colors duration-150",
+              "font-display leading-none transition-colors duration-fast",
               active ? "font-medium" : "text-muted",
             )}
             style={{ fontSize: mark.length > 1 ? "14px" : "18px" }}
@@ -133,7 +133,7 @@ export const ProjectTile = forwardRef<HTMLButtonElement, ProjectTileProps>(funct
         {active ? (
           <span
             aria-hidden
-            className="absolute -left-[10px] top-1/2 h-[18px] w-[2px] -translate-y-1/2 rounded-full"
+            className="absolute -left-[10px] top-1/2 h-[18px] w-[2px] -translate-y-1/2 rounded-pill"
             style={{ backgroundColor: markerColor }}
           />
         ) : null}

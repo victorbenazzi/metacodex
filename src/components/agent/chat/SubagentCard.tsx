@@ -45,16 +45,16 @@ function SubagentCard({ child }: { child: ChildSession }) {
           <Icon icon={Loader2} size={14} className="shrink-0 animate-spin text-muted" />
         )}
         <span className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-[13px] font-medium text-ink">
+          <span className="truncate text-ui font-medium text-ink">
             {child.title || child.agent}
           </span>
-          <span className="truncate text-[12px] text-muted-soft">{subtitle}</span>
+          <span className="truncate text-caption text-muted-soft">{subtitle}</span>
         </span>
         <Icon
           icon={ChevronRight}
           size={14}
           className={cn(
-            "shrink-0 text-muted-soft transition-transform duration-150",
+            "shrink-0 text-muted-soft transition-transform duration-fast",
             open && "rotate-90",
           )}
         />
@@ -63,7 +63,7 @@ function SubagentCard({ child }: { child: ChildSession }) {
       {open ? (
         <div className="border-t border-hairline-soft px-[14px] py-[12px]">
           {child.error ? (
-            <div className="mb-[8px] flex items-start gap-[6px] text-[12px] text-danger">
+            <div className="mb-[8px] flex items-start gap-[6px] text-caption text-danger">
               <Icon icon={AlertTriangle} size={12} className="mt-[2px] shrink-0" />
               <span className="min-w-0 break-words">{child.error}</span>
             </div>
@@ -75,7 +75,7 @@ function SubagentCard({ child }: { child: ChildSession }) {
               ))}
             </div>
           ) : !child.error ? (
-            <div className="flex items-center gap-[8px] text-[12px] text-muted-soft">
+            <div className="flex items-center gap-[8px] text-caption text-muted-soft">
               <Icon icon={Loader2} size={12} className="animate-spin" />
               {t("agent.swarm.starting")}
             </div>
@@ -103,12 +103,12 @@ export function SubagentGroup() {
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-[6px] self-start text-[13px] text-muted hover:text-body"
+        className="flex items-center gap-[6px] self-start text-ui text-muted hover:text-body"
       >
         <Icon
           icon={ChevronDown}
           size={14}
-          className={cn("text-muted-soft transition-transform duration-150", !open && "-rotate-90")}
+          className={cn("text-muted-soft transition-transform duration-fast", !open && "-rotate-90")}
         />
         {t("agent.swarm.started", { count: children.length })}
       </button>

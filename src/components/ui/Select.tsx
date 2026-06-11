@@ -29,7 +29,7 @@ export function Select({ value, onValueChange, options, ariaLabel, className }: 
         aria-label={ariaLabel}
         className={cn(
           "inline-flex h-[30px] min-w-[160px] items-center justify-between gap-[8px] rounded-sm",
-          "border border-hairline-strong bg-canvas px-[10px] text-[12px] text-ink outline-none",
+          "border border-hairline-strong bg-canvas px-[10px] text-caption text-ink outline-none",
           "transition-colors hover:bg-surface-strong/45",
           "focus-visible:ring-2 focus-visible:ring-ink/25 data-[state=open]:border-ink",
           className,
@@ -56,7 +56,7 @@ export function Select({ value, onValueChange, options, ariaLabel, className }: 
                 value={opt.value}
                 className={cn(
                   "flex cursor-pointer items-center justify-between gap-[12px] rounded-sm px-[10px] py-[7px]",
-                  "text-[12px] text-ink outline-none data-[highlighted]:bg-surface-strong/70",
+                  "text-caption text-ink outline-none data-[highlighted]:bg-surface-strong/70",
                 )}
               >
                 <RS.ItemText>{opt.label}</RS.ItemText>

@@ -308,7 +308,7 @@ export function AgentComposer({
           }}
           style={{ maxHeight: MAX_TEXTAREA_PX }}
           className={cn(
-            "block w-full resize-none overflow-y-auto bg-transparent text-[14px] leading-[1.5] text-ink outline-none placeholder:text-muted-soft",
+            "block w-full resize-none overflow-y-auto bg-transparent text-content leading-[1.5] text-ink outline-none placeholder:text-muted-soft",
             compact ? "min-h-[40px] px-[14px] pt-[10px]" : "min-h-[64px] px-[16px] pt-[14px]",
           )}
         />
@@ -345,7 +345,7 @@ export function AgentComposer({
                     onClick={submit}
                     title={t("agent.composer.queue.enqueue")}
                     aria-label={t("agent.composer.queue.enqueue")}
-                    className="inline-flex h-[30px] w-[30px] items-center justify-center rounded-full border border-hairline text-muted hover:bg-surface-2 hover:text-ink"
+                    className="inline-flex h-[30px] w-[30px] items-center justify-center rounded-pill border border-hairline text-muted transition-colors hover:bg-surface-2 hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-hairline-strong"
                   >
                     <Icon icon={ListPlus} size={14} />
                   </button>
@@ -354,7 +354,7 @@ export function AgentComposer({
                   type="button"
                   onClick={() => void stop()}
                   aria-label={t("agent.composer.stop")}
-                  className="inline-flex h-[30px] w-[30px] items-center justify-center rounded-full bg-ink text-on-primary"
+                  className="press-feedback inline-flex h-[30px] w-[30px] items-center justify-center rounded-pill bg-ink text-on-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-hairline-strong"
                 >
                   <Icon icon={Square} size={12} strokeWidth={3} />
                 </button>
@@ -365,7 +365,7 @@ export function AgentComposer({
                 onClick={submit}
                 disabled={!canSend}
                 aria-label={t("agent.composer.send")}
-                className="inline-flex h-[30px] w-[30px] items-center justify-center rounded-full bg-ink text-on-primary disabled:bg-surface-2 disabled:text-muted-soft"
+                className="press-feedback inline-flex h-[30px] w-[30px] items-center justify-center rounded-pill bg-ink text-on-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-hairline-strong disabled:bg-surface-2 disabled:text-muted-soft"
               >
                 <Icon icon={ArrowUp} size={16} strokeWidth={2.25} />
               </button>
@@ -375,18 +375,18 @@ export function AgentComposer({
       </div>
 
       {shellCommand !== null ? (
-        <p className="mt-[6px] px-[2px] text-[11px] text-muted-soft">
+        <p className="mt-[6px] px-[2px] text-label text-muted-soft">
           {busy ? t("agent.composer.shellBusyHint") : t("agent.composer.shellHint")}
         </p>
       ) : canQueue && text.trim() ? (
-        <p className="mt-[6px] px-[2px] text-[11px] text-muted-soft">
+        <p className="mt-[6px] px-[2px] text-label text-muted-soft">
           {t("agent.composer.queue.hint")}
         </p>
       ) : null}
 
       {error ? (
         <div className="mt-[8px] flex items-start justify-between gap-[10px] rounded-md border border-danger/30 bg-danger/5 px-[12px] py-[8px]">
-          <p className="min-w-0 text-[12px] leading-[1.5] text-danger">{error}</p>
+          <p className="min-w-0 text-caption leading-[1.5] text-danger">{error}</p>
           <button
             type="button"
             aria-label={t("agent.chat.dismissError")}

@@ -29,18 +29,18 @@ export function PermissionCard({ prompt }: { prompt: PermissionPrompt }) {
   return (
     <div className="rounded-lg border border-hairline bg-surface-card p-[14px] shadow-elevated">
       <div className="flex items-start gap-[10px]">
-        <span className="mt-[1px] flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-warn/12 text-warn">
+        <span className="mt-[1px] flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-pill bg-warn/12 text-warn">
           <Icon icon={ShieldAlert} size={14} strokeWidth={2} />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-[13px] font-medium text-ink">{t("agent.permission.requestTitle")}</p>
-          <p className="mt-[2px] flex flex-wrap items-center gap-x-[6px] gap-y-[2px] text-[12px] text-body">
+          <p className="text-ui font-medium text-ink">{t("agent.permission.requestTitle")}</p>
+          <p className="mt-[2px] flex flex-wrap items-center gap-x-[6px] gap-y-[2px] text-caption text-body">
             {t("agent.permission.requestBody")}
-            <code className="rounded-sm bg-surface-2 px-[6px] py-[1px] font-mono text-[11px] text-ink">
+            <code className="rounded-sm bg-surface-2 px-[6px] py-[1px] font-mono text-label text-ink">
               {prompt.action}
             </code>
             {target ? (
-              <span className="min-w-0 truncate font-mono text-[11px] text-muted">
+              <span className="min-w-0 truncate font-mono text-label text-muted">
                 {target}
                 {extra > 0 ? ` ${t("agent.permission.moreTargets", { count: extra })}` : ""}
               </span>

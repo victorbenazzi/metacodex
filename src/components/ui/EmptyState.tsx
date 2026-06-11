@@ -45,12 +45,12 @@ export function EmptyState({
       >
         {icon ? <Icon icon={icon} size={20} className="text-muted-soft" /> : null}
         {title ? (
-          <p className="font-display text-[15px] leading-[1.35] text-body">
+          <p className="font-display text-title leading-[1.35] text-body">
             {title}
           </p>
         ) : null}
         {body ? (
-          <p className="max-w-[260px] text-[12px] leading-[1.55] text-muted">
+          <p className="max-w-[260px] text-caption leading-[1.55] text-muted">
             {body}
           </p>
         ) : null}

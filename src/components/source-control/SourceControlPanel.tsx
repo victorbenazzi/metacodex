@@ -108,11 +108,11 @@ export function SourceControlPanel({
 
       <div className="shrink-0 border-b border-hairline-soft px-[14px] py-[12px]">
         {git?.branch ? (
-          <div className="flex min-w-0 items-center gap-[6px] font-mono text-[12px]">
+          <div className="flex min-w-0 items-center gap-[6px] font-mono text-caption">
             <Icon icon={GitBranch} size={11} strokeWidth={2} className="shrink-0 text-muted-soft" />
             <span className="min-w-0 truncate text-body" title={git.branch}>{git.branch}</span>
             {git.ahead > 0 || git.behind > 0 ? (
-              <span className="ml-auto inline-flex shrink-0 items-center gap-[6px] font-mono text-[11px] tabular-nums text-muted">
+              <span className="ml-auto inline-flex shrink-0 items-center gap-[6px] font-mono text-label tabular-nums text-muted">
                 {git.ahead > 0 ? (
                   <span className="inline-flex items-center gap-[1px]">
                     <Icon icon={ArrowUp} size={10} strokeWidth={2} />
@@ -132,17 +132,17 @@ export function SourceControlPanel({
 
         <div className="mt-[10px] flex items-baseline gap-[12px]">
           <Tooltip content={t("sourceControl.additions", { count: totalAdditions })} side="bottom">
-            <span className="whitespace-nowrap font-mono text-[15px] font-medium leading-none tabular-nums text-success/85">
+            <span className="whitespace-nowrap font-mono text-title font-medium leading-none tabular-nums text-success/85">
               +{compactCount(totalAdditions)}
             </span>
           </Tooltip>
           <Tooltip content={t("sourceControl.deletions", { count: totalDeletions })} side="bottom">
-            <span className="whitespace-nowrap font-mono text-[15px] font-medium leading-none tabular-nums text-danger/85">
+            <span className="whitespace-nowrap font-mono text-title font-medium leading-none tabular-nums text-danger/85">
               −{compactCount(totalDeletions)}
             </span>
           </Tooltip>
           {count > 0 ? (
-            <span className="ml-auto shrink-0 font-mono text-[11px] tabular-nums text-muted-soft">
+            <span className="ml-auto shrink-0 font-mono text-label tabular-nums text-muted-soft">
               {t("sourceControl.changedFiles", { count })}
             </span>
           ) : null}
@@ -167,19 +167,19 @@ export function SourceControlPanel({
             return (
               <div
                 key={absPath}
-                className="group grid min-h-[32px] grid-cols-[minmax(0,1fr)_48px_48px_28px] items-center gap-[2px] px-[8px] transition-colors duration-[var(--dur-fast)] hover:bg-surface-strong/35"
+                className="group grid min-h-[32px] grid-cols-[minmax(0,1fr)_48px_48px_28px] items-center gap-[2px] px-[8px] transition-colors duration-fast hover:bg-surface-strong/35"
               >
                 <button
                   type="button"
                   onClick={() => onOpenDiff(absPath, code)}
                   title={absPath}
                   aria-label={`${t(gitStatusLabelKey(code))}: ${rel}`}
-                  className="flex min-w-0 items-center gap-[8px] rounded-xs px-[6px] py-[5px] text-left transition-colors duration-[var(--dur-fast)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-hairline-strong"
+                  className="flex min-w-0 items-center gap-[8px] rounded-xs px-[6px] py-[5px] text-left transition-colors duration-fast focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-hairline-strong"
                 >
                   <span className="inline-flex h-[18px] min-w-[25px] shrink-0 items-center justify-center rounded-xs border border-hairline bg-surface-card px-[4px] font-mono text-[10px] leading-none tracking-tight text-muted-soft">
                     {fileBadge(name)}
                   </span>
-                  <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-body group-hover:text-ink">
+                  <span className="min-w-0 flex-1 truncate font-mono text-caption text-body group-hover:text-ink">
                     {showDir ? <span className="text-muted">{dir}/</span> : null}
                     <span className="text-ink">{name}</span>
                   </span>
@@ -196,10 +196,10 @@ export function SourceControlPanel({
                   </Tooltip>
                 </button>
 
-                <span className="justify-self-end font-mono text-[12px] tabular-nums text-success/85">
+                <span className="justify-self-end font-mono text-caption tabular-nums text-success/85">
                   {additions > 0 ? `+${compactCount(additions)}` : ""}
                 </span>
-                <span className="justify-self-end font-mono text-[12px] tabular-nums text-danger/85">
+                <span className="justify-self-end font-mono text-caption tabular-nums text-danger/85">
                   {deletions > 0 ? `-${compactCount(deletions)}` : ""}
                 </span>
                 <Tooltip content={t("sourceControl.openDiff")} side="left">
@@ -209,7 +209,7 @@ export function SourceControlPanel({
                     aria-label={`${t("sourceControl.openDiff")}: ${rel}`}
                     className={cn(
                       "inline-flex h-[26px] w-[26px] items-center justify-center justify-self-end rounded-xs text-muted",
-                      "opacity-75 transition-colors duration-[var(--dur-fast)] hover:bg-surface-strong/55 hover:text-ink group-hover:opacity-100",
+                      "opacity-75 transition-colors duration-fast hover:bg-surface-strong/55 hover:text-ink group-hover:opacity-100",
                       "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-hairline-strong",
                     )}
                   >

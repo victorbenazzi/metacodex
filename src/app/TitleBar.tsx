@@ -96,7 +96,7 @@ export function TitleBar({ workspaceName, className }: TitleBarProps) {
         {/* Project + branch are redundant in Agent mode (shown under the
             composer), so the topbar only carries them in Code view. */}
         {view !== "agent" && workspaceName ? (
-          <span data-tauri-drag-region className="font-mono text-[11px] text-ink">
+          <span data-tauri-drag-region className="font-mono text-label text-ink">
             {workspaceName}
           </span>
         ) : null}
@@ -106,7 +106,7 @@ export function TitleBar({ workspaceName, className }: TitleBarProps) {
         {view !== "agent" && git && git.branch ? (
           <span
             data-tauri-drag-region
-            className="inline-flex items-center gap-[5px] font-mono text-[11px] text-muted"
+            className="inline-flex items-center gap-[5px] font-mono text-label text-muted"
           >
             <Icon icon={GitBranch} size={10} strokeWidth={2} />
             <span data-tauri-drag-region className="text-ink">
@@ -182,7 +182,7 @@ function PanelToggle({
         aria-pressed={pressed}
         className={cn(
           "inline-flex h-[24px] items-center gap-[5px] rounded-sm border border-hairline px-[7px] font-mono text-[10px] leading-none tabular-nums",
-          "transition-colors duration-[var(--dur-fast)]",
+          "transition-colors duration-fast",
           "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-hairline-strong",
           pressed
             ? "bg-surface-strong/70 text-ink"
@@ -244,11 +244,11 @@ function SaveStatusDot() {
       onClick={handleClick}
       title={title}
       className={cn(
-        "justify-self-end inline-flex h-[14px] w-[14px] items-center justify-center rounded-full transition-opacity duration-200",
+        "justify-self-end inline-flex h-[14px] w-[14px] items-center justify-center rounded-pill transition-opacity duration-base",
         status === "failed" ? "cursor-pointer" : "cursor-default",
       )}
     >
-      <span className={cn("inline-block h-[6px] w-[6px] rounded-full", color)} />
+      <span className={cn("inline-block h-[6px] w-[6px] rounded-pill", color)} />
     </button>
   );
 }

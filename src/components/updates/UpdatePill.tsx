@@ -27,7 +27,7 @@ export function UpdatePill() {
 
   const colorClass = isError
     ? "border-[var(--warn)]/45 bg-[var(--warn)]/12 text-[var(--warn)] hover:bg-[var(--warn)]/18"
-    : "border-[var(--update-blue-strong)] bg-[var(--update-blue-strong)] text-white hover:brightness-110";
+    : "border-[var(--update-blue-strong)] bg-[var(--update-blue-strong)] text-on-update hover:brightness-110";
 
   let label: string;
   let LeftIcon = Download;
@@ -67,8 +67,8 @@ export function UpdatePill() {
       disabled={isBusy}
       title={label}
       className={cn(
-        "inline-flex items-center gap-[6px] rounded-full border px-[10px] py-[2px]",
-        "font-mono text-[11px] leading-none transition-colors duration-150",
+        "inline-flex items-center gap-[6px] rounded-pill border px-[10px] py-[2px]",
+        "font-mono text-label leading-none transition-colors duration-fast",
         isBusy ? "cursor-default" : "cursor-pointer",
         colorClass,
       )}

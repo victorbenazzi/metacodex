@@ -43,14 +43,14 @@ function Chip({ attachment }: { attachment: PendingAttachment }) {
   return (
     <div
       className={cn(
-        "group/chip relative flex max-w-[220px] items-center gap-[6px] rounded-md border border-hairline bg-surface-2 py-[4px] pl-[6px] pr-[22px] text-[12px] text-ink",
+        "group/chip relative flex max-w-[220px] items-center gap-[6px] rounded-md border border-hairline bg-surface-2 py-[4px] pl-[6px] pr-[22px] text-caption text-ink",
         error && "border-danger/40 text-danger",
       )}
     >
       <ChipVisual attachment={attachment} loading={loading} error={error} />
       <span className="min-w-0 truncate">{chipLabel(attachment)}</span>
       {error ? (
-        <span className="shrink-0 whitespace-nowrap text-[11px] opacity-80">
+        <span className="shrink-0 whitespace-nowrap text-label opacity-80">
           {t(errorKey(attachment))}
         </span>
       ) : null}

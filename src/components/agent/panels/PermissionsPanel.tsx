@@ -95,11 +95,11 @@ export function PermissionsSection() {
         subtitle={t("agent.permissions.subtitle")}
       />
       {error ? (
-        <p className="text-[13px] text-danger">
+        <p className="text-ui text-danger">
           {t("agent.permissions.loadFailed")} ({error})
         </p>
       ) : rows === null ? (
-        <div className="flex items-center gap-[8px] text-[13px] text-muted">
+        <div className="flex items-center gap-[8px] text-ui text-muted">
           <Icon icon={Loader2} size={14} className="animate-spin" />
           {t("agent.permissions.loading")}
         </div>
@@ -117,10 +117,10 @@ export function PermissionsSection() {
               key={row.id}
               className="flex items-center gap-[12px] rounded-lg border border-hairline bg-surface-card px-[14px] py-[10px]"
             >
-              <code className="shrink-0 rounded-sm bg-surface-2 px-[6px] py-[2px] text-[12px] text-ink">
+              <code className="shrink-0 rounded-sm bg-surface-2 px-[6px] py-[2px] text-caption text-ink">
                 {row.action || "action"}
               </code>
-              <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-muted">
+              <span className="min-w-0 flex-1 truncate font-mono text-caption text-muted">
                 {row.resource}
               </span>
               <Button size="sm" variant="ghost" onClick={() => setRevoking(row)}>
@@ -140,7 +140,7 @@ export function PermissionsSection() {
         description={t("agent.permissions.revokeConfirmBody")}
         details={
           revoking ? (
-            <span className="font-mono text-[11px]">
+            <span className="font-mono text-label">
               {revoking.action} {revoking.resource}
             </span>
           ) : undefined

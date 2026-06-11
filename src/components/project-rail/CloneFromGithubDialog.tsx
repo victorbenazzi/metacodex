@@ -218,7 +218,7 @@ export function CloneFromGithubDialog({ open, onOpenChange }: CloneFromGithubDia
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               disabled={busy}
-              className="block w-full rounded-sm border border-hairline-strong bg-canvas px-[10px] py-[7px] font-mono text-[12px] text-ink outline-none placeholder:text-muted-soft focus:border-ink disabled:opacity-60"
+              className="block w-full rounded-sm border border-hairline-strong bg-canvas px-[10px] py-[7px] font-mono text-caption text-ink outline-none placeholder:text-muted-soft focus:border-ink disabled:opacity-60"
               placeholder={t("cloneFromGithub.url.placeholder")}
               maxLength={2048}
             />
@@ -237,7 +237,7 @@ export function CloneFromGithubDialog({ open, onOpenChange }: CloneFromGithubDia
                 value={parentDir}
                 onChange={(e) => setParentDir(e.target.value)}
                 disabled={busy}
-                className="block w-full rounded-sm border border-hairline-strong bg-canvas px-[10px] py-[7px] font-mono text-[12px] text-ink outline-none placeholder:text-muted-soft focus:border-ink disabled:opacity-60"
+                className="block w-full rounded-sm border border-hairline-strong bg-canvas px-[10px] py-[7px] font-mono text-caption text-ink outline-none placeholder:text-muted-soft focus:border-ink disabled:opacity-60"
                 placeholder={t("cloneFromGithub.parent.placeholder")}
               />
               <Button
@@ -268,19 +268,19 @@ export function CloneFromGithubDialog({ open, onOpenChange }: CloneFromGithubDia
                 if (!folderNameTouched) setFolderNameTouched(true);
               }}
               disabled={busy}
-              className="block w-full rounded-sm border border-hairline-strong bg-canvas px-[10px] py-[7px] font-mono text-[12px] text-ink outline-none placeholder:text-muted-soft focus:border-ink disabled:opacity-60"
+              className="block w-full rounded-sm border border-hairline-strong bg-canvas px-[10px] py-[7px] font-mono text-caption text-ink outline-none placeholder:text-muted-soft focus:border-ink disabled:opacity-60"
               placeholder={t("cloneFromGithub.name.placeholder")}
               maxLength={200}
             />
             {folderNameInvalid ? (
-              <p className="text-[11px] text-danger">
+              <p className="text-label text-danger">
                 {t("cloneFromGithub.errors.nameInvalid")}
               </p>
             ) : null}
           </div>
 
           {destPreview ? (
-            <p className="font-mono text-[11px] text-muted-soft">
+            <p className="font-mono text-label text-muted-soft">
               {t("cloneFromGithub.preview")}{" "}
               <span className="text-muted">{destPreview}</span>
             </p>
@@ -288,7 +288,7 @@ export function CloneFromGithubDialog({ open, onOpenChange }: CloneFromGithubDia
 
           {busy ? (
             <div className="space-y-[6px]" aria-live="polite">
-              <div className="flex items-center justify-between gap-[8px] text-[12px] text-muted">
+              <div className="flex items-center justify-between gap-[8px] text-caption text-muted">
                 <span className="flex items-center gap-[6px]">
                   <Icon icon={Loader2} size={12} className="animate-spin" />
                   <span>{progress ? progress.phase : t("cloneFromGithub.connecting")}</span>
@@ -301,7 +301,7 @@ export function CloneFromGithubDialog({ open, onOpenChange }: CloneFromGithubDia
             </div>
           ) : null}
 
-          {err ? <p className="text-[12px] text-danger whitespace-pre-wrap">{err}</p> : null}
+          {err ? <p className="text-caption text-danger whitespace-pre-wrap">{err}</p> : null}
         </form>
       </DialogContent>
     </DialogRoot>
@@ -332,7 +332,7 @@ function ProgressBar({ percent }: { percent: number | null }) {
       ) : (
         <span
           aria-hidden
-          className="absolute inset-y-0 left-0 bg-ink transition-[width] duration-200 ease-out"
+          className="absolute inset-y-0 left-0 bg-ink transition-[width] duration-base ease-out"
           style={{ width: `${Math.max(0, Math.min(100, percent ?? 0))}%` }}
         />
       )}

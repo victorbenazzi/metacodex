@@ -47,13 +47,13 @@ export const ChatMessage = memo(function ChatMessage({ message }: { message: Msg
         <AssistantPart key={part.id} part={part} />
       ))}
       {message.error ? (
-        <div className="flex items-start gap-[6px] self-start rounded-md border border-danger/30 bg-danger/8 px-[10px] py-[7px] text-[12px] text-danger">
+        <div className="flex items-start gap-[6px] self-start rounded-md border border-danger/30 bg-danger/8 px-[10px] py-[7px] text-caption text-danger">
           <Icon icon={AlertTriangle} size={13} className="mt-[1px] shrink-0" />
           <span className="min-w-0 break-words">{message.error}</span>
         </div>
       ) : null}
       {message.finish === "length" ? (
-        <span className="self-start text-[11px] text-muted-soft">{t("agent.chat.truncated")}</span>
+        <span className="self-start text-label text-muted-soft">{t("agent.chat.truncated")}</span>
       ) : null}
       <MetaFooter message={message} />
     </div>
@@ -76,7 +76,7 @@ function MetaFooter({ message }: { message: Msg }) {
   }
   if (bits.length === 0) return null;
   return (
-    <span className="self-start text-[11px] text-muted-soft opacity-0 transition-opacity duration-150 group-hover/msg:opacity-100">
+    <span className="self-start text-label text-muted-soft opacity-0 transition-opacity duration-fast group-hover/msg:opacity-100">
       {bits.join(" · ")}
     </span>
   );
@@ -107,20 +107,20 @@ function UserMessage({ message }: { message: Msg }) {
       ) : null}
       {text ? (
         message.shell ? (
-          <div className="flex max-w-[80%] items-baseline gap-[8px] rounded-2xl rounded-br-sm border border-warn/25 bg-surface-2 px-[14px] py-[9px] font-mono text-[13px] leading-[1.55] text-ink">
+          <div className="flex max-w-[80%] items-baseline gap-[8px] rounded-xl rounded-br-sm border border-warn/25 bg-surface-2 px-[14px] py-[9px] font-mono text-ui leading-[1.55] text-ink">
             <span aria-hidden className="select-none text-muted-soft">
               $
             </span>
             <span className="min-w-0 whitespace-pre-wrap break-words">{text}</span>
           </div>
         ) : (
-          <div className="max-w-[80%] whitespace-pre-wrap rounded-2xl rounded-br-sm bg-surface-2 px-[14px] py-[9px] text-[14px] leading-[1.55] text-ink">
+          <div className="max-w-[80%] whitespace-pre-wrap rounded-xl rounded-br-sm bg-surface-2 px-[14px] py-[9px] text-content leading-[1.55] text-ink">
             {text}
           </div>
         )
       ) : null}
       {message.relay ? (
-        <span className="text-[11px] text-muted-soft">{t("agent.chat.visionRelayNote")}</span>
+        <span className="text-label text-muted-soft">{t("agent.chat.visionRelayNote")}</span>
       ) : null}
       <UserMessageActions message={message} />
     </div>
@@ -176,12 +176,12 @@ function UserMessageActions({ message }: { message: Msg }) {
         <span>{t("agent.chat.revert.filesAffected", { count: affected.length })}</span>
         <ul className="space-y-[2px]">
           {affected.slice(0, 8).map((f) => (
-            <li key={f} className="truncate font-mono text-[11px]">
+            <li key={f} className="truncate font-mono text-label">
               {relPath(f, directory)}
             </li>
           ))}
           {affected.length > 8 ? (
-            <li className="text-[11px] text-muted-soft">
+            <li className="text-label text-muted-soft">
               {t("agent.chat.revert.moreFiles", { count: affected.length - 8 })}
             </li>
           ) : null}
@@ -207,7 +207,7 @@ function UserMessageActions({ message }: { message: Msg }) {
 
   return (
     <>
-      <div className="flex items-center gap-[2px] opacity-0 transition-opacity duration-150 group-hover/msg:opacity-100">
+      <div className="flex items-center gap-[2px] opacity-0 transition-opacity duration-fast group-hover/msg:opacity-100">
         {typedText
           ? actionButton(Pencil, t("agent.chat.edit.action"), () => openWithSummary("edit"))
           : null}
@@ -287,7 +287,7 @@ function FileChip({ file }: { file: NonNullable<ChatPart["file"]> }) {
     );
   }
   return (
-    <div className="flex items-center gap-[6px] rounded-md border border-hairline bg-surface-card px-[10px] py-[6px] text-[12px]">
+    <div className="flex items-center gap-[6px] rounded-md border border-hairline bg-surface-card px-[10px] py-[6px] text-caption">
       <Icon icon={FileText} size={13} className="shrink-0 text-muted" />
       <span className="max-w-[200px] truncate font-mono text-ink">
         {file.filename ?? t("agent.chat.fileFallback")}
@@ -319,21 +319,21 @@ function AssistantPart({ part }: { part: ChatPart }) {
       ) : null;
     case "patch":
       return (
-        <div className="flex items-center gap-[8px] self-start rounded-lg border border-hairline bg-surface-card px-[12px] py-[9px] text-[13px]">
+        <div className="flex items-center gap-[8px] self-start rounded-lg border border-hairline bg-surface-card px-[12px] py-[9px] text-ui">
           <Icon icon={FileText} size={14} className="shrink-0 text-muted" />
           <span className="text-muted">{t("agent.chat.patch")}</span>
         </div>
       );
     case "retry":
       return (
-        <div className="flex items-center gap-[6px] self-start text-[12px] text-muted-soft">
+        <div className="flex items-center gap-[6px] self-start text-caption text-muted-soft">
           <Icon icon={RotateCcw} size={12} className="shrink-0" />
           {t("agent.chat.retried")}
         </div>
       );
     case "compaction":
       return (
-        <div className="flex items-center gap-[8px] self-stretch text-[11px] text-muted-soft">
+        <div className="flex items-center gap-[8px] self-stretch text-label text-muted-soft">
           <span className="h-px flex-1 bg-hairline-soft" />
           {t("agent.chat.compacted")}
           <span className="h-px flex-1 bg-hairline-soft" />
@@ -343,7 +343,7 @@ function AssistantPart({ part }: { part: ChatPart }) {
       const text = part.text ?? "";
       if (!text) return null;
       return (
-        <div className="agent-md text-[14px] leading-[1.65] text-body">
+        <div className="agent-md text-content leading-[1.65] text-body">
           <Streamdown parseIncompleteMarkdown plugins={SD_PLUGINS} translations={translations}>
             {text}
           </Streamdown>
@@ -369,17 +369,17 @@ function Reasoning({ part }: { part: ChatPart }) {
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
-        className="-ml-[2px] flex items-center gap-[5px] rounded-sm px-[2px] py-[1px] text-[13px] text-muted hover:text-body"
+        className="-ml-[2px] flex items-center gap-[5px] rounded-sm px-[2px] py-[1px] text-ui text-muted hover:text-body"
       >
         <Icon
           icon={ChevronRight}
           size={13}
-          className={cn("text-muted-soft transition-transform duration-150", open && "rotate-90")}
+          className={cn("text-muted-soft transition-transform duration-fast", open && "rotate-90")}
         />
         {label}
       </button>
       {open ? (
-        <div className="mt-[4px] whitespace-pre-wrap border-l border-hairline-soft pl-[12px] text-[12px] leading-[1.55] text-muted">
+        <div className="mt-[4px] whitespace-pre-wrap border-l border-hairline-soft pl-[12px] text-caption leading-[1.55] text-muted">
           {text}
         </div>
       ) : null}
@@ -411,7 +411,7 @@ function ToolRow({ tool, time }: { tool?: ToolState; time?: ChatPart["time"] }) 
 
   if (view.kind === "file") {
     return (
-      <div className="flex items-center gap-[8px] self-start rounded-lg border border-hairline bg-surface-card px-[12px] py-[9px] text-[13px]">
+      <div className="flex items-center gap-[8px] self-start rounded-lg border border-hairline bg-surface-card px-[12px] py-[9px] text-ui">
         {running ? (
           <Icon icon={Loader2} size={14} className="shrink-0 animate-spin text-muted" />
         ) : (
@@ -419,21 +419,21 @@ function ToolRow({ tool, time }: { tool?: ToolState; time?: ChatPart["time"] }) 
         )}
         <span className="truncate font-mono text-ink">{view.target ?? view.verb}</span>
         {view.additions ? (
-          <span className="shrink-0 font-mono text-[12px] text-success">+{view.additions}</span>
+          <span className="shrink-0 font-mono text-caption text-success">+{view.additions}</span>
         ) : null}
       </div>
     );
   }
 
   return (
-    <div className="flex max-w-full items-center gap-[6px] self-start text-[13px]">
+    <div className="flex max-w-full items-center gap-[6px] self-start text-ui">
       {running ? <Icon icon={Loader2} size={12} className="shrink-0 animate-spin text-muted" /> : null}
       <span className="shrink-0 text-muted">{view.verb}</span>
       {view.target ? (
-        <span className="truncate font-mono text-[12px] text-muted-soft">{view.target}</span>
+        <span className="truncate font-mono text-caption text-muted-soft">{view.target}</span>
       ) : null}
       {!running && secs != null && secs >= 3 ? (
-        <span className="shrink-0 text-[11px] text-muted-soft">{secs}s</span>
+        <span className="shrink-0 text-label text-muted-soft">{secs}s</span>
       ) : null}
     </div>
   );
@@ -451,7 +451,7 @@ function ToolError({ tool, view }: { tool: ToolState; view: ToolView }) {
         aria-expanded={open}
         onClick={() => detail && setOpen((o) => !o)}
         className={cn(
-          "flex max-w-full items-center gap-[6px] text-left text-[13px]",
+          "flex max-w-full items-center gap-[6px] text-left text-ui",
           detail ? "cursor-pointer" : "cursor-default",
         )}
       >
@@ -460,21 +460,21 @@ function ToolError({ tool, view }: { tool: ToolState; view: ToolView }) {
           {t("agent.tool.failed", { tool: view.verb })}
         </span>
         {view.target ? (
-          <span className="truncate font-mono text-[12px] text-muted-soft">{view.target}</span>
+          <span className="truncate font-mono text-caption text-muted-soft">{view.target}</span>
         ) : null}
         {detail ? (
           <Icon
             icon={ChevronRight}
             size={12}
             className={cn(
-              "shrink-0 text-muted-soft transition-transform duration-150",
+              "shrink-0 text-muted-soft transition-transform duration-fast",
               open && "rotate-90",
             )}
           />
         ) : null}
       </button>
       {open && detail ? (
-        <pre className="max-h-[200px] max-w-full overflow-auto whitespace-pre-wrap border-l border-danger/30 pl-[12px] font-mono text-[11.5px] leading-[1.5] text-muted">
+        <pre className="max-h-[200px] max-w-full overflow-auto whitespace-pre-wrap border-l border-danger/30 pl-[12px] font-mono text-label leading-[1.5] text-muted">
           {detail.slice(0, 4000)}
         </pre>
       ) : null}

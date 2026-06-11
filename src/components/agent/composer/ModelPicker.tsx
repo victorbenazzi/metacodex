@@ -69,7 +69,7 @@ export function ModelPicker() {
       </DropdownTrigger>
       <DropdownContent align="start" className="max-h-[340px] min-w-[240px] overflow-y-auto">
         {providers.length === 0 ? (
-          <div className="px-[10px] py-[8px] text-[12px] text-muted">
+          <div className="px-[10px] py-[8px] text-caption text-muted">
             {loadingModels ? t("agent.settings.loadingModels") : t("agent.settings.noModels")}
           </div>
         ) : (

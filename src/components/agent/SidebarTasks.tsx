@@ -48,7 +48,7 @@ export function SidebarTasks() {
 
   if (tasks.length === 0) {
     return (
-      <p className="px-[10px] py-[4px] text-[12px] leading-[1.5] text-muted">
+      <p className="px-[10px] py-[4px] text-caption leading-[1.5] text-muted">
         {t("agent.sidebar.tasksEmpty")}
       </p>
     );
@@ -66,14 +66,14 @@ export function SidebarTasks() {
               type="button"
               onClick={() => toggle(task.id)}
               title={schedule.valid ? schedule.text : task.cron}
-              className="group flex w-full items-center gap-[7px] rounded-md px-[10px] py-[6px] text-left transition-colors duration-150 hover:bg-surface-1"
+              className="group flex w-full items-center gap-[7px] rounded-md px-[10px] py-[6px] text-left transition-colors duration-fast hover:bg-surface-1"
             >
               <Icon
                 icon={isOpen ? ChevronDown : ChevronRight}
                 size={13}
                 className="shrink-0 text-muted-soft"
               />
-              <span className="flex-1 truncate text-[13px] text-body">{task.title}</span>
+              <span className="flex-1 truncate text-ui text-body">{task.title}</span>
               {!task.enabled ? (
                 <span className="shrink-0 text-[10px] text-muted-soft">
                   {t("agent.scheduled.card.off")}
@@ -88,7 +88,7 @@ export function SidebarTasks() {
             {isOpen ? (
               <div className="ml-[21px] mb-[2px] flex flex-col gap-[1px] border-l border-hairline-soft pl-[8px]">
                 {runs.length === 0 ? (
-                  <p className="px-[8px] py-[3px] text-[11.5px] text-muted-soft">
+                  <p className="px-[8px] py-[3px] text-label text-muted-soft">
                     {t("agent.sidebar.noRuns")}
                   </p>
                 ) : (
@@ -104,7 +104,7 @@ export function SidebarTasks() {
                         disabled={!run.sessionId}
                         title={isError ? run.status : undefined}
                         className={cn(
-                          "flex items-center gap-[7px] rounded-sm px-[8px] py-[3px] text-left text-[11.5px] transition-colors duration-150",
+                          "flex items-center gap-[7px] rounded-sm px-[8px] py-[3px] text-left text-label transition-colors duration-fast",
                           run.sessionId
                             ? "text-muted hover:bg-surface-1 hover:text-ink"
                             : "cursor-default text-muted-soft",
@@ -113,7 +113,7 @@ export function SidebarTasks() {
                         <span
                           aria-hidden
                           className={cn(
-                            "h-[5px] w-[5px] shrink-0 rounded-full",
+                            "h-[5px] w-[5px] shrink-0 rounded-pill",
                             isError ? "bg-danger" : "bg-success",
                           )}
                         />

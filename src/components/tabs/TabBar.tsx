@@ -525,7 +525,7 @@ export function TabBar({
                 }}
                 className={cn(
                   "group relative flex h-[34px] min-w-[140px] max-w-[220px] shrink-0 items-center gap-[8px] border-r border-hairline px-[10px]",
-                  "transition-colors duration-100",
+                  "transition-colors duration-fast",
                   active
                     ? "bg-canvas text-ink"
                     : "bg-canvas-soft text-muted hover:bg-surface-strong/40 hover:text-body",
@@ -537,7 +537,7 @@ export function TabBar({
                     convention. Reading order: state → identity → name → controls. */}
                 {tab.dirty ? (
                   <span
-                    className="h-[6px] w-[6px] shrink-0 rounded-full bg-ink"
+                    className="h-[6px] w-[6px] shrink-0 rounded-pill bg-ink"
                     aria-label={t("tabs.unsavedChanges")}
                   />
                 ) : null}
@@ -555,7 +555,7 @@ export function TabBar({
                     onCancel={() => setEditingTabId(null)}
                   />
                 ) : (
-                  <span className="flex-1 truncate text-left font-mono text-[12px] tracking-tight">
+                  <span className="flex-1 truncate text-left font-mono text-caption tracking-tight">
                     {displayedTitle}
                   </span>
                 )}
@@ -575,7 +575,7 @@ export function TabBar({
                     onClose(tab.id);
                   }}
                   className={cn(
-                    "inline-flex h-[18px] w-[18px] items-center justify-center rounded-xs text-muted opacity-0 transition-all duration-100",
+                    "inline-flex h-[18px] w-[18px] items-center justify-center rounded-xs text-muted opacity-0 transition-all duration-fast",
                     "hover:bg-surface-strong/80 hover:text-ink group-hover:opacity-100",
                     active && "opacity-60",
                   )}
@@ -639,7 +639,7 @@ export function TabBar({
             return (
               <div
                 aria-hidden
-                className="pointer-events-none fixed z-[60] flex h-[34px] min-w-[140px] max-w-[220px] items-center gap-[8px] rounded-sm border border-hairline bg-canvas px-[10px] font-mono text-[12px] text-ink shadow-lg"
+                className="pointer-events-none fixed z-[60] flex h-[34px] min-w-[140px] max-w-[220px] items-center gap-[8px] rounded-sm border border-hairline bg-canvas px-[10px] font-mono text-caption text-ink shadow-lg"
                 style={{
                   left: pointerPos.x + 10,
                   top: pointerPos.y - 10,
@@ -722,7 +722,7 @@ function TabRenameInput({ initial, onCommit, onCancel }: TabRenameInputProps) {
       onBlur={commit}
       className={cn(
         "flex-1 min-w-0 truncate rounded-xs border border-accent/60 bg-surface-strong/45 px-[4px]",
-        "text-left font-mono text-[12px] tracking-tight text-ink",
+        "text-left font-mono text-caption tracking-tight text-ink",
         "outline-none focus:border-accent focus:outline-none",
       )}
     />

@@ -75,7 +75,7 @@ export function PermissionPicker() {
                 <span className={active ? "text-ink" : undefined}>
                   {t(`agent.permission.${p.value}`)}
                 </span>
-                <span className="text-[11px] font-normal text-muted">
+                <span className="text-label font-normal text-muted">
                   {t(`agent.permission.${p.value}Desc`)}
                 </span>
               </span>

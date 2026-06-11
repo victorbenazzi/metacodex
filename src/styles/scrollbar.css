@@ -16,7 +16,7 @@
   background: transparent;
   border: 3px solid transparent;
   background-clip: padding-box;
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
   transition: background-color var(--dur-base) var(--ease-out);
 }
 *:hover::-webkit-scrollbar-thumb,

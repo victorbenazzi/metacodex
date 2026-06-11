@@ -123,7 +123,7 @@ export function Segmented<T extends string>({
       {pill && thumb ? (
         <span
           aria-hidden
-          className="absolute bottom-[3px] top-[3px] rounded-pill border border-hairline-soft bg-surface-card shadow-elevated transition-[left,width] duration-[180ms] ease-out motion-reduce:transition-none"
+          className="absolute bottom-[3px] top-[3px] rounded-pill border border-hairline-soft bg-surface-card shadow-elevated transition-[left,width] duration-base ease-out motion-reduce:transition-none"
           style={{ left: thumb.left, width: thumb.width }}
         />
       ) : null}
@@ -141,10 +141,10 @@ export function Segmented<T extends string>({
             tabIndex={active ? 0 : -1}
             onClick={() => onChange(opt.value)}
             className={cn(
-              "relative inline-flex items-center justify-center gap-[5px] font-medium transition-colors duration-150",
+              "relative inline-flex items-center justify-center gap-[5px] font-medium transition-colors duration-fast",
               pill
-                ? cn("rounded-pill", sm ? "h-[20px] px-[10px] text-[12px]" : "h-[26px] px-[12px] text-[12px]")
-                : cn("rounded-sm", sm ? "h-[20px] px-[8px] text-[11px]" : "h-[26px] px-[11px] text-[12px]"),
+                ? cn("rounded-pill", sm ? "h-[20px] px-[10px] text-caption" : "h-[26px] px-[12px] text-caption")
+                : cn("rounded-sm", sm ? "h-[20px] px-[8px] text-label" : "h-[26px] px-[11px] text-caption"),
               active
                 ? pill
                   ? "text-ink"
@@ -160,7 +160,7 @@ export function Segmented<T extends string>({
               <span
                 aria-label={opt.dotLabel}
                 aria-live="polite"
-                className="ml-[1px] inline-block h-[5px] w-[5px] shrink-0 rounded-full bg-muted animate-tab-status-pulse"
+                className="ml-[1px] inline-block h-[5px] w-[5px] shrink-0 rounded-pill bg-muted animate-tab-status-pulse"
               />
             ) : null}
           </button>

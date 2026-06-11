@@ -23,8 +23,8 @@ interface AgentViewProps {
 function ReconnectingBanner() {
   const { t } = useTranslation();
   return (
-    <div className="flex items-center justify-center gap-[8px] border-b border-hairline-soft bg-surface-1 px-[12px] py-[5px] text-[12px] text-muted">
-      <span className="inline-block h-[6px] w-[6px] animate-pulse rounded-full bg-warn" />
+    <div className="flex items-center justify-center gap-[8px] border-b border-hairline-soft bg-surface-1 px-[12px] py-[5px] text-caption text-muted">
+      <span className="inline-block h-[6px] w-[6px] animate-pulse rounded-pill bg-warn" />
       {t("agent.chat.reconnecting")}
     </div>
   );

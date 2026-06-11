@@ -46,7 +46,7 @@ export function CronField({
               type="button"
               onClick={() => onChange(p.expr)}
               className={cn(
-                "h-[26px] rounded-pill border px-[11px] text-[11.5px] font-medium transition-colors duration-150",
+                "h-[26px] rounded-pill border px-[11px] text-label font-medium transition-colors duration-fast",
                 active
                   ? "border-ink bg-ink text-on-primary"
                   : "border-hairline-strong text-body hover:bg-surface-strong/45",
@@ -69,7 +69,7 @@ export function CronField({
         aria-label={t("agent.scheduled.dialog.schedule")}
         aria-invalid={showError}
         className={cn(
-          "h-[38px] rounded-md border bg-surface-1 px-[12px] font-mono text-[13px] tracking-[0.02em] text-ink outline-none transition-colors duration-150",
+          "h-[38px] rounded-md border bg-surface-1 px-[12px] font-mono text-ui tracking-[0.02em] text-ink outline-none transition-colors duration-fast",
           showError
             ? "border-danger focus:border-danger"
             : "border-hairline-strong focus:border-ink",
@@ -78,7 +78,7 @@ export function CronField({
 
       <p
         className={cn(
-          "min-h-[16px] text-[12px] leading-[1.5]",
+          "min-h-[16px] text-caption leading-[1.5]",
           showError ? "text-danger" : desc.valid ? "text-body" : "text-muted",
         )}
       >

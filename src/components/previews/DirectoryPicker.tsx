@@ -87,7 +87,7 @@ export function DirectoryPicker({
             }
           }}
           className={cn(
-            "flex h-[26px] cursor-pointer items-center gap-[4px] rounded-xs pr-[8px] text-[12px]",
+            "flex h-[26px] cursor-pointer items-center gap-[4px] rounded-xs pr-[8px] text-caption",
             isSel
               ? "bg-surface-strong/70 text-ink"
               : "text-body hover:bg-surface-strong/40",
@@ -106,7 +106,7 @@ export function DirectoryPicker({
             <Icon
               icon={ChevronRight}
               size={12}
-              className={cn("transition-transform duration-150", isOpen && "rotate-90")}
+              className={cn("transition-transform duration-fast", isOpen && "rotate-90")}
             />
           </button>
           <Icon icon={Folder} size={13} className="shrink-0 text-muted" />
@@ -116,7 +116,7 @@ export function DirectoryPicker({
           <div>
             {kids === "loading" ? (
               <p
-                className="py-[3px] text-[11px] text-muted-soft"
+                className="py-[3px] text-label text-muted-soft"
                 style={{ paddingLeft: indent + 20 }}
               >
                 {t("common.loading")}
