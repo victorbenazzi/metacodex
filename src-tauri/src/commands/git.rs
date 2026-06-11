@@ -1,6 +1,6 @@
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -12,6 +12,7 @@ use crate::events::{GitCloneProgressPayload, EV_GIT_CLONE_PROGRESS};
 use crate::git::{file_head_content, git_info, GitInfo};
 use crate::projects::ProjectsCache;
 use crate::util::paths;
+use crate::util::process::silent_command;
 
 #[tauri::command]
 pub async fn git_status(app: AppHandle, root: String) -> AppResult<Option<GitInfo>> {
@@ -73,7 +74,7 @@ fn ensure_root_allowed(app: &AppHandle, root: &str) -> AppResult<()> {
 }
 
 fn run_git(root: &str, args: &[&str]) -> Result<std::process::Output, AppError> {
-    Command::new("git")
+    silent_command("git")
         .arg("-C")
         .arg(root)
         .args(args)
@@ -135,14 +136,54 @@ fn valid_branch_name(name: &str) -> bool {
 }
 
 fn default_worktree_path(root: &str, branch_name: &str) -> PathBuf {
-    let slug: String = branch_name
+    let mut slug: String = branch_name
         .chars()
         .map(|c| match c {
-            '/' => '-',
+            // Path-separator-ish characters always collapse.
+            '/' | '\\' => '-',
+            // Windows reserved characters (`<>:"|?*`) and any C0 control byte.
+            '<' | '>' | ':' | '"' | '|' | '?' | '*' => '-',
+            c if (c as u32) < 0x20 => '-',
             c if c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.' => c,
             _ => '-',
         })
         .collect();
+    // Windows refuses names ending in `.` or space — strip both.
+    slug = slug.trim_end_matches(['.', ' ']).to_string();
+    if slug.is_empty() {
+        slug = "wt".into();
+    }
+    // Avoid DOS reserved device names (CON, PRN, …). Prefix when the slug
+    // would collide — leading underscore is legal on every FS we target.
+    let upper = slug.to_uppercase();
+    let reserved = matches!(
+        upper.as_str(),
+        "CON"
+            | "PRN"
+            | "AUX"
+            | "NUL"
+            | "COM1"
+            | "COM2"
+            | "COM3"
+            | "COM4"
+            | "COM5"
+            | "COM6"
+            | "COM7"
+            | "COM8"
+            | "COM9"
+            | "LPT1"
+            | "LPT2"
+            | "LPT3"
+            | "LPT4"
+            | "LPT5"
+            | "LPT6"
+            | "LPT7"
+            | "LPT8"
+            | "LPT9"
+    );
+    if reserved {
+        slug = format!("_{slug}");
+    }
     PathBuf::from(root)
         .join(".metacodex")
         .join("worktrees")
@@ -341,7 +382,7 @@ pub async fn git_clone(
     let op_id_clone = op_id.clone();
 
     tokio::task::spawn_blocking(move || -> AppResult<String> {
-        let mut child = Command::new("git")
+        let mut child = silent_command("git")
             .arg("clone")
             .arg("--progress")
             .arg(&url_trimmed)

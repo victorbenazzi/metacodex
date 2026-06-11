@@ -1,3 +1,5 @@
+#[cfg(windows)]
+pub mod job;
 pub mod session;
 pub mod shell;
 
@@ -63,6 +65,12 @@ pub struct PtyManager {
     /// runtime shutdown would abandon the waiters mid-`child.wait()` and leak
     /// the children as zombies / orphans.
     waiters: Arc<Mutex<HashMap<String, tokio::task::JoinHandle<()>>>>,
+    /// Windows-only: serializes ConPTY spawns. Concurrent `openpty` + spawn
+    /// calls on Windows can leave one PTY with a stalled output pipe (see the
+    /// portable-pty notes); a single mutex around the spawn critical section
+    /// is the documented fix and has negligible overhead.
+    #[cfg(windows)]
+    spawn_lock: Mutex<()>,
     app_handle: AppHandle,
 }
 
@@ -71,11 +79,16 @@ impl PtyManager {
         Self {
             sessions: Arc::new(Mutex::new(HashMap::new())),
             waiters: Arc::new(Mutex::new(HashMap::new())),
+            #[cfg(windows)]
+            spawn_lock: Mutex::new(()),
             app_handle,
         }
     }
 
     pub fn spawn(&self, spec: PtySpawnSpec) -> AppResult<String> {
+        #[cfg(windows)]
+        let _spawn_guard = self.spawn_lock.lock();
+
         let id = Uuid::new_v4().to_string();
 
         let (program, args, kind_label, cli_id) = match &spec.kind {
@@ -132,6 +145,24 @@ impl PtyManager {
 
         let cancel = Arc::new(Notify::new());
 
+        // Windows: assign the spawned process to a KILL_ON_JOB_CLOSE Job Object
+        // so dropping the session terminates the whole descendant tree (the
+        // shell + `claude.cmd` + `node.exe`). Best-effort: if any Win32 call
+        // fails we still return the session — the user just loses descendant
+        // cleanup, which is what we had before this change.
+        #[cfg(windows)]
+        let job = if pid > 0 {
+            match job::PtyJob::assign_pid(pid) {
+                Ok(j) => Some(j),
+                Err(e) => {
+                    eprintln!("[pty] PtyJob::assign_pid failed for pid={pid}: {e}");
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
         let session = Arc::new(PtySession {
             id: id.clone(),
             project_id: spec.project_id.clone(),
@@ -147,6 +178,8 @@ impl PtyManager {
             cancel: cancel.clone(),
             reader_failed: AtomicBool::new(false),
             cwd_override: Mutex::new(None),
+            #[cfg(windows)]
+            job,
         });
 
         self.sessions.lock().insert(id.clone(), session.clone());

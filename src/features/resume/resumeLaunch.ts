@@ -3,6 +3,7 @@ import { resumeFlagFor } from "./sessionDetectors";
 import { cliById, cliLaunchString } from "@/features/terminal/cli-registry";
 import type { Tab } from "@/components/tabs/types";
 import { newId } from "@/lib/idGen";
+import { isWindows } from "@/lib/platform";
 
 /**
  * Build a `Tab` descriptor that, when opened, spawns the CLI with its resume
@@ -32,6 +33,13 @@ export function buildResumeTab(entry: ResumeEntry): Tab | null {
 }
 
 function shellEscape(value: string): string {
+  if (isWindows) {
+    // PowerShell single-quoted strings escape an interior quote by doubling
+    // it: `'it''s'`. No backslash escaping — single quotes inhibit ALL
+    // variable / backtick interpretation, which is what we want for a raw
+    // session id passed to `--resume`.
+    return `'${value.replace(/'/g, "''")}'`;
+  }
   // Conservative: single-quote everything, escaping embedded quotes by closing
   // the quote, inserting `\'` and reopening. Works in bash/zsh/sh.
   return `'${value.replace(/'/g, "'\\''")}'`;

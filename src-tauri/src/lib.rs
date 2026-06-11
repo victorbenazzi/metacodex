@@ -79,6 +79,21 @@ pub fn run() {
             // Trim resume entries older than 30 days. Best-effort: corrupt
             // files are ignored so this never blocks startup.
             commands::resume::prune_blocking(30);
+            // Cold-start "Open With" on Windows/Linux: macOS delivers these as
+            // RunEvent::Opened (Apple Events, handled below). Other platforms
+            // pass file paths via argv on the FIRST launch; the single_instance
+            // callback above only fires from the SECOND launch onward, so the
+            // initial path would otherwise be dropped.
+            #[cfg(not(target_os = "macos"))]
+            {
+                let paths: Vec<String> = std::env::args()
+                    .skip(1)
+                    .filter(|a| !a.starts_with('-'))
+                    .collect();
+                if !paths.is_empty() {
+                    open_files::deliver(app.handle(), paths);
+                }
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

@@ -104,7 +104,12 @@ impl WatcherManager {
                     // is unaffected by edits inside them, and forwarding the
                     // events triggers redundant explorer refreshes for files
                     // the user can't see (the explorer hides hidden dirs).
-                    .filter(|p| !p.contains("/.metacodex/worktrees/"))
+                    // Match both Unix and Windows separators since notify
+                    // reports `\` on Windows and `/` on Unix.
+                    .filter(|p| {
+                        !p.contains("/.metacodex/worktrees/")
+                            && !p.contains("\\.metacodex\\worktrees\\")
+                    })
                     .collect();
                 paths.sort();
                 paths.dedup();
