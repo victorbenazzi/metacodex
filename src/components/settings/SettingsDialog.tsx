@@ -40,6 +40,7 @@ import { CLI_BRAND_ICONS } from "@/components/icons/brand";
 import {
   DEFAULT_CLI_REGISTRY,
   cliCategory,
+  cliInstallCommand,
   isAgentEnabled,
 } from "@/features/terminal/cli-registry";
 import {
@@ -855,12 +856,12 @@ function CliRegistryPane() {
                   >
                     {t("settings.cli.detectedPath")}: {detection.path}
                   </div>
-                ) : cli.installCommand ? (
+                ) : cliInstallCommand(cli) ? (
                   <div
                     className="mt-[2px] truncate font-mono text-[11px] text-muted-soft"
-                    title={cli.installCommand}
+                    title={cliInstallCommand(cli)}
                   >
-                    {t("settings.cli.install")}: {cli.installCommand}
+                    {t("settings.cli.install")}: {cliInstallCommand(cli)}
                   </div>
                 ) : null}
               </div>

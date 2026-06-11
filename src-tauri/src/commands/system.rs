@@ -23,11 +23,11 @@ pub async fn open_external_url(url: String) -> AppResult<()> {
         )));
     }
 
-    use std::process::Command;
+    use crate::util::process::silent_command;
 
     #[cfg(target_os = "macos")]
     {
-        Command::new("open")
+        silent_command("open")
             .arg(&url)
             .status()
             .map_err(|e| AppError::Other(format!("open failed: {e}")))?;
@@ -37,7 +37,7 @@ pub async fn open_external_url(url: String) -> AppResult<()> {
     #[cfg(target_os = "windows")]
     {
         // `start` is a cmd builtin; the empty "" is the window-title argument.
-        Command::new("cmd")
+        silent_command("cmd")
             .args(["/C", "start", "", &url])
             .status()
             .map_err(|e| AppError::Other(format!("start failed: {e}")))?;
@@ -46,7 +46,7 @@ pub async fn open_external_url(url: String) -> AppResult<()> {
 
     #[cfg(all(unix, not(target_os = "macos")))]
     {
-        Command::new("xdg-open")
+        silent_command("xdg-open")
             .arg(&url)
             .status()
             .map_err(|e| AppError::Other(format!("xdg-open failed: {e}")))?;

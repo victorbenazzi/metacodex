@@ -463,9 +463,17 @@ pub fn create_dir(app: &AppHandle, parent: &str, name: &str) -> AppResult<String
 }
 
 fn is_cross_device(e: &std::io::Error) -> bool {
-    // EXDEV (cross-device link) is raw os error 18 on macOS/Linux. We match the raw
-    // code rather than ErrorKind::CrossesDevices, which isn't stable on all toolchains.
-    e.raw_os_error() == Some(18)
+    // We match raw OS codes rather than `ErrorKind::CrossesDevices`, which
+    // isn't stable on all toolchains. EXDEV = 18 on macOS/Linux;
+    // ERROR_NOT_SAME_DEVICE = 17 on Windows.
+    #[cfg(unix)]
+    {
+        e.raw_os_error() == Some(18)
+    }
+    #[cfg(windows)]
+    {
+        e.raw_os_error() == Some(17)
+    }
 }
 
 /// Move a file, falling back to copy + remove when `from` and `to` live on
@@ -600,18 +608,30 @@ pub fn move_into_project(app: &AppHandle, from: &str, to_dir: &str) -> AppResult
 
 /// Atomic write primitive: write to `<path>.<ext>.metacodex.tmp`, then rename over
 /// the target. The tmp lands next to the target (same volume) so the rename is atomic.
+///
+/// Windows: AV / OneDrive / Defender briefly hold handles on the destination during
+/// scans; a single `rename` can hit `ERROR_SHARING_VIOLATION`. We retry twice with
+/// short backoff before surfacing the error.
 fn atomic_write(path: &Path, bytes: &[u8]) -> AppResult<()> {
     let tmp = path.with_extension(format!(
         "{}.metacodex.tmp",
         path.extension().and_then(|s| s.to_str()).unwrap_or("")
     ));
     fs::write(&tmp, bytes).map_err(|e| io_error("write tmp", e))?;
-    fs::rename(&tmp, path).map_err(|e| {
-        // best-effort cleanup
-        let _ = fs::remove_file(&tmp);
-        io_error("rename", e)
-    })?;
-    Ok(())
+    let mut last_err: Option<std::io::Error> = None;
+    for attempt in 0..3 {
+        match fs::rename(&tmp, path) {
+            Ok(()) => return Ok(()),
+            Err(e) => {
+                last_err = Some(e);
+                if attempt < 2 {
+                    std::thread::sleep(std::time::Duration::from_millis(50 * (attempt + 1)));
+                }
+            }
+        }
+    }
+    let _ = fs::remove_file(&tmp);
+    Err(io_error("rename", last_err.expect("retry loop ran")))
 }
 
 /// Atomic write: write to <path>.tmp, then rename over the target.

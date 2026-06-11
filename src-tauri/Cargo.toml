@@ -42,6 +42,20 @@ grep-regex = "0.1"
 grep-matcher = "0.1"
 git2 = { version = "0.18", default-features = false, features = ["vendored-libgit2"] }
 
+# Windows-only.
+# - `netstat2`: fast listening-port enumeration via IP Helper API. Replaces the
+#   macOS `lsof` shell-out path inside `commands::terminal::list_listening_ports`.
+# - `windows`: Job Object bindings (see `pty::job`) so killing a PTY also kills
+#   every descendant (`claude.cmd` → `node.exe`) via `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`.
+[target.'cfg(target_os = "windows")'.dependencies]
+netstat2 = "0.11"
+windows = { version = "0.61", features = [
+  "Win32_Foundation",
+  "Win32_Security",
+  "Win32_System_JobObjects",
+  "Win32_System_Threading",
+] }
+
 [profile.dev]
 incremental = true
 

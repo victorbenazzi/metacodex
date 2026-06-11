@@ -59,7 +59,14 @@ function decodeFileUri(uri: string): string | null {
   const slashIdx = trimmed.indexOf("/", "file://".length);
   if (slashIdx === -1) return null;
   try {
-    return decodeURIComponent(trimmed.slice(slashIdx));
+    let p = decodeURIComponent(trimmed.slice(slashIdx));
+    // Windows OSC 7 emitters (pwsh, Windows Terminal, mosh) format the URI as
+    // `file:///C:/path/to/dir/`, so after stripping `file://` we end up with
+    // `/C:/path/...`. Strip the leading slash when the next chars are a drive
+    // letter + colon — otherwise downstream consumers (cwd validation,
+    // explorer reveal) break on the spurious root slash.
+    if (/^\/[A-Za-z]:[/\\]/.test(p)) p = p.slice(1);
+    return p;
   } catch {
     return null;
   }

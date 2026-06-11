@@ -223,9 +223,11 @@ impl<'a> grep_searcher::Sink for CollectSink<'a> {
 
 /// Workspace-relative path helper for display.
 pub fn relative_to<'a>(path: &'a str, root: &'a str) -> &'a str {
-    let root = root.trim_end_matches('/');
+    // Trim both separators so Windows paths (`C:\proj\`) and Unix paths
+    // (`/home/user/proj/`) normalize the same way before the prefix check.
+    let root = root.trim_end_matches(['/', '\\']);
     if let Some(rest) = path.strip_prefix(root) {
-        rest.trim_start_matches('/')
+        rest.trim_start_matches(['/', '\\'])
     } else {
         path
     }

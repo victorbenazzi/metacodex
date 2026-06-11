@@ -15,11 +15,34 @@ jobs:
   publish-tauri:
     permissions:
       contents: write
-    runs-on: macos-latest
     # Signing turns on automatically once the APPLE_CERTIFICATE secret exists.
     # Until then the build falls back to ad-hoc signing (the previous behavior).
     env:
       SIGN: ${{ secrets.APPLE_CERTIFICATE != '' }}
+    strategy:
+      # Don't cancel the macOS build if Windows/Linux flakes (and vice-versa).
+      # Each platform is independent — a Windows toolchain hiccup shouldn't
+      # block shipping the macOS DMG.
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            target: aarch64-apple-darwin
+            args: "--target aarch64-apple-darwin"
+            label: "macOS Apple Silicon (M1+)"
+          - platform: macos-latest
+            target: x86_64-apple-darwin
+            args: "--target x86_64-apple-darwin"
+            label: "macOS Intel"
+          - platform: windows-latest
+            target: x86_64-pc-windows-msvc
+            args: "--target x86_64-pc-windows-msvc"
+            label: "Windows x64"
+          - platform: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            args: "--target x86_64-unknown-linux-gnu"
+            label: "Linux x64"
+    runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -38,13 +61,30 @@ jobs:
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-darwin
+          targets: ${{ matrix.target }}
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
           workspaces: ./src-tauri -> target
-          key: aarch64-apple-darwin
+          key: ${{ matrix.target }}
+
+      - name: Linux build dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            libgtk-3-dev
 
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
@@ -55,7 +95,7 @@ jobs:
       # This does NOT notarize; the Gatekeeper "unidentified developer" warning
       # (and the one-time `xattr -cr`) still applies.
       - name: Set up self-signed signing keychain
-        if: ${{ env.SIGN == 'true' }}
+        if: ${{ env.SIGN == 'true' && matrix.platform == 'macos-latest' }}
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -106,8 +146,9 @@ jobs:
 
             ### Download
             - **macOS Apple Silicon (M1/M2/M3/M4)** → `metacodex_*_aarch64.dmg`
-
-            > _macOS Intel, Windows and Linux builds are temporarily disabled while we polish them. They will be back soon._
+            - **macOS Intel** → `metacodex_*_x64.dmg`
+            - **Windows x64** → `metacodex_*_x64-setup.exe` (NSIS) or `metacodex_*_x64_en-US.msi` (WiX)
+            - **Linux x64** → `metacodex_*_amd64.AppImage` or `metacodex_*_amd64.deb`
 
             ### Auto-update
             Already running a previous version? metacodex will check for this release on next launch and show an **Update** pill in the top bar. One click — download, install, relaunch. No reinstall.
@@ -121,8 +162,11 @@ jobs:
 
             > _Notarization (what removes this step entirely) needs Apple's $99/year Developer Program. Until metacodex pays its own bill, it's one terminal command on first install. Your granted permissions now survive updates._
 
-            Full instructions: [README → macOS signature error](https://github.com/victorbenazzi/metacodex#macos-signature-error-app-is-damaged--cannot-be-opened).
+            ### Windows SmartScreen notice
+            Windows builds are unsigned. The first launch shows "Windows protected your PC". Click **More info → Run anyway** (one-time). An EV signing cert is on the roadmap.
+
+            Full instructions: [README → installation](https://github.com/victorbenazzi/metacodex#install).
           releaseDraft: true
           prerelease: false
           includeUpdaterJson: true
-          args: "--target aarch64-apple-darwin"
+          args: ${{ matrix.args }}
