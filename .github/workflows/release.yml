@@ -137,6 +137,12 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           # Empty when the secret is absent => tauri-action falls back to ad-hoc.
           APPLE_SIGNING_IDENTITY: ${{ env.SIGN == 'true' && 'metacodex self-signed' || '' }}
+          # GitHub runners have no FUSE, so linuxdeploy's AppImage can't mount
+          # itself ("failed to run linuxdeploy" with no output). Extract-and-run
+          # bypasses FUSE; NO_STRIP avoids a strip step that can also break it.
+          # Harmless on macOS/Windows (only the Linux job reads them).
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+          NO_STRIP: "true"
         with:
           tagName: ${{ github.event.inputs.tag || github.ref_name }}
           releaseName: "metacodex ${{ github.event.inputs.tag || github.ref_name }}"
