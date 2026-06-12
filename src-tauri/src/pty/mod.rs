@@ -6,7 +6,7 @@ use std::io::Read;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use chrono::Utc;
@@ -146,6 +146,7 @@ impl PtyManager {
             killer: Mutex::new(killer),
             cancel: cancel.clone(),
             reader_failed: AtomicBool::new(false),
+            killed: AtomicBool::new(false),
             cwd_override: Mutex::new(None),
         });
 
@@ -254,6 +255,18 @@ impl PtyManager {
             let mut child = child;
             let mut exit_reason: Option<&'static str> = None;
             loop {
+                // Level-triggered cancel check: covers a lost `Notify` wakeup
+                // (kill landing before this task first polls `notified()`).
+                if session_for_waiter.killed.load(Ordering::SeqCst) {
+                    exit_reason = Some(
+                        if session_for_waiter.reader_failed.load(Ordering::SeqCst) {
+                            "reader_error"
+                        } else {
+                            "killed"
+                        },
+                    );
+                    break;
+                }
                 let exited = tokio::select! {
                     _ = cancel_w.notified() => {
                         // Disambiguate: reader thread sets `reader_failed` then
@@ -299,10 +312,41 @@ impl PtyManager {
             }
             // If the loop broke via cancel (kill_all or explicit kill), the child
             // may still be alive — finish it and emit so the frontend can stop
-            // showing "running". Best effort: ignore individual errors.
+            // showing "running". portable-pty's killer only sends SIGHUP, which a
+            // HUP-ignoring child survives; if we then blocked on `child.wait()` we
+            // would pin this tokio worker forever. So poll non-blockingly and
+            // escalate to SIGKILL, never doing a blocking wait on the runtime.
             if let Some(reason) = exit_reason {
-                let _ = child.kill();
-                let exit_code = child.wait().map(|s| s.exit_code() as i32).unwrap_or(-1);
+                let _ = child.kill(); // SIGHUP (or TerminateProcess on Windows)
+                let pid = session_for_waiter.pid;
+                let grace = Instant::now() + Duration::from_millis(400);
+                let deadline = Instant::now() + Duration::from_secs(3);
+                let mut hard_killed = false;
+                let mut exit_code = -1;
+                loop {
+                    match child.try_wait() {
+                        Ok(Some(status)) => {
+                            exit_code = status.exit_code() as i32;
+                            break;
+                        }
+                        _ => {}
+                    }
+                    let now = Instant::now();
+                    if !hard_killed && now >= grace && pid != 0 {
+                        #[cfg(unix)]
+                        unsafe {
+                            // SIGKILL the whole process group (the child is a
+                            // session leader via setsid, so descendants die too).
+                            libc::kill(-(pid as i32), libc::SIGKILL);
+                            libc::kill(pid as i32, libc::SIGKILL);
+                        }
+                        hard_killed = true;
+                    }
+                    if now >= deadline {
+                        break; // SIGKILL is unignorable; this is a paranoia backstop
+                    }
+                    tokio::time::sleep(Duration::from_millis(40)).await;
+                }
                 let _ = app_w.emit(EV_PTY_EXIT, PtyExitPayload {
                     session_id: id_w.clone(),
                     exit_code,

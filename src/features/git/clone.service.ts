@@ -6,7 +6,14 @@ export interface CloneRepoArgs {
   url: string;
   parentDir: string;
   folderName: string;
+  /** Pass to make the clone cancellable via `cancelClone(opId)`. Generated if omitted. */
+  opId?: string;
   onProgress?: (p: { phase: string; percent: number }) => void;
+}
+
+/** Abort an in-flight clone by op id. The pending `cloneRepo` promise rejects. */
+export async function cancelClone(opId: string): Promise<void> {
+  await invoke<void>(CMD.gitCloneCancel, { opId });
 }
 
 /**
@@ -19,9 +26,10 @@ export async function cloneRepo({
   url,
   parentDir,
   folderName,
+  opId: opIdArg,
   onProgress,
 }: CloneRepoArgs): Promise<string> {
-  const opId = `clone-${newId(10)}`;
+  const opId = opIdArg ?? `clone-${newId(10)}`;
   let unlisten: (() => void) | undefined;
   if (onProgress) {
     unlisten = await listenTo<GitCloneProgressPayload>(EV.gitCloneProgress, (e) => {

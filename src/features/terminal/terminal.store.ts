@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { TerminalSession, TerminalStatus } from "./terminal.types";
+import { useTabMetadataStore } from "./tabMetadata.store";
 
 interface TerminalState {
   sessions: Record<string, TerminalSession>;
@@ -46,6 +47,9 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
       const lastFocusedByProject = Object.fromEntries(
         Object.entries(state.lastFocusedByProject).filter(([, sid]) => sid !== id),
       );
+      // Evict polled metadata for this session so it doesn't accumulate for the
+      // app's lifetime (keyed by UUID, so this is a pure leak otherwise).
+      useTabMetadataStore.getState().clear(id);
       return { sessions: rest, lastFocusedByProject };
     }),
   getById: (id) => get().sessions[id],

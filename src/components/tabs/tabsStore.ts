@@ -63,18 +63,24 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     set((state) => {
       const cur = state.byProject[projectKey] ?? emptyBucket;
       // Dedup strategy:
-      //  1) If `tab` has a `path`, prefer matching by path — covers the case
-      //     where a tab was renamed (its `id` is now decoupled from the new
-      //     path, but the tab still represents that file).
-      //  2) Otherwise fall back to id-based dedup for terminals / non-file tabs.
+      //  1) If `tab` has a `path`, match by path — BUT scoped to the same tab
+      //     family. A diff tab and an editor tab can point at the same file and
+      //     must stay independent (opening the diff of an already-open file must
+      //     not just focus the editor, and vice-versa). `path` is the identity
+      //     for file tabs, so we do NOT fall back to id-dedup for them (a stale
+      //     post-rename id could otherwise steal focus from a new same-name file).
+      //  2) Tabs without a path (terminals / CLIs) dedup by id only.
       const tabPath = "path" in tab ? (tab as { path?: string }).path : undefined;
+      const isDiff = tab.kind === "diff";
       let existingIdx = -1;
       if (tabPath) {
         existingIdx = cur.tabs.findIndex(
-          (t) => "path" in t && (t as { path?: string }).path === tabPath,
+          (t) =>
+            "path" in t &&
+            (t as { path?: string }).path === tabPath &&
+            (t.kind === "diff") === isDiff,
         );
-      }
-      if (existingIdx < 0) {
+      } else {
         existingIdx = cur.tabs.findIndex((t) => t.id === tab.id);
       }
       const existing = existingIdx >= 0 ? cur.tabs[existingIdx] : null;

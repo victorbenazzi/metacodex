@@ -65,6 +65,7 @@ export function WorktreeCreateDialog({
   }, [open, defaultBranchName, defaultCliId]);
 
   const submit = async () => {
+    if (submitting) return;
     const name = branchName.trim();
     if (!name) {
       setError(t("worktrees.dialog.branchInvalid") as string);
@@ -107,7 +108,13 @@ export function WorktreeCreateDialog({
           </>
         }
       >
-        <div className="flex flex-col gap-[14px]">
+        <form
+          className="flex flex-col gap-[14px]"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void submit();
+          }}
+        >
           <Field
             label={t("worktrees.dialog.branchLabel") as string}
             hint={t("worktrees.dialog.branchHint") as string}
@@ -136,7 +143,9 @@ export function WorktreeCreateDialog({
               {error}
             </p>
           ) : null}
-        </div>
+          {/* Hidden submit so Enter works without changing the footer buttons. */}
+          <button type="submit" className="hidden" aria-hidden tabIndex={-1} />
+        </form>
       </DialogContent>
     </DialogRoot>
   );

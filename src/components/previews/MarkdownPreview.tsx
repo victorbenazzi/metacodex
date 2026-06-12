@@ -188,7 +188,16 @@ function MarkdownBody({ source }: { source: string }) {
           );
         },
         code: (p: any) => {
-          if (p.inline) {
+          // react-markdown v9 dropped the `inline` prop. Detect inline code as
+          // "no language- class AND no newline": fenced blocks carry a
+          // `language-xxx` class (or, if fenced without a lang, contain a
+          // newline), inline `code` has neither.
+          const className = p.className as string | undefined;
+          const raw = Array.isArray(p.children)
+            ? p.children.join("")
+            : String(p.children ?? "");
+          const isBlock = /\blanguage-/.test(className ?? "") || raw.includes("\n");
+          if (!isBlock) {
             return (
               <code className="rounded-xs bg-surface-strong/50 px-[5px] py-[1px] font-mono text-caption text-ink">
                 {p.children}
@@ -198,10 +207,7 @@ function MarkdownBody({ source }: { source: string }) {
           // Fenced block — react-markdown wraps it in <pre><code> and passes the
           // ```lang on the <code> className as `language-xxx`. We override the
           // <pre> below to a passthrough, then let ShikiCode own both elements.
-          const lang = (p.className as string | undefined)?.replace("language-", "");
-          const raw = Array.isArray(p.children)
-            ? p.children.join("")
-            : String(p.children ?? "");
+          const lang = className?.replace(/.*\blanguage-/, "").split(/\s/)[0];
           return <ShikiCode code={raw.replace(/\n$/, "")} lang={lang} themeId={theme.id} />;
         },
         pre: (p: any) => <>{p.children}</>,

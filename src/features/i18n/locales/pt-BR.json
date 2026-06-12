@@ -588,7 +588,8 @@
     "close": "Fechar",
     "dismiss": "Dispensar",
     "expand": "Expandir",
-    "collapse": "Recolher"
+    "collapse": "Recolher",
+    "more": "Mais"
   },
   "preview": {
     "badge": "Preview",
@@ -738,6 +739,8 @@
         "settingsOpen": "Abrir configurações",
         "tabClose": "Fechar aba ativa",
         "tabRename": "Renomear aba ativa",
+        "tabNext": "Próxima aba",
+        "tabPrevious": "Aba anterior",
         "tabMoveLeft": "Mover aba ativa para a esquerda",
         "tabMoveRight": "Mover aba ativa para a direita",
         "searchInProject": "Buscar no projeto",
@@ -795,6 +798,7 @@
   "explorer": {
     "ariaLabel": "Explorador de arquivos",
     "title": "Explorador",
+    "renameFailed": "Não foi possível renomear",
     "noProject": "Nenhum projeto aberto",
     "noProjectBody": "Abra uma pasta local para navegar pelos arquivos. Suas pastas ficam no disco, o metacodex só guarda metadados do workspace.",
     "openFolder": "Abrir pasta",
@@ -933,6 +937,8 @@
     "openFolderTitle": "Abrir pasta",
     "deleteFailed": "Não foi possível apagar:\n\n{{error}}",
     "moveFailed": "Não foi possível mover:\n\n{{error}}",
+    "deleteFailedTitle": "Não foi possível apagar",
+    "moveFailedTitle": "Não foi possível mover",
     "deleteFileTitle": "Apagar \"{{name}}\"?",
     "deleteFolderTitle": "Apagar a pasta \"{{name}}\"?",
     "deleteFileDescription": "O arquivo será apagado do disco. Esta ação não pode ser desfeita.",
@@ -1050,7 +1056,9 @@
       "revealInFinder": "Revelar no Finder",
       "openTerminalHere": "Novo terminal aqui",
       "removeFailed": "Não foi possível remover a worktree:\n\n{{error}}",
-      "mergeFailed": "Falha ao mesclar:\n\n{{error}}"
+      "mergeFailed": "Falha ao mesclar:\n\n{{error}}",
+      "removeFailedTitle": "Não foi possível remover a worktree",
+      "mergeFailedTitle": "Falha ao mesclar"
     }
   },
   "worktrees": {
@@ -1105,6 +1113,7 @@
     "preview": "Será criado em:",
     "submit": "Clonar",
     "submitting": "Clonando…",
+    "cancelClone": "Cancelar clone",
     "connecting": "Conectando ao remoto…",
     "errors": {
       "nameInvalid": "O nome da pasta não pode conter barras ou caracteres especiais.",

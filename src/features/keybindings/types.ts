@@ -5,6 +5,8 @@ export type CommandId =
   | "folder.clone"
   | "tab.close"
   | "tab.rename"
+  | "tab.next"
+  | "tab.previous"
   | "tab.moveLeft"
   | "tab.moveRight"
   | "project.switch"

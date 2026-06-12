@@ -99,7 +99,9 @@ pub fn search(root: &str, query: &str, options: SearchOptions) -> AppResult<Sear
         regex::escape(query)
     };
     let pattern = if options.whole_word {
-        format!(r"\b{}\b", pattern)
+        // Group the pattern so word boundaries wrap the WHOLE alternation, not
+        // just the first/last branch (`\bfoo|bar\b` would mean `\bfoo` OR `bar\b`).
+        format!(r"\b(?:{})\b", pattern)
     } else {
         pattern
     };

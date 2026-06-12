@@ -23,13 +23,13 @@ import type { Tab } from "@/components/tabs/types";
 import { fileKindFor } from "@/components/tabs/fileKind";
 import { SendToProjectDialog, type SentToProject } from "@/components/previews/SendToProjectDialog";
 import { DropOverlay } from "@/components/previews/DropOverlay";
-import { flushEditor } from "@/features/editor/editorSavers";
+import { flushEditor, flushAllEditors } from "@/features/editor/editorSavers";
 import { newId } from "@/lib/idGen";
 import { cliLaunchString, type CliTool } from "@/features/terminal/cli-registry";
 import { preloadCliDetections } from "@/features/terminal/cli-detection";
 import { basename } from "@/lib/path";
 import { useProjectsStore } from "@/features/projects/project.store";
-import { useSettingsDataStore } from "@/features/settings/settings.data.store";
+import { useSettingsDataStore, flushSettings } from "@/features/settings/settings.data.store";
 import { UI_DENSITY_MULTIPLIER } from "@/features/settings/settings.types";
 import { useKeybindingsStore } from "@/features/keybindings/keybindings.store";
 import { useExplorerStore } from "@/features/explorer/explorer.store";
@@ -72,6 +72,8 @@ import { useWorktreesStore } from "@/features/git/worktrees.store";
 import { useWorktreeOccupancySync } from "@/features/git/useWorktreeOccupancySync";
 import { WorktreeCreateDialog } from "@/components/source-control/WorktreeCreateDialog";
 import { CloneFromGithubDialog } from "@/components/project-rail/CloneFromGithubDialog";
+import { Toaster } from "@/components/ui/Toaster";
+import { toast } from "@/features/ui/toast.store";
 import { useResumeStore } from "@/features/resume/resume.store";
 import { recordDiag, useDiagnosticsStore } from "@/features/diagnostics/diagnostics.store";
 import { useSaveStatusStore } from "@/features/workspace/saveStatus.store";
@@ -371,14 +373,22 @@ export function AppShell() {
               openFilePaths.add((t as { path: string }).path);
             }
           }
-          // Only stat paths that match an open tab, keeps the IPC blast
-          // small even when the watcher fires for hundreds of changes.
-          const candidates = paths.filter((p) => openFilePaths.has(p));
+          // Stat an event path if it's an open tab OR an ANCESTOR of one.
+          // macOS FSEvents coalesces a recursive delete (`rm -rf src/old`) into
+          // a single dir-level event, so matching only exact tab paths would
+          // leave the files inside as live-looking tabs. closeForRemovedPath
+          // cascades to children, so closing on the ancestor covers them.
+          const candidates = paths.filter(
+            (p) =>
+              openFilePaths.has(p) ||
+              [...openFilePaths].some((open) => open.startsWith(p + "/")),
+          );
           for (const p of candidates) {
             try {
               await invoke(CMD.stat, { path: p });
             } catch {
-              // stat failure (ENOENT or otherwise) → close the tab(s) at this path.
+              // stat failure (ENOENT or otherwise) → close the tab(s) at this
+              // path and any open descendants.
               useTabsStore.getState().closeForRemovedPath(projectId, p);
               recordDiag("tab.close_external", { projectId, detail: { path: p } });
             }
@@ -508,11 +518,18 @@ export function AppShell() {
         return null;
       })
       .filter((t): t is SerializedTab => t !== null);
+    // Only persist activeTabId if it survives serialization (terminals/CLIs are
+    // dropped). Otherwise the restored workspace would point at a dead id and
+    // render a blank work area until the user clicks a tab.
+    const persistedActiveId =
+      cur?.activeTabId && persistTabs.some((t) => t.id === cur.activeTabId)
+        ? cur.activeTabId
+        : persistTabs[0]?.id ?? null;
     useSaveStatusStore.getState().beginSave();
     try {
       await workspaceApi.save(projectId, {
         openTabs: persistTabs,
-        activeTabId: cur?.activeTabId ?? null,
+        activeTabId: persistedActiveId,
         expandedPaths,
       });
       useSaveStatusStore.getState().markSaved();
@@ -566,6 +583,10 @@ export function AppShell() {
     let cancelled = false;
     (async () => {
       const off = await listenTo<unknown>(EV.beforeQuit, async () => {
+        // Flush unsaved editor buffers + pending settings FIRST (each no-ops
+        // when clean) so Cmd+Q within the autosave/debounce window doesn't drop
+        // in-progress edits or a just-changed preference.
+        await Promise.all([flushAllEditors(), flushSettings()]);
         // Cancel all pending debounce timers, we're about to save explicitly.
         for (const timer of saveTimers.current.values()) clearTimeout(timer);
         saveTimers.current.clear();
@@ -598,6 +619,12 @@ export function AppShell() {
     };
   }, [performWorkspaceSave]);
 
+  // (Re)arm the debounce timer whenever the active project's bucket changes.
+  // NOTE: this effect has NO cleanup-flush. React runs cleanup on EVERY dep
+  // change, so flushing here would defeat the debounce entirely (every tab
+  // switch / OSC title update would write to disk immediately). Flush-on-leave
+  // is handled by the separate `project`-keyed effect below, which only tears
+  // down on a genuine project switch / unmount.
   useEffect(() => {
     if (!project) return;
     if (hydrationStatus.current.get(project.id) !== "loaded") return;
@@ -613,9 +640,14 @@ export function AppShell() {
       void performWorkspaceSave(projectId);
     }, saveDebounceMs);
     saveTimers.current.set(projectId, handle);
-    // On unmount / project switch: flush immediately INSTEAD of dropping the
-    // pending save, guarantees the bucket we're leaving lands on disk even if
-    // the user switched within the debounce window.
+  }, [project, bucket.tabs, bucket.activeTabId, performWorkspaceSave]);
+
+  // Flush-on-leave: keyed ONLY on `project`, so its cleanup runs exactly when we
+  // switch projects or unmount. Guarantees the bucket we're leaving lands on
+  // disk even if the user switched within the debounce window.
+  useEffect(() => {
+    if (!project) return;
+    const projectId = project.id;
     return () => {
       const pending = saveTimers.current.get(projectId);
       if (pending) {
@@ -624,7 +656,7 @@ export function AppShell() {
         void performWorkspaceSave(projectId);
       }
     };
-  }, [project, bucket.tabs, bucket.activeTabId, performWorkspaceSave]);
+  }, [project, performWorkspaceSave]);
 
   // -- Actions ------------------------------------------------------------------
   const handleOpenFolder = useCallback(async () => {
@@ -851,6 +883,22 @@ export function AppShell() {
     [bucket.activeTabId, bucket.tabs, moveTabStore, projectKey],
   );
 
+  // Cycle focus to the adjacent tab (Ctrl+Tab / Ctrl+Shift+Tab). Wraps around
+  // the ends so it never dead-ends, matching editor/browser convention.
+  const activateAdjacentTab = useCallback(
+    (delta: -1 | 1) => {
+      const n = bucket.tabs.length;
+      if (n < 2) return;
+      const idx = bucket.activeTabId
+        ? bucket.tabs.findIndex((t) => t.id === bucket.activeTabId)
+        : -1;
+      const base = idx < 0 ? (delta === 1 ? -1 : 0) : idx;
+      const next = ((base + delta) % n + n) % n;
+      setActiveTab(projectKey, bucket.tabs[next].id);
+    },
+    [bucket.activeTabId, bucket.tabs, projectKey, setActiveTab],
+  );
+
   const performDelete = useCallback(
     async (target: PendingDelete) => {
       if (!project) return;
@@ -859,10 +907,9 @@ export function AppShell() {
         useTabsStore.getState().closeForRemovedPath(project.id, target.path);
       } catch (err) {
         console.warn("[explorer] delete failed", err);
-        window.alert(
-          t("appShell.deleteFailed", {
-            error: err instanceof Error ? err.message : String(err),
-          }),
+        toast.error(
+          t("appShell.deleteFailedTitle"),
+          err instanceof Error ? err.message : String(err),
         );
       }
     },
@@ -904,10 +951,9 @@ export function AppShell() {
           .moveNode(project.id, from, toDir);
       } catch (err) {
         console.warn("[explorer] move failed", err);
-        window.alert(
-          t("appShell.moveFailed", {
-            error: err instanceof Error ? err.message : String(err),
-          }),
+        toast.error(
+          t("appShell.moveFailedTitle"),
+          err instanceof Error ? err.message : String(err),
         );
       }
     },
@@ -1152,8 +1198,10 @@ export function AppShell() {
 
   const closeActiveTab = useCallback(() => {
     if (!bucket.activeTabId) return;
-    closeTab(projectKey, bucket.activeTabId);
-  }, [bucket.activeTabId, closeTab, projectKey]);
+    // Route through handleCloseTab so Cmd+W gets the same destructive-close
+    // confirmation as clicking the X (terminals / CLIs with a live process).
+    handleCloseTab(bucket.activeTabId);
+  }, [bucket.activeTabId, handleCloseTab]);
 
   const switchProject = useCallback(
     (n: number) => {
@@ -1194,6 +1242,7 @@ export function AppShell() {
       jumpToNextAttention,
       renameActiveTab,
       moveActiveTab,
+      activateAdjacentTab,
     };
     return () => {
       delete (window as any).__metacodex;
@@ -1212,6 +1261,7 @@ export function AppShell() {
     jumpToNextAttention,
     renameActiveTab,
     moveActiveTab,
+    activateAdjacentTab,
   ]);
 
   // CSS-grid template: the variable-width columns interpolate the current
@@ -1501,6 +1551,7 @@ export function AppShell() {
           ) : null}
         </div>
       ) : null}
+      <Toaster />
     </div>
   );
 }

@@ -46,6 +46,18 @@ export const COMMANDS: CommandDef[] = [
     category: "view",
   },
   {
+    id: "tab.next",
+    defaultBinding: ["ctrl+tab"],
+    descriptionKey: "settings.shortcuts.cmd.tabNext",
+    category: "view",
+  },
+  {
+    id: "tab.previous",
+    defaultBinding: ["ctrl+shift+tab"],
+    descriptionKey: "settings.shortcuts.cmd.tabPrevious",
+    category: "view",
+  },
+  {
     id: "tab.moveLeft",
     defaultBinding: ["alt+left"],
     descriptionKey: "settings.shortcuts.cmd.tabMoveLeft",

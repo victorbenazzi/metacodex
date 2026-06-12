@@ -347,8 +347,22 @@ export function EditorTab({
       } else {
         await fsApi.writeFileText(path, content);
       }
-      setLoaded(tabId, content); // buffer now matches disk — update the baseline
-      updateTab(projectKey, tabId, { dirty: false });
+      // The baseline always advances to what we just wrote (that IS what's on
+      // disk now). But only clear `dirty` if the live doc still equals `content`:
+      // edits typed during the `await` must keep the tab dirty, or we'd strand
+      // them (and the reconciler would treat the buffer as clean and reload over
+      // them on the next external change).
+      setLoaded(tabId, content); // also resets editor.store dirty → false
+      const stillMatches = viewRef.current?.state.doc.toString() === content;
+      if (stillMatches) {
+        updateTab(projectKey, tabId, { dirty: false });
+      } else {
+        // Edits landed during the await: re-mark dirty in BOTH stores so the
+        // dot stays, the saver still fires on quit, and the reconciler won't
+        // silently reload over the unsaved tail.
+        setDirty(tabId, true);
+        updateTab(projectKey, tabId, { dirty: true });
+      }
       setSavingNotice(t("editor.saved"));
       setTimeout(() => setSavingNotice(null), 1400);
     } catch (err: any) {

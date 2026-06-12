@@ -1,6 +1,7 @@
 import { CMD, invoke } from "@/lib/ipc";
 import { useSettingsDataStore } from "@/features/settings/settings.data.store";
 import { useTabsStore } from "@/components/tabs/tabsStore";
+import { useProjectsStore } from "@/features/projects/project.store";
 
 /**
  * Single funnel for "an agent in tab X wants attention".
@@ -65,20 +66,24 @@ function playChime() {
 
 function tabIsCurrentlyVisible(tabId: string): boolean {
   if (document.hidden) return false;
+  // Only the ACTIVE project's active tab is actually on screen. A tab that's
+  // the active one of a backgrounded project is NOT visible, so a banner for it
+  // must still fire (the old "assume visible" answer suppressed legitimate
+  // notifications when the user switched projects mid-run).
+  const activeProjectId = useProjectsStore.getState().activeProjectId;
   const buckets = useTabsStore.getState().byProject;
-  for (const bucket of Object.values(buckets)) {
-    if (bucket.activeTabId === tabId) {
-      // Found the tab as the active one in some project, but only the
-      // currently active project's active tab is actually rendered. We
-      // can't introspect the active project from here without coupling
-      // back to projects store; the conservative answer is "yes, visible"
-      // so we don't double-banner the user. The focus-when-active toggle
-      // covers the case where they want banners regardless.
-      return true;
-    }
+  for (const [projectKey, bucket] of Object.entries(buckets)) {
+    if (bucket.activeTabId !== tabId) continue;
+    // projectKey is the project id (or WORKSPACE_NULL for the no-project bucket).
+    return projectKey === activeProjectId;
   }
   return false;
 }
+
+// Per-tab chime throttle: an agent re-emitting OSC 9 at the end of every
+// subtask must not turn into a burst of beeps.
+const CHIME_THROTTLE_MS = 3000;
+const lastChimeByTab = new Map<string, number>();
 
 export function dispatchAgentNotification(payload: AgentNotificationPayload) {
   const notifSettings = useSettingsDataStore.getState().settings.notifications;
@@ -88,7 +93,20 @@ export function dispatchAgentNotification(payload: AgentNotificationPayload) {
     notifSettings.osNotificationsEnabled &&
     (notifSettings.notifyWhenFocused || !isVisible);
 
-  const shouldChime = notifSettings.soundEnabled && payload.sound;
+  // Chime follows the same focus gate as the banner, plus a per-tab throttle.
+  let shouldChime = notifSettings.soundEnabled && payload.sound;
+  if (shouldChime && isVisible && !notifSettings.notifyWhenFocused) {
+    shouldChime = false;
+  }
+  if (shouldChime) {
+    const now = Date.now();
+    const last = lastChimeByTab.get(payload.tabId) ?? 0;
+    if (now - last < CHIME_THROTTLE_MS) {
+      shouldChime = false;
+    } else {
+      lastChimeByTab.set(payload.tabId, now);
+    }
+  }
 
   if (shouldBanner) {
     void invoke(CMD.notifyShow, {

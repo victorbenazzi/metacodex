@@ -19,6 +19,7 @@ import {
   DropdownTrigger,
 } from "@/components/ui/DropdownMenu";
 import { useWorktreesStore } from "@/features/git/worktrees.store";
+import { toast } from "@/features/ui/toast.store";
 import type { WorktreeInfo, MergeStrategy } from "@/features/git/worktrees.service";
 import { CMD, invoke } from "@/lib/ipc";
 import { basename } from "@/lib/path";
@@ -61,10 +62,9 @@ export function WorktreesSection({
       await merge(projectId, projectPath, mergeTarget.branch, strategy);
       setMergeTarget(null);
     } catch (err) {
-      window.alert(
-        t("sourceControl.worktrees.mergeFailed", {
-          error: err instanceof Error ? err.message : String(err),
-        }),
+      toast.error(
+        t("sourceControl.worktrees.mergeFailedTitle"),
+        err instanceof Error ? err.message : String(err),
       );
     }
   };
@@ -76,10 +76,9 @@ export function WorktreesSection({
       setRemoveTarget(null);
       setForceRemove(false);
     } catch (err) {
-      window.alert(
-        t("sourceControl.worktrees.removeFailed", {
-          error: err instanceof Error ? err.message : String(err),
-        }),
+      toast.error(
+        t("sourceControl.worktrees.removeFailedTitle"),
+        err instanceof Error ? err.message : String(err),
       );
     }
   };
@@ -179,7 +178,7 @@ export function WorktreesSection({
                     <DropdownTrigger asChild>
                       <button
                         type="button"
-                        aria-label="More"
+                        aria-label={t("common.more")}
                         className="inline-flex h-[20px] w-[20px] items-center justify-center rounded-xs text-muted opacity-0 transition-opacity group-hover:opacity-100 hover:bg-surface-strong/55 hover:text-ink"
                       >
                         <Icon icon={MoreHorizontal} size={12} />

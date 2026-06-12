@@ -21,3 +21,12 @@ export async function flushEditor(tabId: string): Promise<void> {
   const fn = savers.get(tabId);
   if (fn) await fn();
 }
+
+/**
+ * Flush every registered editor buffer. Used by the quit handshake so unsaved
+ * edits aren't lost when the user hits Cmd+Q within the autosave window. Each
+ * saver no-ops when its buffer is clean, so this is cheap in the common case.
+ */
+export async function flushAllEditors(): Promise<void> {
+  await Promise.all(Array.from(savers.values()).map((fn) => fn().catch(() => undefined)));
+}

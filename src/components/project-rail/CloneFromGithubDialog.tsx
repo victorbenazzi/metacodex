@@ -8,7 +8,8 @@ import { DialogContent, DialogRoot } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { useProjectsStore } from "@/features/projects/project.store";
-import { cloneRepo, repoNameFromUrl } from "@/features/git/clone.service";
+import { cloneRepo, cancelClone, repoNameFromUrl } from "@/features/git/clone.service";
+import { newId } from "@/lib/idGen";
 import { isAppError, CMD, invoke } from "@/lib/ipc";
 import { useSettingsDataStore } from "@/features/settings/settings.data.store";
 
@@ -40,6 +41,7 @@ export function CloneFromGithubDialog({ open, onOpenChange }: CloneFromGithubDia
   const [err, setErr] = useState<string | null>(null);
   const [progress, setProgress] = useState<ProgressState | null>(null);
   const cancelledRef = useRef(false);
+  const opIdRef = useRef<string | null>(null);
 
   // Reset state every time the dialog opens. Also pre-fill the parent dir with
   // the user's Documents folder so the common case is a single-click flow.
@@ -139,6 +141,8 @@ export function CloneFromGithubDialog({ open, onOpenChange }: CloneFromGithubDia
   const submit = async () => {
     if (!canSubmit) return;
     cancelledRef.current = false;
+    const opId = `clone-${newId(10)}`;
+    opIdRef.current = opId;
     setBusy(true);
     setErr(null);
     setProgress(null);
@@ -147,6 +151,7 @@ export function CloneFromGithubDialog({ open, onOpenChange }: CloneFromGithubDia
         url: trimmedUrl,
         parentDir,
         folderName: trimmedName,
+        opId,
         onProgress: (p) => {
           if (!cancelledRef.current) setProgress(p);
         },
@@ -161,21 +166,45 @@ export function CloneFromGithubDialog({ open, onOpenChange }: CloneFromGithubDia
       }
       onOpenChange(false);
     } catch (e: unknown) {
-      const raw = isAppError(e) ? e.message : e instanceof Error ? e.message : String(e);
-      setErr(mapErrorMessage(raw));
+      // A user-initiated cancel surfaces as a clone error; don't show it as one.
+      if (!cancelledRef.current) {
+        const raw = isAppError(e) ? e.message : e instanceof Error ? e.message : String(e);
+        setErr(mapErrorMessage(raw));
+      }
     } finally {
+      opIdRef.current = null;
       setBusy(false);
       setProgress(null);
     }
+  };
+
+  // Abort an in-flight clone (Cancel button / Escape while busy). The pending
+  // `cloneRepo` promise then rejects and `submit`'s finally clears `busy`.
+  const handleCancel = () => {
+    if (busy && opIdRef.current) {
+      cancelledRef.current = true;
+      void cancelClone(opIdRef.current).catch(() => undefined);
+      return;
+    }
+    onOpenChange(false);
   };
 
   return (
     <DialogRoot
       open={open}
       onOpenChange={(o) => {
-        if (busy) return; // refuse to close mid-clone
+        if (o) {
+          onOpenChange(true);
+          return;
+        }
+        // Closing: if a clone is running, abort it instead of stranding a modal
+        // the user can't escape. Otherwise just close.
+        if (busy) {
+          handleCancel();
+          return;
+        }
         cancelledRef.current = true;
-        onOpenChange(o);
+        onOpenChange(false);
       }}
     >
       <DialogContent
@@ -184,13 +213,8 @@ export function CloneFromGithubDialog({ open, onOpenChange }: CloneFromGithubDia
         width={480}
         footer={
           <>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onOpenChange(false)}
-              disabled={busy}
-            >
-              {t("common.cancel")}
+            <Button variant="outline" size="sm" onClick={handleCancel}>
+              {busy ? t("cloneFromGithub.cancelClone") : t("common.cancel")}
             </Button>
             <Button variant="primary" size="sm" disabled={!canSubmit} onClick={submit}>
               {busy ? t("cloneFromGithub.submitting") : t("cloneFromGithub.submit")}

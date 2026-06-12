@@ -41,11 +41,20 @@ const CONFIRM_REGEXES: RegExp[] = [
   /Tool use \(.*\) requires approval/i,
 ];
 
-function readScrollbackTail(term: Terminal, lines: number): string {
+/**
+ * Read the lines around the cursor — where an active confirm prompt lives. We
+ * deliberately do NOT scan the whole scrollback tail: an already-answered prompt
+ * that scrolled up a few lines must not keep re-matching and pinning the tab to
+ * `needs-attention` forever. The prompt the agent is waiting on is on / just
+ * above the row the cursor sits on.
+ */
+function readCursorVicinity(term: Terminal, lines: number): string {
   const buf = term.buffer.active;
+  const cursorAbs = buf.baseY + buf.cursorY;
+  const start = Math.max(0, cursorAbs - lines + 1);
+  const end = Math.min(buf.length - 1, cursorAbs);
   const out: string[] = [];
-  const start = Math.max(0, buf.length - lines);
-  for (let i = start; i < buf.length; i++) {
+  for (let i = start; i <= end; i++) {
     const ln = buf.getLine(i);
     if (ln) out.push(ln.translateToString(true));
   }
@@ -57,22 +66,38 @@ export function createAgentHeuristic(
   opts: AgentHeuristicOpts,
 ): IDisposable {
   const idleAfterMs = opts.idleAfterMs ?? 800;
-  const tailLines = opts.tailLines ?? 50;
+  // Tight window around the cursor: enough to span a multi-line prompt, small
+  // enough that a scrolled-past, answered prompt no longer matches.
+  const vicinityLines = opts.tailLines ?? 12;
   let idleTimer: number | null = null;
+  // Did WE set the current `needs-attention`? If so we may clear it once the
+  // prompt is gone. An OSC-driven needs-attention (authoritative) stays put.
+  let attentionFromHeuristic = false;
 
   const writeListener = term.onWriteParsed(() => {
     if (idleTimer != null) {
       window.clearTimeout(idleTimer);
     }
     idleTimer = window.setTimeout(() => {
-      const tail = readScrollbackTail(term, tailLines);
-      const matched = CONFIRM_REGEXES.find((re) => re.test(tail));
+      const current = opts.getStatus();
+      // Someone authoritative (OSC) changed the status out from under us; stop
+      // claiming ownership of a needs-attention we no longer set.
+      if (current !== "needs-attention") attentionFromHeuristic = false;
+
+      const text = readCursorVicinity(term, vicinityLines);
+      const matched = CONFIRM_REGEXES.find((re) => re.test(text));
       if (matched) {
-        // Walk back to find the exact line that matched (for hint text).
-        const hint = (tail.match(matched)?.[0] ?? "").slice(0, 80);
+        // Never override a `done` the agent just signalled via OSC.
+        if (current === "done") return;
+        const hint = (text.match(matched)?.[0] ?? "").slice(0, 80);
         opts.setStatus("needs-attention", hint);
-      } else if (opts.getStatus() === "working") {
+        attentionFromHeuristic = true;
+      } else if (current === "working") {
         opts.setStatus("idle");
+      } else if (current === "needs-attention" && attentionFromHeuristic) {
+        // The prompt we flagged is gone (answered / scrolled away) — recover.
+        opts.setStatus("idle");
+        attentionFromHeuristic = false;
       }
     }, idleAfterMs);
   });

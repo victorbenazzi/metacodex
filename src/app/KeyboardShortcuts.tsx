@@ -27,6 +27,7 @@ interface MetacodexApi {
   jumpToNextAttention?: () => void;
   renameActiveTab?: () => void;
   moveActiveTab?: (delta: -1 | 1) => void;
+  activateAdjacentTab?: (delta: -1 | 1) => void;
 }
 
 /**
@@ -57,6 +58,12 @@ function dispatchCommand(cmd: ResolvedCommand) {
       break;
     case "tab.moveRight":
       api?.moveActiveTab?.(1);
+      break;
+    case "tab.next":
+      api?.activateAdjacentTab?.(1);
+      break;
+    case "tab.previous":
+      api?.activateAdjacentTab?.(-1);
       break;
     case "project.switch":
       if (cmd.arg) api?.switchProject?.(cmd.arg);

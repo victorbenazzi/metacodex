@@ -588,7 +588,8 @@
     "close": "Close",
     "dismiss": "Dismiss",
     "expand": "Expand",
-    "collapse": "Collapse"
+    "collapse": "Collapse",
+    "more": "More"
   },
   "preview": {
     "badge": "Preview",
@@ -738,6 +739,8 @@
         "settingsOpen": "Open settings",
         "tabClose": "Close active tab",
         "tabRename": "Rename active tab",
+        "tabNext": "Next tab",
+        "tabPrevious": "Previous tab",
         "tabMoveLeft": "Move active tab left",
         "tabMoveRight": "Move active tab right",
         "searchInProject": "Search in project",
@@ -795,6 +798,7 @@
   "explorer": {
     "ariaLabel": "File explorer",
     "title": "Explorer",
+    "renameFailed": "Could not rename",
     "noProject": "No project open",
     "noProjectBody": "Open a local folder to browse files. Your folders stay on disk, metacodex only stores workspace metadata.",
     "openFolder": "Open Folder",
@@ -933,6 +937,8 @@
     "openFolderTitle": "Open folder",
     "deleteFailed": "Could not delete:\n\n{{error}}",
     "moveFailed": "Could not move:\n\n{{error}}",
+    "deleteFailedTitle": "Could not delete",
+    "moveFailedTitle": "Could not move",
     "deleteFileTitle": "Delete \"{{name}}\"?",
     "deleteFolderTitle": "Delete the folder \"{{name}}\"?",
     "deleteFileDescription": "The file will be deleted from disk. This action cannot be undone.",
@@ -1050,7 +1056,9 @@
       "revealInFinder": "Reveal in Finder",
       "openTerminalHere": "New terminal here",
       "removeFailed": "Could not remove worktree:\n\n{{error}}",
-      "mergeFailed": "Merge failed:\n\n{{error}}"
+      "mergeFailed": "Merge failed:\n\n{{error}}",
+      "removeFailedTitle": "Could not remove worktree",
+      "mergeFailedTitle": "Merge failed"
     }
   },
   "worktrees": {
@@ -1105,6 +1113,7 @@
     "preview": "Will be created at:",
     "submit": "Clone",
     "submitting": "Cloning…",
+    "cancelClone": "Cancel clone",
     "connecting": "Connecting to remote…",
     "errors": {
       "nameInvalid": "Folder name cannot contain slashes or special characters.",

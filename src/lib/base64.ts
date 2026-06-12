@@ -16,7 +16,9 @@ export function uint8ArrayToBase64(bytes: Uint8Array): string {
   let binary = "";
   const chunk = 0x8000;
   for (let i = 0; i < bytes.length; i += chunk) {
-    binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunk)));
+    // `fromCharCode.apply` accepts a TypedArray directly — no need to
+    // materialize an intermediate Array per chunk.
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk) as unknown as number[]);
   }
   return btoa(binary);
 }

@@ -393,19 +393,24 @@ export function TerminalTab({
           if (reason !== "normal" || e.payload.exit_code !== 0) {
             setExitInfo({ code: e.payload.exit_code, reason });
           }
-          // Promote the tab dot to `done` so the user sees the agent finished
-          // even after switching away. Heuristic + OSC keep it bounded.
-          useAgentStatusStore.getState().setStatus(tabId, "done");
+          // Only agent CLIs get the "done" dot + completion chime. A plain
+          // shell exiting (the user typed `exit` in a Cmd+T terminal) must not
+          // pop an "Agent done" banner for a tab that never ran an agent.
+          if (cliToolId != null) {
+            // Promote the tab dot to `done` so the user sees the agent finished
+            // even after switching away. Heuristic + OSC keep it bounded.
+            useAgentStatusStore.getState().setStatus(tabId, "done");
+            dispatchAgentNotification({
+              tabId,
+              title: i18n.t("notifications.agentDone"),
+              body: label,
+              sound: true,
+            });
+          }
           // Clear the agent's "I am doing X" title — it's stale the moment the
           // process exits. User overrides (userTitle) stay untouched.
           useTabsStore.getState().setTabTitles(projectKey, tabId, {
             agentTitle: null,
-          });
-          dispatchAgentNotification({
-            tabId,
-            title: i18n.t("notifications.agentDone"),
-            body: label,
-            sound: true,
           });
         });
 

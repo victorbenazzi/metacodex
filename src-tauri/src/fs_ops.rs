@@ -631,6 +631,19 @@ pub fn write_preview_text(path: &str, content: &str) -> AppResult<()> {
             "unsupported preview text type: {path:?}"
         )));
     }
+    // SECURITY: a preview write only ever saves a file the user already opened
+    // (and thus consented to). The path is a webview-supplied string, so we must
+    // NOT let it create new files or follow symlinks: require an existing, regular
+    // file in place. This closes the "write an arbitrary new hook.sh" escalation
+    // and the in-tree-symlink-escapes-the-sandbox case in one check.
+    let meta = Path::new(path)
+        .symlink_metadata()
+        .map_err(|e| io_error("write_preview_text", e))?;
+    if !meta.file_type().is_file() {
+        return Err(AppError::PathNotAllowed(format!(
+            "preview write target is not a regular file: {path:?}"
+        )));
+    }
     atomic_write(Path::new(path), content.as_bytes())
 }
 

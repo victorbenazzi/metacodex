@@ -8,6 +8,7 @@ import { OpenClawIcon } from "./OpenClawIcon";
 import { OpenCodeIcon } from "./OpenCodeIcon";
 import { PiIcon } from "./PiIcon";
 import type { BrandIconProps } from "./types";
+import { XiaomiMiMoIcon } from "./XiaomiMiMoIcon";
 
 export {
   AntigravityIcon,
@@ -17,6 +18,7 @@ export {
   OpenClawIcon,
   OpenCodeIcon,
   PiIcon,
+  XiaomiMiMoIcon,
 };
 export type { BrandIconProps };
 
@@ -31,4 +33,5 @@ export const CLI_BRAND_ICONS: Record<string, ComponentType<BrandIconProps>> = {
   "pi-cli": PiIcon,
   hermes: HermesIcon,
   openclaw: OpenClawIcon,
+  "mimo-code": XiaomiMiMoIcon,
 };

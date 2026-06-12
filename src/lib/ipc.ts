@@ -81,6 +81,7 @@ export const CMD = {
   gitWorktreeRemove: "git_worktree_remove",
   gitMergeInto: "git_merge_into",
   gitClone: "git_clone",
+  gitCloneCancel: "git_clone_cancel",
 
   // notifications
   notifyShow: "notify_show",

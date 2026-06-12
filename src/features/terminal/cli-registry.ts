@@ -68,6 +68,17 @@ export const DEFAULT_CLI_REGISTRY: CliTool[] = [
     description: "Open-source AI coding agent.",
   },
   {
+    id: "mimo-code",
+    label: "MiMo Code",
+    command: "mimo",
+    args: [],
+    detectCommand: "command -v mimo",
+    installCommand: "curl -fsSL https://mimo.xiaomi.com/install | bash",
+    altInstallCommand: "npm install -g @mimo-ai/cli",
+    docsUrl: "https://mimo.xiaomi.com/mimocode",
+    description: "Xiaomi's terminal coding agent.",
+  },
+  {
     id: "antigravity-cli",
     label: "Antigravity CLI",
     command: "antigravity",

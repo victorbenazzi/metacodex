@@ -1,6 +1,6 @@
 [package]
 name = "metacodex"
-version = "0.0.10"
+version = "0.0.11"
 description = "metacodex — premium local-first developer workspace"
 authors = ["Victor"]
 edition = "2021"
@@ -47,6 +47,11 @@ reqwest = { version = "0.13", default-features = false, features = ["json"] }
 # reqwest::Client doesn't panic "No provider set". Pinned to the ring provider
 # that's already in the tree (no aws-lc-rs).
 rustls = { version = "0.23", default-features = false, features = ["ring"] }
+
+# SIGKILL escalation for stuck PTY children (portable-pty's killer only sends
+# SIGHUP). Unix-only; on Windows portable-pty already does a forceful kill.
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
 
 [profile.dev]
 incremental = true

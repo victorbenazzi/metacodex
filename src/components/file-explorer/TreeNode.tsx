@@ -32,6 +32,7 @@ import {
   gitStatusLabelKey,
 } from "@/features/git/gitStatus";
 import { DEFAULT_CLI_REGISTRY, type CliTool } from "@/features/terminal/cli-registry";
+import { toast } from "@/features/ui/toast.store";
 import { cn } from "@/lib/cn";
 import { CMD, invoke } from "@/lib/ipc";
 import { basename, dirname } from "@/lib/path";
@@ -136,10 +137,15 @@ export const TreeNode = memo(function TreeNode({
         setEditing(false);
       } catch (err) {
         console.warn("[rename] failed", err);
-        // keep editing; let the user retry or Esc out
+        // Surface the reason (name conflict / invalid) instead of a silent
+        // no-op; keep editing so the user can fix it or Esc out.
+        toast.error(
+          t("explorer.renameFailed"),
+          err instanceof Error ? err.message : String(err),
+        );
       }
     },
-    [entry.isDir, entry.name, entry.path, onRename],
+    [entry.isDir, entry.name, entry.path, onRename, t],
   );
 
   const copyPath = useCallback(() => {

@@ -37,6 +37,24 @@ function schedulePersist(read: () => AppSettings) {
   }, PERSIST_DEBOUNCE_MS);
 }
 
+/**
+ * Persist pending settings immediately, cancelling the debounce. Called by the
+ * quit handshake so a preference changed within the 400ms window (e.g. a panel
+ * width drag) isn't lost when the app exits. Safe to call when nothing's
+ * pending (writes the current settings, which is a no-op on disk content).
+ */
+export async function flushSettings(): Promise<void> {
+  if (persistTimer) {
+    clearTimeout(persistTimer);
+    persistTimer = null;
+  }
+  try {
+    await settingsApi.write(useSettingsDataStore.getState().settings);
+  } catch (err) {
+    console.error("[settings] flush failed", err);
+  }
+}
+
 export const useSettingsDataStore = create<SettingsDataState>((set, get) => ({
   settings: DEFAULT_SETTINGS,
   hydrated: false,

@@ -97,6 +97,7 @@ pub fn run() {
             app.manage(Arc::new(ProjectsCache::default()));
             app.manage(Arc::new(WatcherManager::new(app.handle().clone())));
             app.manage(Arc::new(PendingOpenFiles::default()));
+            app.manage(Arc::new(commands::git::CloneRegistry::default()));
             // opencode runtime sidecar (Agent View). Spawned lazily on first use.
             app.manage(agent::AgentRuntime::new());
             // Scheduled-task (cron) registry, hydrated from disk.
@@ -173,6 +174,7 @@ pub fn run() {
             commands::git::git_worktree_remove,
             commands::git::git_merge_into,
             commands::git::git_clone,
+            commands::git::git_clone_cancel,
             commands::notifications::notify_show,
             commands::resume::resume_list,
             commands::resume::resume_save,

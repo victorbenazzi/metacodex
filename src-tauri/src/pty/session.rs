@@ -32,6 +32,11 @@ pub struct PtySession {
     /// reason "reader_error" instead of "killed" so the frontend banner can
     /// distinguish "I aborted this" from "the PTY broke under us".
     pub(crate) reader_failed: AtomicBool,
+    /// Set by `kill()` so the waiter task observes the cancel even if the
+    /// `Notify` wakeup is lost (e.g. a kill that lands before the waiter first
+    /// polls `notified()`, as in the StrictMode immediate-unmount race).
+    /// Level-triggered: the waiter checks this every loop iteration.
+    pub(crate) killed: AtomicBool,
     /// Latest cwd hint pushed by the frontend via OSC 7. When `None`, fall
     /// back to `cwd` (the spawn-time directory).
     pub cwd_override: Mutex<Option<String>>,
@@ -56,6 +61,7 @@ impl PtySession {
     }
 
     pub fn kill(&self) {
+        self.killed.store(true, std::sync::atomic::Ordering::SeqCst);
         self.cancel.notify_waiters();
         let mut k = self.killer.lock();
         let _ = k.kill();

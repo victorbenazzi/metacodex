@@ -1,11 +1,18 @@
+use std::collections::HashMap;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::{Child, Command, Stdio};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use parking_lot::Mutex;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
+
+/// In-flight `git clone` processes keyed by op_id, so the UI can abort a clone
+/// that's hanging on a slow network. Managed in `lib.rs`.
+#[derive(Default)]
+pub struct CloneRegistry(Mutex<HashMap<String, Child>>);
 
 use crate::error::{AppError, AppResult};
 use crate::events::{GitCloneProgressPayload, EV_GIT_CLONE_PROGRESS};
@@ -287,6 +294,11 @@ pub async fn git_worktree_add(
     let root_clone = root.clone();
     let branch_clone = branch_name.clone();
     let base = base_ref.unwrap_or_else(|| "HEAD".to_string());
+    // base is passed positionally as the commit-ish; a leading `-` would be
+    // parsed as a flag to `git worktree add`. Validate like any other ref.
+    if !valid_branch_name(&base) && base != "HEAD" {
+        return Err(AppError::Other(format!("invalid base ref: {base}")));
+    }
 
     tokio::task::spawn_blocking(move || -> AppResult<WorktreeInfo> {
         if let Some(parent) = target.parent() {
@@ -379,6 +391,42 @@ fn invalid_folder_name(name: &str) -> bool {
         || name.contains('\0')
 }
 
+/// Allow only the network transports a user actually pastes. Git invoked
+/// directly honors `ext::`/`file::` transports, which run arbitrary commands
+/// during clone (e.g. `ext::sh -c "..."`), so the scheme MUST be allow-listed.
+/// A leading `-` would also be parsed as a flag; reject it too.
+fn valid_clone_url(url: &str) -> bool {
+    if url.is_empty() || url.len() > 2048 || url.starts_with('-') || url.contains('\0') {
+        return false;
+    }
+    let lower = url.to_ascii_lowercase();
+    const ALLOWED: [&str; 4] = ["https://", "http://", "git://", "ssh://"];
+    if ALLOWED.iter().any(|p| lower.starts_with(p)) {
+        return true;
+    }
+    // scp-style: user@host:path or host:path (no scheme). Reject anything that
+    // smells like an explicit transport (contains "::") to keep ext::/file:: out.
+    if lower.contains("::") {
+        return false;
+    }
+    if let Some(colon) = url.find(':') {
+        // A "//" right after the colon means a scheme form (e.g. file://) that
+        // wasn't in the allow-list above — reject. scp-style has no "//".
+        if url[colon + 1..].starts_with("//") {
+            return false;
+        }
+        let host = &url[..colon];
+        // host part must look like a hostname / user@host, never a path/flag.
+        !host.is_empty()
+            && !host.contains('/')
+            && host
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_' | '@'))
+    } else {
+        false
+    }
+}
+
 /// Parse a single stderr line from `git clone --progress`. Lines look like:
 ///   "Receiving objects:  47% (470/1000), 1.2 MiB | 600 KiB/s"
 ///   "Resolving deltas: 100% (300/300), done."
@@ -407,7 +455,7 @@ pub async fn git_clone(
     // Validation — destination lives outside any registered root, so we can't
     // use ensure_within_roots. Tight argument checks instead.
     let url_trimmed = url.trim().to_string();
-    if url_trimmed.is_empty() || url_trimmed.len() > 2048 {
+    if !valid_clone_url(&url_trimmed) {
         return Err(AppError::Other("invalid url".into()));
     }
     if invalid_folder_name(folder_name.trim()) {
@@ -432,11 +480,13 @@ pub async fn git_clone(
     let dest_str = dest.to_string_lossy().into_owned();
     let dest_for_thread = dest.clone();
     let op_id_clone = op_id.clone();
+    let registry = app.state::<Arc<CloneRegistry>>().inner().clone();
 
     tokio::task::spawn_blocking(move || -> AppResult<String> {
         let mut child = Command::new("git")
             .arg("clone")
             .arg("--progress")
+            .arg("--")
             .arg(&url_trimmed)
             .arg(dest_for_thread.as_os_str())
             .stdout(Stdio::piped())
@@ -445,6 +495,9 @@ pub async fn git_clone(
             // The user's credential helper / SSH agent still works; only the
             // tty-prompt fallback is suppressed.
             .env("GIT_TERMINAL_PROMPT", "0")
+            // Belt-and-suspenders with valid_clone_url: even if a transport slips
+            // through, git refuses anything outside this list.
+            .env("GIT_ALLOW_PROTOCOL", "https:http:git:ssh")
             .spawn()
             .map_err(|e| AppError::Other(format!("git clone spawn: {e}")))?;
 
@@ -457,6 +510,10 @@ pub async fn git_clone(
             .take()
             .ok_or_else(|| AppError::Other("git clone: no stderr pipe".into()))?;
         let mut reader = BufReader::new(stderr);
+
+        // Register the child (stderr already detached) so git_clone_cancel can
+        // kill it. Killing closes stderr → the read loop hits EOF → we reap below.
+        registry.0.lock().insert(op_id_clone.clone(), child);
 
         let mut last_emit = Instant::now() - Duration::from_secs(1);
         let mut last_phase = String::new();
@@ -505,6 +562,15 @@ pub async fn git_clone(
             }
         }
 
+        // Reclaim the child from the registry to reap it. If it's already gone,
+        // git_clone_cancel removed and killed it — report cancellation.
+        let mut child = match registry.0.lock().remove(&op_id_clone) {
+            Some(c) => c,
+            None => {
+                let _ = std::fs::remove_dir_all(&dest_for_thread);
+                return Err(AppError::Other("clone cancelled".into()));
+            }
+        };
         let status = child
             .wait()
             .map_err(|e| AppError::Other(format!("git clone wait: {e}")))?;
@@ -530,6 +596,20 @@ pub async fn git_clone(
     .map_err(|e| AppError::Other(format!("join: {e}")))?
 }
 
+/// Abort an in-flight clone. Removing the child from the registry and killing it
+/// closes its stderr, so the clone task's read loop ends and it cleans up the
+/// partial destination. No-op if the op already finished.
+#[tauri::command]
+pub async fn git_clone_cancel(app: AppHandle, op_id: String) -> AppResult<()> {
+    let registry = app.state::<Arc<CloneRegistry>>();
+    let child = registry.0.lock().remove(&op_id);
+    if let Some(mut c) = child {
+        let _ = c.kill();
+        let _ = c.wait();
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn git_merge_into(
     app: AppHandle,
@@ -538,6 +618,9 @@ pub async fn git_merge_into(
     strategy: String,
 ) -> AppResult<()> {
     ensure_root_allowed(&app, &root)?;
+    if !valid_branch_name(&branch) {
+        return Err(AppError::Other(format!("invalid branch name: {branch}")));
+    }
     let root_clone = root.clone();
     tokio::task::spawn_blocking(move || -> AppResult<()> {
         let mut args = vec!["merge".to_string()];
@@ -553,6 +636,7 @@ pub async fn git_merge_into(
                 return Err(AppError::Other(format!("unknown merge strategy: {other}")));
             }
         }
+        args.push("--".into());
         args.push(branch.clone());
         let args_ref: Vec<&str> = args.iter().map(String::as_str).collect();
         let out = run_git(&root_clone, &args_ref)?;
@@ -566,4 +650,36 @@ pub async fn git_merge_into(
     })
     .await
     .map_err(|e| AppError::Other(format!("join: {e}")))?
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{valid_branch_name, valid_clone_url};
+
+    #[test]
+    fn clone_url_allows_real_remotes() {
+        assert!(valid_clone_url("https://github.com/owner/repo.git"));
+        assert!(valid_clone_url("http://example.com/x.git"));
+        assert!(valid_clone_url("git://example.com/x.git"));
+        assert!(valid_clone_url("ssh://git@example.com/x.git"));
+        assert!(valid_clone_url("git@github.com:owner/repo.git"));
+    }
+
+    #[test]
+    fn clone_url_rejects_dangerous_transports() {
+        assert!(!valid_clone_url("ext::sh -c \"id\""));
+        assert!(!valid_clone_url("file:///etc/passwd"));
+        assert!(!valid_clone_url("-oProxyCommand=evil"));
+        assert!(!valid_clone_url("--upload-pack=evil"));
+        assert!(!valid_clone_url(""));
+        assert!(!valid_clone_url("not a url"));
+    }
+
+    #[test]
+    fn branch_name_rejects_flags() {
+        assert!(valid_branch_name("feature/foo"));
+        assert!(!valid_branch_name("--force"));
+        assert!(!valid_branch_name("-x"));
+        assert!(!valid_branch_name("a..b"));
+    }
 }
