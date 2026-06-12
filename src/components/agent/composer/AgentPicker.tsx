@@ -9,12 +9,14 @@ import {
   DropdownRoot,
   DropdownTrigger,
 } from "@/components/ui/DropdownMenu";
+import { useAgentChatStore } from "@/features/agent/chat.store";
 import {
   selectEntityForChat,
   syncSelectedEntity,
   useAgentEntitiesStore,
 } from "@/features/agent/entities.store";
 import { useAgentNavStore } from "@/features/agent/nav.store";
+import { useProjectsStore } from "@/features/projects/project.store";
 import { useSettingsDataStore } from "@/features/settings/settings.data.store";
 import { AgentAvatarBadge } from "@/components/agent/entities/AgentAvatar";
 
@@ -33,6 +35,17 @@ export function AgentPicker() {
   const loaded = useAgentEntitiesStore((s) => s.loaded);
   const load = useAgentEntitiesStore((s) => s.load);
   const entityId = useSettingsDataStore((s) => s.settings.agent.entityId);
+  const directory = useAgentChatStore((s) => s.directory);
+  const projects = useProjectsStore((s) => s.projects);
+
+  // The entity's `projects` allowlist applies to the interactive chat too,
+  // not only to autonomous runs: an entity restricted to other projects is
+  // visible (so the user understands why) but not selectable here.
+  const activeProjectId = directory
+    ? (projects.find((p) => p.path === directory)?.id ?? null)
+    : null;
+  const allowedHere = (allowlist?: string[]) =>
+    !allowlist || (activeProjectId !== null && allowlist.includes(activeProjectId));
 
   // Hydrate the catalog once (the picker may render before the Agents page
   // ever opened) and re-bind the persisted selection to the chat store.
@@ -68,14 +81,21 @@ export function AgentPicker() {
         </DropdownItem>
         {entities.map((e) => {
           const active = e.id === entityId;
+          const allowed = allowedHere(e.projects);
           return (
             <DropdownItem
               key={e.id}
+              disabled={!allowed}
               onSelect={() => selectEntityForChat(e)}
               trailing={active ? <Icon icon={Check} size={13} className="text-ink" /> : null}
             >
               <AgentAvatarBadge avatar={e.avatar} color={e.color} size="sm" />
               <span className={active ? "text-ink" : undefined}>{e.name}</span>
+              {!allowed ? (
+                <span className="ml-auto text-label text-muted-soft">
+                  {t("agent.composer.agentNotAllowedHere")}
+                </span>
+              ) : null}
             </DropdownItem>
           );
         })}

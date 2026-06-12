@@ -211,6 +211,9 @@ pub fn run() {
             commands::agent::agent_entity_activity,
             commands::agent::agent_entity_proposals,
             commands::agent::agent_entity_proposal_resolve,
+            commands::agent::agent_entity_heartbeat_read,
+            commands::agent::agent_entity_heartbeat_write,
+            commands::agent::agent_entity_status,
             commands::agent::agent_ui_state_read,
             commands::agent::agent_ui_state_write,
         ])

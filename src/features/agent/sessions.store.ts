@@ -33,6 +33,8 @@ export interface SessionRow {
   createdAt: number;
   updatedAt: number;
   pinned: boolean;
+  /** Agent entity (slug) stamped on the session at create time, if any. */
+  entityId?: string;
 }
 
 /** Store key for a directory; `null` (no folder) buckets under "". */
@@ -98,6 +100,9 @@ function mapSession(raw: OcSession): SessionRow | null {
     createdAt: raw.time?.created ?? 0,
     updatedAt: raw.time?.updated ?? raw.time?.created ?? 0,
     pinned: raw.metadata?.pinned === true,
+    ...(typeof raw.metadata?.entityId === "string" && raw.metadata.entityId
+      ? { entityId: raw.metadata.entityId }
+      : {}),
   };
 }
 
@@ -218,6 +223,11 @@ export const useAgentSessionsStore = create<AgentSessionsState>((set, get) => ({
     const base = get().baseUrl;
     if (!base) return;
     const key = dirKey(directory);
+    // The entity stamp rides the same metadata object; resend it alongside the
+    // pin so a replace-semantics PATCH can't silently drop it.
+    const entityId = (get().byDirectory[key] ?? [])
+      .concat(get().archivedByDirectory[key] ?? [])
+      .find((r) => r.id === id)?.entityId;
     // Optimistic: re-rank locally, reconcile on the next load if the PATCH fails.
     set((s) => ({
       byDirectory: {
@@ -231,7 +241,7 @@ export const useAgentSessionsStore = create<AgentSessionsState>((set, get) => ({
       const res = await fetch(`${base}/session/${id}${qs(directory)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ metadata: { pinned } }),
+        body: JSON.stringify({ metadata: { pinned, ...(entityId ? { entityId } : {}) } }),
       });
       if (!res.ok) void get().loadSessions(directory);
     } catch {

@@ -129,6 +129,9 @@ export const CMD = {
   agentEntityActivity: "agent_entity_activity",
   agentEntityProposals: "agent_entity_proposals",
   agentEntityProposalResolve: "agent_entity_proposal_resolve",
+  agentEntityHeartbeatRead: "agent_entity_heartbeat_read",
+  agentEntityHeartbeatWrite: "agent_entity_heartbeat_write",
+  agentEntityStatus: "agent_entity_status",
 } as const;
 
 export type CmdName = (typeof CMD)[keyof typeof CMD];

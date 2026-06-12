@@ -3,7 +3,11 @@ import { create } from "zustand";
 import { CMD, invoke } from "@/lib/ipc";
 import { useSettingsDataStore } from "@/features/settings/settings.data.store";
 
-import { useAgentChatStore, type SelectedEntity } from "./chat.store";
+import {
+  registerSessionEntityHandler,
+  useAgentChatStore,
+  type SelectedEntity,
+} from "./chat.store";
 import { errMessage } from "./oc";
 
 /**
@@ -170,7 +174,10 @@ export const useAgentEntitiesStore = create<EntitiesState>((set, get) => ({
       const entities = await invoke<AgentEntity[]>(CMD.agentEntityList);
       set({ entities, loaded: true, error: null });
     } catch (e) {
-      set({ error: errMessage(e), loaded: true });
+      // Do NOT mark loaded: syncSelectedEntity treats `loaded && not found`
+      // as "agent deleted" and would wipe the persisted selection over a
+      // transient IPC failure.
+      set({ error: errMessage(e) });
     }
   },
 
@@ -236,6 +243,28 @@ export function selectEntityForChat(entity: AgentEntity | null): void {
   useSettingsDataStore.getState().update("agent", { entityId: entity?.id ?? "" });
   useAgentChatStore.getState().setEntity(entity ? toSelectedEntity(entity) : null);
 }
+
+// Opening a session from the history re-binds the entity that owns it (the
+// chat store reads the session's metadata stamp and calls back here, keeping
+// the dependency one-way). `keepSession` skips the new-chat reset, since the
+// session being opened IS the one we want.
+registerSessionEntityHandler((entityId) => {
+  const apply = () => {
+    const entity = entityId
+      ? (useAgentEntitiesStore.getState().entities.find((e) => e.id === entityId) ?? null)
+      : null;
+    useSettingsDataStore.getState().update("agent", { entityId: entity?.id ?? "" });
+    useAgentChatStore
+      .getState()
+      .setEntity(entity ? toSelectedEntity(entity) : null, { keepSession: true });
+  };
+  const st = useAgentEntitiesStore.getState();
+  if (entityId && !st.loaded) {
+    void st.load().then(apply);
+  } else {
+    apply();
+  }
+});
 
 /** Re-resolve the persisted entity pick after a load/refresh: a stale slug
  *  (agent deleted, hand-removed dir) silently clears the selection; an edit

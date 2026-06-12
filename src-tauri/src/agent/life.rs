@@ -10,6 +10,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 use crate::error::{AppError, AppResult};
 
@@ -169,24 +170,78 @@ pub fn memory_read(home: &Path, rel: &str) -> AppResult<String> {
 
 pub fn memory_write(home: &Path, rel: &str, content: &str) -> AppResult<()> {
     let path = resolve_memory_path(home, rel)?;
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    let tmp = path.with_extension("md.metacodex.tmp");
-    fs::write(&tmp, content.as_bytes())?;
-    fs::rename(&tmp, &path).map_err(|e| {
-        let _ = fs::remove_file(&tmp);
-        AppError::Io(e)
-    })?;
-    Ok(())
+    crate::config_paths::write_text_atomic(&path, content)
 }
 
 pub fn memory_delete(home: &Path, rel: &str) -> AppResult<()> {
-    if rel == "MEMORY.md" {
+    // No index is deletable: neither the global one nor a project layer's.
+    if rel == "MEMORY.md" || rel.ends_with("/MEMORY.md") {
         return Err(AppError::Other("the index file cannot be deleted".into()));
     }
     let path = resolve_memory_path(home, rel)?;
     fs::remove_file(&path).map_err(AppError::Io)
+}
+
+/// The standing heartbeat checklist (user-editable from the Agenda tab).
+pub fn heartbeat_read(home: &Path) -> String {
+    read_or_empty(&home.join("HEARTBEAT.md"))
+}
+
+pub fn heartbeat_write(home: &Path, content: &str) -> AppResult<()> {
+    crate::config_paths::write_text_atomic(&home.join("HEARTBEAT.md"), content)
+}
+
+/// Cheap harness-side consistency check of the memory layers (risk 2 of
+/// AGENTS_DESIGN.md): memory files no index line mentions, and index lines
+/// pointing at files that no longer exist. The result feeds the dream prompt
+/// as material; the harness never auto-fixes.
+pub fn memory_orphans(home: &Path) -> Vec<String> {
+    let mut out = Vec::new();
+    let layers: Vec<(PathBuf, String)> = {
+        let mut v = vec![(home.join("MEMORY.md"), "memory/".to_string())];
+        if let Ok(read) = fs::read_dir(home.join("memory/projects")) {
+            for entry in read.flatten() {
+                if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+                    if let Some(key) = entry.file_name().to_str() {
+                        v.push((
+                            entry.path().join("MEMORY.md"),
+                            format!("memory/projects/{key}/"),
+                        ));
+                    }
+                }
+            }
+        }
+        v
+    };
+    for (index_path, prefix) in layers {
+        let index = read_or_empty(&index_path);
+        let dir = home.join(prefix.trim_end_matches('/'));
+        // A file counts as indexed when its NAME appears anywhere in the
+        // layer's index (tolerant of either relative or layer-rooted links).
+        for f in list_md_files(&dir, &prefix) {
+            if !index.contains(&f.name) {
+                out.push(format!("memory file not referenced by its index: {}", f.rel_path));
+            }
+        }
+        // Index lines linking to .md files that don't exist in the layer.
+        for line in index.lines() {
+            let Some(start) = line.find("](") else { continue };
+            let Some(end) = line[start + 2..].find(')') else { continue };
+            let link = &line[start + 2..start + 2 + end];
+            if !link.ends_with(".md") || link.contains("://") {
+                continue;
+            }
+            let target = if link.starts_with("memory/") {
+                home.join(link)
+            } else {
+                dir.join(link)
+            };
+            if !target.is_file() {
+                out.push(format!("index line points at a missing file: {link}"));
+            }
+        }
+    }
+    out
 }
 
 // ---------------------------------------------------------------------------
@@ -209,17 +264,35 @@ pub struct RunLogEntry {
     pub continuations: u32,
 }
 
+/// Rotation threshold for `runs.jsonl`: past this size the file is rewritten
+/// keeping only the newest entries (a heartbeat every few minutes would grow
+/// it without bound otherwise).
+const RUN_LOG_MAX_BYTES: u64 = 512 * 1024;
+const RUN_LOG_KEEP_LINES: usize = 500;
+
 pub fn append_run_log(home: &Path, entry: &RunLogEntry) {
     let dir = home.join("logs");
     let _ = fs::create_dir_all(&dir);
+    let path = dir.join("runs.jsonl");
     let Ok(line) = serde_json::to_string(entry) else { return };
     let res = fs::OpenOptions::new()
         .create(true)
         .append(true)
-        .open(dir.join("runs.jsonl"))
+        .open(&path)
         .and_then(|mut f| writeln!(f, "{line}"));
     if let Err(e) = res {
         eprintln!("[metacodex] agent run log append failed: {e}");
+    }
+    let oversized = fs::metadata(&path).map(|m| m.len() > RUN_LOG_MAX_BYTES).unwrap_or(false);
+    if oversized {
+        if let Ok(raw) = fs::read_to_string(&path) {
+            let lines: Vec<&str> = raw.lines().collect();
+            let keep = lines.len().saturating_sub(RUN_LOG_KEEP_LINES);
+            let trimmed = lines[keep..].join("\n") + "\n";
+            if let Err(e) = crate::config_paths::write_text_atomic(&path, &trimmed) {
+                eprintln!("[metacodex] agent run log rotation failed: {e}");
+            }
+        }
     }
 }
 
@@ -232,6 +305,13 @@ pub fn recent_runs(home: &Path, limit: usize) -> Vec<RunLogEntry> {
         .filter_map(|l| serde_json::from_str(l).ok())
         .collect();
     out.reverse(); // newest first
+    // Collapse the in-flight "needs-you (pending)" row into the run's final
+    // entry once it lands (both carry the same session id; keep the newest).
+    let mut seen_sessions = std::collections::HashSet::new();
+    out.retain(|e| match &e.session_id {
+        Some(sid) => seen_sessions.insert(sid.clone()),
+        None => true,
+    });
     out.truncate(limit);
     out
 }
@@ -269,6 +349,10 @@ pub fn write_state(home: &Path, state: &HarnessState) {
 // ---------------------------------------------------------------------------
 
 fn parse_frontmatter(raw: &str) -> (Vec<(String, String)>, String) {
+    // Proposals are written by the model and may arrive with CRLF (notably on
+    // the Windows port); normalize so the frontmatter still parses.
+    let raw = raw.replace("\r\n", "\n");
+    let raw = raw.as_str();
     let Some(rest) = raw.strip_prefix("---\n") else {
         return (Vec::new(), raw.to_string());
     };
@@ -320,7 +404,10 @@ pub fn write_report(
     fs::create_dir_all(&dir)?;
     let now = chrono::Local::now();
     let stamp = now.format("%Y%m%d-%H%M%S");
-    let file = format!("{stamp}-{trigger}.md");
+    // Second-resolution stamps collide (two runs ending together would
+    // silently overwrite each other); a short unique suffix prevents that.
+    let nonce = &Uuid::new_v4().simple().to_string()[..6];
+    let file = format!("{stamp}-{trigger}-{nonce}.md");
     let mut doc = String::new();
     doc.push_str("---\n");
     doc.push_str(&format!("title: {}\n", fm_safe(title)));
@@ -333,21 +420,26 @@ pub fn write_report(
     doc.push_str("---\n\n");
     doc.push_str(body.trim());
     doc.push('\n');
-    fs::write(dir.join(&file), doc.as_bytes())?;
+    crate::config_paths::write_text_atomic(&dir.join(&file), &doc)?;
     Ok(file)
 }
 
 pub fn list_reports(home: &Path, limit: usize) -> Vec<ReportInfo> {
     let dir = home.join("reports");
     let Ok(read) = fs::read_dir(&dir) else { return Vec::new() };
-    let mut out: Vec<ReportInfo> = read
+    // File names start with a sortable timestamp: pick the newest `limit`
+    // BEFORE reading contents, so an old pile of reports costs nothing.
+    let mut names: Vec<String> = read
         .flatten()
-        .filter_map(|e| {
-            let name = e.file_name().to_str()?.to_string();
-            if !name.ends_with(".md") {
-                return None;
-            }
-            let raw = fs::read_to_string(e.path()).ok()?;
+        .filter_map(|e| e.file_name().to_str().map(String::from))
+        .filter(|n| n.ends_with(".md"))
+        .collect();
+    names.sort_by(|a, b| b.cmp(a));
+    names.truncate(limit);
+    names
+        .into_iter()
+        .filter_map(|name| {
+            let raw = fs::read_to_string(dir.join(&name)).ok()?;
             let (fm, body) = parse_frontmatter(&raw);
             Some(ReportInfo {
                 title: fm_get(&fm, "title").unwrap_or(&name).to_string(),
@@ -359,11 +451,7 @@ pub fn list_reports(home: &Path, limit: usize) -> Vec<ReportInfo> {
                 file: name,
             })
         })
-        .collect();
-    // File names start with a sortable timestamp; newest first.
-    out.sort_by(|a, b| b.file.cmp(&a.file));
-    out.truncate(limit);
-    out
+        .collect()
 }
 
 #[derive(Serialize, Clone)]
@@ -382,14 +470,38 @@ pub struct ProposalInfo {
     pub persona: Option<String>,
 }
 
-/// Extract the body of a ```persona fenced block, if any.
-fn extract_persona_block(body: &str) -> Option<String> {
-    let start = body.find("```persona")?;
-    let after = &body[start + "```persona".len()..];
+/// Extract the body of a fenced block with the given label (```persona,
+/// ```skill), if any.
+fn extract_fenced_block(body: &str, label: &str) -> Option<String> {
+    let marker = format!("```{label}");
+    let start = body.find(&marker)?;
+    let after = &body[start + marker.len()..];
     let after = after.strip_prefix('\n').unwrap_or(after);
     let end = after.find("```")?;
     let block = after[..end].trim();
     if block.is_empty() { None } else { Some(block.to_string()) }
+}
+
+fn extract_persona_block(body: &str) -> Option<String> {
+    extract_fenced_block(body, "persona")
+}
+
+/// Lowercase-dash slug for file names derived from a proposal title.
+fn file_slug(s: &str) -> String {
+    let mut out = String::new();
+    for c in s.chars() {
+        let c = c.to_ascii_lowercase();
+        if c.is_ascii_lowercase() || c.is_ascii_digit() {
+            out.push(c);
+        } else if !out.ends_with('-') && !out.is_empty() {
+            out.push('-');
+        }
+        if out.len() >= 40 {
+            break;
+        }
+    }
+    let out = out.trim_matches('-').to_string();
+    if out.is_empty() { "item".into() } else { out }
 }
 
 fn proposal_path(home: &Path, file: &str) -> AppResult<PathBuf> {
@@ -425,10 +537,14 @@ pub fn list_proposals(home: &Path) -> Vec<ProposalInfo> {
     out
 }
 
-/// Approve or reject a pending proposal. Approving a proposal that carries a
-/// `persona` block applies it to AGENT.md (the ONLY self-modification path,
-/// always behind this human gate). Rejection records the reason as a memory,
-/// so the agent doesn't propose the same thing again.
+/// Approve or reject a pending proposal. Approving applies the proposal's
+/// payload: a `persona` block rewrites AGENT.md, a `skill` block (kind:
+/// skill) lands as `skills/<slug>/SKILL.md`. Both ONLY behind this human
+/// gate. Rejection records the reason as a memory, so the agent doesn't
+/// propose the same thing again.
+///
+/// Callers must hold `entities::state_mutex` for the entity: the
+/// read-check-write below is not atomic on its own (double-resolve gate).
 pub fn resolve_proposal(
     home: &Path,
     file: &str,
@@ -442,13 +558,20 @@ pub fn resolve_proposal(
         return Err(AppError::Other("proposal is already resolved".into()));
     }
     let title = fm_get(&fm, "title").unwrap_or(file).to_string();
+    let kind = fm_get(&fm, "kind").unwrap_or("other").to_string();
 
     if approve {
         if let Some(persona) = extract_persona_block(&body) {
-            let agent_md = home.join("AGENT.md");
-            let tmp = agent_md.with_extension("md.metacodex.tmp");
-            fs::write(&tmp, persona.as_bytes())?;
-            fs::rename(&tmp, &agent_md)?;
+            crate::config_paths::write_text_atomic(&home.join("AGENT.md"), &persona)?;
+        }
+        if kind == "skill" {
+            if let Some(skill) = extract_fenced_block(&body, "skill") {
+                let slug = file_slug(&title);
+                crate::config_paths::write_text_atomic(
+                    &home.join("skills").join(&slug).join("SKILL.md"),
+                    &skill,
+                )?;
+            }
         }
     } else if let Some(reason) = reason.filter(|r| !r.trim().is_empty()) {
         let slug: String = file.trim_end_matches(".md").chars().take(40).collect();
@@ -466,7 +589,7 @@ pub fn resolve_proposal(
                 index.push('\n');
             }
             index.push_str(&format!("- [Rejected: {title}]({mem_rel}), do not re-propose\n"));
-            fs::write(&index_path, index.as_bytes())?;
+            crate::config_paths::write_text_atomic(&index_path, &index)?;
         }
     }
 
@@ -490,7 +613,7 @@ pub fn resolve_proposal(
     }
     doc.push_str("---\n\n");
     doc.push_str(&body);
-    fs::write(&path, doc.as_bytes())?;
+    crate::config_paths::write_text_atomic(&path, &doc)?;
     Ok(())
 }
 
@@ -511,9 +634,9 @@ pub fn autonomous_instructions() -> String {
     format!(
         "Autonomous run protocol:\n\
          - You are running unattended; nobody answers follow-up questions. Decide and act.\n\
-         - If the task is NOT finished and you need a fresh session to continue, end your reply with a final line `{CONTINUE_MARKER} <one-line state summary>`. If you instead need to WAIT for something external, end with `{CONTINUE_IN_MARKER} <minutes>: <one-line state summary>`. Use these only when genuinely needed.\n\
-         - Keep durable progress in files, not in conversation: a continuation starts with a fresh context and only your state summary.\n\
-         - End your reply with a short plain-text account of what you did and anything that needs the user (it becomes your report)."
+         - End your reply with a short plain-text account of what you did and anything that needs the user (it becomes your report).\n\
+         - If the task is NOT finished and you need a fresh session to continue, add one more line AFTER the account, as the very last line of your reply: `{CONTINUE_MARKER} <one-line state summary>`. If you instead need to WAIT for something external, make that last line `{CONTINUE_IN_MARKER} <minutes>: <one-line state summary>`. Use these only when genuinely needed.\n\
+         - Keep durable progress in files, not in conversation: a continuation starts with a fresh context and only your state summary."
     )
 }
 
@@ -529,34 +652,58 @@ pub fn heartbeat_prompt(home: &Path) -> String {
 
 pub fn dream_prompt(home: &Path) -> String {
     let home_s = home.display();
+    let orphans = memory_orphans(home);
+    let orphan_section = if orphans.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "\nMemory inconsistencies the harness detected (fix them during step 2):\n{}\n",
+            orphans
+                .iter()
+                .map(|o| format!("- {o}"))
+                .collect::<Vec<_>>()
+                .join("\n")
+        )
+    };
     format!(
         "This is your scheduled DREAM: a maintenance session about yourself. Work ONLY inside your agent home: {home_s}. Never touch any project directory.\n\
          1. Read logs/runs.jsonl and the recent files in reports/ (since your last dream) to recall what you did.\n\
          2. Consolidate memory: promote durable facts you learned into memory files + index lines (global layer and memory/projects/<key>/ layers); deduplicate; compress or delete stale entries; keep MEMORY.md indexes accurate.\n\
          3. Write a short journal entry at journal/<yyyy-mm-dd>.md: what I did, what I learned, what I'd do differently.\n\
-         4. If you see a concrete way to improve your own persona or a skill worth having, write a proposal file at proposals/<yyyy-mm-dd>-<slug>.md with frontmatter lines (---\\ntitle: ...\\nkind: persona|skill|new-agent\\nstatus: pending\\n---). For a persona change, include the FULL new persona inside a fenced code block labeled persona. NEVER edit AGENT.md directly.\n\
+         4. If you see a concrete way to improve your own persona or a skill worth having, write a proposal file at proposals/<yyyy-mm-dd>-<slug>.md with frontmatter lines (---\\ntitle: ...\\nkind: persona|skill|new-agent\\nstatus: pending\\n---). For a persona change, include the FULL new persona inside a fenced code block labeled persona. For a skill, include the FULL SKILL.md content (frontmatter with name + description, then the instructions) inside a fenced code block labeled skill. NEVER edit AGENT.md or skills/ directly.\n\
+         {orphan_section}\
          Finish with a one-paragraph summary of the consolidation."
     )
 }
 
 /// Parse a continuation request from the final assistant text. Returns
-/// `(delay_minutes, state_summary)`; delay 0 = immediate.
+/// `(delay_minutes, state_summary)`; delay 0 = immediate. The marker is
+/// looked for in the LAST few non-empty lines, not only the very last one:
+/// models routinely append a closing sentence after it despite the protocol.
 pub fn parse_continuation(final_text: &str) -> Option<(u64, String)> {
-    let line = final_text.trim().lines().last()?.trim();
-    if let Some(rest) = line.strip_prefix(CONTINUE_MARKER) {
-        let summary = rest.trim();
-        if !summary.is_empty() {
-            return Some((0, summary.to_string()));
+    for line in final_text
+        .trim()
+        .lines()
+        .rev()
+        .map(str::trim)
+        .filter(|l| !l.is_empty())
+        .take(8)
+    {
+        if let Some(rest) = line.strip_prefix(CONTINUE_MARKER) {
+            let summary = rest.trim();
+            if !summary.is_empty() {
+                return Some((0, summary.to_string()));
+            }
         }
-    }
-    if let Some(rest) = line.strip_prefix(CONTINUE_IN_MARKER) {
-        // `CONTINUE_IN 10: summary`
-        let rest = rest.trim_start();
-        let (mins, summary) = rest.split_once(':')?;
-        let mins: u64 = mins.trim().parse().ok()?;
-        let summary = summary.trim();
-        if !summary.is_empty() {
-            return Some((mins.clamp(1, 60), summary.to_string()));
+        if let Some(rest) = line.strip_prefix(CONTINUE_IN_MARKER) {
+            // `CONTINUE_IN 10: summary`
+            let rest = rest.trim_start();
+            let Some((mins, summary)) = rest.split_once(':') else { continue };
+            let Ok(mins) = mins.trim().parse::<u64>() else { continue };
+            let summary = summary.trim();
+            if !summary.is_empty() {
+                return Some((mins.clamp(1, 60), summary.to_string()));
+            }
         }
     }
     None

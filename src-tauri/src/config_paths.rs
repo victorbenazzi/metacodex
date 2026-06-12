@@ -266,6 +266,23 @@ pub fn write_json_atomic_private<T: Serialize>(path: &Path, value: &T) -> AppRes
     Ok(())
 }
 
+/// Atomic plain-text write: `<file>.metacodex.tmp.<pid>.<n>` → rename. Same
+/// SECURITY carve-out as [`write_json_atomic`] (app-derived paths under
+/// `~/.metacodex`, outside project roots). The canonical helper for AGENT.md,
+/// memory files, reports and proposals; do not hand-roll tmp→rename variants.
+pub fn write_text_atomic(path: &Path, contents: &str) -> AppResult<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let tmp = tmp_path(path);
+    fs::write(&tmp, contents.as_bytes())?;
+    fs::rename(&tmp, path).map_err(|e| {
+        let _ = fs::remove_file(&tmp);
+        AppError::Io(e)
+    })?;
+    Ok(())
+}
+
 /// Unique-per-write temp path next to `path`. Uniqueness (pid + counter) keeps
 /// two concurrent writers of the SAME file from clobbering each other's temp
 /// and failing the rename with a spurious NotFound.

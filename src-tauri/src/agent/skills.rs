@@ -25,12 +25,25 @@ fn skill_roots() -> Vec<(&'static str, PathBuf)> {
     let metacodex_skills = crate::config_paths::config_root()
         .map(|r| r.join("skills"))
         .unwrap_or_else(|_| home.join(".metacodex/skills"));
-    vec![
+    let mut roots = vec![
         ("metacodex", metacodex_skills),
         ("opencode", home.join(".config/opencode/skills")),
         ("claude", home.join(".claude/skills")),
         ("agents", home.join(".agents/skills")),
-    ]
+    ];
+    // Each agent entity's own skills/ enters the catalog too (AGENTS_DESIGN.md
+    // anatomy). Last in priority, so a global skill wins a slug tie.
+    if let Ok(agents) = crate::config_paths::agents_dir() {
+        if let Ok(entries) = fs::read_dir(&agents) {
+            for entry in entries.flatten() {
+                let dir = entry.path().join("skills");
+                if dir.is_dir() {
+                    roots.push(("agent", dir));
+                }
+            }
+        }
+    }
+    roots
 }
 
 pub fn list_skills() -> Vec<SkillInfo> {

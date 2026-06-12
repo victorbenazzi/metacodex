@@ -4,9 +4,9 @@ import { ArrowLeft, Bot, MessageSquare, Pencil, Plus, Trash2 } from "lucide-reac
 
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { EmptyState } from "@/components/ui/EmptyState";
 import { Icon } from "@/components/ui/Icon";
 import { IconButton } from "@/components/ui/IconButton";
+import { LateralTabs } from "@/components/ui/LateralTabs";
 import {
   selectEntityForChat,
   syncSelectedEntity,
@@ -14,8 +14,11 @@ import {
   type AgentEntity,
 } from "@/features/agent/entities.store";
 import { useAgentNavStore } from "@/features/agent/nav.store";
+import { findModel, useAgentRuntimeStore } from "@/features/agent/runtime.store";
 import { useProjectsStore } from "@/features/projects/project.store";
 import { useSettingsDataStore } from "@/features/settings/settings.data.store";
+import { CMD, invoke } from "@/lib/ipc";
+import { cn } from "@/lib/cn";
 import { AgentAvatarBadge } from "@/components/agent/entities/AgentAvatar";
 import { AgentBuilderDialog } from "@/components/agent/entities/AgentBuilderDialog";
 import {
@@ -28,6 +31,11 @@ import { PanelShell } from "./PanelShell";
 
 type ProfileTab = "persona" | "memory" | "activity" | "proposals" | "agenda";
 const PROFILE_TABS: ProfileTab[] = ["persona", "memory", "activity", "proposals", "agenda"];
+
+/** Live status of the entities' autonomous runs (slug absent = idle). */
+type EntityStatusMap = Record<string, "working" | "needs-you">;
+
+const STATUS_POLL_MS = 5000;
 
 /**
  * The Agents page: list of agent entities, or one agent's profile when
@@ -45,10 +53,32 @@ export function AgentsPanel() {
 
   const [builderOpen, setBuilderOpen] = useState(false);
   const [editing, setEditing] = useState<AgentEntity | null>(null);
+  const [statuses, setStatuses] = useState<EntityStatusMap>({});
 
   useEffect(() => {
     void load().then(syncSelectedEntity);
   }, [load]);
+
+  // Live run status, polled while the panel is mounted (the scheduler runs
+  // headless: there is no event to push from). Best-effort: a failed tick
+  // keeps the last known map.
+  useEffect(() => {
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const map = await invoke<EntityStatusMap>(CMD.agentEntityStatus);
+        if (!cancelled) setStatuses(map);
+      } catch {
+        // sidecar/scheduler unavailable; keep the last snapshot
+      }
+    };
+    void tick();
+    const id = window.setInterval(() => void tick(), STATUS_POLL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, []);
 
   const profile = profileAgentId ? entities.find((e) => e.id === profileAgentId) : null;
 
@@ -83,16 +113,40 @@ export function AgentsPanel() {
           }
         >
           {loaded && entities.length === 0 ? (
-            <EmptyState
-              variant="panel"
-              icon={Bot}
-              title={t("agent.agents.emptyTitle")}
-              body={t("agent.agents.emptyBody")}
-            />
+            // Same empty-state anatomy as Scheduled Tasks: icon tile + display
+            // title + action line, no card chrome.
+            <div className="flex min-h-[52vh] flex-col items-center justify-center text-center">
+              <span className="flex h-[64px] w-[64px] items-center justify-center rounded-xl bg-surface-strong/45">
+                <Icon icon={Bot} size={28} className="text-muted-soft" strokeWidth={1.5} />
+              </span>
+              <p className="mt-[16px] font-display text-[16px] text-body">
+                {t("agent.agents.emptyTitle")}
+              </p>
+              <p className="mt-[8px] max-w-[360px] text-ui leading-[1.55] text-muted">
+                {t("agent.agents.emptyBody")}
+              </p>
+              <p className="mt-[8px] text-ui text-muted">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditing(null);
+                    setBuilderOpen(true);
+                  }}
+                  className="font-medium text-ink underline-offset-2 hover:underline"
+                >
+                  {t("agent.agents.emptyAction")}
+                </button>
+              </p>
+            </div>
           ) : (
             <ul className="flex flex-col gap-[8px]">
               {entities.map((e) => (
-                <AgentRow key={e.id} entity={e} onOpen={() => openAgents(e.id)} />
+                <AgentRow
+                  key={e.id}
+                  entity={e}
+                  status={statuses[e.id]}
+                  onOpen={() => openAgents(e.id)}
+                />
               ))}
             </ul>
           )}
@@ -121,10 +175,47 @@ function startChatWith(entity: AgentEntity) {
   nav.setSection("chat");
 }
 
-function AgentRow({ entity, onOpen }: { entity: AgentEntity; onOpen: () => void }) {
+/** 6px live-run dot, same vocabulary as the Code view's TabStatusDot:
+ *  working = soft pulsing update tint, needs-you = static warn. Idle agents
+ *  render nothing so the list stays quiet. */
+function EntityStatusDot({ status }: { status?: "working" | "needs-you" }) {
   const { t } = useTranslation();
+  if (!status) return null;
+  const label =
+    status === "working"
+      ? t("agent.agents.status.working")
+      : t("agent.agents.status.needsYou");
+  return (
+    <span
+      role="img"
+      aria-label={label}
+      title={label}
+      className={cn(
+        "inline-block h-[6px] w-[6px] shrink-0 rounded-pill",
+        status === "working"
+          ? "animate-tab-status-pulse bg-[var(--update-blue)]"
+          : "bg-warn",
+      )}
+    />
+  );
+}
+
+function AgentRow({
+  entity,
+  status,
+  onOpen,
+}: {
+  entity: AgentEntity;
+  status?: "working" | "needs-you";
+  onOpen: () => void;
+}) {
+  const { t } = useTranslation();
+  const providers = useAgentRuntimeStore((s) => s.providers);
+  // Display name from the catalog when it's loaded; raw id otherwise.
   const modelLabel = entity.modelId
-    ? entity.modelId
+    ? ((entity.providerId
+        ? findModel(providers, entity.providerId, entity.modelId)?.name
+        : undefined) ?? entity.modelId)
     : t("agent.agents.builder.modelInherit");
 
   // The row opens the profile; the chat shortcut is a SIBLING control (never
@@ -138,7 +229,10 @@ function AgentRow({ entity, onOpen }: { entity: AgentEntity; onOpen: () => void 
       >
         <AgentAvatarBadge avatar={entity.avatar} color={entity.color} size="md" />
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-ui font-medium text-ink">{entity.name}</span>
+          <span className="flex items-center gap-[7px]">
+            <span className="truncate text-ui font-medium text-ink">{entity.name}</span>
+            <EntityStatusDot status={status} />
+          </span>
           <span className="block truncate text-caption text-muted">
             {modelLabel} · {t(`agent.permission.${entity.permissionPreset}`)}
           </span>
@@ -185,14 +279,15 @@ function AgentProfile({
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="mx-auto w-full max-w-[860px] px-[28px] py-[28px]">
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={onBack}
-          className="mb-[16px] inline-flex items-center gap-[6px] rounded-sm px-[6px] py-[3px] text-caption text-muted transition-colors hover:bg-surface-strong/55 hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-hairline-strong"
+          className="mb-[16px] gap-[6px] text-muted hover:text-ink"
         >
           <Icon icon={ArrowLeft} size={13} />
           {t("agent.agents.back")}
-        </button>
+        </Button>
 
         <header className="mb-[24px] flex items-start justify-between gap-[16px]">
           <div className="flex min-w-0 items-center gap-[14px]">
@@ -225,23 +320,13 @@ function AgentProfile({
 
         {/* Lateral tabs, same anatomy as the Customize page. */}
         <div className="flex items-start gap-[24px]">
-          <nav className="sticky top-0 flex w-[148px] shrink-0 flex-col gap-[1px]">
-            {PROFILE_TABS.map((id) => (
-              <button
-                key={id}
-                type="button"
-                aria-current={tab === id ? "page" : undefined}
-                onClick={() => setTab(id)}
-                className={
-                  tab === id
-                    ? "flex w-full items-center rounded-md bg-surface-2 px-[10px] py-[7px] text-ui text-ink transition-colors duration-fast"
-                    : "flex w-full items-center rounded-md px-[10px] py-[7px] text-ui text-body transition-colors duration-fast hover:bg-surface-1"
-                }
-              >
-                <span className="truncate text-left">{t(`agent.agents.tabs.${id}`)}</span>
-              </button>
-            ))}
-          </nav>
+          <LateralTabs
+            tabs={PROFILE_TABS.map((id) => ({ id, label: t(`agent.agents.tabs.${id}`) }))}
+            value={tab}
+            onChange={setTab}
+            ariaLabel={t("agent.agents.tabsLabel")}
+            className="w-[148px]"
+          />
 
           <div className="min-w-0 flex-1">
             {tab === "persona" ? (

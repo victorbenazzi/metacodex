@@ -149,12 +149,19 @@ pub enum AvatarInput {
     Keep,
 }
 
-/// Create/update payload. `id: None` creates (slug derived from `name`).
+/// Create/update payload (the create slug derives from `name`).
+///
+/// Absence semantics on UPDATE differ per field, matching who owns it:
+/// - `provider_id`/`model_id` absent = clear (the builder's "inherit" choice);
+/// - `projects` absent = all projects (the builder's checkbox);
+/// - `avatar` absent = remove (the builder's "none" state; `Keep` preserves);
+/// - `variant`/`color` absent = KEEP the stored value (no UI carries them;
+///   clearing is a hand edit of agent.json);
+/// - harness knobs (`heartbeat`/`dream_after_runs`/`continuation_cap`) absent
+///   = keep stored values (update) or defaults (create).
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct AgentEntityInput {
-    #[serde(default)]
-    pub id: Option<String>,
     pub name: String,
     pub persona: String,
     #[serde(default)]
@@ -170,8 +177,6 @@ pub struct AgentEntityInput {
     pub permission_preset: String,
     #[serde(default)]
     pub projects: Option<Vec<String>>,
-    /// Harness knobs (Agenda tab). Absent = keep stored values (update) or
-    /// defaults (create).
     #[serde(default)]
     pub heartbeat: Option<HeartbeatConfig>,
     #[serde(default)]
@@ -320,12 +325,41 @@ fn resolve_avatar(home: &Path, stored: &Option<Avatar>) -> Option<Avatar> {
 }
 
 fn read_config(home: &Path) -> AppResult<AgentEntityConfig> {
-    let raw = fs::read_to_string(home.join("agent.json"))?;
-    serde_json::from_str(&raw)
-        .map_err(|e| AppError::Other(format!("parse {}: {e}", home.join("agent.json").display())))
+    let path = home.join("agent.json");
+    let raw = fs::read_to_string(&path).map_err(|e| {
+        if e.kind() == std::io::ErrorKind::NotFound {
+            AppError::NotFound(format!(
+                "agent {}",
+                home.file_name().and_then(|s| s.to_str()).unwrap_or("?")
+            ))
+        } else {
+            AppError::Io(e)
+        }
+    })?;
+    let mut config: AgentEntityConfig = serde_json::from_str(&raw)
+        .map_err(|e| AppError::Other(format!("parse {}: {e}", path.display())))?;
+    // agent.json is hand-editable: normalize on READ so a typo can never widen
+    // permissions (fail closed to "ask") or melt the scheduler (interval 0
+    // would fire a heartbeat on every 20s tick).
+    if !PRESETS.contains(&config.permission_preset.as_str()) {
+        eprintln!(
+            "[metacodex] agent {}: unknown permission preset {:?}, treating as \"ask\"",
+            path.display(),
+            config.permission_preset
+        );
+        config.permission_preset = "ask".into();
+    }
+    config.heartbeat.interval_minutes = config.heartbeat.interval_minutes.clamp(5, 24 * 60);
+    config.dream_after_runs = config.dream_after_runs.clamp(1, 100);
+    config.continuation_cap = config.continuation_cap.clamp(0, 50);
+    Ok(config)
 }
 
 fn read_entity(agents_dir: &Path, slug: &str) -> AppResult<AgentEntity> {
+    read_entity_impl(agents_dir, slug, true)
+}
+
+fn read_entity_impl(agents_dir: &Path, slug: &str, with_avatar: bool) -> AppResult<AgentEntity> {
     let home = agents_dir.join(slug);
     let config = read_config(&home)?;
     let persona = fs::read_to_string(home.join("AGENT.md")).unwrap_or_default();
@@ -333,7 +367,11 @@ fn read_entity(agents_dir: &Path, slug: &str) -> AppResult<AgentEntity> {
         id: slug.to_string(),
         name: config.name.clone(),
         persona,
-        avatar: resolve_avatar(&home, &config.avatar),
+        avatar: if with_avatar {
+            resolve_avatar(&home, &config.avatar)
+        } else {
+            None
+        },
         color: config.color.clone(),
         provider_id: config.provider_id.clone(),
         model_id: config.model_id.clone(),
@@ -352,6 +390,17 @@ fn read_entity(agents_dir: &Path, slug: &str) -> AppResult<AgentEntity> {
 /// Scan the agents directory. Entries that fail to parse are skipped with a
 /// log line (one corrupt agent.json must not hide every other agent).
 pub fn scan_entities(agents_dir: &Path) -> Vec<AgentEntity> {
+    scan_entities_impl(agents_dir, true)
+}
+
+/// [`scan_entities`] without resolving image avatars (no file read + base64
+/// per entity). Use anywhere the avatar is not displayed: the scheduler tick,
+/// compiled-config generation, slug lookups.
+pub fn scan_entities_light(agents_dir: &Path) -> Vec<AgentEntity> {
+    scan_entities_impl(agents_dir, false)
+}
+
+fn scan_entities_impl(agents_dir: &Path, with_avatar: bool) -> Vec<AgentEntity> {
     let Ok(read) = fs::read_dir(agents_dir) else {
         return Vec::new();
     };
@@ -367,7 +416,7 @@ pub fn scan_entities(agents_dir: &Path) -> Vec<AgentEntity> {
         if validate_slug(&slug).is_err() {
             continue;
         }
-        match read_entity(agents_dir, &slug) {
+        match read_entity_impl(agents_dir, &slug, with_avatar) {
             Ok(e) => out.push(e),
             Err(e) => eprintln!("[metacodex] skipping agent {slug:?}: {e}"),
         }
@@ -382,7 +431,7 @@ pub fn scan_entities(agents_dir: &Path) -> Vec<AgentEntity> {
 /// on session create) stays the single authority, exactly like plain chat.
 pub fn compiled_agents(agents_dir: &Path) -> serde_json::Map<String, serde_json::Value> {
     let mut map = serde_json::Map::new();
-    for entity in scan_entities(agents_dir) {
+    for entity in scan_entities_light(agents_dir) {
         let mut agent = serde_json::Map::new();
         agent.insert("description".into(), serde_json::json!(entity.name));
         // "all": usable as a chat primary AND invocable as a subagent by other
@@ -461,7 +510,9 @@ fn apply_avatar(
         Some(AvatarInput::Keep) => Ok(existing),
         Some(AvatarInput::Emoji { value }) => {
             let value = value.trim().to_string();
-            if value.is_empty() || value.chars().count() > 4 {
+            // Byte cap, not a scalar count: ZWJ sequences (family, flags) are
+            // legitimate single graphemes made of many scalars.
+            if value.is_empty() || value.len() > 32 || value.chars().any(char::is_whitespace) {
                 return Err(AppError::Other("invalid emoji avatar".into()));
             }
             remove_files(None);
@@ -479,20 +530,6 @@ fn apply_avatar(
 
 fn write_config(home: &Path, config: &AgentEntityConfig) -> AppResult<()> {
     config_paths::write_json_atomic(&home.join("agent.json"), config)
-}
-
-/// Atomic-ish text write (tmp + rename) for AGENT.md and templates.
-fn write_text(path: &Path, contents: &str) -> AppResult<()> {
-    let tmp = path.with_file_name(format!(
-        "{}.metacodex.tmp",
-        path.file_name().and_then(|s| s.to_str()).unwrap_or("file")
-    ));
-    fs::write(&tmp, contents.as_bytes())?;
-    fs::rename(&tmp, path).map_err(|e| {
-        let _ = fs::remove_file(&tmp);
-        AppError::Io(e)
-    })?;
-    Ok(())
 }
 
 fn create_entity(agents_dir: &Path, input: AgentEntityInput) -> AppResult<AgentEntity> {
@@ -521,9 +558,9 @@ fn create_entity(agents_dir: &Path, input: AgentEntityInput) -> AppResult<AgentE
         fs::create_dir_all(&dir)?;
         fs::write(dir.join(".gitkeep"), b"")?;
     }
-    write_text(&home.join("AGENT.md"), &input.persona)?;
-    write_text(&home.join("HEARTBEAT.md"), HEARTBEAT_TEMPLATE)?;
-    write_text(&home.join("MEMORY.md"), MEMORY_TEMPLATE)?;
+    config_paths::write_text_atomic(&home.join("AGENT.md"), &input.persona)?;
+    config_paths::write_text_atomic(&home.join("HEARTBEAT.md"), HEARTBEAT_TEMPLATE)?;
+    config_paths::write_text_atomic(&home.join("MEMORY.md"), MEMORY_TEMPLATE)?;
 
     let avatar = apply_avatar(&home, input.avatar, None)?;
     let now = now_iso();
@@ -560,13 +597,19 @@ fn update_entity(agents_dir: &Path, slug: &str, input: AgentEntityInput) -> AppR
     let home = agents_dir.join(slug);
     let mut config = read_config(&home)?; // NotFound surfaces here
 
-    write_text(&home.join("AGENT.md"), &input.persona)?;
+    config_paths::write_text_atomic(&home.join("AGENT.md"), &input.persona)?;
     config.avatar = apply_avatar(&home, input.avatar, config.avatar.take())?;
     config.name = input.name.trim().to_string();
-    config.color = input.color;
+    // variant/color: absent = keep (see AgentEntityInput docs). The builder
+    // doesn't carry them; clobbering here was data loss on every edit.
+    if input.color.is_some() {
+        config.color = input.color;
+    }
+    if input.variant.is_some() {
+        config.variant = input.variant;
+    }
     config.provider_id = input.provider_id;
     config.model_id = input.model_id;
-    config.variant = input.variant;
     config.permission_preset = input.permission_preset;
     config.projects = input.projects;
     if let Some(hb) = input.heartbeat {
@@ -610,6 +653,21 @@ pub fn home_dir(slug: &str) -> AppResult<PathBuf> {
         return Err(AppError::NotFound(format!("agent {slug}")));
     }
     Ok(home)
+}
+
+/// Per-entity mutex for short critical sections over the agent home: the
+/// `state.json` read-modify-write, proposal resolution, memory edits and the
+/// git checkpoint that follows each of them. Never held across an await.
+/// Run-level overlap (two executions of the same entity) is a separate guard:
+/// the scheduler's running set with an `entity:<slug>` key.
+pub fn state_mutex(slug: &str) -> std::sync::Arc<Mutex<()>> {
+    static LOCKS: std::sync::OnceLock<Mutex<std::collections::HashMap<String, std::sync::Arc<Mutex<()>>>>> =
+        std::sync::OnceLock::new();
+    let map = LOCKS.get_or_init(|| Mutex::new(std::collections::HashMap::new()));
+    map.lock()
+        .entry(slug.to_string())
+        .or_insert_with(|| std::sync::Arc::new(Mutex::new(())))
+        .clone()
 }
 
 /// Managed store (Tauri state). Stateless reads (the directory IS the truth,
@@ -662,7 +720,6 @@ mod tests {
 
     fn input(name: &str) -> AgentEntityInput {
         AgentEntityInput {
-            id: None,
             name: name.into(),
             persona: "You are a test agent.".into(),
             avatar: Some(AvatarInput::Emoji { value: "🤖".into() }),

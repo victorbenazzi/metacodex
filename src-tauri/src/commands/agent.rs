@@ -3,6 +3,7 @@ use std::sync::Arc;
 use serde::Serialize;
 use tauri::{AppHandle, State};
 
+use crate::agent::executor;
 use crate::agent::scheduler;
 use crate::agent::{
     AgentEntity, AgentEntityInput, AgentEntityStore, AgentRuntime, CronInput, CronStore,
@@ -91,6 +92,30 @@ pub async fn agent_cron_list(store: State<'_, CronStore>) -> AppResult<Vec<CronT
     Ok(store.list())
 }
 
+/// A task bound to an agent must point at an EXISTING entity, and at a
+/// directory that entity is allowed in; failing at save time beats a silent
+/// `last_status: error` at fire time.
+fn ensure_cron_agent(projects: &ProjectsCache, input: &CronInput) -> AppResult<()> {
+    let Some(slug) = input.agent_id.as_deref().filter(|s| !s.trim().is_empty()) else {
+        return Ok(());
+    };
+    let entity = executor::find_entity(slug)?;
+    if let (Some(dir), Some(allowed)) = (
+        input.directory.as_deref().filter(|d| !d.trim().is_empty()),
+        entity.projects.as_ref(),
+    ) {
+        if let Some(owner) = projects.find_owner(dir) {
+            if !allowed.contains(&owner.0) {
+                return Err(AppError::Other(format!(
+                    "agent {:?} is not allowed to work in project {:?}",
+                    entity.id, owner.1
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn agent_cron_create(
     store: State<'_, CronStore>,
@@ -98,6 +123,7 @@ pub async fn agent_cron_create(
     input: CronInput,
 ) -> AppResult<CronTask> {
     ensure_cron_directory(&projects, input.directory.as_deref())?;
+    ensure_cron_agent(&projects, &input)?;
     store.create(input)
 }
 
@@ -109,6 +135,7 @@ pub async fn agent_cron_update(
     input: CronInput,
 ) -> AppResult<CronTask> {
     ensure_cron_directory(&projects, input.directory.as_deref())?;
+    ensure_cron_agent(&projects, &input)?;
     store.update(&id, input)
 }
 
@@ -288,6 +315,8 @@ pub async fn agent_entity_memory_write(
     content: String,
 ) -> AppResult<()> {
     let home = crate::agent::entities::home_dir(&id)?;
+    let lock = crate::agent::entities::state_mutex(&id);
+    let _guard = lock.lock();
     life::memory_write(&home, &rel_path, &content)?;
     if let Err(e) = crate::agent::entities::checkpoint(&home, "edit memory") {
         eprintln!("[metacodex] agent git checkpoint failed for {id}: {e}");
@@ -298,11 +327,39 @@ pub async fn agent_entity_memory_write(
 #[tauri::command]
 pub async fn agent_entity_memory_delete(id: String, rel_path: String) -> AppResult<()> {
     let home = crate::agent::entities::home_dir(&id)?;
+    let lock = crate::agent::entities::state_mutex(&id);
+    let _guard = lock.lock();
     life::memory_delete(&home, &rel_path)?;
     if let Err(e) = crate::agent::entities::checkpoint(&home, "delete memory") {
         eprintln!("[metacodex] agent git checkpoint failed for {id}: {e}");
     }
     Ok(())
+}
+
+/// The standing heartbeat checklist (HEARTBEAT.md), editable from the Agenda tab.
+#[tauri::command]
+pub async fn agent_entity_heartbeat_read(id: String) -> AppResult<String> {
+    let home = crate::agent::entities::home_dir(&id)?;
+    Ok(life::heartbeat_read(&home))
+}
+
+#[tauri::command]
+pub async fn agent_entity_heartbeat_write(id: String, content: String) -> AppResult<()> {
+    let home = crate::agent::entities::home_dir(&id)?;
+    let lock = crate::agent::entities::state_mutex(&id);
+    let _guard = lock.lock();
+    life::heartbeat_write(&home, &content)?;
+    if let Err(e) = crate::agent::entities::checkpoint(&home, "edit heartbeat checklist") {
+        eprintln!("[metacodex] agent git checkpoint failed for {id}: {e}");
+    }
+    Ok(())
+}
+
+/// Live status per entity (slug -> "working" | "needs-you"; absent = idle),
+/// polled by the agents list while it is visible.
+#[tauri::command]
+pub async fn agent_entity_status() -> AppResult<std::collections::HashMap<String, String>> {
+    Ok(executor::entity_status_map())
 }
 
 #[derive(Serialize)]
@@ -338,12 +395,19 @@ pub async fn agent_entity_proposal_resolve(
     reason: Option<String>,
 ) -> AppResult<()> {
     let home = crate::agent::entities::home_dir(&id)?;
-    life::resolve_proposal(&home, &file, approve, reason.as_deref())?;
-    if let Err(e) = crate::agent::entities::checkpoint(
-        &home,
-        if approve { "approve proposal" } else { "reject proposal" },
-    ) {
-        eprintln!("[metacodex] agent git checkpoint failed for {id}: {e}");
+    {
+        // The double-resolve gate inside resolve_proposal is read-check-write;
+        // the per-entity mutex makes it atomic against a second click or a
+        // concurrent execution's bookkeeping.
+        let lock = crate::agent::entities::state_mutex(&id);
+        let _guard = lock.lock();
+        life::resolve_proposal(&home, &file, approve, reason.as_deref())?;
+        if let Err(e) = crate::agent::entities::checkpoint(
+            &home,
+            if approve { "approve proposal" } else { "reject proposal" },
+        ) {
+            eprintln!("[metacodex] agent git checkpoint failed for {id}: {e}");
+        }
     }
     if approve {
         crate::agent::mcp::regenerate_opencode_config()?;

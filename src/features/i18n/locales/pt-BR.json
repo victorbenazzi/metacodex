@@ -13,7 +13,6 @@
       "mcp": "Servidores MCP",
       "agents": "Agentes",
       "customize": "Personalizar",
-      "soon": "Em breve",
       "settings": "Configurações",
       "project": "Projeto",
       "projectEmpty": "Crie ou selecione um arquivo para começar",
@@ -105,6 +104,7 @@
       },
       "noAgent": "Sem agente",
       "agentLabel": "Escolher agente",
+      "agentNotAllowedHere": "fora deste projeto",
       "manageAgents": "Gerenciar agentes..."
     },
     "chat": {
@@ -295,6 +295,7 @@
         "runsIn": "Roda em:",
         "agent": "Agente",
         "agentNone": "Sem agente (task avulsa)",
+        "agentRemoved": "Agente removido",
         "agentHint": "Com um agente, a execução usa a persona, a memória e o preset de permissões dele, e entra no registro de atividade dele."
       },
       "card": {
@@ -450,20 +451,28 @@
       "new": "Novo agente",
       "emptyTitle": "Nenhum agente ainda",
       "emptyBody": "Crie um agente com persona, modelo e permissões próprios e selecione ele no composer.",
+      "emptyAction": "Criar seu primeiro agente",
       "back": "Todos os agentes",
       "edit": "Editar",
       "chat": "Conversar com o agente",
       "delete": "Excluir agente",
       "deleteConfirmTitle": "Excluir este agente?",
       "deleteConfirmBody": "\"{{name}}\" e todo o diretório dele (persona, memória, logs) serão excluídos permanentemente.",
-      "personaTitle": "Persona",
       "personaEmpty": "Sem persona ainda.",
+      "tabsLabel": "Seções do perfil do agente",
+      "status": {
+        "working": "Trabalhando",
+        "needsYou": "Precisa de você"
+      },
       "builder": {
         "newTitle": "Novo agente",
         "editTitle": "Editar agente",
+        "modeLabel": "Modo de criação",
+        "modeDescribe": "Criar com IA",
+        "modeManual": "Manual",
         "describeTitle": "Descreva o agente que você quer",
         "describePlaceholder": "ex.: Um revisor de código meticuloso para meus projetos TypeScript, tom direto, focado em segurança",
-        "describeHint": "Pré-preenche o formulário abaixo. Nada é salvo até você criar.",
+        "describeHint": "Gerar pré-preenche o formulário para revisão. Nada é salvo até você clicar em Salvar.",
         "generate": "Gerar",
         "generateError": "Não consegui rascunhar um agente com isso. Tente reformular.",
         "name": "Nome",
@@ -471,9 +480,10 @@
         "persona": "Persona",
         "personaPlaceholder": "Você é...",
         "personaHint": "O system prompt do agente: identidade, especialidade, jeito de trabalhar, regras.",
-        "avatarEmoji": "Emoji",
+        "avatarLabel": "Escolher avatar",
+        "avatarEmojiCustom": "Digite um emoji",
         "avatarUpload": "Enviar foto",
-        "avatarRemove": "Remover avatar",
+        "avatarRemove": "Remover",
         "avatarTooLarge": "Imagem grande demais (máx. 1 MB).",
         "model": "Modelo",
         "modelInherit": "Escolha do composer",
@@ -498,7 +508,16 @@
         "delete": "Excluir memória",
         "save": "Salvar",
         "pickFile": "Escolha um arquivo à esquerda para ler ou editar.",
-        "emptyHint": "Nada aqui ainda. O agente escreve a própria memória enquanto trabalha; você também pode editar esses arquivos à mão."
+        "emptyHint": "Nada aqui ainda. O agente escreve a própria memória enquanto trabalha; você também pode editar esses arquivos à mão.",
+        "editorLabel": "Editor de arquivo de memória",
+        "loadFailed": "Não consegui carregar esta memória. Tente de novo.",
+        "saveFailed": "Não consegui salvar o arquivo. Tente de novo.",
+        "deleteFailed": "Não consegui excluir o arquivo. Tente de novo.",
+        "deleteConfirmTitle": "Excluir este arquivo de memória?",
+        "deleteConfirmBody": "\"{{name}}\" será excluído permanentemente da memória do agente.",
+        "discardTitle": "Descartar alterações não salvas?",
+        "discardBody": "Você editou \"{{name}}\" e não salvou. Trocar de arquivo descarta essas alterações.",
+        "discardConfirm": "Descartar"
       },
       "activity": {
         "loading": "Carregando atividade",
@@ -507,11 +526,16 @@
         "reports": "Reports",
         "noReports": "Nenhum report ainda.",
         "runs": "Registro de execuções",
-        "continuations": "{{count}} continuações",
+        "openConversation": "Abrir conversa",
+        "continuations_one": "{{count}} continuação",
+        "continuations_other": "{{count}} continuações",
         "status": {
           "ok": "ok",
+          "ok-quiet": "ok (silencioso)",
           "needs-you": "precisa de você",
+          "pending": "permissão pendente",
           "aborted": "abortada",
+          "incomplete": "incompleta (limite de continuações)",
           "error": "erro"
         }
       },
@@ -525,7 +549,8 @@
         "reasonPlaceholder": "Por quê? (vira memória para não propor de novo)",
         "approved": "Aprovada",
         "rejected": "Rejeitada",
-        "appliesPersona": "Aprovar aplica a persona proposta no AGENT.md."
+        "appliesPersona": "Aprovar aplica a persona proposta no AGENT.md.",
+        "resolveFailed": "Não consegui aplicar a decisão. Tente de novo."
       },
       "agenda": {
         "heartbeat": "Heartbeat",
@@ -533,6 +558,12 @@
         "heartbeatInterval": "Intervalo (minutos)",
         "dreamAfter": "Dream após N execuções",
         "continuationCap": "Limite de continuações por tarefa",
+        "saveFailed": "Não consegui salvar as configurações de agenda. Tente de novo.",
+        "heartbeatFile": "Checklist do HEARTBEAT.md",
+        "heartbeatFileHint": "O que o agente confere a cada heartbeat. Edite como uma lista de tarefas.",
+        "heartbeatLoading": "Carregando HEARTBEAT.md",
+        "heartbeatLoadFailed": "Não consegui carregar o HEARTBEAT.md. Tente de novo.",
+        "heartbeatSaveFailed": "Não consegui salvar o HEARTBEAT.md. Tente de novo.",
         "crons": "Tasks agendadas deste agente",
         "noCrons": "Nenhuma ainda. Atribua uma task a este agente em Scheduled Tasks.",
         "manageCrons": "Gerenciar Scheduled Tasks"

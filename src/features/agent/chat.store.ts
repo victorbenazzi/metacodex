@@ -8,7 +8,7 @@ import { useSettingsDataStore } from "@/features/settings/settings.data.store";
 import { findModel, useAgentRuntimeStore, type RuntimeStatus } from "./runtime.store";
 import { applyEvent, clearRoles, mapStoredMessage, seedRoles } from "./chat.events";
 import { loadCommands } from "./commands";
-import { errMessage, qs } from "./oc";
+import { DEFAULT_MODEL, errMessage, qs } from "./oc";
 import { useAgentSessionsStore } from "./sessions.store";
 import { useAgentComposerStore } from "./composer.store";
 import { describeImages } from "./visionRelay";
@@ -136,10 +136,11 @@ export interface QueuedPrompt {
   parts: OutgoingPart[];
 }
 
-/** Fallback model when settings carry no explicit pick. Exported so composer
- *  controls (VariantPicker) and the cron dialog resolve the SAME effective
- *  model the send uses. */
-export const DEFAULT_MODEL = "deepseek-v4-flash";
+/** Fallback model when settings carry no explicit pick. Defined in `oc.ts`
+ *  (the lowest layer, also used by the one-shot extractors) and re-exported
+ *  here so composer controls (VariantPicker) and the cron dialog keep their
+ *  import path. */
+export { DEFAULT_MODEL };
 
 /** Minimal slice of an agent entity the send path needs. The full entity
  *  (persona, avatar, projects) lives in entities.store; the composer's
@@ -218,8 +219,10 @@ export interface ChatState {
   /** Re-point everything at a fresh sidecar base URL after a restart (the
    *  `--port 0` spawn means every restart changes the port). */
   rebindBase: (base: string) => void;
-  /** Select/clear the agent entity driving new turns (composer AgentPicker). */
-  setEntity: (entity: SelectedEntity | null) => void;
+  /** Select/clear the agent entity driving new turns (composer AgentPicker).
+   *  `keepSession` is the selectSession re-sync path: rebind the entity WITHOUT
+   *  resetting the conversation that was just opened. */
+  setEntity: (entity: SelectedEntity | null, opts?: { keepSession?: boolean }) => void;
   setDirectory: (dir: string | null) => Promise<void>;
   loadAgents: () => Promise<void>;
   newChat: () => void;
@@ -349,8 +352,11 @@ async function entitySystem(
         directory,
       });
       if (ctx.trim()) blocks.push(ctx);
-    } catch {
-      // memory context is additive; the persona still rides the compiled agent
+    } catch (e) {
+      // Memory context is additive (the persona still rides the compiled
+      // agent), but a silent skip makes "the agent forgot everything"
+      // undiagnosable; leave a trace.
+      console.warn("[metacodex] entity memory context failed:", e);
     }
   }
   if (swarm) blocks.push(SWARM_SYSTEM);
@@ -367,7 +373,7 @@ async function entitySystem(
 async function ensureSession(
   get: Get,
   set: Set,
-  opts: { preset: PermissionPreset; swarm: boolean; agent?: string },
+  opts: { preset: PermissionPreset; swarm: boolean; agent?: string; entityId?: string },
 ): Promise<string | null> {
   const existing = get().sessionId;
   if (existing) return existing;
@@ -383,6 +389,15 @@ async function ensureSession(
     ).json()) as { id?: string };
     if (!created.id) throw new Error("session create returned no id");
     set({ sessionId: created.id });
+    // Stamp which entity owns this session (free-form metadata, the same ride
+    // the sidebar pin uses), so reopening it later re-binds the right entity
+    // instead of silently mixing personas. Best-effort.
+    if (opts.entityId) {
+      void ocFetch(get, `/session/${created.id}`, {
+        method: "PATCH",
+        json: { metadata: { entityId: opts.entityId } },
+      }).catch(() => undefined);
+    }
     return created.id;
   } catch (e) {
     set({
@@ -391,6 +406,14 @@ async function ensureSession(
     });
     return null;
   }
+}
+
+/** Injected by entities.store at module init (keeps deps periphery -> chat
+ *  .store, one-way): re-bind the selected entity when an opened session
+ *  belongs to a different one (or to none). */
+let sessionEntityHandler: ((entityId: string | null) => void) | null = null;
+export function registerSessionEntityHandler(fn: (entityId: string | null) => void): void {
+  sessionEntityHandler = fn;
 }
 
 /**
@@ -672,14 +695,28 @@ export const useAgentChatStore = create<ChatState>((set, get) => ({
     void get().loadAgents();
   },
 
-  setEntity: (entity) => {
-    const changed = (entity?.id ?? null) !== (get().entity?.id ?? null);
+  setEntity: (entity, opts) => {
+    const prev = get().entity;
+    const changed = (entity?.id ?? null) !== (prev?.id ?? null);
     // Same-id calls still land: an edit may have changed model/preset/variant.
     set({ entity });
-    // A session is created with its agent + permission posture; switching the
-    // entity mid-thread would silently mix personas, so the next turn starts
-    // a fresh session (same rule as switching the project).
-    if (changed && get().sessionId) get().newChat();
+    if (opts?.keepSession) return;
+    if (changed && get().sessionId) {
+      // A live stream must not keep running invisibly under the new chat, and
+      // stop() also drains the queued prompts back to the composer.
+      if (get().status !== "idle") void get().stop();
+      // A session is created with its agent + permission posture; switching the
+      // entity mid-thread would silently mix personas, so the next turn starts
+      // a fresh session (same rule as switching the project).
+      get().newChat();
+      return;
+    }
+    // Same entity, edited preset: the session ruleset was fixed at create and
+    // the PermissionPicker (the only other PATCH caller) is hidden while an
+    // entity is selected, so the live session must be re-ruled here.
+    if (!changed && entity && prev && entity.permissionPreset !== prev.permissionPreset) {
+      void get().applyPermissionPreset();
+    }
   },
 
   setDirectory: async (dir) => {
@@ -779,9 +816,22 @@ export const useAgentChatStore = create<ChatState>((set, get) => ({
       ]);
       const rows: unknown = await rowsRes.json();
       const sessionInfo = sessionRes
-        ? ((await sessionRes.json().catch(() => null)) as { revert?: unknown } | null)
+        ? ((await sessionRes.json().catch(() => null)) as {
+            revert?: unknown;
+            metadata?: Record<string, unknown>;
+          } | null)
         : null;
       if (!fresh()) return;
+      // Re-bind the entity to the session's owner (stamped at create): sending
+      // into an old session with a different entity selected would mix the
+      // personas/rulesets the comments below promise to keep apart.
+      const sessionEntityId =
+        typeof sessionInfo?.metadata?.entityId === "string" && sessionInfo.metadata.entityId
+          ? sessionInfo.metadata.entityId
+          : null;
+      if (sessionEntityHandler && sessionEntityId !== (get().entity?.id ?? null)) {
+        sessionEntityHandler(sessionEntityId);
+      }
       const all = Array.isArray(rows)
         ? (rows.map(mapStoredMessage).filter(Boolean) as ChatMessage[])
         : [];
@@ -903,7 +953,12 @@ export const useAgentChatStore = create<ChatState>((set, get) => ({
     const modelID = effectiveModelId(cfg.providerID, cfg.modelID, cfg.mode);
 
     // Ensure a session exists, created with the chosen permission posture.
-    const sessionId = await ensureSession(get, set, { preset: cfg.preset, swarm, agent });
+    const sessionId = await ensureSession(get, set, {
+      preset: cfg.preset,
+      swarm,
+      agent,
+      entityId: get().entity?.id,
+    });
     if (!sessionId) return false;
 
     // Vision relay: data-URL images headed to a model that can't see them get
@@ -944,6 +999,9 @@ export const useAgentChatStore = create<ChatState>((set, get) => ({
         set((s) => ({ thread: [...s.thread, userMsg], error: null }));
         useAgentSessionsStore.getState().markRunning(sessionId);
         const directoryAtSend = get().directory;
+        // Same identity + memory the plain message path sends: a command turn
+        // of an entity session must not run persona-less and amnesiac.
+        const cmdSystem = await entitySystem(get().entity, directoryAtSend, swarm);
         void ocFetch(get, `/session/${sessionId}/command`, {
           method: "POST",
           json: {
@@ -953,6 +1011,8 @@ export const useAgentChatStore = create<ChatState>((set, get) => ({
             // pick ("provider/model" flat string in this body).
             ...(cmd.model ? {} : { model: `${cfg.providerID}/${modelID}` }),
             ...(variant ? { variant } : {}),
+            ...(agent ? { agent } : {}),
+            ...(cmdSystem ? { system: cmdSystem } : {}),
           },
         })
           .then(async (res) => {
@@ -1060,7 +1120,12 @@ export const useAgentChatStore = create<ChatState>((set, get) => ({
     const swarm = cfg.mode === "swarm";
     const modelID = effectiveModelId(cfg.providerID, cfg.modelID, cfg.mode);
 
-    const sessionId = await ensureSession(get, set, { preset: cfg.preset, swarm, agent });
+    const sessionId = await ensureSession(get, set, {
+      preset: cfg.preset,
+      swarm,
+      agent,
+      entityId: get().entity?.id,
+    });
     if (!sessionId) return false;
 
     const userMsg: ChatMessage = {

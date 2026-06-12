@@ -107,6 +107,13 @@ export function ScheduledTaskDialog({
   const cronValid = describeCron(cron, i18n.language).valid;
   const canSubmit = name.trim().length > 0 && prompt.trim().length > 0 && cronValid;
 
+  // A stored agentId whose entity no longer exists (agent deleted after the
+  // task was created). Only meaningful once the list actually loaded.
+  const ghostAgentId =
+    agentId && entitiesLoaded && !agentEntities.some((e) => e.id === agentId)
+      ? agentId
+      : null;
+
   const submit = async () => {
     if (!canSubmit || submitting) return;
     setSubmitting(true);
@@ -222,7 +229,7 @@ export function ScheduledTaskDialog({
             />
           </Field>
 
-          {agentEntities.length > 0 ? (
+          {agentEntities.length > 0 || ghostAgentId ? (
             <div className="flex flex-col gap-[8px]">
               <span className="text-caption font-medium text-body">
                 {t("agent.scheduled.dialog.agent")}
@@ -235,6 +242,17 @@ export function ScheduledTaskDialog({
                 options={[
                   { value: "none", label: t("agent.scheduled.dialog.agentNone") },
                   ...agentEntities.map((e) => ({ value: e.id, label: e.name })),
+                  // The stored agent was deleted: keep its value visible (and
+                  // clearable via "none") instead of rendering a blank trigger.
+                  ...(ghostAgentId
+                    ? [
+                        {
+                          value: ghostAgentId,
+                          label: t("agent.scheduled.dialog.agentRemoved"),
+                          disabled: true,
+                        },
+                      ]
+                    : []),
                 ]}
                 className="w-full"
               />

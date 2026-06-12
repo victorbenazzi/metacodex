@@ -13,7 +13,6 @@
       "mcp": "MCP Servers",
       "agents": "Agents",
       "customize": "Customize",
-      "soon": "Soon",
       "settings": "Settings",
       "project": "Project",
       "projectEmpty": "Create or select a file to start",
@@ -105,6 +104,7 @@
       },
       "noAgent": "No agent",
       "agentLabel": "Choose agent",
+      "agentNotAllowedHere": "not in this project",
       "manageAgents": "Manage agents..."
     },
     "chat": {
@@ -295,6 +295,7 @@
         "runsIn": "Runs in:",
         "agent": "Agent",
         "agentNone": "No agent (standalone task)",
+        "agentRemoved": "Removed agent",
         "agentHint": "With an agent, the run uses its persona, memory and permission preset, and lands in its activity log."
       },
       "card": {
@@ -450,20 +451,28 @@
       "new": "New agent",
       "emptyTitle": "No agents yet",
       "emptyBody": "Create an agent with its own persona, model and permissions, then pick it in the composer.",
+      "emptyAction": "Create your first agent",
       "back": "All agents",
       "edit": "Edit",
       "chat": "Chat with agent",
       "delete": "Delete agent",
       "deleteConfirmTitle": "Delete this agent?",
       "deleteConfirmBody": "\"{{name}}\" and its whole home directory (persona, memory, logs) will be permanently deleted.",
-      "personaTitle": "Persona",
       "personaEmpty": "No persona yet.",
+      "tabsLabel": "Agent profile sections",
+      "status": {
+        "working": "Working",
+        "needsYou": "Needs you"
+      },
       "builder": {
         "newTitle": "New agent",
         "editTitle": "Edit agent",
+        "modeLabel": "Creation mode",
+        "modeDescribe": "Create with AI",
+        "modeManual": "Manual",
         "describeTitle": "Describe the agent you want",
         "describePlaceholder": "e.g. A meticulous code reviewer for my TypeScript projects, direct tone, focused on security",
-        "describeHint": "Prefills the form below. Nothing is saved until you hit Create.",
+        "describeHint": "Generate prefills the form for review. Nothing is saved until you hit Save.",
         "generate": "Generate",
         "generateError": "Couldn't draft an agent from that. Try rephrasing.",
         "name": "Name",
@@ -471,9 +480,10 @@
         "persona": "Persona",
         "personaPlaceholder": "You are...",
         "personaHint": "The agent's system prompt: identity, expertise, working style, rules.",
-        "avatarEmoji": "Emoji",
+        "avatarLabel": "Choose avatar",
+        "avatarEmojiCustom": "Type any emoji",
         "avatarUpload": "Upload photo",
-        "avatarRemove": "Remove avatar",
+        "avatarRemove": "Remove",
         "avatarTooLarge": "Image too large (max 1 MB).",
         "model": "Model",
         "modelInherit": "Composer's pick",
@@ -498,7 +508,16 @@
         "delete": "Delete memory",
         "save": "Save",
         "pickFile": "Pick a file on the left to read or edit it.",
-        "emptyHint": "Nothing here yet. The agent writes its own memory while it works; you can also edit these files by hand."
+        "emptyHint": "Nothing here yet. The agent writes its own memory while it works; you can also edit these files by hand.",
+        "editorLabel": "Memory file editor",
+        "loadFailed": "Couldn't load this memory. Try again.",
+        "saveFailed": "Couldn't save the file. Try again.",
+        "deleteFailed": "Couldn't delete the file. Try again.",
+        "deleteConfirmTitle": "Delete this memory file?",
+        "deleteConfirmBody": "\"{{name}}\" will be permanently deleted from the agent's memory.",
+        "discardTitle": "Discard unsaved changes?",
+        "discardBody": "You edited \"{{name}}\" and didn't save. Switching files discards those changes.",
+        "discardConfirm": "Discard"
       },
       "activity": {
         "loading": "Loading activity",
@@ -507,11 +526,16 @@
         "reports": "Reports",
         "noReports": "No reports yet.",
         "runs": "Run log",
-        "continuations": "{{count}} continuations",
+        "openConversation": "Open conversation",
+        "continuations_one": "{{count}} continuation",
+        "continuations_other": "{{count}} continuations",
         "status": {
           "ok": "ok",
+          "ok-quiet": "ok (quiet)",
           "needs-you": "needs you",
+          "pending": "permission pending",
           "aborted": "aborted",
+          "incomplete": "incomplete (continuation cap)",
           "error": "error"
         }
       },
@@ -525,7 +549,8 @@
         "reasonPlaceholder": "Why? (becomes a memory so it won't re-propose)",
         "approved": "Approved",
         "rejected": "Rejected",
-        "appliesPersona": "Approving applies the proposed persona to AGENT.md."
+        "appliesPersona": "Approving applies the proposed persona to AGENT.md.",
+        "resolveFailed": "Couldn't apply the decision. Try again."
       },
       "agenda": {
         "heartbeat": "Heartbeat",
@@ -533,6 +558,12 @@
         "heartbeatInterval": "Interval (minutes)",
         "dreamAfter": "Dream after N runs",
         "continuationCap": "Continuation cap per task",
+        "saveFailed": "Couldn't save the schedule settings. Try again.",
+        "heartbeatFile": "HEARTBEAT.md checklist",
+        "heartbeatFileHint": "What the agent checks on every heartbeat. Edit it like a to-do list.",
+        "heartbeatLoading": "Loading HEARTBEAT.md",
+        "heartbeatLoadFailed": "Couldn't load HEARTBEAT.md. Try again.",
+        "heartbeatSaveFailed": "Couldn't save HEARTBEAT.md. Try again.",
         "crons": "Scheduled tasks of this agent",
         "noCrons": "None yet. Assign a task to this agent in Scheduled Tasks.",
         "manageCrons": "Manage Scheduled Tasks"

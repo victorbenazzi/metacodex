@@ -7,7 +7,7 @@ import { cn } from "@/lib/cn";
 const SIZES = {
   sm: { box: 20, emoji: "text-caption", icon: 11 },
   md: { box: 28, emoji: "text-title", icon: 14 },
-  lg: { box: 44, emoji: "text-[22px]", icon: 20 },
+  lg: { box: 44, emoji: "text-display-s", icon: 20 },
 } as const;
 
 /** Identity badge of an agent entity: photo, emoji, or a Bot glyph fallback,

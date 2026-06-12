@@ -1,5 +1,9 @@
+import { CMD, invoke } from "@/lib/ipc";
+import { useSettingsDataStore } from "@/features/settings/settings.data.store";
+
 import { mapStoredMessage } from "./chat.events";
 import type { SessionFileDiff } from "./opencode";
+import type { RuntimeStatus } from "./runtime.store";
 
 /**
  * Shared low-level helpers for talking to the opencode sidecar over HTTP.
@@ -7,6 +11,11 @@ import type { SessionFileDiff } from "./opencode";
  * and the throwaway one-shot prompt dance, so they can't drift across the
  * chat store, the sessions mirror, the vision relay and "create from chat".
  */
+
+/** Fallback model when settings carry no explicit pick. Lives here (the
+ *  lowest layer) so chat.store, composer controls and the one-shot extractors
+ *  all resolve the SAME effective model without import cycles. */
+export const DEFAULT_MODEL = "deepseek-v4-flash";
 
 /** `?directory=` query string for a path-scoped opencode call. */
 export function qs(directory: string | null): string {
@@ -80,6 +89,57 @@ export async function fetchSessionDiff(
       }));
   } catch {
     return null;
+  }
+}
+
+export type JsonOneShotResult<T> = { ok: true; value: T } | { ok: false; error: string };
+
+/**
+ * The "create from chat" scaffolding shared by `cron.fromText` and
+ * `entities.fromText`: trim the request, start (or reuse) the sidecar, run a
+ * throwaway `oneShotPrompt` with a strict-JSON system instruction, then parse
+ * the first `{` ... last `}` slice of the reply. The model rides the settings
+ * pick (same default as the chat send path). Errors come back as plain
+ * strings via `errMessage`; never throws.
+ */
+export async function extractJsonOneShot<T>(opts: {
+  system: string;
+  request: string;
+  directory: string | null;
+}): Promise<JsonOneShotResult<T>> {
+  const text = opts.request.trim();
+  if (!text) return { ok: false, error: "empty request" };
+
+  const agent = useSettingsDataStore.getState().settings.agent;
+  const model = {
+    providerID: agent.providerId || "opencode-go",
+    modelID: agent.modelId || DEFAULT_MODEL,
+  };
+
+  try {
+    const status = await invoke<RuntimeStatus>(CMD.agentRuntimeStart);
+    const base = status.baseUrl;
+    if (!base) return { ok: false, error: "runtime not connected" };
+
+    const replyText = await oneShotPrompt(base, opts.directory, {
+      parts: [{ type: "text", text }],
+      system: opts.system,
+      model,
+    });
+    if (!replyText) return { ok: false, error: "model call failed" };
+
+    const start = replyText.indexOf("{");
+    const end = replyText.lastIndexOf("}");
+    if (start === -1 || end <= start) {
+      return { ok: false, error: "no JSON could be read from the reply" };
+    }
+    try {
+      return { ok: true, value: JSON.parse(replyText.slice(start, end + 1)) as T };
+    } catch {
+      return { ok: false, error: "no JSON could be read from the reply" };
+    }
+  } catch (e) {
+    return { ok: false, error: errMessage(e) };
   }
 }
 

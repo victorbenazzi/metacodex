@@ -167,6 +167,31 @@ Aceite: dizer um fato ao agente num chat; novo chat (outra sessão) usa o
 fato sem releitura do transcript; fato de projeto A não aparece em projeto B;
 memória editável à mão sobrevive e o índice se mantém consistente.
 
+> **Revisão 2026-06-11 (pós-implementação):** um review profundo fechou os
+> principais gaps e bugs da primeira leva. Mudanças relevantes sobre o texto
+> abaixo: (a) execuções são serializadas POR ENTIDADE (claim `entity:<slug>`
+> no running set + `entities::state_mutex` para seções críticas curtas sobre
+> state.json/git/propostas); (b) preset desconhecido em agent.json falha
+> FECHADO para "ask" nos dois lados do espelho (teste
+> `ruleset_mirrors_frontend_presets` pina os 3 rulesets); (c) o watcher de
+> permissão auto-aprova asks cujo alvo está dentro do agent home (memória/
+> journal/propostas funcionam em preset restritivo sem acordar o usuário);
+> (d) `skills/` do home entra no catálogo do skills.rs; (e) propostas persona
+> renderizam DIFF contra o AGENT.md atual e propostas kind:skill aplicam para
+> `skills/<slug>/SKILL.md`; (f) HEARTBEAT.md editável na aba Agenda; (g) lista
+> de agentes mostra status idle/working/needs-you (poll de
+> `agent_entity_status`); (h) runs com permissão pendente gravam uma linha
+> "needs-you (pending)" no runs.jsonl na hora (com session id) e a aba
+> Atividade abre a conversa da run, inclusive de heartbeat/dream (directory =
+> home, que não aparece em nenhum projeto da sidebar); (i) sessões de chat
+> são carimbadas com o entityId (metadata) e reabrir uma conversa re-vincula
+> a entidade dona (sem misturar personas); (j) dream recebe a lista de
+> órfãos de memória detectados pelo harness (risco 2); (k) a orquestração
+> saiu do scheduler.rs para `agent/executor.rs`; `run_prompt` virou wrapper
+> de `run_entity_turn`. Cortes que CONTINUAM: espelho de crons em agent.json,
+> dream por cron diário, enforcement de profundidade 2, proposta de agente
+> novo auto-aplicada, continuação com delay morre com o app.
+
 ### Fase 3: a entidade trabalha sozinha (IMPLEMENTADA 2026-06-11, com cortes)
 
 Como ficou: `CronTask.agent_id` opcional (decisão C; task sem agente é byte a

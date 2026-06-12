@@ -7,6 +7,8 @@ import { cn } from "@/lib/cn";
 export interface SelectOption {
   value: string;
   label: string;
+  /** Visible but not selectable (e.g. a value that no longer exists). */
+  disabled?: boolean;
 }
 
 interface SelectProps {
@@ -54,9 +56,11 @@ export function Select({ value, onValueChange, options, ariaLabel, className }: 
               <RS.Item
                 key={opt.value}
                 value={opt.value}
+                disabled={opt.disabled}
                 className={cn(
                   "flex cursor-pointer items-center justify-between gap-[12px] rounded-sm px-[10px] py-[7px]",
                   "text-caption text-ink outline-none data-[highlighted]:bg-surface-strong/70",
+                  "data-[disabled]:cursor-not-allowed data-[disabled]:opacity-40",
                 )}
               >
                 <RS.ItemText>{opt.label}</RS.ItemText>

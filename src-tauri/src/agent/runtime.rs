@@ -333,19 +333,14 @@ impl AgentRuntime {
     }
 
     /// Fire-and-complete a one-shot prompt in a fresh session. Used by the
-    /// scheduler to run cron tasks headlessly. Returns the new session id.
+    /// scheduler to run standalone cron tasks headlessly. Returns the new
+    /// session id.
     ///
-    /// Two things make a *headless* run actually do work, mirroring the chat path:
-    /// - `directory` is threaded as `?directory=` on every call. Without it
-    ///   opencode runs in the sidecar's launch cwd, not the user's project (this
-    ///   is what dumped earlier cron output into `src-tauri/`).
-    /// - the session is created with a fully-permissive ruleset. A scheduled run
-    ///   is unattended, so any tool that would normally prompt for approval (edit,
-    ///   bash, network, escaping the root) must be pre-allowed or the turn stalls
-    ///   forever waiting for a click no one will make.
-    ///
-    /// Bounded by [`RUN_PROMPT_BUDGET`]; on expiry the session is aborted and the
-    /// run records an error instead of hanging the scheduler task forever.
+    /// A thin wrapper over [`Self::run_entity_turn`] (no agent identity, no
+    /// system block, the full-auto ruleset): the unattended run is pre-allowed
+    /// for every consequential tool, `directory` rides as `?directory=` on
+    /// every call, and the turn is bounded by [`RUN_PROMPT_BUDGET`] with a
+    /// best-effort abort on expiry.
     pub async fn run_prompt(
         &self,
         prompt: &str,
@@ -353,71 +348,27 @@ impl AgentRuntime {
         model_id: &str,
         directory: Option<&str>,
     ) -> AppResult<String> {
-        let base = self.ensure_base().await?;
-        // `?directory=` built by hand (mirrors the frontend's encodeURIComponent,
-        // so opencode decodes it identically) rather than reqwest's query builder.
-        let suffix = directory
-            .filter(|d| !d.is_empty())
-            .map(|d| format!("?directory={}", encode_uri_component(d)))
-            .unwrap_or_default();
-
-        let create_resp = self
-            .client
-            .post(format!("{base}/session{suffix}"))
-            .json(&serde_json::json!({ "permission": full_auto_ruleset() }))
-            .timeout(Duration::from_secs(10))
-            .send()
-            .await
-            .map_err(|e| AppError::Other(format!("session create: {e}")))?;
-        if !create_resp.status().is_success() {
+        let outcome = self
+            .run_entity_turn(EntityTurnRequest {
+                agent_name: None,
+                preset: "full-auto",
+                provider_id,
+                model_id,
+                variant: None,
+                directory,
+                system: None,
+                prompt,
+                on_permission_pending: None,
+                auto_approve_dir: None,
+            })
+            .await?;
+        if outcome.aborted {
             return Err(AppError::Other(format!(
-                "session create failed: HTTP {}",
-                create_resp.status()
+                "run timed out after {} minutes (session aborted)",
+                RUN_PROMPT_BUDGET.as_secs() / 60
             )));
         }
-        let created: serde_json::Value = create_resp
-            .json()
-            .await
-            .map_err(|e| AppError::Other(format!("session decode: {e}")))?;
-        let session_id = created
-            .get("id")
-            .and_then(serde_json::Value::as_str)
-            .ok_or_else(|| AppError::Other("session create returned no id".into()))?
-            .to_string();
-
-        let body = serde_json::json!({
-            "parts": [{ "type": "text", "text": prompt }],
-            "model": { "providerID": provider_id, "modelID": model_id },
-        });
-        // The POST resolves only when the turn finishes, so the timeout is the
-        // run's total budget. Without one, a wedged turn (hung tool, stuck
-        // model) pins the scheduler task forever and the run history records
-        // nothing at all; bounded, it lands as an error row and the session is
-        // best-effort aborted.
-        let send = self
-            .client
-            .post(format!("{base}/session/{session_id}/message{suffix}"))
-            .json(&body)
-            .send();
-        let resp = match tokio::time::timeout(RUN_PROMPT_BUDGET, send).await {
-            Ok(r) => r.map_err(|e| AppError::Other(format!("prompt request: {e}")))?,
-            Err(_) => {
-                let _ = self
-                    .client
-                    .post(format!("{base}/session/{session_id}/abort{suffix}"))
-                    .timeout(Duration::from_secs(5))
-                    .send()
-                    .await;
-                return Err(AppError::Other(format!(
-                    "run timed out after {} minutes (session aborted)",
-                    RUN_PROMPT_BUDGET.as_secs() / 60
-                )));
-            }
-        };
-        if !resp.status().is_success() {
-            return Err(AppError::Other(format!("prompt failed: HTTP {}", resp.status())));
-        }
-        Ok(session_id)
+        Ok(outcome.session_id)
     }
 
     /// One turn of an ENTITY execution (phase 3): like [`Self::run_prompt`]
@@ -438,13 +389,16 @@ impl AgentRuntime {
             .map(|d| format!("?directory={}", encode_uri_component(d)))
             .unwrap_or_default();
 
+        let mut create_body = serde_json::json!({
+            "permission": ruleset_for_preset(req.preset),
+        });
+        if let Some(agent) = req.agent_name {
+            create_body["agent"] = serde_json::json!(agent);
+        }
         let create_resp = self
             .client
             .post(format!("{base}/session{suffix}"))
-            .json(&serde_json::json!({
-                "permission": ruleset_for_preset(req.preset),
-                "agent": req.agent_name,
-            }))
+            .json(&create_body)
             .timeout(Duration::from_secs(10))
             .send()
             .await
@@ -465,34 +419,69 @@ impl AgentRuntime {
             .ok_or_else(|| AppError::Other("session create returned no id".into()))?
             .to_string();
 
-        // Permission watcher: only meaningful when the preset can ask.
+        // Permission watcher: only meaningful when the preset can ask. Asks
+        // whose every target sits inside `auto_approve_dir` (the agent home:
+        // memory writes, journal, proposals) are approved by the harness, so
+        // phase-2 memory works on restrictive presets without waking the user;
+        // anything else notifies once and waits for the human.
         let watcher = if req.preset != "full-auto" {
             let client = self.client.clone();
-            let url = format!("{base}/permission{suffix}");
+            let base_c = base.clone();
+            let suffix_c = suffix.clone();
             let sid = session_id.clone();
             let on_pending = req.on_permission_pending.clone();
+            let auto_dir = req.auto_approve_dir.clone();
             Some(tauri::async_runtime::spawn(async move {
                 let mut notified = false;
                 loop {
                     tokio::time::sleep(Duration::from_secs(15)).await;
-                    let Ok(resp) = client.get(&url).timeout(Duration::from_secs(8)).send().await
+                    let Ok(resp) = client
+                        .get(format!("{base_c}/permission{suffix_c}"))
+                        .timeout(Duration::from_secs(8))
+                        .send()
+                        .await
                     else {
                         continue;
                     };
                     let Ok(v) = resp.json::<serde_json::Value>().await else { continue };
-                    let pending = v
-                        .as_array()
-                        .map(|rows| {
-                            rows.iter().any(|r| {
-                                r.get("sessionID").and_then(serde_json::Value::as_str)
-                                    == Some(sid.as_str())
+                    let Some(rows) = v.as_array() else { continue };
+                    let mut pending_other = false;
+                    for r in rows {
+                        if r.get("sessionID").and_then(serde_json::Value::as_str)
+                            != Some(sid.as_str())
+                        {
+                            continue;
+                        }
+                        let id = r.get("id").and_then(serde_json::Value::as_str);
+                        let patterns: Vec<&str> = r
+                            .get("patterns")
+                            .and_then(serde_json::Value::as_array)
+                            .map(|a| {
+                                a.iter().filter_map(serde_json::Value::as_str).collect()
                             })
-                        })
-                        .unwrap_or(false);
-                    if pending && !notified {
+                            .unwrap_or_default();
+                        let home_scoped = auto_dir.as_deref().is_some_and(|d| {
+                            !patterns.is_empty() && patterns.iter().all(|p| p.starts_with(d))
+                        });
+                        match id {
+                            Some(id) if home_scoped => {
+                                // v1 reply shape, same endpoint the chat uses.
+                                let _ = client
+                                    .post(format!(
+                                        "{base_c}/session/{sid}/permissions/{id}{suffix_c}"
+                                    ))
+                                    .json(&serde_json::json!({ "response": "once" }))
+                                    .timeout(Duration::from_secs(8))
+                                    .send()
+                                    .await;
+                            }
+                            _ => pending_other = true,
+                        }
+                    }
+                    if pending_other && !notified {
                         notified = true;
                         if let Some(cb) = &on_pending {
-                            cb();
+                            cb(&sid);
                         }
                     }
                 }
@@ -504,8 +493,10 @@ impl AgentRuntime {
         let mut body = serde_json::json!({
             "parts": [{ "type": "text", "text": req.prompt }],
             "model": { "providerID": req.provider_id, "modelID": req.model_id },
-            "agent": req.agent_name,
         });
+        if let Some(agent) = req.agent_name {
+            body["agent"] = serde_json::json!(agent);
+        }
         if let Some(system) = req.system.filter(|s| !s.trim().is_empty()) {
             body["system"] = serde_json::json!(system);
         }
@@ -531,14 +522,26 @@ impl AgentRuntime {
                 false
             }
             Err(_) => {
-                let _ = self
+                let abort = self
                     .client
                     .post(format!("{base}/session/{session_id}/abort{suffix}"))
                     .timeout(Duration::from_secs(5))
                     .send()
                     .await;
+                if let Err(e) = abort {
+                    // The turn keeps burning tokens server-side; at least leave
+                    // a trace instead of silently pretending it stopped.
+                    eprintln!("[metacodex] session {session_id} abort failed: {e}");
+                }
                 true
             }
+        };
+        // A fresh check, not the watcher's sticky flag: an ask the user already
+        // answered must not mislabel a slow run's timeout as "needs-you".
+        let permission_pending = if aborted {
+            self.session_has_pending_permission(&base, &suffix, &session_id).await
+        } else {
+            false
         };
 
         // Final assistant text (for the report + continuation marker). Best
@@ -565,7 +568,42 @@ impl AgentRuntime {
             session_id,
             final_text,
             aborted,
+            permission_pending,
         })
+    }
+
+    async fn session_has_pending_permission(&self, base: &str, suffix: &str, sid: &str) -> bool {
+        let Ok(resp) = self
+            .client
+            .get(format!("{base}/permission{suffix}"))
+            .timeout(Duration::from_secs(8))
+            .send()
+            .await
+        else {
+            return false;
+        };
+        let Ok(v) = resp.json::<serde_json::Value>().await else { return false };
+        v.as_array()
+            .map(|rows| {
+                rows.iter().any(|r| {
+                    r.get("sessionID").and_then(serde_json::Value::as_str) == Some(sid)
+                })
+            })
+            .unwrap_or(false)
+    }
+
+    /// Best-effort `POST /global/dispose`: invalidate every cached opencode
+    /// directory instance so the next session reads the freshly generated
+    /// config. No-op when the sidecar is down (a fresh spawn reads it anyway).
+    pub async fn dispose_global(&self) {
+        let base = { self.inner.lock().base_url.clone() };
+        let Some(base) = base else { return };
+        let _ = self
+            .client
+            .post(format!("{base}/global/dispose"))
+            .timeout(Duration::from_secs(5))
+            .send()
+            .await;
     }
 
     /// Set an API-key credential for a provider (e.g. the opencode GO key) via
@@ -602,8 +640,9 @@ const RUN_PROMPT_BUDGET: Duration = Duration::from_secs(30 * 60);
 
 /// One turn of an entity execution (see [`AgentRuntime::run_entity_turn`]).
 pub struct EntityTurnRequest<'a> {
-    /// Compiled opencode agent name (`mcx-<slug>`).
-    pub agent_name: &'a str,
+    /// Compiled opencode agent name (`mcx-<slug>`); None = no agent identity
+    /// (the standalone `run_prompt` path).
+    pub agent_name: Option<&'a str>,
     /// "ask" | "auto-edit" | "full-auto" (the entity's own preset).
     pub preset: &'a str,
     pub provider_id: &'a str,
@@ -613,29 +652,32 @@ pub struct EntityTurnRequest<'a> {
     /// Memory context + autonomous protocol, sent as the message `system`.
     pub system: Option<String>,
     pub prompt: &'a str,
-    /// Fired AT MOST ONCE when a permission ask is pending for this session.
-    pub on_permission_pending: Option<std::sync::Arc<dyn Fn() + Send + Sync>>,
+    /// Fired AT MOST ONCE when a permission ask is pending for this session;
+    /// receives the session id so the orchestrator can surface the run.
+    pub on_permission_pending: Option<std::sync::Arc<dyn Fn(&str) + Send + Sync>>,
+    /// Directory prefix (the agent home) whose permission asks the harness
+    /// auto-approves: the agent writing its own memory/journal/proposals is
+    /// pre-sanctioned by design, so restrictive presets don't stall on it.
+    pub auto_approve_dir: Option<String>,
 }
 
 pub struct EntityTurnOutcome {
     pub session_id: String,
     pub final_text: String,
-    /// True when the run hit the budget (likely a permission nobody answered)
-    /// and the session was aborted.
+    /// True when the run hit the budget and the session was aborted.
     pub aborted: bool,
+    /// True when, at abort time, a permission ask was still waiting for this
+    /// session (the run "needs you" rather than merely timed out).
+    pub permission_pending: bool,
 }
 
 /// Rust mirror of the frontend `rulesetForPreset` (opencode.ts) for the three
 /// chat presets. MANUAL MIRROR, pinned by `ruleset_mirrors_frontend_presets`.
-fn ruleset_for_preset(preset: &str) -> serde_json::Value {
+/// An unknown preset (agent.json is hand-editable) fails CLOSED to "ask":
+/// falling through to full-auto would let a typo run bash unattended.
+pub fn ruleset_for_preset(preset: &str) -> serde_json::Value {
     match preset {
-        "ask" => serde_json::json!([
-            { "permission": "edit", "pattern": "**", "action": "ask" },
-            { "permission": "bash", "pattern": "*", "action": "ask" },
-            { "permission": "webfetch", "pattern": "**", "action": "ask" },
-            { "permission": "websearch", "pattern": "**", "action": "ask" },
-            { "permission": "external_directory", "pattern": "**", "action": "ask" }
-        ]),
+        "full-auto" => full_auto_ruleset(),
         "auto-edit" => serde_json::json!([
             { "permission": "edit", "pattern": "**", "action": "allow" },
             { "permission": "bash", "pattern": "*", "action": "ask" },
@@ -643,7 +685,13 @@ fn ruleset_for_preset(preset: &str) -> serde_json::Value {
             { "permission": "websearch", "pattern": "**", "action": "allow" },
             { "permission": "external_directory", "pattern": "**", "action": "ask" }
         ]),
-        _ => full_auto_ruleset(),
+        _ => serde_json::json!([
+            { "permission": "edit", "pattern": "**", "action": "ask" },
+            { "permission": "bash", "pattern": "*", "action": "ask" },
+            { "permission": "webfetch", "pattern": "**", "action": "ask" },
+            { "permission": "websearch", "pattern": "**", "action": "ask" },
+            { "permission": "external_directory", "pattern": "**", "action": "ask" }
+        ]),
     }
 }
 
@@ -1039,7 +1087,35 @@ fn extract_url(line: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{extract_url, full_auto_ruleset, parse_providers};
+    use super::{extract_url, full_auto_ruleset, parse_providers, ruleset_for_preset};
+
+    /// Pins the Rust side of the THREE-preset manual mirror against
+    /// `rulesetForPreset` in `src/features/agent/opencode.ts` (swarm = false),
+    /// and the fail-closed default: an unknown preset (hand-edited agent.json)
+    /// must get the "ask" ruleset, never full-auto.
+    #[test]
+    fn ruleset_mirrors_frontend_presets() {
+        let ask = serde_json::json!([
+            { "permission": "edit", "pattern": "**", "action": "ask" },
+            { "permission": "bash", "pattern": "*", "action": "ask" },
+            { "permission": "webfetch", "pattern": "**", "action": "ask" },
+            { "permission": "websearch", "pattern": "**", "action": "ask" },
+            { "permission": "external_directory", "pattern": "**", "action": "ask" }
+        ]);
+        let auto_edit = serde_json::json!([
+            { "permission": "edit", "pattern": "**", "action": "allow" },
+            { "permission": "bash", "pattern": "*", "action": "ask" },
+            { "permission": "webfetch", "pattern": "**", "action": "allow" },
+            { "permission": "websearch", "pattern": "**", "action": "allow" },
+            { "permission": "external_directory", "pattern": "**", "action": "ask" }
+        ]);
+        assert_eq!(ruleset_for_preset("ask"), ask);
+        assert_eq!(ruleset_for_preset("auto-edit"), auto_edit);
+        assert_eq!(ruleset_for_preset("full-auto"), full_auto_ruleset());
+        // fail closed
+        assert_eq!(ruleset_for_preset("yolo"), ask);
+        assert_eq!(ruleset_for_preset(""), ask);
+    }
 
     /// Pins the Rust side of the TS/Rust manual mirror: this JSON must equal
     /// `rulesetForPreset("full-auto")` in `src/features/agent/opencode.ts`

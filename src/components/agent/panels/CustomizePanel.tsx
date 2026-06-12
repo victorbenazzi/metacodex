@@ -2,10 +2,9 @@ import { useTranslation } from "react-i18next";
 import type { LucideIcon } from "lucide-react";
 import { BookOpen, Plug, ShieldCheck, Wrench } from "lucide-react";
 
-import { Icon } from "@/components/ui/Icon";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { LateralTabs } from "@/components/ui/LateralTabs";
 import { useAgentNavStore, type CustomizeTab } from "@/features/agent/nav.store";
-import { cn } from "@/lib/cn";
 import { SectionHeader } from "./PanelShell";
 import { SkillsSection } from "./SkillsPanel";
 import { McpSection } from "./McpPanel";
@@ -39,31 +38,13 @@ export function CustomizePanel() {
         </header>
 
         <div className="flex items-start gap-[28px]">
-          <nav
-            aria-label={t("agent.customize.tabsLabel")}
-            className="sticky top-0 flex w-[176px] shrink-0 flex-col gap-[1px]"
-          >
-            {TABS.map(({ id, icon, labelKey }) => (
-              <button
-                key={id}
-                type="button"
-                aria-current={tab === id ? "page" : undefined}
-                onClick={() => openCustomize(id)}
-                className={cn(
-                  "flex w-full items-center gap-[10px] rounded-md px-[10px] py-[7px] text-ui transition-colors duration-fast",
-                  tab === id ? "bg-surface-2 text-ink" : "text-body hover:bg-surface-1",
-                )}
-              >
-                <Icon
-                  icon={icon}
-                  size={15}
-                  strokeWidth={1.75}
-                  className={tab === id ? "text-ink" : "text-muted"}
-                />
-                <span className="truncate text-left">{t(labelKey)}</span>
-              </button>
-            ))}
-          </nav>
+          <LateralTabs
+            tabs={TABS.map(({ id, icon, labelKey }) => ({ id, icon, label: t(labelKey) }))}
+            value={tab}
+            onChange={(id) => openCustomize(id)}
+            ariaLabel={t("agent.customize.tabsLabel")}
+            className="w-[176px]"
+          />
 
           <div className="min-w-0 flex-1">
             {tab === "skills" ? (

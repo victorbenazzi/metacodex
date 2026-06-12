@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ImagePlus, Loader2, Sparkles, X } from "lucide-react";
+import { ImagePlus, Loader2, Pencil, Sparkles, SquarePen, X } from "lucide-react";
 
 import { Button } from "@/components/ui/Button";
 import { DialogContent, DialogRoot } from "@/components/ui/Dialog";
 import { Icon } from "@/components/ui/Icon";
+import { Segmented } from "@/components/ui/Segmented";
 import { Select } from "@/components/ui/Select";
 import { useAgentChatStore } from "@/features/agent/chat.store";
 import {
@@ -19,11 +20,26 @@ import { useProjectsStore } from "@/features/projects/project.store";
 import { isModelEnabled } from "@/features/settings/settings.types";
 import { useSettingsDataStore } from "@/features/settings/settings.data.store";
 import { cn } from "@/lib/cn";
+import { firstGrapheme } from "@/lib/grapheme";
 import { AgentAvatarBadge } from "./AgentAvatar";
 
 const NAME_MAX = 40;
 const MAX_AVATAR_BYTES = 1024 * 1024;
+/** Raw input cap for the emoji field: legit ZWJ sequences span several code
+ *  units; materialization cuts to the first grapheme anyway. */
+const EMOJI_INPUT_MAX = 8;
+const AVATAR_MAX_DIM = 128;
 const PRESETS = ["ask", "auto-edit", "full-auto"] as const;
+
+type BuilderMode = "describe" | "manual";
+
+/** Curated picks for the avatar popover; any other emoji can be typed in the
+ *  free input below the grid. */
+const EMOJI_CHOICES = [
+  "🤖", "🧠", "🦾", "🛠️", "🔍", "🧪", "📝", "📚",
+  "🐞", "🚀", "🧹", "🔒", "🛡️", "🌐", "💬", "📊",
+  "🎨", "⚙️", "🧭", "🎯", "⚡️", "🔥", "🦉", "🦊",
+] as const;
 
 /** Form-local avatar state; materialized into `AgentAvatarInput` on submit. */
 type AvatarDraft =
@@ -34,7 +50,10 @@ type AvatarDraft =
 
 function toAvatarInput(draft: AvatarDraft): AgentAvatarInput | undefined {
   if (draft.kind === "emoji" && draft.value.trim()) {
-    return { kind: "emoji", value: draft.value.trim() };
+    // First grapheme cluster, not a code-unit slice: family/flag/skin-tone
+    // emoji are multi-code-point and a blind cut renders tofu.
+    const emoji = firstGrapheme(draft.value);
+    return emoji ? { kind: "emoji", value: emoji } : undefined;
   }
   if (draft.kind === "image") {
     return draft.stored ? { kind: "keep" } : { kind: "image", dataUrl: draft.dataUrl };
@@ -42,10 +61,171 @@ function toAvatarInput(draft: AvatarDraft): AgentAvatarInput | undefined {
   return undefined;
 }
 
+/** Downscale an avatar data URL to fit 128x128 (aspect preserved) via canvas.
+ *  Returns the original URL when already small enough or on any failure: the
+ *  1 MB pick gate already bounds the worst case. */
+function downscaleAvatar(dataUrl: string): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const { naturalWidth: w, naturalHeight: h } = img;
+      if (w <= AVATAR_MAX_DIM && h <= AVATAR_MAX_DIM) {
+        resolve(dataUrl);
+        return;
+      }
+      const scale = AVATAR_MAX_DIM / Math.max(w, h);
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(w * scale));
+      canvas.height = Math.max(1, Math.round(h * scale));
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        resolve(dataUrl);
+        return;
+      }
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      try {
+        resolve(canvas.toDataURL("image/png"));
+      } catch {
+        resolve(dataUrl);
+      }
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
 /**
- * Create / edit an agent entity. Same anatomy as the Scheduled Task dialog:
- * an optional natural-language box on create ("describe the agent you want",
- * one-shot prefill, never auto-saved) above the real form.
+ * Avatar control: one clickable identity badge that opens a popover grouping
+ * EVERY avatar affordance (curated emoji grid, free emoji input, photo upload,
+ * remove). Hand-rolled panel, not a Radix menu: the free input needs real
+ * focus (same reasoning as MentionPopup). Pure-opacity fade per the popup
+ * motion rule.
+ */
+function AvatarPicker({
+  draft,
+  preview,
+  onEmoji,
+  onRemove,
+  onUpload,
+}: {
+  draft: AvatarDraft;
+  preview: { kind: "emoji" | "image"; value: string } | undefined;
+  onEmoji: (value: string) => void;
+  onRemove: () => void;
+  onUpload: () => void;
+}) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={rootRef} className="relative shrink-0">
+      <button
+        type="button"
+        aria-label={t("agent.agents.builder.avatarLabel")}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        className="group relative block rounded-pill focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-hairline-strong"
+      >
+        <AgentAvatarBadge avatar={preview} size="lg" />
+        <span
+          aria-hidden
+          className="absolute -bottom-[2px] -right-[2px] flex h-[16px] w-[16px] items-center justify-center rounded-pill border border-hairline bg-surface-card text-muted transition-colors duration-fast group-hover:text-ink"
+        >
+          <Icon icon={Pencil} size={9} />
+        </span>
+      </button>
+
+      {open ? (
+        <div
+          role="dialog"
+          aria-label={t("agent.agents.builder.avatarLabel")}
+          className="absolute left-0 top-full z-20 mt-[6px] w-[252px] animate-fade-in rounded-md border border-hairline bg-surface-card p-[10px] shadow-elevated"
+        >
+          <div className="grid grid-cols-8 gap-[2px]">
+            {EMOJI_CHOICES.map((e) => (
+              <button
+                key={e}
+                type="button"
+                aria-label={e}
+                onClick={() => {
+                  onEmoji(e);
+                  setOpen(false);
+                }}
+                className="flex h-[27px] w-[27px] items-center justify-center rounded-sm text-content transition-colors duration-fast hover:bg-surface-strong/55 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-hairline-strong"
+              >
+                {e}
+              </button>
+            ))}
+          </div>
+          <input
+            value={draft.kind === "emoji" ? draft.value : ""}
+            maxLength={EMOJI_INPUT_MAX}
+            onChange={(e) => onEmoji(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") setOpen(false);
+            }}
+            placeholder={t("agent.agents.builder.avatarEmojiCustom")}
+            aria-label={t("agent.agents.builder.avatarEmojiCustom")}
+            className="mt-[8px] h-[28px] w-full rounded-sm border border-hairline-soft bg-surface-1 px-[8px] text-center text-ui text-ink outline-none transition-colors duration-fast focus:border-ink"
+          />
+          <div className="mt-[8px] flex items-center justify-between gap-[6px] border-t border-hairline-soft pt-[8px]">
+            <Button
+              variant="subtle"
+              size="sm"
+              className="gap-[5px]"
+              onClick={() => {
+                onUpload();
+                setOpen(false);
+              }}
+            >
+              <Icon icon={ImagePlus} size={12} />
+              {t("agent.agents.builder.avatarUpload")}
+            </Button>
+            {draft.kind !== "none" ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-[5px]"
+                onClick={() => {
+                  onRemove();
+                  setOpen(false);
+                }}
+              >
+                <Icon icon={X} size={12} />
+                {t("agent.agents.builder.avatarRemove")}
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Create / edit an agent entity. Creation offers two explicit modes behind a
+ * segmented control: "Create with AI" (describe the agent, one-shot prefill,
+ * never auto-saved) and "Manual" (the form). A successful generation lands on
+ * the Manual tab with the form prefilled for review. Edit mode is always the
+ * form.
  */
 export function AgentBuilderDialog({
   open,
@@ -67,6 +247,7 @@ export function AgentBuilderDialog({
 
   const isEdit = entity != null;
 
+  const [mode, setMode] = useState<BuilderMode>("describe");
   const [name, setName] = useState("");
   const [persona, setPersona] = useState("");
   const [avatar, setAvatar] = useState<AvatarDraft>({ kind: "none" });
@@ -87,6 +268,7 @@ export function AgentBuilderDialog({
   // Seed the form whenever the dialog opens (or the edited entity changes).
   useEffect(() => {
     if (!open) return;
+    setMode(entity ? "manual" : "describe");
     setName(entity?.name ?? "");
     setPersona(entity?.persona ?? "");
     setAvatar(
@@ -118,6 +300,8 @@ export function AgentBuilderDialog({
       if (result.name) setName(result.name.slice(0, NAME_MAX));
       if (result.persona) setPersona(result.persona);
       if (result.emoji) setAvatar({ kind: "emoji", value: result.emoji });
+      // Land on the form for review: generation prefills, the user saves.
+      setMode("manual");
     } else {
       setNlError(t("agent.agents.builder.generateError"));
     }
@@ -146,11 +330,21 @@ export function AgentBuilderDialog({
     if (!canSubmit || submitting) return;
     setSubmitting(true);
     setSubmitError(null);
-    const [providerId, modelId] = model ? model.split("/", 2) : ["", ""];
+    // Split on the FIRST "/" only: modelIds may carry slashes themselves
+    // (e.g. openrouter "anthropic/claude-x"); split("/", 2) would truncate.
+    const sep = model.indexOf("/");
+    const [providerId, modelId] =
+      model && sep > 0 ? [model.slice(0, sep), model.slice(sep + 1)] : ["", ""];
+    // Freshly picked photos are downscaled client-side before they ever cross
+    // IPC ("keep" and emoji pass through untouched).
+    let avatarInput = toAvatarInput(avatar);
+    if (avatarInput?.kind === "image") {
+      avatarInput = { kind: "image", dataUrl: await downscaleAvatar(avatarInput.dataUrl) };
+    }
     const input: AgentEntityInput = {
       name: name.trim().slice(0, NAME_MAX),
       persona: persona.trim(),
-      avatar: toAvatarInput(avatar),
+      avatar: avatarInput,
       ...(providerId && modelId ? { providerId, modelId } : {}),
       permissionPreset: preset,
       ...(allProjects ? {} : { projects: projectIds }),
@@ -190,6 +384,8 @@ export function AgentBuilderDialog({
         ? ({ kind: "emoji", value: avatar.value.trim() } as const)
         : undefined;
 
+  const describing = !isEdit && mode === "describe";
+
   return (
     <DialogRoot open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -197,26 +393,55 @@ export function AgentBuilderDialog({
         title={isEdit ? t("agent.agents.builder.editTitle") : t("agent.agents.builder.newTitle")}
         footer={
           <>
-            <Button variant="outline" size="sm" onClick={() => onOpenChange(false)} disabled={submitting}>
+            <Button variant="outline" size="sm" onClick={() => onOpenChange(false)} disabled={submitting || generating}>
               {t("agent.agents.builder.cancel")}
             </Button>
-            <Button variant="primary" size="sm" onClick={() => void submit()} disabled={!canSubmit || submitting}>
-              {t("agent.agents.builder.save")}
-            </Button>
+            {describing ? (
+              // One primary action per screen: in describe mode it IS Generate.
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => void generate()}
+                disabled={!nl.trim() || generating}
+                className="gap-[6px]"
+              >
+                <Icon
+                  icon={generating ? Loader2 : Sparkles}
+                  size={13}
+                  className={cn(generating && "animate-spin")}
+                />
+                {t("agent.agents.builder.generate")}
+              </Button>
+            ) : (
+              <Button variant="primary" size="sm" onClick={() => void submit()} disabled={!canSubmit || submitting}>
+                {t("agent.agents.builder.save")}
+              </Button>
+            )}
           </>
         }
       >
-        <div className="flex flex-col gap-[18px]">
+        <div className="flex flex-col gap-[16px]">
           {!isEdit ? (
-            <div className="rounded-lg border border-hairline-strong bg-surface-1 p-[12px]">
-              <div className="mb-[8px] flex items-center gap-[6px] text-caption font-medium text-body">
-                <Icon icon={Sparkles} size={13} className="text-muted" />
-                {t("agent.agents.builder.describeTitle")}
-              </div>
+            <Segmented
+              ariaLabel={t("agent.agents.builder.modeLabel")}
+              value={mode}
+              onChange={setMode}
+              className="self-start"
+              options={[
+                { value: "describe", label: t("agent.agents.builder.modeDescribe"), icon: Sparkles },
+                { value: "manual", label: t("agent.agents.builder.modeManual"), icon: SquarePen },
+              ]}
+            />
+          ) : null}
+
+          {describing ? (
+            <div className="flex flex-col gap-[8px]">
               <textarea
                 value={nl}
                 onChange={(e) => setNl(e.target.value)}
-                rows={2}
+                rows={5}
+                autoFocus
+                aria-label={t("agent.agents.builder.describeTitle")}
                 placeholder={t("agent.agents.builder.describePlaceholder")}
                 onKeyDown={(e) => {
                   if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
@@ -224,184 +449,137 @@ export function AgentBuilderDialog({
                     void generate();
                   }
                 }}
-                className="w-full resize-none rounded-md border border-hairline-soft bg-canvas px-[10px] py-[8px] text-ui leading-[1.5] text-ink outline-none transition-colors duration-fast focus:border-ink"
+                className="w-full resize-none rounded-md border border-hairline-strong bg-surface-1 px-[12px] py-[10px] text-ui leading-[1.55] text-ink outline-none transition-colors duration-fast focus:border-ink"
               />
-              <div className="mt-[8px] flex items-center justify-between gap-[10px]">
-                <span className={cn("text-label leading-[1.4]", nlError ? "text-danger" : "text-muted-soft")}>
-                  {nlError ?? t("agent.agents.builder.describeHint")}
-                </span>
-                <Button
-                  variant="subtle"
-                  size="sm"
-                  onClick={() => void generate()}
-                  disabled={!nl.trim() || generating}
-                  className="shrink-0 gap-[6px]"
-                >
-                  <Icon
-                    icon={generating ? Loader2 : Sparkles}
-                    size={13}
-                    className={cn(generating && "animate-spin")}
-                  />
-                  {t("agent.agents.builder.generate")}
-                </Button>
-              </div>
+              <span className={cn("text-label leading-[1.4]", nlError ? "text-danger" : "text-muted-soft")}>
+                {nlError ?? t("agent.agents.builder.describeHint")}
+              </span>
             </div>
-          ) : null}
+          ) : (
+            <>
+              {/* Identity row: ONE avatar control (emoji grid, free emoji,
+                  photo, remove all live in its popover) + name. */}
+              <div className="flex items-center gap-[14px]">
+                <AvatarPicker
+                  draft={avatar}
+                  preview={previewAvatar}
+                  onEmoji={(v) =>
+                    setAvatar(v.trim() ? { kind: "emoji", value: v } : { kind: "none" })
+                  }
+                  onRemove={() => setAvatar({ kind: "none" })}
+                  onUpload={() => fileRef.current?.click()}
+                />
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="hidden"
+                  onChange={(e) => {
+                    pickImage(e.target.files?.[0] ?? null);
+                    e.target.value = "";
+                  }}
+                />
+                <Field label={t("agent.agents.builder.name")} required className="min-w-0 flex-1">
+                  <div className="relative">
+                    <input
+                      value={name}
+                      maxLength={NAME_MAX}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder={t("agent.agents.builder.namePlaceholder")}
+                      className="h-[38px] w-full rounded-md border border-hairline-strong bg-surface-1 pl-[12px] pr-[52px] text-ui text-ink outline-none transition-colors duration-fast focus:border-ink"
+                    />
+                    <span className="pointer-events-none absolute right-[12px] top-1/2 -translate-y-1/2 font-mono text-label tabular-nums text-muted-soft">
+                      {name.length}/{NAME_MAX}
+                    </span>
+                  </div>
+                </Field>
+              </div>
 
-          {/* Identity row: avatar (emoji or photo) + name. */}
-          <div className="flex items-start gap-[14px]">
-            <div className="flex flex-col items-center gap-[6px]">
-              <AgentAvatarBadge avatar={previewAvatar} size="lg" />
-              <div className="flex items-center gap-[2px]">
-                <button
-                  type="button"
-                  title={t("agent.agents.builder.avatarUpload")}
-                  aria-label={t("agent.agents.builder.avatarUpload")}
-                  onClick={() => fileRef.current?.click()}
-                  className="inline-flex h-[22px] w-[22px] items-center justify-center rounded-sm text-muted transition-colors hover:bg-surface-strong/55 hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-hairline-strong"
-                >
-                  <Icon icon={ImagePlus} size={13} />
-                </button>
-                {avatar.kind !== "none" ? (
-                  <button
-                    type="button"
-                    title={t("agent.agents.builder.avatarRemove")}
-                    aria-label={t("agent.agents.builder.avatarRemove")}
-                    onClick={() => setAvatar({ kind: "none" })}
-                    className="inline-flex h-[22px] w-[22px] items-center justify-center rounded-sm text-muted transition-colors hover:bg-surface-strong/55 hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-hairline-strong"
-                  >
-                    <Icon icon={X} size={13} />
-                  </button>
+              <Field label={t("agent.agents.builder.persona")} required>
+                <textarea
+                  value={persona}
+                  onChange={(e) => setPersona(e.target.value)}
+                  rows={6}
+                  placeholder={t("agent.agents.builder.personaPlaceholder")}
+                  className="w-full resize-none rounded-md border border-hairline-strong bg-surface-1 px-[12px] py-[10px] font-mono text-caption leading-[1.55] text-ink outline-none transition-colors duration-fast focus:border-ink"
+                />
+                <span className="text-label leading-[1.4] text-muted-soft">
+                  {t("agent.agents.builder.personaHint")}
+                </span>
+              </Field>
+
+              <div className="grid grid-cols-2 gap-[14px]">
+                <Field label={t("agent.agents.builder.model")}>
+                  <Select
+                    value={model || "inherit"}
+                    onValueChange={(v) => setModel(v === "inherit" ? "" : v)}
+                    options={modelOptions}
+                    ariaLabel={t("agent.agents.builder.model")}
+                    className="w-full"
+                  />
+                </Field>
+                <Field label={t("agent.agents.builder.permission")}>
+                  <Select
+                    value={preset}
+                    onValueChange={(v) => setPreset(v as (typeof PRESETS)[number])}
+                    options={presetOptions}
+                    ariaLabel={t("agent.agents.builder.permission")}
+                    className="w-full"
+                  />
+                </Field>
+              </div>
+
+              {/* Projects the agent may work in (the autonomy boundary later). */}
+              <div className="flex flex-col gap-[8px]">
+                <span className="text-caption font-medium text-body">
+                  {t("agent.agents.builder.projects")}
+                </span>
+                <label className="flex cursor-pointer items-center gap-[8px] text-ui text-body">
+                  <input
+                    type="checkbox"
+                    checked={allProjects}
+                    onChange={(e) => setAllProjects(e.target.checked)}
+                    className="accent-current"
+                  />
+                  {t("agent.agents.builder.projectsAll")}
+                </label>
+                {!allProjects ? (
+                  <div className="flex max-h-[140px] flex-col gap-[2px] overflow-y-auto rounded-md border border-hairline-soft p-[8px]">
+                    {projects.length === 0 ? (
+                      <span className="px-[4px] py-[2px] text-caption text-muted-soft">
+                        {t("agent.agents.builder.projectsEmpty")}
+                      </span>
+                    ) : (
+                      projects.map((p) => (
+                        <label
+                          key={p.id}
+                          className="flex cursor-pointer items-center gap-[8px] rounded-sm px-[6px] py-[4px] text-ui text-body hover:bg-surface-1"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={projectIds.includes(p.id)}
+                            onChange={(e) =>
+                              setProjectIds((ids) =>
+                                e.target.checked ? [...ids, p.id] : ids.filter((x) => x !== p.id),
+                              )
+                            }
+                            className="accent-current"
+                          />
+                          <span className="truncate">{p.name}</span>
+                        </label>
+                      ))
+                    )}
+                  </div>
                 ) : null}
               </div>
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                className="hidden"
-                onChange={(e) => {
-                  pickImage(e.target.files?.[0] ?? null);
-                  e.target.value = "";
-                }}
-              />
-            </div>
 
-            <div className="flex min-w-0 flex-1 flex-col gap-[12px]">
-              <Field label={t("agent.agents.builder.name")} required>
-                <div className="relative">
-                  <input
-                    value={name}
-                    maxLength={NAME_MAX}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder={t("agent.agents.builder.namePlaceholder")}
-                    className="h-[38px] w-full rounded-md border border-hairline-strong bg-surface-1 pl-[12px] pr-[52px] text-ui text-ink outline-none transition-colors duration-fast focus:border-ink"
-                  />
-                  <span className="pointer-events-none absolute right-[12px] top-1/2 -translate-y-1/2 font-mono text-label tabular-nums text-muted-soft">
-                    {name.length}/{NAME_MAX}
-                  </span>
-                </div>
-              </Field>
-              <Field label={t("agent.agents.builder.avatarEmoji")}>
-                <input
-                  value={avatar.kind === "emoji" ? avatar.value : ""}
-                  maxLength={4}
-                  onChange={(e) =>
-                    setAvatar(
-                      e.target.value.trim()
-                        ? { kind: "emoji", value: e.target.value }
-                        : { kind: "none" },
-                    )
-                  }
-                  placeholder="🤖"
-                  className="h-[34px] w-[88px] rounded-md border border-hairline-strong bg-surface-1 px-[12px] text-center text-title text-ink outline-none transition-colors duration-fast focus:border-ink"
-                />
-              </Field>
-            </div>
-          </div>
-
-          <Field label={t("agent.agents.builder.persona")} required>
-            <textarea
-              value={persona}
-              onChange={(e) => setPersona(e.target.value)}
-              rows={6}
-              placeholder={t("agent.agents.builder.personaPlaceholder")}
-              className="w-full resize-none rounded-md border border-hairline-strong bg-surface-1 px-[12px] py-[10px] font-mono text-caption leading-[1.55] text-ink outline-none transition-colors duration-fast focus:border-ink"
-            />
-            <span className="text-label leading-[1.4] text-muted-soft">
-              {t("agent.agents.builder.personaHint")}
-            </span>
-          </Field>
-
-          <div className="grid grid-cols-2 gap-[14px]">
-            <Field label={t("agent.agents.builder.model")}>
-              <Select
-                value={model || "inherit"}
-                onValueChange={(v) => setModel(v === "inherit" ? "" : v)}
-                options={modelOptions}
-                ariaLabel={t("agent.agents.builder.model")}
-                className="w-full"
-              />
-            </Field>
-            <Field label={t("agent.agents.builder.permission")}>
-              <Select
-                value={preset}
-                onValueChange={(v) => setPreset(v as (typeof PRESETS)[number])}
-                options={presetOptions}
-                ariaLabel={t("agent.agents.builder.permission")}
-                className="w-full"
-              />
-            </Field>
-          </div>
-
-          {/* Projects the agent may work in (the autonomy boundary later). */}
-          <div className="flex flex-col gap-[8px]">
-            <span className="text-caption font-medium text-body">
-              {t("agent.agents.builder.projects")}
-            </span>
-            <label className="flex cursor-pointer items-center gap-[8px] text-ui text-body">
-              <input
-                type="checkbox"
-                checked={allProjects}
-                onChange={(e) => setAllProjects(e.target.checked)}
-                className="accent-current"
-              />
-              {t("agent.agents.builder.projectsAll")}
-            </label>
-            {!allProjects ? (
-              <div className="flex max-h-[140px] flex-col gap-[2px] overflow-y-auto rounded-md border border-hairline-soft p-[8px]">
-                {projects.length === 0 ? (
-                  <span className="px-[4px] py-[2px] text-caption text-muted-soft">
-                    {t("agent.agents.builder.projectsEmpty")}
-                  </span>
-                ) : (
-                  projects.map((p) => (
-                    <label
-                      key={p.id}
-                      className="flex cursor-pointer items-center gap-[8px] rounded-sm px-[6px] py-[4px] text-ui text-body hover:bg-surface-1"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={projectIds.includes(p.id)}
-                        onChange={(e) =>
-                          setProjectIds((ids) =>
-                            e.target.checked ? [...ids, p.id] : ids.filter((x) => x !== p.id),
-                          )
-                        }
-                        className="accent-current"
-                      />
-                      <span className="truncate">{p.name}</span>
-                    </label>
-                  ))
-                )}
-              </div>
-            ) : null}
-          </div>
-
-          {submitError ? (
-            <p className="text-caption leading-[1.5] text-danger">
-              {t("agent.agents.builder.saveFailed")} {submitError}
-            </p>
-          ) : null}
+              {submitError ? (
+                <p className="text-caption leading-[1.5] text-danger">
+                  {t("agent.agents.builder.saveFailed")} {submitError}
+                </p>
+              ) : null}
+            </>
+          )}
         </div>
       </DialogContent>
     </DialogRoot>
@@ -411,14 +589,16 @@ export function AgentBuilderDialog({
 function Field({
   label,
   required,
+  className,
   children,
 }: {
   label: string;
   required?: boolean;
+  className?: string;
   children: React.ReactNode;
 }) {
   return (
-    <label className="flex flex-col gap-[6px]">
+    <label className={cn("flex flex-col gap-[6px]", className)}>
       <span className="text-caption font-medium text-body">
         {label}
         {required ? <span className="ml-[3px] text-danger">*</span> : null}

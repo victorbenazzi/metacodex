@@ -39,13 +39,15 @@ export function DialogContent({
         onCloseAutoFocus={onCloseAutoFocus}
         style={{ width }}
         className={cn(
-          "fixed left-1/2 top-1/2 z-[101] -translate-x-1/2 -translate-y-1/2",
+          // max-h + column layout: the BODY scrolls while header/footer stay
+          // pinned, so the action buttons never fall off a short viewport.
+          "fixed left-1/2 top-1/2 z-[101] flex max-h-[85dvh] -translate-x-1/2 -translate-y-1/2 flex-col",
           "rounded-md border border-hairline bg-surface-card",
           "data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out",
         )}
       >
         {title || description ? (
-          <header className="border-b border-hairline-soft px-[18px] pb-[12px] pt-[16px]">
+          <header className="shrink-0 border-b border-hairline-soft px-[18px] pb-[12px] pt-[16px]">
             {title ? (
               <RD.Title className="text-ui font-medium tracking-tight text-ink">
                 {title}
@@ -59,10 +61,10 @@ export function DialogContent({
           </header>
         ) : null}
 
-        <div className="px-[18px] py-[16px]">{children}</div>
+        <div className="min-h-0 overflow-y-auto px-[18px] py-[16px]">{children}</div>
 
         {footer ? (
-          <footer className="flex items-center justify-end gap-[8px] border-t border-hairline-soft px-[18px] py-[12px]">
+          <footer className="flex shrink-0 items-center justify-end gap-[8px] border-t border-hairline-soft px-[18px] py-[12px]">
             {footer}
           </footer>
         ) : null}

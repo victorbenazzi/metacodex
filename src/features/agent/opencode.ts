@@ -112,6 +112,7 @@ export function rulesetForPreset(preset: PermissionPreset, swarm = false): Permi
     ? [{ permission: "task", pattern: ANY_PATH, action: "allow" }]
     : [];
   switch (preset) {
+    default: // fail CLOSED: an out-of-union value (stale persisted settings) must never widen permissions
     case "ask":
       return [
         { permission: "edit", pattern: ANY_PATH, action: "ask" },
