@@ -2,8 +2,9 @@ use crate::error::AppResult;
 use tauri::AppHandle;
 use tauri_plugin_notification::NotificationExt;
 
-/// Show a macOS native notification banner. Frontend gates this behind a user
-/// setting + window/focus state, so the command itself is unconditional.
+/// Show a native OS notification (macOS NSUserNotification, Windows toast,
+/// Linux libnotify) via `tauri-plugin-notification`. Frontend gates this behind
+/// a user setting + window/focus state, so the command itself is unconditional.
 #[tauri::command]
 pub async fn notify_show(
     app: AppHandle,

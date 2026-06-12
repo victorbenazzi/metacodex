@@ -67,11 +67,11 @@ pub async fn get_active_project_id() -> AppResult<Option<String>> {
 #[tauri::command]
 pub async fn reveal_in_finder(path: String) -> AppResult<()> {
     use crate::error::AppError;
-    use std::process::Command;
+    use crate::util::process::silent_command;
 
     #[cfg(target_os = "macos")]
     {
-        Command::new("open")
+        silent_command("open")
             .args(["-R", &path])
             .status()
             .map_err(|e| AppError::Other(format!("open -R failed: {e}")))?;
@@ -80,9 +80,18 @@ pub async fn reveal_in_finder(path: String) -> AppResult<()> {
 
     #[cfg(target_os = "windows")]
     {
-        Command::new("explorer")
-            .args(["/select,", &path])
-            .status()
+        // `explorer /select,<path>` needs the path quoted when it contains
+        // spaces — and `Command::args` quotes EACH arg, which mangles the
+        // `/select,` + path combo. Use raw_arg so the OS receives a single,
+        // properly-quoted command line. Strip embedded quotes defensively.
+        // Also: do NOT wait on `explorer` — it returns non-zero exit codes
+        // even on success (selecting an existing item still yields 1), so
+        // a `.status()?.success()` check would falsely report failure.
+        use std::os::windows::process::CommandExt;
+        let sanitized = path.replace('"', "");
+        silent_command("explorer")
+            .raw_arg(format!("/select,\"{}\"", sanitized))
+            .spawn()
             .map_err(|e| AppError::Other(format!("explorer failed: {e}")))?;
         return Ok(());
     }
@@ -94,7 +103,7 @@ pub async fn reveal_in_finder(path: String) -> AppResult<()> {
             .parent()
             .map(|p| p.to_path_buf())
             .unwrap_or_else(|| std::path::PathBuf::from(&path));
-        Command::new("xdg-open")
+        silent_command("xdg-open")
             .arg(parent.as_os_str())
             .status()
             .map_err(|e| AppError::Other(format!("xdg-open failed: {e}")))?;

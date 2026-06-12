@@ -1,11 +1,11 @@
+#[cfg(unix)]
 use std::process::Command;
 
 use serde::Serialize;
 
-use crate::{
-    error::{AppError, AppResult},
-    pty::shell,
-};
+use crate::error::{AppError, AppResult};
+#[cfg(unix)]
+use crate::pty::shell;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct CliDetectResult {
@@ -71,16 +71,46 @@ fn detect_via_login_shell(command: &str) -> Option<String> {
 
 #[cfg(windows)]
 fn detect_via_login_shell(command: &str) -> Option<String> {
-    let output = Command::new("where.exe").arg(command).output().ok()?;
-    if !output.status.success() {
-        return None;
+    use crate::util::process::silent_command;
+
+    // Primary: `where.exe` (resolves via PATH + PATHEXT). Silent_command keeps
+    // the Tauri GUI from flashing a console window during boot detection.
+    if let Ok(output) = silent_command("where.exe").arg(command).output() {
+        if output.status.success() {
+            if let Some(line) = String::from_utf8_lossy(&output.stdout)
+                .lines()
+                .map(str::trim)
+                .find(|l| !l.is_empty())
+            {
+                return Some(line.to_owned());
+            }
+        }
     }
 
-    String::from_utf8_lossy(&output.stdout)
-        .lines()
-        .map(str::trim)
-        .find(|line| !line.is_empty())
-        .map(ToOwned::to_owned)
+    // Fallback: scan well-known install roots that the Tauri GUI's inherited
+    // PATH often misses on Windows. Order: npm global, WinGet shims, Scoop
+    // shims. We honor PATHEXT so a CLI installed as `.cmd`, `.exe`, `.bat`
+    // or `.ps1` all resolve.
+    let roots: Vec<std::path::PathBuf> = [
+        std::env::var_os("APPDATA").map(|v| std::path::PathBuf::from(v).join("npm")),
+        std::env::var_os("LOCALAPPDATA")
+            .map(|v| std::path::PathBuf::from(v).join("Microsoft\\WinGet\\Links")),
+        std::env::var_os("USERPROFILE").map(|v| std::path::PathBuf::from(v).join("scoop\\shims")),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+
+    let pathext = std::env::var("PATHEXT").unwrap_or_else(|_| ".CMD;.EXE;.BAT;.PS1".into());
+    for root in &roots {
+        for ext in pathext.split(';').filter(|e| !e.is_empty()) {
+            let candidate = root.join(format!("{command}{ext}"));
+            if candidate.is_file() {
+                return Some(candidate.display().to_string());
+            }
+        }
+    }
+    None
 }
 
 #[cfg(unix)]

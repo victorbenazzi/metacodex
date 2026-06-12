@@ -40,6 +40,13 @@ pub struct PtySession {
     /// Latest cwd hint pushed by the frontend via OSC 7. When `None`, fall
     /// back to `cwd` (the spawn-time directory).
     pub cwd_override: Mutex<Option<String>>,
+    /// Windows-only: KILL_ON_JOB_CLOSE Job Object holding the spawned process.
+    /// When the session is dropped the kernel terminates every descendant
+    /// (`claude.cmd` → `node.exe` chains) so agents can't outlive their tab.
+    /// Field is unread by design — its lifetime is the kill mechanism.
+    #[cfg(windows)]
+    #[allow(dead_code)]
+    pub(crate) job: Option<crate::pty::job::PtyJob>,
 }
 
 impl PtySession {

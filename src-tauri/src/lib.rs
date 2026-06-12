@@ -116,6 +116,21 @@ pub fn run() {
             // Start the Agent View cron scheduler (fires due tasks once a minute
             // while the app is open).
             agent::scheduler::start(app.handle().clone());
+            // Cold-start "Open With" on Windows/Linux: macOS delivers these as
+            // RunEvent::Opened (Apple Events, handled below). Other platforms
+            // pass file paths via argv on the FIRST launch; the single_instance
+            // callback above only fires from the SECOND launch onward, so the
+            // initial path would otherwise be dropped.
+            #[cfg(not(target_os = "macos"))]
+            {
+                let paths: Vec<String> = std::env::args()
+                    .skip(1)
+                    .filter(|a| !a.starts_with('-'))
+                    .collect();
+                if !paths.is_empty() {
+                    open_files::deliver(app.handle(), paths);
+                }
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

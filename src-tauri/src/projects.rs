@@ -169,7 +169,9 @@ fn basename(path: &str) -> String {
 }
 
 pub fn add(app: &AppHandle, path: String) -> AppResult<Project> {
-    let path = path.trim_end_matches('/').to_string();
+    // Trim trailing separators of either flavor so `C:\proj\` and `C:\proj`
+    // dedupe to the same project entry, same as `/proj/` and `/proj` on Unix.
+    let path = path.trim_end_matches(['/', '\\']).to_string();
     // Guard: reject empty / non-existent paths
     if path.is_empty() {
         return Err(AppError::Other("empty path".into()));

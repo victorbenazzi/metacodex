@@ -221,12 +221,22 @@ pub fn write_json_atomic<T: Serialize>(path: &Path, value: &T) -> AppResult<()> 
         .map_err(|e| AppError::Other(format!("serialize config: {e}")))?;
     let tmp = tmp_path(path);
     fs::write(&tmp, json.as_bytes())?;
-    fs::rename(&tmp, path).map_err(|e| {
-        // best-effort cleanup of the temp file
-        let _ = fs::remove_file(&tmp);
-        AppError::Io(e)
-    })?;
-    Ok(())
+    // Windows: AV / OneDrive briefly hold handles on the destination during
+    // scans; retry the atomic rename twice with short backoff before surfacing.
+    let mut last_err: Option<std::io::Error> = None;
+    for attempt in 0..3 {
+        match fs::rename(&tmp, path) {
+            Ok(()) => return Ok(()),
+            Err(e) => {
+                last_err = Some(e);
+                if attempt < 2 {
+                    std::thread::sleep(std::time::Duration::from_millis(50 * (attempt + 1)));
+                }
+            }
+        }
+    }
+    let _ = fs::remove_file(&tmp);
+    Err(AppError::Io(last_err.expect("retry loop ran")))
 }
 
 /// [`write_json_atomic`] with the temp file CREATED 0600, for files carrying

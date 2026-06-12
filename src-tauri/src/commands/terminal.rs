@@ -1,5 +1,7 @@
+#[cfg(target_os = "macos")]
 use std::process::Command;
 use std::sync::Arc;
+#[cfg(target_os = "macos")]
 use std::time::Duration;
 
 use base64::{engine::general_purpose::STANDARD, Engine as _};
@@ -179,10 +181,45 @@ fn list_listening_ports(pid: u32) -> Option<Vec<ListeningPort>> {
     Some(out)
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(target_os = "windows")]
+fn list_listening_ports(pid: u32) -> Option<Vec<ListeningPort>> {
+    // Use the IP Helper API (`GetExtendedTcpTable`) via `netstat2` — sub-ms,
+    // pure Rust, no PowerShell round-trip. We iterate every TCP socket, keep
+    // only LISTEN sockets owned by `pid`, and dedupe identical IPv4/IPv6
+    // entries on the same port for display.
+    use netstat2::{
+        get_sockets_info, AddressFamilyFlags, ProtocolFlags, ProtocolSocketInfo, TcpState,
+    };
+    let sockets = get_sockets_info(
+        AddressFamilyFlags::IPV4 | AddressFamilyFlags::IPV6,
+        ProtocolFlags::TCP,
+    )
+    .ok()?;
+    let mut out: Vec<ListeningPort> = Vec::new();
+    for si in sockets {
+        if !si.associated_pids.iter().any(|p| *p == pid) {
+            continue;
+        }
+        if let ProtocolSocketInfo::Tcp(tcp) = si.protocol_socket_info {
+            if tcp.state != TcpState::Listen {
+                continue;
+            }
+            out.push(ListeningPort {
+                port: tcp.local_port,
+                protocol: "tcp".into(),
+                address: tcp.local_addr.to_string(),
+            });
+        }
+    }
+    out.sort_by_key(|p| (p.port, p.protocol.clone()));
+    out.dedup_by(|a, b| a.port == b.port && a.protocol == b.protocol);
+    Some(out)
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
 fn list_listening_ports(_pid: u32) -> Option<Vec<ListeningPort>> {
-    // Linux/Windows port discovery is out of scope for the MVP — Feature 3
-    // ships macOS-only and the UI degrades gracefully (chips list stays empty).
+    // Linux port discovery is out of scope for the MVP — the UI degrades
+    // gracefully (chips list stays empty).
     None
 }
 

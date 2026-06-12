@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import type { UnlistenFn } from "@tauri-apps/api/event";
+import {
+  readText as readClipboardText,
+  writeText as writeClipboardText,
+} from "@tauri-apps/plugin-clipboard-manager";
 
 import { useXterm } from "./useXterm";
 import i18n from "@/features/i18n/config";
@@ -23,6 +27,7 @@ import { dispatchAgentNotification } from "@/features/terminal/notificationDispa
 import { CMD, invoke } from "@/lib/ipc";
 import { useSessionCapture } from "@/features/resume/useSessionCapture";
 import { TerminalExitBanner } from "./TerminalExitBanner";
+import { isMac } from "@/lib/platform";
 
 const AGENT_TITLE_MAX = 40;
 
@@ -296,6 +301,19 @@ export function TerminalTab({
     //   2. Match on `ev.code === "Enter"` too — WKWebView in some keyboard
     //      layouts (ABNT2, AZERTY) reports `ev.key` as a localized label
     //      while `ev.code` stays canonical.
+    // Paste from the system clipboard into the active PTY. Uses `term.paste`
+    // so the data flows through xterm's bracketed-paste machinery (the shell
+    // sees `\x1b[200~...\x1b[201~` whenever it has DECSET 2004 enabled — Bash,
+    // Zsh, Fish, vim, and most TUIs request this), then through `onData` to
+    // the PTY just like keyboard input.
+    const pasteFromClipboard = () => {
+      void readClipboardText()
+        .then((text) => {
+          if (text) term.paste(text);
+        })
+        .catch((err) => console.warn("[term] clipboard read failed", err));
+    };
+
     term.attachCustomKeyEventHandler((ev) => {
       const isEnter = ev.key === "Enter" || ev.code === "Enter" || ev.keyCode === 13;
       if (ev.type === "keydown" && isEnter && ev.shiftKey) {
@@ -307,8 +325,60 @@ export function TerminalTab({
         }
         return false;
       }
+      // Paste: Cmd+V on macOS, Ctrl+V (or Ctrl+Shift+V) on Windows/Linux.
+      // Default xterm behaviour for Ctrl+V is to forward `\x16` (SYN) to the
+      // PTY, which is never what the user wants when typing a familiar paste
+      // shortcut. We intercept and inject the real clipboard contents instead.
+      // Matching `ev.code === "KeyV"` keeps this working under ABNT2 / AZERTY
+      // where `ev.key` is localized.
+      const primaryMod = isMac
+        ? ev.metaKey && !ev.ctrlKey
+        : ev.ctrlKey && !ev.metaKey;
+      const isV = ev.key === "v" || ev.key === "V" || ev.code === "KeyV";
+      if (ev.type === "keydown" && isV && primaryMod && !ev.altKey) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        pasteFromClipboard();
+        return false;
+      }
+      // Copy: when the user has a selection, Cmd/Ctrl+C copies it instead of
+      // sending SIGINT — same convention as VS Code's integrated terminal.
+      // Without a selection we fall through so the PTY still gets `\x03`.
+      const isC = ev.key === "c" || ev.key === "C" || ev.code === "KeyC";
+      if (
+        ev.type === "keydown" &&
+        isC &&
+        primaryMod &&
+        !ev.altKey &&
+        !ev.shiftKey &&
+        term.hasSelection()
+      ) {
+        const selection = term.getSelection();
+        if (selection) {
+          ev.preventDefault();
+          ev.stopPropagation();
+          void writeClipboardText(selection).catch((err) =>
+            console.warn("[term] clipboard write failed", err),
+          );
+          term.clearSelection();
+          return false;
+        }
+      }
       return true;
     });
+
+    // Right-click → paste. The document-level contextmenu handler in App.tsx
+    // suppresses the WebView's native menu globally, which left the terminal
+    // with no paste affordance for users who prefer the mouse. Since event
+    // listeners on the inner element run before the document-level one, we
+    // stop propagation so only our paste behaviour fires.
+    const onTerminalContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      pasteFromClipboard();
+    };
+    const containerEl = containerRef.current;
+    containerEl?.addEventListener("contextmenu", onTerminalContextMenu);
 
     // Pre-register a placeholder session so UI can show "starting"
     const localKind = cliLaunchCommand ? "cli" : "shell";
@@ -491,6 +561,7 @@ export function TerminalTab({
       useAgentStatusStore.getState().clear(tabId);
       unlistenData?.();
       unlistenExit?.();
+      containerEl?.removeEventListener("contextmenu", onTerminalContextMenu);
       const sid = sessionIdRef.current;
       if (sid) {
         ptyApi.kill(sid).catch(() => undefined);

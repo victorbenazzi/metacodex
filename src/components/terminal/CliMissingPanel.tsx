@@ -7,7 +7,12 @@ import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { Badge } from "@/components/ui/Badge";
 import { cn } from "@/lib/cn";
-import type { CliTool } from "@/features/terminal/cli-registry";
+import {
+  cliAltInstallCommand,
+  cliDetectCommandDisplay,
+  cliInstallCommand,
+  type CliTool,
+} from "@/features/terminal/cli-registry";
 
 interface CliMissingPanelProps {
   cli: CliTool;
@@ -18,6 +23,12 @@ interface CliMissingPanelProps {
 export function CliMissingPanel({ cli, onRetry, onOpenInTerminal }: CliMissingPanelProps) {
   const { t } = useTranslation();
   const needsConfig = !!cli.needsConfig;
+  // Read the platform-correct install / detect snippets so Windows users see
+  // `npm install -g @anthropic-ai/claude-code` instead of `curl | bash`, and
+  // `Get-Command claude` instead of `command -v claude`.
+  const installCmd = cliInstallCommand(cli);
+  const altInstallCmd = cliAltInstallCommand(cli);
+  const detectCmd = cliDetectCommandDisplay(cli);
 
   return (
     <div className="relative flex h-full w-full overflow-hidden bg-canvas">
@@ -62,22 +73,22 @@ export function CliMissingPanel({ cli, onRetry, onOpenInTerminal }: CliMissingPa
         ) : (
           <div className="flex flex-col gap-[10px]">
             <p className="editorial-caps">{t("terminal.installCommand")}</p>
-            <InstallBlock command={cli.installCommand} />
-            {cli.altInstallCommand ? (
+            <InstallBlock command={installCmd} />
+            {altInstallCmd ? (
               <>
                 <p className="mt-[6px] editorial-caps">{t("terminal.orViaNpm")}</p>
-                <InstallBlock command={cli.altInstallCommand} secondary />
+                <InstallBlock command={altInstallCmd} secondary />
               </>
             ) : null}
           </div>
         )}
 
         <div className="mt-[8px] flex flex-wrap items-center gap-[8px]">
-          {!needsConfig && cli.installCommand ? (
+          {!needsConfig && installCmd ? (
             <Button
               variant="primary"
               size="md"
-              onClick={() => onOpenInTerminal(cli.installCommand)}
+              onClick={() => onOpenInTerminal(installCmd)}
             >
               <Icon icon={Terminal} size={13} className="text-on-primary" />
               {t("terminal.openInTerminal")}
@@ -106,7 +117,7 @@ export function CliMissingPanel({ cli, onRetry, onOpenInTerminal }: CliMissingPa
         <p className="mt-auto pb-[24px] pt-[28px] font-mono text-label text-muted-soft">
           <Trans
             i18nKey="terminal.lookup"
-            values={{ command: cli.command, detect: cli.detectCommand }}
+            values={{ command: cli.command, detect: detectCmd }}
             components={[<span className="text-ink" />, <span className="text-ink" />]}
           />
         </p>
