@@ -46,6 +46,7 @@ export function Select({ value, onValueChange, options, ariaLabel, className }: 
         <RS.Content
           position="popper"
           sideOffset={6}
+          collisionPadding={8}
           className={cn(
             "z-[120] max-h-[280px] overflow-hidden rounded-md border border-hairline bg-surface-card p-[5px]",
             "data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out",

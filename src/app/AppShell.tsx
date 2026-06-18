@@ -5,6 +5,8 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 
 import { MiniProjectSidebar } from "@/components/project-rail/MiniProjectSidebar";
 import { ExplorerPanel } from "@/components/file-explorer/ExplorerPanel";
+import { ExpandedProjectsSidebar } from "@/components/code-sidebar/ExpandedProjectsSidebar";
+import { useCodeSidebarStore } from "@/features/ui/codeSidebar.store";
 import { WorkArea } from "@/components/tabs/WorkArea";
 import { TitleBar } from "@/app/TitleBar";
 import { useViewStore } from "@/features/ui/view.store";
@@ -30,6 +32,7 @@ import { preloadCliDetections } from "@/features/terminal/cli-detection";
 import { basename } from "@/lib/path";
 import { useProjectsStore } from "@/features/projects/project.store";
 import { useSettingsDataStore, flushSettings } from "@/features/settings/settings.data.store";
+import { useSettingsStore } from "@/features/settings/settings.store";
 import { UI_DENSITY_MULTIPLIER } from "@/features/settings/settings.types";
 import { useKeybindingsStore } from "@/features/keybindings/keybindings.store";
 import { useExplorerStore } from "@/features/explorer/explorer.store";
@@ -72,6 +75,7 @@ import { useWorktreesStore } from "@/features/git/worktrees.store";
 import { useWorktreeOccupancySync } from "@/features/git/useWorktreeOccupancySync";
 import { WorktreeCreateDialog } from "@/components/source-control/WorktreeCreateDialog";
 import { CloneFromGithubDialog } from "@/components/project-rail/CloneFromGithubDialog";
+import { SettingsDialog } from "@/components/settings/SettingsDialog";
 import { Toaster } from "@/components/ui/Toaster";
 import { toast } from "@/features/ui/toast.store";
 import { useResumeStore } from "@/features/resume/resume.store";
@@ -124,6 +128,11 @@ const EMPTY_BUCKET = { tabs: [], activeTabId: null } as {
   activeTabId: null;
 };
 
+// Projects sidebar column width: the icon rail when collapsed (matches the
+// `--rail-w` token), the wider Agent-style projects panel when expanded.
+const RAIL_WIDTH_PX = 48;
+const PROJECTS_PANEL_WIDTH_PX = 264;
+
 export function AppShell() {
   const { t } = useTranslation();
   const [homeDirPath, setHomeDirPath] = useState<string | null>(null);
@@ -138,6 +147,10 @@ export function AppShell() {
 
   const settingsHydrated = useSettingsDataStore((s) => s.hydrated);
   const hydrateSettings = useSettingsDataStore((s) => s.hydrate);
+  // Settings dialog lives here (always mounted) so it opens regardless of which
+  // sidebar form is rendered. Driven by the global settings (open/close) store.
+  const settingsDialogOpen = useSettingsStore((s) => s.open);
+  const setSettingsDialogOpen = useSettingsStore((s) => s.setOpen);
 
   const keybindingsHydrated = useKeybindingsStore((s) => s.hydrated);
   const hydrateKeybindings = useKeybindingsStore((s) => s.hydrate);
@@ -257,6 +270,8 @@ export function AppShell() {
 
   const refreshGit = useGitStore((s) => s.refresh);
   const panelOpen = useSourceControlStore((s) => s.open);
+  // Code sidebar collapsed -> the Files/History panel folds away to just the rail.
+  const codeSidebarCollapsed = useCodeSidebarStore((s) => s.collapsed);
 
   // Resizable panel widths, driven by settings, persisted to ~/.metacodex.
   const explorerWidth = useSettingsDataStore((s) => s.settings.panels.explorerWidth);
@@ -1268,9 +1283,13 @@ export function AppShell() {
   // settings so resizing rerenders only this style + the dragged column.
   // The right panel currently hosts Source Control only, see
   // `SourceControlPanel.tsx`.
+  // Column 1 is the projects sidebar: the icon rail when collapsed, a wider
+  // Agent-style panel (projects + nested sections) when expanded. The file
+  // explorer stays its own column (col 2) at explorerWidth.
+  const projectsColWidth = codeSidebarCollapsed ? RAIL_WIDTH_PX : PROJECTS_PANEL_WIDTH_PX;
   const gridTemplateColumns = panelOpen
-    ? `56px ${explorerWidth}px minmax(0,1fr) ${sourceControlWidth}px`
-    : `56px ${explorerWidth}px minmax(0,1fr)`;
+    ? `${projectsColWidth}px ${explorerWidth}px minmax(0,1fr) ${sourceControlWidth}px`
+    : `${projectsColWidth}px ${explorerWidth}px minmax(0,1fr)`;
 
   // Agent View renders as an opaque overlay below the titlebar so the Code
   // panels (and their live terminals) stay mounted underneath while in Agent
@@ -1299,16 +1318,25 @@ export function AppShell() {
       style={{ gridTemplateColumns }}
     >
       <DropOverlay active={dropActive} />
-      <TitleBar workspaceName={project?.name} className="col-span-full" />
+      <TitleBar
+        workspaceName={project?.name}
+        className="col-span-full"
+        onOpenFolder={handleOpenFolder}
+        onCloneFromGithub={handleCloneFromGithub}
+        onNewTerminal={handleNewTerminal}
+        onLaunchCli={handleLaunchCli}
+        onNewWorktree={project ? handleOpenWorktreeDialog : undefined}
+      />
 
       {/* `contents` keeps these as direct grid items; `inert` while the Agent
           overlay is up removes the hidden Code view from the tab order and the
           accessibility tree (the opaque overlay already blocks pointers). */}
       <div className="contents" inert={agentMode || undefined}>
-      <MiniProjectSidebar
-        onOpenFolder={handleOpenFolder}
-        onCloneFromGithub={handleCloneFromGithub}
-      />
+      {codeSidebarCollapsed ? (
+        <MiniProjectSidebar />
+      ) : (
+        <ExpandedProjectsSidebar onOpenFolder={handleOpenFolder} />
+      )}
 
       <div className="relative min-w-0">
         <ExplorerPanel
@@ -1353,7 +1381,6 @@ export function AppShell() {
         onMoveTab={handleMoveTab}
         onNewTerminal={handleNewTerminal}
         onLaunchCli={handleLaunchCli}
-        onNewWorktree={project ? handleOpenWorktreeDialog : undefined}
         onOpenFolder={handleOpenFolder}
         onCloneFromGithub={handleCloneFromGithub}
         onOpenPreviewFile={handlePickPreviewFile}
@@ -1390,6 +1417,8 @@ export function AppShell() {
         </div>
       ) : null}
       </div>
+
+      <SettingsDialog open={settingsDialogOpen} onOpenChange={setSettingsDialogOpen} />
 
       <CloseTabsConfirm
         state={pendingClose}

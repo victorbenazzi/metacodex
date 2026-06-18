@@ -71,11 +71,11 @@
   }
 
   ::selection {
-    background-color: rgba(38, 37, 30, 0.16);
+    background-color: rgba(40, 42, 54, 0.16);
   }
 
   [data-theme="dark"] ::selection {
-    background-color: rgba(247, 247, 244, 0.16);
+    background-color: rgba(138, 138, 243, 0.28);
   }
 
   button {
@@ -96,6 +96,18 @@
 }
 
 @layer components {
+  /* Atmosphere — a faint lavender glow bleeding from the left corners, layered
+     UNDER the surface color (backgrounds always paint behind content, so this
+     never touches text contrast). The gradient itself is theme-defined via
+     --atmosphere in tokens.css. `-soft` sits on sidebars/rails (canvas-soft),
+     `-canvas` on the main work surface. */
+  .atmosphere-soft {
+    background: var(--atmosphere), var(--canvas-soft);
+  }
+  .atmosphere-canvas {
+    background: var(--atmosphere), var(--canvas);
+  }
+
   /* Editorial caps label — used for section labels and titles */
   .editorial-caps {
     font-family: var(--font-mono);

@@ -61,11 +61,6 @@ export function tileBackground(
   return rgba(baseHex, alpha);
 }
 
-/** Faint left-edge marker color for the active tile. */
-export function tileMarkerColor(theme: EffectiveTheme): string {
-  return theme === "dark" ? "#f7f7f4" : "#26251e";
-}
-
 /**
  * Softer fill for tiles that show a favicon image — the project's accent still
  * tints the cell, but quietly enough that the favicon's own colors don't fight

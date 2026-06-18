@@ -1,8 +1,7 @@
 import type { Tab } from "./types";
+import { useSettingsDataStore } from "@/features/settings/settings.data.store";
 import { TabBar } from "./TabBar";
 import { TabContent } from "./TabContent";
-import { NewTabContextMenu } from "./NewTabMenu";
-import { TabTrailingActions } from "./TabTrailingActions";
 import { WelcomeScreen } from "@/app/WelcomeScreen";
 import { ProjectEmptyState } from "@/app/ProjectEmptyState";
 import type { CliTool } from "@/features/terminal/cli-registry";
@@ -35,7 +34,6 @@ interface WorkAreaProps {
   onMoveTab: (id: string, toIndex: number) => void;
   onNewTerminal: () => void;
   onLaunchCli: (cli: CliTool) => void;
-  onNewWorktree?: () => void;
   onOpenFolder: () => void;
   onCloneFromGithub: () => void;
   onOpenPreviewFile: () => void;
@@ -58,7 +56,6 @@ export function WorkArea({
   onMoveTab,
   onNewTerminal,
   onLaunchCli,
-  onNewWorktree,
   onOpenFolder,
   onCloneFromGithub,
   onOpenPreviewFile,
@@ -69,10 +66,14 @@ export function WorkArea({
   // (and kill the PTYs/editors of OTHER projects mounted underneath) every time
   // the user lands on a project with an empty bucket.
   const hasActiveTabs = tabs.length > 0;
+  // Vertical layout hides the horizontal tab bar: the sidebar's per-project
+  // sections drive which single tab the center pane shows (Codex-style).
+  const layoutMode = useSettingsDataStore((s) => s.settings.interface.layoutMode);
+  const showTabBar = layoutMode === "horizontal" && hasActiveTabs;
 
   return (
     <section className="relative flex h-full w-full flex-col overflow-hidden bg-canvas">
-      {hasActiveTabs ? (
+      {showTabBar ? (
         <TabBar
           tabs={tabs}
           activeTabId={activeTabId}
@@ -87,28 +88,8 @@ export function WorkArea({
           onMoveTab={onMoveTab}
           onNewTerminal={onNewTerminal}
           onLaunchCli={onLaunchCli}
-          trailing={
-            <TabTrailingActions
-              onNewTerminal={onNewTerminal}
-              onLaunchCli={onLaunchCli}
-              onNewWorktree={onNewWorktree}
-            />
-          }
         />
-      ) : (
-        <NewTabContextMenu onNewTerminal={onNewTerminal} onLaunchCli={onLaunchCli}>
-          <div
-            data-tauri-drag-region
-            className="flex h-[34px] shrink-0 items-center justify-end border-b border-hairline px-[10px]"
-          >
-            <TabTrailingActions
-              onNewTerminal={onNewTerminal}
-              onLaunchCli={onLaunchCli}
-              onNewWorktree={onNewWorktree}
-            />
-          </div>
-        </NewTabContextMenu>
-      )}
+      ) : null}
       <div className="relative flex-1 overflow-hidden">
         <TabContent
           allBuckets={allBuckets}

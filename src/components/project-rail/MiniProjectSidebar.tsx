@@ -1,34 +1,18 @@
 import { useEffect, useRef, useState, type PointerEvent as RPointerEvent } from "react";
-import { FolderOpen, FolderPlus, Github, Settings, Trash2 } from "lucide-react";
+import { Settings } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Icon } from "@/components/ui/Icon";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { Kbd } from "@/components/ui/Kbd";
-import { Button } from "@/components/ui/Button";
-import {
-  DialogContent,
-  DialogRoot,
-} from "@/components/ui/Dialog";
-import {
-  DropdownContent,
-  DropdownItem,
-  DropdownRoot,
-  DropdownTrigger,
-} from "@/components/ui/DropdownMenu";
 import { ProjectTile } from "./ProjectTile";
 import { ProjectContextMenu } from "./ProjectContextMenu";
 import { RenameProjectDialog } from "./RenameProjectDialog";
-import { SettingsDialog } from "@/components/settings/SettingsDialog";
+import { RemoveProjectDialog } from "./RemoveProjectDialog";
 import { useProjectsStore } from "@/features/projects/project.store";
 import { useSettingsStore } from "@/features/settings/settings.store";
 import type { Project } from "@/features/projects/project.types";
 import { cn } from "@/lib/cn";
-
-interface MiniProjectSidebarProps {
-  onOpenFolder: () => void;
-  onCloneFromGithub: () => void;
-}
 
 // Minimum pointer travel before a press becomes a drag. Below this, the press
 // is treated as a click (setActive). 8px is roomy enough to absorb the small
@@ -37,17 +21,17 @@ interface MiniProjectSidebarProps {
 // click, which is the "I can't switch projects" symptom on trackpad users.
 const DRAG_THRESHOLD_PX = 8;
 
-export function MiniProjectSidebar({ onOpenFolder, onCloneFromGithub }: MiniProjectSidebarProps) {
+// Collapsed form of the Code projects sidebar (the icon rail). The expand
+// toggle and add-project controls live in the title bar; Settings stays here.
+export function MiniProjectSidebar() {
   const { t } = useTranslation();
   const projects = useProjectsStore((s) => s.projects);
   const activeProjectId = useProjectsStore((s) => s.activeProjectId);
   const setActive = useProjectsStore((s) => s.setActive);
-  const remove = useProjectsStore((s) => s.remove);
   const reorder = useProjectsStore((s) => s.reorder);
 
   const [renameTarget, setRenameTarget] = useState<Project | null>(null);
   const [removeTarget, setRemoveTarget] = useState<Project | null>(null);
-  const settingsOpen = useSettingsStore((s) => s.open);
   const setSettingsOpen = useSettingsStore((s) => s.setOpen);
 
   // Drag state.
@@ -234,7 +218,7 @@ export function MiniProjectSidebar({ onOpenFolder, onCloneFromGithub }: MiniProj
   return (
     <>
       <aside
-        className="relative flex h-full w-full flex-col items-center overflow-hidden border-r border-hairline bg-canvas-soft"
+        className="atmosphere-soft relative flex h-full w-full flex-col items-center overflow-hidden border-r border-hairline"
         aria-label={t("projectRail.ariaLabel")}
       >
         <div
@@ -293,53 +277,18 @@ export function MiniProjectSidebar({ onOpenFolder, onCloneFromGithub }: MiniProj
         </div>
 
         <div className="flex w-full shrink-0 flex-col items-center gap-[6px] border-t border-hairline-soft py-[10px]">
-          <DropdownRoot>
-            <Tooltip content={t("projectRail.addProject")} side="right">
-              <DropdownTrigger asChild>
-                <button
-                  type="button"
-                  className={cn(
-                    "inline-flex h-[32px] w-[32px] items-center justify-center rounded-sm",
-                    "text-muted hover:bg-surface-strong/55 hover:text-ink transition-colors",
-                    "focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[2px]",
-                    "data-[state=open]:bg-surface-strong/55 data-[state=open]:text-ink",
-                  )}
-                  aria-label={t("projectRail.addProject")}
-                >
-                  <Icon icon={FolderPlus} size={15} />
-                </button>
-              </DropdownTrigger>
-            </Tooltip>
-            <DropdownContent align="start" sideOffset={8}>
-              <DropdownItem
-                onSelect={onOpenFolder}
-                trailing={<Kbd keys={["Mod", "O"]} />}
-              >
-                <Icon icon={FolderOpen} size={13} className="text-muted" />
-                {t("welcome.openProjectMenu.local")}
-              </DropdownItem>
-              <DropdownItem
-                onSelect={onCloneFromGithub}
-                trailing={<Kbd keys={["Mod", "Shift", "O"]} />}
-              >
-                <Icon icon={Github} size={13} className="text-muted" />
-                {t("welcome.openProjectMenu.github")}
-              </DropdownItem>
-            </DropdownContent>
-          </DropdownRoot>
-
           <Tooltip content={t("projectRail.settings")} shortcut={<Kbd keys={["Mod", ","]} />} side="right">
             <button
               type="button"
               onClick={() => setSettingsOpen(true)}
               className={cn(
-                "inline-flex h-[32px] w-[32px] items-center justify-center rounded-sm",
+                "inline-flex h-[28px] w-[28px] items-center justify-center rounded-sm",
                 "text-muted hover:bg-surface-strong/55 hover:text-ink transition-colors",
                 "focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[2px]",
               )}
               aria-label={t("projectRail.openSettings")}
             >
-              <Icon icon={Settings} size={14} />
+              <Icon icon={Settings} size={13} />
             </button>
           </Tooltip>
         </div>
@@ -368,53 +317,17 @@ export function MiniProjectSidebar({ onOpenFolder, onCloneFromGithub }: MiniProj
         </div>
       ) : null}
 
-      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
-
       <RenameProjectDialog
         project={renameTarget}
         open={!!renameTarget}
         onOpenChange={(o) => !o && setRenameTarget(null)}
       />
 
-      <DialogRoot
+      <RemoveProjectDialog
+        project={removeTarget}
         open={!!removeTarget}
         onOpenChange={(o) => !o && setRemoveTarget(null)}
-      >
-        {removeTarget && (
-          <DialogContent
-            title={t("projectRail.removeTitle")}
-            description={t("projectRail.removeDescription")}
-            width={420}
-            footer={
-              <>
-                <Button variant="outline" size="sm" onClick={() => setRemoveTarget(null)}>
-                  {t("common.cancel")}
-                </Button>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={async () => {
-                    const target = removeTarget;
-                    setRemoveTarget(null);
-                    await remove(target.id);
-                  }}
-                  className="bg-danger text-on-primary hover:bg-danger/85"
-                >
-                  <Icon icon={Trash2} size={12} className="text-on-primary" />
-                  {t("common.remove")}
-                </Button>
-              </>
-            }
-          >
-            <div className="space-y-[8px]">
-              <p className="text-ui text-body">
-                <span className="font-medium text-ink">{removeTarget.name}</span>{t("projectRail.removeBodySuffix")}
-              </p>
-              <p className="font-mono text-label text-muted-soft">{removeTarget.path}</p>
-            </div>
-          </DialogContent>
-        )}
-      </DialogRoot>
+      />
     </>
   );
 }

@@ -52,7 +52,7 @@ export function ProjectPicker() {
             <Icon icon={ChevronDown} size={13} strokeWidth={2} className="shrink-0" />
           </button>
         </DropdownTrigger>
-        <DropdownContent align="start" className="max-h-[360px] min-w-[248px] overflow-y-auto">
+        <DropdownContent side="top" align="start" className="max-h-[360px] min-w-[248px] overflow-y-auto">
           <ProjectActionItems onStartScratch={() => setCreateOpen(true)} />
           {projects.length > 0 ? <DropdownSeparator /> : null}
           {projects.map((p) => {

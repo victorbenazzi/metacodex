@@ -76,7 +76,7 @@ export function BranchPicker({ root }: { root: string }) {
             <Icon icon={ChevronDown} size={13} strokeWidth={2} className="shrink-0" />
           </button>
         </DropdownTrigger>
-        <DropdownContent align="start" className="max-h-[360px] min-w-[220px] overflow-y-auto">
+        <DropdownContent side="top" align="start" className="max-h-[360px] min-w-[220px] overflow-y-auto">
           {branches.map((b) => (
             <DropdownItem
               key={b.name}

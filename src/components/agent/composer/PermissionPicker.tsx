@@ -56,7 +56,7 @@ export function PermissionPicker() {
           aria-label={t("agent.composer.askPermissions")}
         />
       </DropdownTrigger>
-      <DropdownContent align="start" className="min-w-[280px]">
+      <DropdownContent side="top" align="start" className="min-w-[280px]">
         {PRESETS.map((p) => {
           const active = p.value === preset;
           return (

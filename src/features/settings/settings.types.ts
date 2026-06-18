@@ -29,6 +29,12 @@ export const UI_DENSITY_MULTIPLIER: Record<UiDensity, number> = {
   spacious: 1.15,
 };
 
+/** Workspace layout. `horizontal` keeps open items in the top tab bar (the
+ *  sidebar then carries only projects + history). `vertical` hides the tab bar
+ *  and drives the single center pane from the sidebar's per-project sections
+ *  (Codex-style, except the center is the agent's terminal, not a chat). */
+export type LayoutMode = "horizontal" | "vertical";
+
 /**
  * The full set of user preferences persisted to `~/.metacodex/settings.json`.
  * `theme` and `language` mirror the existing theme/i18n stores (which still own
@@ -67,6 +73,8 @@ export interface AppSettings {
     explorerIconStyle: ExplorerIconStyle;
     /** Global spacing density (compact / comfortable / spacious). */
     uiDensity: UiDensity;
+    /** Horizontal (tab bar) vs vertical (sidebar-driven single pane) workspace. */
+    layoutMode: LayoutMode;
   };
   /** Persisted horizontal dimensions of the resizable shell panels. Survives
    *  project switches and app restarts. Widths are integers in px; the diff
@@ -188,6 +196,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     enabledAgents: {},
     explorerIconStyle: "mono",
     uiDensity: "comfortable",
+    layoutMode: "horizontal",
   },
   panels: {
     explorerWidth: PANEL_LIMITS.explorer.default,
@@ -258,6 +267,7 @@ const THEME_VALUES: ThemeMode[] = ["system", "light", "dark"];
 const CURSOR_VALUES: TerminalCursorStyle[] = ["bar", "block", "underline"];
 const ICON_STYLE_VALUES: ExplorerIconStyle[] = ["mono", "color"];
 const DENSITY_VALUES: UiDensity[] = ["compact", "comfortable", "spacious"];
+const LAYOUT_MODE_VALUES: LayoutMode[] = ["horizontal", "vertical"];
 
 /**
  * Coerce arbitrary (possibly hand-edited / partial) JSON into a fully-populated,
@@ -312,6 +322,7 @@ export function mergeSettings(raw: unknown): AppSettings {
         D.interface.explorerIconStyle,
       ),
       uiDensity: oneOf(iface.uiDensity, DENSITY_VALUES, D.interface.uiDensity),
+      layoutMode: oneOf(iface.layoutMode, LAYOUT_MODE_VALUES, D.interface.layoutMode),
     },
     panels: {
       explorerWidth: Math.round(

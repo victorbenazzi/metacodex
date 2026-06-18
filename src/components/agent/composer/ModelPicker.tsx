@@ -67,7 +67,7 @@ export function ModelPicker() {
       <DropdownTrigger asChild>
         <ComposerControl icon={Sparkles} label={label} aria-label={t("agent.composer.modelLabel")} />
       </DropdownTrigger>
-      <DropdownContent align="start" className="max-h-[340px] min-w-[240px] overflow-y-auto">
+      <DropdownContent side="top" align="start" className="max-h-[340px] min-w-[240px] overflow-y-auto">
         {providers.length === 0 ? (
           <div className="px-[10px] py-[8px] text-caption text-muted">
             {loadingModels ? t("agent.settings.loadingModels") : t("agent.settings.noModels")}

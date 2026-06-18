@@ -7,11 +7,11 @@
  */
 
 :root {
-  /* Surfaces — light (default) */
-  --canvas: #f7f7f4;
-  --canvas-soft: #fafaf7;
+  /* Surfaces — light (default). Cool, airy near-white (Porcelain). */
+  --canvas: #f5f6f9;
+  --canvas-soft: #f9fafc;
   --surface-card: #ffffff;
-  --surface-strong: #e6e5e0;
+  --surface-strong: #e6e8ef;
 
   /* Surface elevation scale — aliases on top of the canvas/card tokens so
      components can express intent ("this is elevated") instead of color
@@ -22,39 +22,55 @@
   --surface-3: var(--surface-card);
 
   /* Hairlines */
-  --hairline: #e6e5e0;
-  --hairline-soft: #efeee8;
-  --hairline-strong: #cfcdc4;
+  --hairline: #e5e7ee;
+  --hairline-soft: #eef0f5;
+  --hairline-strong: #d2d5df;
 
-  /* Scrim + elevation. Light theme: warm ink at low alpha so modals read as
+  /* Scrim + elevation. Light theme: cool ink at low alpha so modals read as
      "the canvas tinted darker", not "a black square covering everything". */
-  --overlay-scrim: rgba(38, 37, 30, 0.32);
+  --overlay-scrim: rgba(18, 19, 28, 0.34);
   --shadow-elevated:
     0 1px 0 var(--hairline-soft),
-    0 12px 28px -10px rgba(38, 37, 30, 0.10);
+    0 12px 28px -10px rgba(18, 19, 28, 0.10);
   --shadow-drag:
-    0 18px 36px -12px rgba(38, 37, 30, 0.28),
-    0 4px 8px -4px rgba(38, 37, 30, 0.18);
+    0 18px 36px -12px rgba(18, 19, 28, 0.26),
+    0 4px 8px -4px rgba(18, 19, 28, 0.16);
 
   /* High-contrast scrollbar thumb for the tab strip — visible at 1px against
      the canvas-soft background. Light theme: near-black; dark theme: near-white. */
   --scrollbar-tab-thumb: rgba(0, 0, 0, 0.9);
 
   /* Ink */
-  --ink: #26251e;
-  --body: #5a5852;
-  --muted: #807d72;
-  --muted-soft: #a09c92;
+  --ink: #1b1c21;
+  --body: #51545e;
+  --muted: #767a86;
+  --muted-soft: #a0a4b1;
 
-  /* Brand-as-ink (we use ink as the brand) */
-  --primary: #26251e;
-  --primary-active: #000000;
+  /* Brand-as-ink (ink stays the solid-CTA color; accent is a separate, quiet
+     highlight, never a loud fill). */
+  --primary: #1b1c21;
+  --primary-active: #0a0b0f;
   --on-primary: #ffffff;
 
+  /* Accent — restrained indigo/lavender. Powers selected/active/focus tints
+     (bg-accent/NN, ring-accent, text-accent) and the corner atmosphere glow.
+     Kept consistent across every light syntax theme (defined here, not in the
+     theme chrome schema). */
+  --accent: #5a5ad8;
+  --accent-strong: #4a4ac4;
+  --on-accent: #ffffff;
+
+  /* Atmosphere — faint lavender glow bleeding from the left corners. Consumed
+     by the `.atmosphere-*` utilities as a background layer (always behind
+     content, so it never touches text contrast). */
+  --atmosphere:
+    radial-gradient(120% 90% at 0% 0%, rgba(90, 90, 216, 0.06), transparent 58%),
+    radial-gradient(110% 80% at 0% 100%, rgba(90, 90, 216, 0.045), transparent 52%);
+
   /* Semantic */
-  --success: #1f8a65;
-  --danger: #cf2d56;
-  --warn: #b9722a;
+  --success: #18906b;
+  --danger: #d83b4a;
+  --warn: #b3760f;
 
   /* Update pill (top bar) — a quiet blue that reads as "informational action"
      without competing with --success (git clean) or --warn (saving). Light
@@ -68,27 +84,27 @@
   --on-update: #ffffff;
 
   /* Diff / git change gutter */
-  --diff-add: #3a9b76;
-  --diff-modify: #4c6f8a;
-  --diff-remove: #cf2d56;
+  --diff-add: #1f9b73;
+  --diff-modify: #4d6f97;
+  --diff-remove: #d83b4a;
 
   /* Explorer: ephemeral tint for files that just appeared on disk
      (created by the IA in the terminal, by another process, or by the
      user via inline create). Held full for ~14.4s, then fades the last
      600ms via the `explorer-recent-tint` keyframe. */
-  --explorer-recent: rgba(76, 111, 138, 0.18);
+  --explorer-recent: rgba(90, 90, 216, 0.12);
 
   /* Diff view (side-by-side) line + token surfaces */
-  --diff-add-line: rgba(58, 155, 118, 0.10);
-  --diff-add-text: rgba(58, 155, 118, 0.26);
-  --diff-remove-line: rgba(207, 45, 86, 0.09);
-  --diff-remove-text: rgba(207, 45, 86, 0.24);
+  --diff-add-line: rgba(31, 155, 115, 0.10);
+  --diff-add-text: rgba(31, 155, 115, 0.24);
+  --diff-remove-line: rgba(216, 59, 74, 0.09);
+  --diff-remove-text: rgba(216, 59, 74, 0.22);
 
   /* Editor selection — must keep ~AA contrast with every syntax token, so we
      darken the canvas (light theme) rather than tint it with an accent. Themes
      override --selection via applyTheme(); these defaults catch the boot
      window before a theme is applied. */
-  --selection: rgba(38, 37, 30, 0.22);
+  --selection: rgba(40, 42, 54, 0.18);
 
   /* Radius */
   --radius-xs: 4px;
@@ -154,7 +170,7 @@
   --density-multiplier: 1;
 
   /* Layout */
-  --rail-w: 56px;
+  --rail-w: 48px;
   --explorer-w: 248px;
   --title-bar-h: 36px;
 
@@ -214,11 +230,11 @@
 }
 
 [data-theme="dark"] {
-  /* Surfaces — dark */
-  --canvas: #11110f;
-  --canvas-soft: #171714;
-  --surface-card: #1d1c18;
-  --surface-strong: #2a2924;
+  /* Surfaces — dark. Cool near-black (Graphite). */
+  --canvas: #0f1015;
+  --canvas-soft: #14151b;
+  --surface-card: #181a21;
+  --surface-strong: #252830;
 
   /* Surface elevation scale — see :root for the rationale. */
   --surface-0: var(--canvas);
@@ -227,9 +243,9 @@
   --surface-3: var(--surface-card);
 
   /* Hairlines */
-  --hairline: #2c2b26;
-  --hairline-soft: #232220;
-  --hairline-strong: #44423a;
+  --hairline: #24262e;
+  --hairline-soft: #1c1e25;
+  --hairline-strong: #3a3d47;
 
   /* Scrim + elevation. Dark theme: deeper alpha because the canvas itself is
      already low-luminance — needs more separation to read as overlay. */
@@ -244,40 +260,48 @@
   --scrollbar-tab-thumb: rgba(255, 255, 255, 0.9);
 
   /* Ink */
-  --ink: #f7f7f4;
-  --body: #c8c5ba;
-  --muted: #969287;
-  --muted-soft: #68645c;
+  --ink: #f3f4f7;
+  --body: #c0c3cd;
+  --muted: #888c99;
+  --muted-soft: #5b5e69;
 
-  --primary: #f7f7f4;
+  --primary: #f3f4f7;
   --primary-active: #ffffff;
-  --on-primary: #11110f;
+  --on-primary: #0f1015;
 
-  --success: #4ec99a;
-  --danger: #ff5a7d;
-  --warn: #e3a35a;
+  /* Accent — lavender lifted brighter so it reads on the dim canvas. */
+  --accent: #8a8af3;
+  --accent-strong: #9d9dff;
+  --on-accent: #0f1015;
+  --atmosphere:
+    radial-gradient(120% 90% at 0% 0%, rgba(138, 138, 243, 0.10), transparent 58%),
+    radial-gradient(110% 80% at 0% 100%, rgba(138, 138, 243, 0.07), transparent 52%);
+
+  --success: #3ed092;
+  --danger: #ff626a;
+  --warn: #e2a65c;
   --update-blue: #6aa3e8;
   --update-blue-strong: #3b6fb8;
 
   /* Diff / git change gutter */
-  --diff-add: #4ec99a;
-  --diff-modify: #88a8c2;
-  --diff-remove: #ff5a7d;
+  --diff-add: #3ed092;
+  --diff-modify: #7da2c6;
+  --diff-remove: #ff626a;
 
-  /* Explorer recent-file tint — dark variant, sits at ~14% alpha. */
-  --explorer-recent: rgba(136, 168, 194, 0.22);
+  /* Explorer recent-file tint — dark variant, accent-keyed. */
+  --explorer-recent: rgba(138, 138, 243, 0.18);
 
   /* Diff view (side-by-side) line + token surfaces */
-  --diff-add-line: rgba(78, 201, 154, 0.13);
-  --diff-add-text: rgba(78, 201, 154, 0.26);
-  --diff-remove-line: rgba(255, 90, 125, 0.13);
-  --diff-remove-text: rgba(255, 90, 125, 0.26);
+  --diff-add-line: rgba(62, 208, 146, 0.13);
+  --diff-add-text: rgba(62, 208, 146, 0.26);
+  --diff-remove-line: rgba(255, 98, 106, 0.13);
+  --diff-remove-text: rgba(255, 98, 106, 0.26);
 
   /* Opaque + darker than every syntax token so selected text stays legible.
      The previous fallback `--term-selection rgba(247,247,244,0.18)` was a
      white overlay on dark canvas — produced a pale lavender that crushed
      contrast against mid-tone tokens. */
-  --selection: #3a3833;
+  --selection: #2a2d39;
 
   /* Terminal palette dark */
   --term-bg: var(--canvas);

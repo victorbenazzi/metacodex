@@ -7,6 +7,7 @@ import { DialogContent, DialogRoot } from "@/components/ui/Dialog";
 import { Icon } from "@/components/ui/Icon";
 import { Segmented } from "@/components/ui/Segmented";
 import { Select } from "@/components/ui/Select";
+import { useAnchoredPopup } from "@/components/ui/useAnchoredPopup";
 import { useAgentChatStore } from "@/features/agent/chat.store";
 import {
   useAgentEntitiesStore,
@@ -117,6 +118,15 @@ function AvatarPicker({
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  // Collision-aware placement: flips above the trigger / shifts inward near a
+  // viewport edge instead of the old static `top-full left-0`. Absolute
+  // strategy (no portal) keeps the panel inside rootRef, so the click-outside
+  // check below still covers it.
+  const { refs, floatingStyles } = useAnchoredPopup({
+    open,
+    placement: "bottom-start",
+    constrainHeight: false,
+  });
 
   useEffect(() => {
     if (!open) return;
@@ -137,6 +147,7 @@ function AvatarPicker({
   return (
     <div ref={rootRef} className="relative shrink-0">
       <button
+        ref={refs.setReference}
         type="button"
         aria-label={t("agent.agents.builder.avatarLabel")}
         aria-haspopup="dialog"
@@ -155,9 +166,11 @@ function AvatarPicker({
 
       {open ? (
         <div
+          ref={refs.setFloating}
           role="dialog"
           aria-label={t("agent.agents.builder.avatarLabel")}
-          className="absolute left-0 top-full z-20 mt-[6px] w-[252px] animate-fade-in rounded-md border border-hairline bg-surface-card p-[10px] shadow-elevated"
+          style={floatingStyles}
+          className="z-20 w-[252px] animate-fade-in rounded-md border border-hairline bg-surface-card p-[10px] shadow-elevated"
         >
           <div className="grid grid-cols-8 gap-[2px]">
             {EMOJI_CHOICES.map((e) => (

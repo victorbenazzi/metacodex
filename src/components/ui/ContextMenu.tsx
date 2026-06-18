@@ -14,6 +14,7 @@ export function ContextMenuContent({
   return (
     <RCM.Portal>
       <RCM.Content
+        collisionPadding={8}
         className={cn(
           "z-50 min-w-[200px] rounded-md border border-hairline bg-surface-card p-[5px] text-ui text-ink",
           // Tight floating elevation — Linear/Raycast aesthetic, denser than
@@ -104,6 +105,7 @@ export function ContextMenuSub({
       </RCM.SubTrigger>
       <RCM.Portal>
         <RCM.SubContent
+          collisionPadding={8}
           className={cn(
             "z-50 min-w-[180px] rounded-md border border-hairline bg-surface-card p-[5px] text-ui text-ink",
             "data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out",

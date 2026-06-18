@@ -70,6 +70,26 @@ function writeStored(mode: ThemeMode, themeId: string) {
   }
 }
 
+// One-time identity migration: the cool Porcelain/Graphite pair replaced the
+// warm Solar Cream / Mono Slate as the defaults. Anyone whose stored choice was
+// one of the OLD defaults is moved to the matching NEW default exactly once
+// (stamped via THEME_REV), so the redesign actually shows on existing installs.
+// A deliberate non-default pick (e.g. Tokyo Night) is left untouched.
+const THEME_REV_KEY = "metacodex:themeRev";
+const THEME_REV = "cool-1";
+function migrateDefaultIdentity() {
+  try {
+    if (localStorage.getItem(THEME_REV_KEY) === THEME_REV) return;
+    const stored = localStorage.getItem(THEME_ID_KEY);
+    if (stored === "solar-cream") localStorage.setItem(THEME_ID_KEY, DEFAULT_LIGHT_THEME_ID);
+    else if (stored === "mono-slate") localStorage.setItem(THEME_ID_KEY, DEFAULT_DARK_THEME_ID);
+    localStorage.setItem(THEME_REV_KEY, THEME_REV);
+  } catch {
+    // localStorage may be unavailable; the new defaults still apply for fresh state
+  }
+}
+migrateDefaultIdentity();
+
 // First-paint resolution: pick the stored themeId if any, otherwise derive
 // from the stored mode (falling back to OS). This runs synchronously at module
 // load so the cascade is correct before React mounts — no FOUC.

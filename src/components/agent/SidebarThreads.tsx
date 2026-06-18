@@ -329,7 +329,7 @@ const ThreadRow = memo(function ThreadRow({
               <Icon icon={MoreHorizontal} size={12} strokeWidth={2} />
             </IconButton>
           </DropdownTrigger>
-          <DropdownContent align="end" className="min-w-[160px]">
+          <DropdownContent align="start" className="min-w-[160px]">
             <DropdownItem onSelect={() => setRenaming(true)}>
               <Icon icon={Pencil} size={13} className="text-muted" />
               {t("agent.sidebar.rename")}

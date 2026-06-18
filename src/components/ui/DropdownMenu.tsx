@@ -9,20 +9,31 @@ export const DropdownPortal = RDM.Portal;
 
 export function DropdownContent({
   children,
+  side,
   align = "start",
   sideOffset = 6,
+  alignOffset,
+  collisionPadding = 8,
   className,
 }: {
   children: React.ReactNode;
+  side?: "top" | "right" | "bottom" | "left";
   align?: "start" | "center" | "end";
   sideOffset?: number;
+  alignOffset?: number;
+  /** Margin kept from the viewport edges when Radix flips/shifts on collision.
+   *  Default 8 so menus never touch the screen edge. */
+  collisionPadding?: number;
   className?: string;
 }) {
   return (
     <RDM.Portal>
       <RDM.Content
+        side={side}
         align={align}
         sideOffset={sideOffset}
+        alignOffset={alignOffset}
+        collisionPadding={collisionPadding}
         className={cn(
           "z-50 min-w-[220px] rounded-md border border-hairline bg-surface-card p-[5px]",
           "text-ui text-ink",
@@ -120,6 +131,7 @@ export function DropdownSubContent({
       <RDM.SubContent
         sideOffset={6}
         alignOffset={-5}
+        collisionPadding={8}
         className={cn(
           "z-50 min-w-[220px] rounded-md border border-hairline bg-surface-card p-[5px]",
           "text-ui text-ink",

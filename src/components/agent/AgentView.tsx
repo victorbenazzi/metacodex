@@ -5,6 +5,7 @@ import { useAgentChatStore } from "@/features/agent/chat.store";
 import { useAgentNavStore } from "@/features/agent/nav.store";
 import { useAgentRuntimeStore } from "@/features/agent/runtime.store";
 import { useProjectsStore } from "@/features/projects/project.store";
+import { useCodeSidebarStore } from "@/features/ui/codeSidebar.store";
 import { AgentSidebar } from "@/components/agent/AgentSidebar";
 import { AgentHero } from "@/components/agent/AgentHero";
 import { AgentOnboarding, OPENCODE_CLI } from "@/components/agent/AgentOnboarding";
@@ -55,6 +56,7 @@ export function AgentView({ className }: AgentViewProps) {
   const connectionError = useAgentChatStore((s) => s.connectionError);
   const setDirectory = useAgentChatStore((s) => s.setDirectory);
   const section = useAgentNavStore((s) => s.section);
+  const agentCollapsed = useCodeSidebarStore((s) => s.agentCollapsed);
   const loadModels = useAgentRuntimeStore((s) => s.loadModels);
   const activeProject = useProjectsStore((s) =>
     s.projects.find((p) => p.id === s.activeProjectId),
@@ -83,7 +85,7 @@ export function AgentView({ className }: AgentViewProps) {
 
   return (
     <div className={cn("flex bg-canvas text-ink", className)}>
-      <AgentSidebar />
+      {agentCollapsed ? null : <AgentSidebar />}
       <main className="flex min-w-0 flex-1 flex-col">
         {/* Stream dropped after a successful connect: the reconnect loop is
             already re-resolving the sidecar; tell the user instead of leaving

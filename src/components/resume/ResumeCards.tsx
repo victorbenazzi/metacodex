@@ -14,6 +14,7 @@ import {
   useCliDetections,
 } from "@/features/terminal/cli-detection";
 import { cn } from "@/lib/cn";
+import { agoShort } from "@/lib/time";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import type { ResumeEntry } from "@/features/resume/resume.service";
@@ -91,7 +92,7 @@ export function ResumeCards({ projectId, title, limit = 5 }: ResumeCardsProps) {
                   {entry.cwd}
                 </div>
                 <div className="font-mono text-[10px] text-muted-soft">
-                  {t("resume.lastSeen", { ago: timeAgo(entry.lastSeenAt) })}
+                  {t("resume.lastSeen", { ago: agoShort(entry.lastSeenAt) })}
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-[6px]">
@@ -116,15 +117,3 @@ export function ResumeCards({ projectId, title, limit = 5 }: ResumeCardsProps) {
   );
 }
 
-function timeAgo(iso: string): string {
-  const t = Date.parse(iso);
-  if (Number.isNaN(t)) return "—";
-  const seconds = Math.max(1, Math.floor((Date.now() - t) / 1000));
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h`;
-  const days = Math.floor(hours / 24);
-  return `${days}d`;
-}

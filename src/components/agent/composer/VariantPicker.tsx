@@ -63,7 +63,7 @@ export function VariantPicker() {
             aria-label={t("agent.composer.variantLabel")}
           />
         </DropdownTrigger>
-        <DropdownContent align="start" className="min-w-[160px]">
+        <DropdownContent side="top" align="start" className="min-w-[160px]">
           <DropdownItem
             onSelect={() => choose("")}
             trailing={!active ? <Icon icon={Check} size={13} className="text-ink" /> : null}

@@ -7,6 +7,11 @@ import {
   Sparkles,
   Code2,
   FolderTree,
+  FolderPlus,
+  FolderOpen,
+  Github,
+  PanelLeftClose,
+  PanelLeftOpen,
   Minus,
   Square,
   Copy,
@@ -22,10 +27,19 @@ import { useAgentSessionsStore } from "@/features/agent/sessions.store";
 import { useGitStore } from "@/features/git/git.store";
 import { useProjectsStore } from "@/features/projects/project.store";
 import { useViewStore } from "@/features/ui/view.store";
+import { useCodeSidebarStore } from "@/features/ui/codeSidebar.store";
 import { Icon } from "@/components/ui/Icon";
 import { Kbd } from "@/components/ui/Kbd";
 import { Segmented } from "@/components/ui/Segmented";
 import { Tooltip } from "@/components/ui/Tooltip";
+import {
+  DropdownContent,
+  DropdownItem,
+  DropdownRoot,
+  DropdownTrigger,
+} from "@/components/ui/DropdownMenu";
+import { TabTrailingActions } from "@/components/tabs/TabTrailingActions";
+import type { CliTool } from "@/features/terminal/cli-registry";
 import { useSaveStatusStore } from "@/features/workspace/saveStatus.store";
 import { useDiagnosticsStore } from "@/features/diagnostics/diagnostics.store";
 import { UpdatePill } from "@/components/updates/UpdatePill";
@@ -33,6 +47,13 @@ import { UpdatePill } from "@/components/updates/UpdatePill";
 interface TitleBarProps {
   workspaceName?: string;
   className?: string;
+  /** Sidebar collapse + add-project sit left of the view pill (both views). */
+  onOpenFolder?: () => void;
+  onCloneFromGithub?: () => void;
+  /** Code view: new-tab + Source Control toggle, moved up to the right slot. */
+  onNewTerminal?: () => void;
+  onLaunchCli?: (cli: CliTool) => void;
+  onNewWorktree?: () => void;
 }
 
 /**
@@ -50,12 +71,27 @@ interface TitleBarProps {
  * click path. Without it on the inner spans, mousedown on the labels won't be
  * recognized as a drag and the window can't be moved.
  */
-export function TitleBar({ workspaceName, className }: TitleBarProps) {
+export function TitleBar({
+  workspaceName,
+  className,
+  onOpenFolder,
+  onCloneFromGithub,
+  onNewTerminal,
+  onLaunchCli,
+  onNewWorktree,
+}: TitleBarProps) {
   const { t } = useTranslation();
   const activeId = useProjectsStore((s) => s.activeProjectId);
   const git = useGitStore((s) => (activeId ? s.byProject[activeId] : null));
   const view = useViewStore((s) => s.view);
   const setView = useViewStore((s) => s.setView);
+  const codeCollapsed = useCodeSidebarStore((s) => s.collapsed);
+  const toggleCodeSidebar = useCodeSidebarStore((s) => s.toggleCollapsed);
+  const agentCollapsed = useCodeSidebarStore((s) => s.agentCollapsed);
+  const toggleAgentSidebar = useCodeSidebarStore((s) => s.toggleAgentCollapsed);
+  // The title-bar toggle flips whichever sidebar matches the active view.
+  const sidebarCollapsed = view === "agent" ? agentCollapsed : codeCollapsed;
+  const toggleSidebar = view === "agent" ? toggleAgentSidebar : toggleCodeSidebar;
   const agentBusy = useAgentSessionsStore((s) => Object.keys(s.runningById).length > 0);
   const explorerOpen = useAgentOverlayPanelsStore((s) => s.explorerOpen);
   const gitOpen = useAgentOverlayPanelsStore((s) => s.gitOpen);
@@ -79,11 +115,67 @@ export function TitleBar({ workspaceName, className }: TitleBarProps) {
       {/* Top-level view switch, sits where the wordmark used to, just past the
           macOS traffic lights. NOT a drag region (it's an interactive control);
           the rest of the header still drags the window. */}
-      <div className="justify-self-start">
-        {/* Pill treatment (sliding thumb) marks this as the app's top-level
-            mode switch, one notch above in-page segmented controls. The plain
-            span wrapper exists because Radix's asChild trigger needs a host
-            that spreads props, which Segmented intentionally doesn't. */}
+      <div className="flex items-center gap-[8px] justify-self-start">
+        {/* Workspace controls first (left of the mode switch), separated by a
+            hairline so the toggle never feels glued to the pill. The toggle
+            flips the ACTIVE view's sidebar (Code rail / Agent sidebar);
+            add-project is global, so both show in either view. */}
+        <div className="flex items-center gap-[2px]">
+          <Tooltip
+            content={sidebarCollapsed ? t("codeSidebar.expand") : t("codeSidebar.collapse")}
+            side="bottom"
+            align="start"
+          >
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              aria-label={sidebarCollapsed ? t("codeSidebar.expand") : t("codeSidebar.collapse")}
+              aria-pressed={!sidebarCollapsed}
+              className={cn(
+                "inline-flex h-[24px] w-[24px] items-center justify-center rounded-sm text-muted transition-colors",
+                "hover:bg-surface-strong/55 hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-hairline-strong",
+              )}
+            >
+              <Icon icon={sidebarCollapsed ? PanelLeftOpen : PanelLeftClose} size={15} />
+            </button>
+          </Tooltip>
+          <DropdownRoot>
+            <Tooltip content={t("projectRail.addProject")} side="bottom">
+              <DropdownTrigger asChild>
+                <button
+                  type="button"
+                  aria-label={t("projectRail.addProject")}
+                  className={cn(
+                    "inline-flex h-[24px] w-[24px] items-center justify-center rounded-sm text-muted transition-colors",
+                    "hover:bg-surface-strong/55 hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-hairline-strong",
+                    "data-[state=open]:bg-surface-strong/55 data-[state=open]:text-ink",
+                  )}
+                >
+                  <Icon icon={FolderPlus} size={15} />
+                </button>
+              </DropdownTrigger>
+            </Tooltip>
+            <DropdownContent align="start" sideOffset={6}>
+              <DropdownItem onSelect={() => onOpenFolder?.()} trailing={<Kbd keys={["Mod", "O"]} />}>
+                <Icon icon={FolderOpen} size={13} className="text-muted" />
+                {t("welcome.openProjectMenu.local")}
+              </DropdownItem>
+              <DropdownItem
+                onSelect={() => onCloneFromGithub?.()}
+                trailing={<Kbd keys={["Mod", "Shift", "O"]} />}
+              >
+                <Icon icon={Github} size={13} className="text-muted" />
+                {t("welcome.openProjectMenu.github")}
+              </DropdownItem>
+            </DropdownContent>
+          </DropdownRoot>
+        </div>
+
+        <span aria-hidden className="h-[14px] w-px bg-hairline-strong" />
+
+        {/* Top-level view switch (pill with sliding thumb). The plain span
+            wrapper exists because Radix's asChild trigger needs a host that
+            spreads props, which Segmented intentionally doesn't. */}
         <Tooltip
           content={t("agent.viewToggle.label")}
           shortcut={<Kbd keys={["Mod", "E"]} />}
@@ -173,6 +265,14 @@ export function TitleBar({ workspaceName, className }: TitleBarProps) {
               badge={changeCount > 0 ? (changeCount > 99 ? "99+" : String(changeCount)) : undefined}
             />
           </>
+        ) : view === "code" && activeId && onNewTerminal && onLaunchCli ? (
+          // Moved up from the tab bar so the tab strip is all tabs and the
+          // new-tab + Source Control toggle live in the chrome (both layouts).
+          <TabTrailingActions
+            onNewTerminal={onNewTerminal}
+            onLaunchCli={onLaunchCli}
+            onNewWorktree={onNewWorktree}
+          />
         ) : null}
         <SaveStatusDot />
       </div>

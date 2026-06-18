@@ -69,7 +69,7 @@ export function AgentPicker() {
           aria-label={t("agent.composer.agentLabel")}
         />
       </DropdownTrigger>
-      <DropdownContent align="start" className="max-h-[340px] min-w-[240px] overflow-y-auto">
+      <DropdownContent side="top" align="start" className="max-h-[340px] min-w-[240px] overflow-y-auto">
         <DropdownItem
           onSelect={() => selectEntityForChat(null)}
           trailing={!selected ? <Icon icon={Check} size={13} className="text-ink" /> : null}

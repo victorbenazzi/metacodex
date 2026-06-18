@@ -6,7 +6,7 @@ import { cn } from "@/lib/cn";
 import { FileExplorer } from "./FileExplorer";
 import type { TreeNodeActions } from "./TreeNode";
 
-interface ExplorerPanelProps extends TreeNodeActions {
+export interface ExplorerPanelProps extends TreeNodeActions {
   hasProject: boolean;
   projectId?: string;
   projectName?: string;

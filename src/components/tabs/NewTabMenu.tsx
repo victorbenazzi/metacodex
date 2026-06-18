@@ -5,6 +5,7 @@ import {
   ChevronRight,
   Settings2,
   GitBranch,
+  SquareTerminal,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -104,6 +105,7 @@ export function NewTabBody({ actions, C }: { actions: NewTabActions; C: MenuComp
         trailing={<Kbd keys={["Mod", "T"]} />}
         className={itemClass}
       >
+        <Icon icon={SquareTerminal} size={13} className="text-muted" />
         <span className="font-medium">{t("tabs.newTerminal")}</span>
       </C.Item>
 

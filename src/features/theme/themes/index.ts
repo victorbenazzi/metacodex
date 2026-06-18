@@ -3,19 +3,25 @@ import type { Theme, ThemeKind } from "../types";
 import { catppuccinMocha } from "./catppuccinMocha";
 import { githubDark } from "./githubDark";
 import { githubLight } from "./githubLight";
+import { graphite } from "./graphite";
 import { monoSlate } from "./monoSlate";
 import { oneDark } from "./oneDark";
 import { paper } from "./paper";
+import { porcelain } from "./porcelain";
 import { solarCream } from "./solarCream";
 import { solarizedLight } from "./solarizedLight";
 import { tokyoNight } from "./tokyoNight";
 
-/** Built-in theme registry. Order here is the order they appear in the picker. */
+/** Built-in theme registry. Order here is the order they appear in the picker.
+ *  Porcelain / Graphite (cool, Codex-grade) lead each kind as the defaults; the
+ *  warm originals (Solar Cream / Mono Slate) stay available below them. */
 export const THEMES: Theme[] = [
+  porcelain,
   solarCream,
   paper,
   githubLight,
   solarizedLight,
+  graphite,
   monoSlate,
   tokyoNight,
   oneDark,
@@ -25,8 +31,8 @@ export const THEMES: Theme[] = [
 
 const BY_ID: Record<string, Theme> = Object.fromEntries(THEMES.map((t) => [t.id, t]));
 
-export const DEFAULT_LIGHT_THEME_ID = solarCream.id;
-export const DEFAULT_DARK_THEME_ID = monoSlate.id;
+export const DEFAULT_LIGHT_THEME_ID = porcelain.id;
+export const DEFAULT_DARK_THEME_ID = graphite.id;
 
 export function isThemeId(id: unknown): id is string {
   return typeof id === "string" && id in BY_ID;

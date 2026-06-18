@@ -30,6 +30,12 @@ export default {
         "primary-active": "var(--primary-active)",
         "on-primary": "var(--on-primary)",
 
+        // Restrained indigo/lavender accent (active/selected/focus + glow).
+        // Token-driven so it stays consistent across every syntax theme.
+        accent: "var(--accent)",
+        "accent-strong": "var(--accent-strong)",
+        "on-accent": "var(--on-accent)",
+
         success: "var(--success)",
         danger: "var(--danger)",
         warn: "var(--warn)",
@@ -157,6 +163,13 @@ export default {
           from: { opacity: "0", transform: "translateX(-8px)" },
           to: { opacity: "1", transform: "translateX(0)" },
         },
+        // List/grid item entrance — a small rise + fade. Stagger via per-item
+        // animation-delay (30-50ms apart) for sidebar history, cards, etc.
+        // In-flow content only (transform is safe here, unlike popups).
+        rise: {
+          from: { opacity: "0", transform: "translateY(6px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
       },
       animation: {
         // Enter decelerates in (ease-out); exit accelerates out (ease-in) and
@@ -169,6 +182,7 @@ export default {
         "tab-status-pulse": "tab-status-pulse 1.6s ease-in-out infinite",
         "progress-indeterminate": "progress-indeterminate 1.4s ease-in-out infinite",
         "slide-in-left": "slide-in-left 180ms var(--ease-out) both",
+        rise: "rise 240ms var(--ease-out) both",
       },
     },
   },

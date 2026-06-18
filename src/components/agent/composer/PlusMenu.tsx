@@ -54,7 +54,7 @@ export function PlusMenu({
           <Icon icon={Plus} size={16} strokeWidth={2} />
         </button>
       </DropdownTrigger>
-      <DropdownContent align="start" sideOffset={8}>
+      <DropdownContent side="top" align="start" sideOffset={8}>
         <DropdownItem
           onSelect={() => {
             void openDialog({ multiple: true }).then((picked) => {

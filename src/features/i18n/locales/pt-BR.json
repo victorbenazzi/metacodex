@@ -680,6 +680,10 @@
       "iconStyleHint": "Monocromático segue o tema. Colorido pinta arquivos com marca conhecida na cor original.",
       "iconStyleMono": "Mono",
       "iconStyleColor": "Colorido",
+      "layout": "Layout",
+      "layoutHint": "Horizontal mantém as coisas abertas na barra de guias do topo. Vertical esconde a barra e controla o painel central pela sidebar (estilo Codex).",
+      "layoutHorizontal": "Horizontal",
+      "layoutVertical": "Vertical",
       "density": "Densidade",
       "densityHint": "Ajusta o espaçamento globalmente. Compacta para dados densos, espaçosa para mais respiro.",
       "densityCompact": "Compacta",
@@ -794,6 +798,21 @@
     "needsConfigTooltip": "Requer configuração ou instalação",
     "checkingTooltip": "Verificando instalação…",
     "notInstalledTooltip": "Não instalado. Clique para abrir a ajuda de instalação."
+  },
+  "codeSidebar": {
+    "projects": "Projetos",
+    "collapse": "Recolher barra lateral",
+    "expand": "Expandir barra lateral",
+    "expandProject": "Expandir projeto",
+    "collapseProject": "Recolher projeto",
+    "historico": "Histórico",
+    "terminais": "Terminais",
+    "agentes": "Agentes",
+    "newInProject": "Novo terminal ou agente",
+    "projectOptions": "Opções do projeto",
+    "resumeAria": "Retomar sessão do {{cli}}",
+    "endTerminal": "Encerrar terminal",
+    "endAgent": "Encerrar agente"
   },
   "explorer": {
     "ariaLabel": "Explorador de arquivos",
