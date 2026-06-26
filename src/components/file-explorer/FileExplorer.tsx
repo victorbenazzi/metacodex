@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { FilePlus, FolderPlus, Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -22,11 +22,8 @@ export function FileExplorer({
   rootPath,
   rootName,
   onOpenFile,
-  onRequestDelete,
-  onRename,
   onOpenInTerminal,
   onLaunchCliInPath,
-  onMove,
 }: FileExplorerProps) {
   const { t } = useTranslation();
   const loadIfNeeded = useExplorerStore((s) => s.loadIfNeeded);
@@ -39,8 +36,6 @@ export function FileExplorer({
     (s) => s.byProject[projectId]?.children[rootPath],
   );
   const creating = useExplorerStore((s) => s.byProject[projectId]?.creating);
-
-  const [rootDropTarget, setRootDropTarget] = useState(false);
 
   // Load the root on first mount (or when project changes)
   useEffect(() => {
@@ -98,34 +93,10 @@ export function FileExplorer({
       </header>
 
       <nav
-        className={cn(
-          "flex-1 overflow-y-auto overflow-x-hidden py-[6px]",
-          rootDropTarget && "bg-accent/10 ring-1 ring-inset ring-accent/40",
-        )}
+        className="flex-1 overflow-y-auto overflow-x-hidden py-[6px]"
         onClick={(e) => {
           // Clicking empty space clears selection (so New File/Folder targets root).
           if (e.target === e.currentTarget) setSelected(projectId, null);
-        }}
-        onDragOver={(e) => {
-          e.preventDefault();
-          e.dataTransfer.dropEffect = "move";
-          if (!rootDropTarget) setRootDropTarget(true);
-        }}
-        onDragLeave={(e) => {
-          if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-            setRootDropTarget(false);
-          }
-        }}
-        onDrop={(e) => {
-          e.preventDefault();
-          setRootDropTarget(false);
-          const from =
-            e.dataTransfer.getData("application/x-metacodex-path") ||
-            e.dataTransfer.getData("text/plain");
-          if (!from) return;
-          // No-op if already a direct child of root.
-          if (dirname(from) === rootPath) return;
-          void onMove(from, rootPath);
         }}
       >
         {creatingAtRoot ? (
@@ -159,11 +130,8 @@ export function FileExplorer({
                 entry={c}
                 depth={0}
                 onOpenFile={onOpenFile}
-                onRequestDelete={onRequestDelete}
-                onRename={onRename}
                 onOpenInTerminal={onOpenInTerminal}
                 onLaunchCliInPath={onLaunchCliInPath}
-                onMove={onMove}
               />
             ))
           )

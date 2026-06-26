@@ -22,13 +22,12 @@ export interface SentToProject {
 }
 
 interface SendToProjectDialogProps {
-  /** Preview file path to send; null = dialog closed. */
-  path: string | null;
+  file: { path: string; grantId: string } | null;
   onOpenChange: (open: boolean) => void;
   onSent: (result: SentToProject) => void;
 }
 
-export function SendToProjectDialog({ path, onOpenChange, onSent }: SendToProjectDialogProps) {
+export function SendToProjectDialog({ file, onOpenChange, onSent }: SendToProjectDialogProps) {
   const { t } = useTranslation();
   const projects = useProjectsStore((s) => s.projects);
   const [projectId, setProjectId] = useState<string | null>(null);
@@ -36,7 +35,7 @@ export function SendToProjectDialog({ path, onOpenChange, onSent }: SendToProjec
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const open = path !== null;
+  const open = file !== null;
   const selectedProject = projects.find((p) => p.id === projectId) ?? null;
 
   // Reset selection each time the dialog opens for a new file.
@@ -48,7 +47,7 @@ export function SendToProjectDialog({ path, onOpenChange, onSent }: SendToProjec
     setBusy(false);
     setError(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, path]);
+  }, [open, file?.path]);
 
   const pickProject = (p: Project) => {
     setProjectId(p.id);
@@ -57,12 +56,12 @@ export function SendToProjectDialog({ path, onOpenChange, onSent }: SendToProjec
   };
 
   const confirm = async () => {
-    if (!path || !selectedProject || !destDir) return;
+    if (!file || !selectedProject || !destDir) return;
     setBusy(true);
     setError(null);
     try {
-      const newPath = await fsApi.moveIntoProject(path, destDir);
-      onSent({ project: selectedProject, oldPath: path, newPath, toDir: destDir });
+      const newPath = await fsApi.moveIntoProject(file.grantId, destDir);
+      onSent({ project: selectedProject, oldPath: file.path, newPath, toDir: destDir });
       onOpenChange(false);
     } catch (err: any) {
       setError(err?.message ?? String(err));
@@ -85,7 +84,7 @@ export function SendToProjectDialog({ path, onOpenChange, onSent }: SendToProjec
       <DialogContent
         width={460}
         title={t("sendToProject.title")}
-        description={path ? t("sendToProject.subtitle", { name: basename(path) }) : undefined}
+        description={file ? t("sendToProject.subtitle", { name: basename(file.path) }) : undefined}
         footer={
           <>
             <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)} disabled={busy}>

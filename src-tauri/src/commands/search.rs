@@ -1,11 +1,39 @@
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
-use tauri::{AppHandle, Manager};
+use parking_lot::Mutex;
+use tauri::{AppHandle, Manager, State};
 
 use crate::error::{AppError, AppResult};
 use crate::projects::ProjectsCache;
 use crate::search::{list_files as list_files_impl, search, SearchOptions, SearchResults};
 use crate::util::paths;
+
+#[derive(Default)]
+pub struct SearchRegistry {
+    by_root: Mutex<std::collections::HashMap<String, Arc<AtomicBool>>>,
+}
+
+impl SearchRegistry {
+    fn start(&self, root: &str) -> Arc<AtomicBool> {
+        let mut guard = self.by_root.lock();
+        if let Some(prev) = guard.insert(root.to_string(), Arc::new(AtomicBool::new(false))) {
+            prev.store(true, Ordering::SeqCst);
+        }
+        guard.get(root).cloned().expect("token inserted")
+    }
+
+    fn finish(&self, root: &str, token: &Arc<AtomicBool>) {
+        let mut guard = self.by_root.lock();
+        if guard
+            .get(root)
+            .map(|current| Arc::ptr_eq(current, token))
+            .unwrap_or(false)
+        {
+            guard.remove(root);
+        }
+    }
+}
 
 /// Reject roots that aren't inside a registered project. Mirrors the guard every
 /// other filesystem-touching command uses; search/list MUST honor the sandbox
@@ -24,6 +52,7 @@ fn ensure_root_allowed(app: &AppHandle, root: &str) -> AppResult<()> {
 #[tauri::command]
 pub async fn search_in_project(
     app: AppHandle,
+    registry: State<'_, Arc<SearchRegistry>>,
     root: String,
     query: String,
     options: Option<SearchOptions>,
@@ -35,10 +64,16 @@ pub async fn search_in_project(
         regex: false,
         max_matches: 500,
     });
+    let token = registry.start(&root);
+    let registry_for_finish = registry.inner().clone();
+    let root_for_finish = root.clone();
+    let token_for_finish = token.clone();
     // Run in a blocking task so we don't tie up the tokio runtime.
-    tokio::task::spawn_blocking(move || search(&root, &query, opts))
+    let result = tokio::task::spawn_blocking(move || search(&root, &query, opts, Some(token)))
         .await
-        .map_err(|e| crate::error::AppError::Other(format!("join: {e}")))?
+        .map_err(|e| crate::error::AppError::Other(format!("join: {e}")))?;
+    registry_for_finish.finish(&root_for_finish, &token_for_finish);
+    result
 }
 
 /// Flat list of files in a project, for the command palette's go-to-file.

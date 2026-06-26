@@ -4,7 +4,7 @@ import { newId } from "@/lib/idGen";
 
 export interface CloneRepoArgs {
   url: string;
-  parentDir: string;
+  parentGrantId: string;
   folderName: string;
   /** Pass to make the clone cancellable via `cancelClone(opId)`. Generated if omitted. */
   opId?: string;
@@ -24,7 +24,7 @@ export async function cancelClone(opId: string): Promise<void> {
  */
 export async function cloneRepo({
   url,
-  parentDir,
+  parentGrantId,
   folderName,
   opId: opIdArg,
   onProgress,
@@ -41,12 +41,27 @@ export async function cloneRepo({
     return await invoke<string>(CMD.gitClone, {
       opId,
       url,
-      parentDir,
+      parentGrantId,
       folderName,
     });
   } finally {
     unlisten?.();
   }
+}
+
+export interface DirectoryGrant {
+  path: string;
+  grantId: string;
+}
+
+export async function pickCloneParentDir(
+  title: string,
+  defaultPath: string,
+): Promise<DirectoryGrant | null> {
+  return await invoke<DirectoryGrant | null>(CMD.pickCloneParentDir, {
+    title,
+    defaultPath,
+  });
 }
 
 /**

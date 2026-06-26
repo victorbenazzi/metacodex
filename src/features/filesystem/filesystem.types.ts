@@ -28,3 +28,8 @@ export interface BytesFile {
   truncated: boolean;
   size: number;
 }
+
+export interface PreviewGrant {
+  path: string;
+  grantId: string;
+}

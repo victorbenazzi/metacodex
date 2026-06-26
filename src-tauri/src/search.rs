@@ -1,4 +1,6 @@
 use std::path::Path;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use grep_matcher::Matcher;
 use grep_regex::RegexMatcher;
@@ -82,7 +84,12 @@ pub fn list_files(root: &str, max: usize) -> AppResult<Vec<String>> {
     Ok(out)
 }
 
-pub fn search(root: &str, query: &str, options: SearchOptions) -> AppResult<SearchResults> {
+pub fn search(
+    root: &str,
+    query: &str,
+    options: SearchOptions,
+    cancel: Option<Arc<AtomicBool>>,
+) -> AppResult<SearchResults> {
     let started = std::time::Instant::now();
     if query.is_empty() {
         return Ok(SearchResults {
@@ -138,6 +145,13 @@ pub fn search(root: &str, query: &str, options: SearchOptions) -> AppResult<Sear
         if truncated {
             break;
         }
+        if cancel
+            .as_ref()
+            .map(|flag| flag.load(Ordering::SeqCst))
+            .unwrap_or(false)
+        {
+            break;
+        }
         let entry = match entry {
             Ok(e) => e,
             Err(_) => continue,
@@ -155,6 +169,7 @@ pub fn search(root: &str, query: &str, options: SearchOptions) -> AppResult<Sear
                 matcher: &matcher,
                 matches: &mut matches,
                 cap_remaining: limit.saturating_sub(total as usize),
+                cancel: cancel.as_deref(),
             },
         );
         if res.is_err() {
@@ -185,6 +200,7 @@ struct CollectSink<'a> {
     matcher: &'a RegexMatcher,
     matches: &'a mut Vec<SearchMatch>,
     cap_remaining: usize,
+    cancel: Option<&'a AtomicBool>,
 }
 
 impl<'a> grep_searcher::Sink for CollectSink<'a> {
@@ -196,6 +212,13 @@ impl<'a> grep_searcher::Sink for CollectSink<'a> {
         mat: &SinkMatch<'_>,
     ) -> Result<bool, Self::Error> {
         if self.cap_remaining == 0 {
+            return Ok(false);
+        }
+        if self
+            .cancel
+            .map(|flag| flag.load(Ordering::SeqCst))
+            .unwrap_or(false)
+        {
             return Ok(false);
         }
         let line = mat.line_number().unwrap_or(0);

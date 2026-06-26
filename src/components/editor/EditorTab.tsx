@@ -50,7 +50,8 @@ interface EditorTabProps {
   /** Preview tab (file outside any project): read/write via the roots-bypassing
    *  preview commands and skip project-only features (git gutter, HEAD diff). */
   preview?: boolean;
-  /** Rendered inside MarkdownPreview's source view, which owns its own header —
+  previewGrantId?: string;
+  /** Rendered inside MarkdownPreview's source view, which owns its own header ,
    *  suppress the standalone preview toolbar to avoid doubling it up. */
   embedded?: boolean;
 }
@@ -58,7 +59,7 @@ interface EditorTabProps {
 /**
  * Marks dispatches that originate from the agent-driven external reload path
  * (or from a user-confirmed reload). The updateListener uses this to know it
- * should NOT flag the buffer dirty — the change came from disk, not the user.
+ * should NOT flag the buffer dirty , the change came from disk, not the user.
  */
 const ExternalReload = Annotation.define<true>();
 
@@ -68,6 +69,7 @@ export function EditorTab({
   projectId,
   projectKey,
   preview = false,
+  previewGrantId,
   embedded = false,
 }: EditorTabProps) {
   const { t } = useTranslation();
@@ -94,7 +96,7 @@ export function EditorTab({
   const clearStatus = useEditorStatusStore((s) => s.clear);
   // Re-fetch HEAD for the change gutter whenever this project's git state moves
   // (commit, checkout, stage). The object identity changes on every refresh.
-  // Preview files live outside any repo — skip git entirely.
+  // Preview files live outside any repo , skip git entirely.
   const gitInfo = useGitStore((s) =>
     !preview && projectId ? s.byProject[projectId] : undefined,
   );
@@ -115,8 +117,11 @@ export function EditorTab({
 
     (async () => {
       try {
+        if (preview && !previewGrantId) {
+          throw new Error("preview grant missing");
+        }
         const text = preview
-          ? await fsApi.readPreviewText(path, 25 * 1024 * 1024)
+          ? await fsApi.readPreviewText(previewGrantId!, 25 * 1024 * 1024)
           : await fsApi.readFileText(path, 25 * 1024 * 1024);
         if (cancelled) return;
         // Heuristic binary detection on the first 8 KiB
@@ -212,7 +217,7 @@ export function EditorTab({
               // Skip dirty-marking when the change came from disk (agent edited
               // the file from a terminal tab and the reconciler is silently
               // syncing the buffer). The dot on the tab is reserved for the
-              // user's own edits — AI saves are already on disk.
+              // user's own edits , AI saves are already on disk.
               const isExternal = u.transactions.some((tr) =>
                 tr.annotation(ExternalReload),
               );
@@ -243,7 +248,7 @@ export function EditorTab({
         publishStatus(view.state);
 
         // Seed the change gutter with the file's committed (HEAD) text. Preview
-        // files aren't in a repo — skip the HEAD lookup entirely.
+        // files aren't in a repo , skip the HEAD lookup entirely.
         if (!preview) {
           void gitApi
             .fileHeadContent(path)
@@ -273,7 +278,7 @@ export function EditorTab({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabId, path]);
 
-  // Reconfigure the theme in place on a theme/font change — no view rebuild,
+  // Reconfigure the theme in place on a theme/font change , no view rebuild,
   // so undo history, cursor, and scroll position survive.
   useEffect(() => {
     const view = viewRef.current;
@@ -291,7 +296,7 @@ export function EditorTab({
   useEffect(() => {
     if (pendingGotoLine == null) return;
     const view = viewRef.current;
-    if (!view) return; // not built yet — the creation effect will consume it
+    if (!view) return; // not built yet , the creation effect will consume it
     const line = usePendingGotoStore.getState().consume(tabId);
     if (line && line > 0) requestAnimationFrame(() => gotoLine(view, line));
   }, [pendingGotoLine, tabId]);
@@ -309,7 +314,7 @@ export function EditorTab({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gitInfo, path]);
 
-  // Apply a disk reload requested by the reconciler — either a silent reload
+  // Apply a disk reload requested by the reconciler , either a silent reload
   // (external change while this buffer was clean) or the user clicking
   // "Recarregar" on the conflict banner. Keyed on reloadNonce so it fires once
   // per request without rebuilding the view.
@@ -326,12 +331,12 @@ export function EditorTab({
         anchor: Math.min(sel.anchor, next.length),
         head: Math.min(sel.head, next.length),
       },
-      // Tag this transaction so the updateListener skips dirty marking — the
+      // Tag this transaction so the updateListener skips dirty marking , the
       // change came from disk (agent edit / confirmed reload), not the user.
       annotations: ExternalReload.of(true),
     });
     setLoaded(tabId, next); // resets baseline + clears the external flag
-    // The buffer now matches disk again — make sure the tab dot is cleared,
+    // The buffer now matches disk again , make sure the tab dot is cleared,
     // even if the user had pending edits before clicking "Reload".
     updateTab(projectKey, tabId, { dirty: false });
     setSavingNotice(t("editor.reloaded"));
@@ -343,7 +348,8 @@ export function EditorTab({
     setSaving(tabId, true);
     try {
       if (preview) {
-        await fsApi.writePreviewText(path, content);
+        if (!previewGrantId) throw new Error("preview grant missing");
+        await fsApi.writePreviewText(previewGrantId, content);
       } else {
         await fsApi.writeFileText(path, content);
       }
@@ -421,7 +427,7 @@ export function EditorTab({
         />
       ) : null}
       {preview && !embedded ? (
-        <PreviewToolbar path={path} />
+        <PreviewToolbar path={path} grantId={previewGrantId} />
       ) : (
         <EditorBreadcrumbs tabId={tabId} fileName={basename(path)} />
       )}

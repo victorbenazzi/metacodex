@@ -10,7 +10,7 @@ import type { Theme } from "./types";
  *
  * Shiki's bundle is ~MB; importing it from a module that's part of the boot
  * graph would bloat first paint, so we only `import('shiki')` from the lazy
- * `ensureHighlighter()` path — triggered by the first ``` block to render.
+ * `ensureHighlighter()` path, triggered by the first ``` block to render.
  */
 
 let highlighterPromise: Promise<Highlighter> | null = null;
@@ -101,8 +101,7 @@ export async function highlightToHtml(
 
 /**
  * Token-level variant of `highlightToHtml` for consumers that render their own
- * DOM (the agent chat's streamdown code plugin). Shares the same engine,
- * language cache and token-driven theme.
+ * DOM. Shares the same engine, language cache and token-driven theme.
  */
 export async function highlightToTokens(
   code: string,

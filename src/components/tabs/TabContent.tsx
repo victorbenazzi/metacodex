@@ -16,7 +16,7 @@ interface TabContentProps {
   /**
    * Every project's tab bucket. We render tabs from ALL projects so that
    * PTYs/xterm sessions and CodeMirror buffers survive switching the active
-   * project — only the active project's active tab is shown; everything else
+   * project , only the active project's active tab is shown; everything else
    * stays mounted with display:none.
    */
   allBuckets: Record<string, TabsBucketLike>;
@@ -61,6 +61,7 @@ function renderTab(tab: Tab, isVisible: boolean, projectKey: string) {
           projectId={tab.projectId ?? ""}
           projectKey={projectKey}
           preview={preview}
+          previewGrantId={tab.previewGrantId}
         />
       );
     case "diff":
@@ -80,12 +81,13 @@ function renderTab(tab: Tab, isVisible: boolean, projectKey: string) {
           projectKey={projectKey}
           mode={tab.mode}
           preview={preview}
+          previewGrantId={tab.previewGrantId}
         />
       );
     case "image":
-      return <ImagePreview path={tab.path} preview={preview} />;
+      return <ImagePreview path={tab.path} preview={preview} previewGrantId={tab.previewGrantId} />;
     case "pdf":
-      return <PdfPreview path={tab.path} preview={preview} />;
+      return <PdfPreview path={tab.path} preview={preview} previewGrantId={tab.previewGrantId} />;
     default:
       return null;
   }
@@ -95,7 +97,7 @@ function renderTab(tab: Tab, isVisible: boolean, projectKey: string) {
  * Render-all-hide-inactive: every tab across EVERY project stays mounted with
  * `display: none` so xterm/PTY sessions and CodeMirror state survive both tab
  * switches AND project switches. The whole point of metacodex is multi-project
- * orchestration — an AI agent running in project A must keep working when the
+ * orchestration , an AI agent running in project A must keep working when the
  * user jumps to project B and back.
  */
 export function TabContent({ allBuckets, activeProjectKey, activeTabId }: TabContentProps) {

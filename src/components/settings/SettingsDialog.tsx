@@ -13,8 +13,6 @@ import {
   Info,
   LayoutPanelLeft,
   Bell,
-  Bot,
-  Boxes,
   X,
   Sun,
   Moon,
@@ -52,12 +50,8 @@ import {
   type CliDetectionStatus,
 } from "@/features/terminal/cli-detection";
 import { useSettingsDataStore } from "@/features/settings/settings.data.store";
-import { useSettingsStore, type SettingsTab } from "@/features/settings/settings.store";
-import { useAgentRuntimeStore } from "@/features/agent/runtime.store";
 import {
   DEFAULT_TERMINAL_FONT_FAMILY,
-  isModelEnabled,
-  modelKey,
   type ExplorerIconStyle,
   type LayoutMode,
   type TerminalCursorStyle,
@@ -92,8 +86,6 @@ type CategoryId =
   | "notifications"
   | "shortcuts"
   | "advanced"
-  | "agent"
-  | "agent-models"
   | "cli"
   | "about";
 
@@ -103,26 +95,18 @@ interface Category {
   icon: LucideIcon;
 }
 
-/** The two top-level tabs (mirrors the TitleBar's Agent | Code identity):
- *  workspace settings vs everything that drives the Agent View. */
-const CATEGORIES_BY_TAB: Record<SettingsTab, Category[]> = {
-  code: [
-    { id: "general", labelKey: "settings.nav.general", icon: Sliders },
-    { id: "appearance", labelKey: "settings.nav.appearance", icon: Palette },
-    { id: "interface", labelKey: "settings.nav.interface", icon: LayoutPanelLeft },
-    { id: "editor", labelKey: "settings.nav.editor", icon: FileCode },
-    { id: "terminal", labelKey: "settings.nav.terminal", icon: SquareTerminal },
-    { id: "notifications", labelKey: "settings.nav.notifications", icon: Bell },
-    { id: "shortcuts", labelKey: "settings.nav.shortcuts", icon: Keyboard },
-    { id: "advanced", labelKey: "settings.nav.advanced", icon: Gauge },
-    { id: "cli", labelKey: "settings.nav.cli", icon: Terminal },
-    { id: "about", labelKey: "settings.nav.about", icon: Info },
-  ],
-  agent: [
-    { id: "agent", labelKey: "agent.settings.navLabel", icon: Bot },
-    { id: "agent-models", labelKey: "agent.settings.navModels", icon: Boxes },
-  ],
-};
+const CATEGORIES: Category[] = [
+  { id: "general", labelKey: "settings.nav.general", icon: Sliders },
+  { id: "appearance", labelKey: "settings.nav.appearance", icon: Palette },
+  { id: "interface", labelKey: "settings.nav.interface", icon: LayoutPanelLeft },
+  { id: "editor", labelKey: "settings.nav.editor", icon: FileCode },
+  { id: "terminal", labelKey: "settings.nav.terminal", icon: SquareTerminal },
+  { id: "notifications", labelKey: "settings.nav.notifications", icon: Bell },
+  { id: "shortcuts", labelKey: "settings.nav.shortcuts", icon: Keyboard },
+  { id: "advanced", labelKey: "settings.nav.advanced", icon: Gauge },
+  { id: "cli", labelKey: "settings.nav.cli", icon: Terminal },
+  { id: "about", labelKey: "settings.nav.about", icon: Info },
+];
 
 /** Curated monospace families. Stored value is the CSS font stack. */
 const EDITOR_FONT_OPTIONS: SelectOption[] = [
@@ -151,16 +135,7 @@ function withCurrent(options: SelectOption[], value: string): SelectOption[] {
 
 export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const { t } = useTranslation();
-  const tab = useSettingsStore((s) => s.tab);
-  const setTab = useSettingsStore((s) => s.setTab);
   const [selected, setSelected] = useState<CategoryId>("general");
-
-  // Keep the selected category inside the active tab (also covers opening
-  // straight onto the Agent tab via the Agent view's gear).
-  useEffect(() => {
-    const categories = CATEGORIES_BY_TAB[tab];
-    if (!categories.some((c) => c.id === selected)) setSelected(categories[0].id);
-  }, [tab, selected]);
 
   return (
     <RD.Root open={open} onOpenChange={onOpenChange}>
@@ -186,16 +161,6 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               <span className="editorial-caps">{t("settings.header")}</span>
               <span className="font-mono text-label text-muted-soft">metacodex</span>
             </div>
-            <div className="absolute left-1/2 -translate-x-1/2">
-              <Segmented
-                value={tab}
-                onChange={setTab}
-                options={[
-                  { id: "code" as SettingsTab, label: t("settings.tab.code"), icon: FileCode },
-                  { id: "agent" as SettingsTab, label: t("settings.tab.agent"), icon: Bot },
-                ]}
-              />
-            </div>
             <RD.Close asChild>
               <IconButton aria-label={t("settings.close")}>
                 <Icon icon={X} size={13} />
@@ -205,7 +170,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
           <div className="grid h-[calc(100%-48px)] grid-cols-[200px_1fr]">
             <aside className="flex flex-col gap-[1px] overflow-y-auto border-r border-hairline-soft bg-canvas-soft p-[10px]">
-              {CATEGORIES_BY_TAB[tab].map((c) => (
+              {CATEGORIES.map((c) => (
                 <SidebarRow
                   key={c.id}
                   category={c}
@@ -224,8 +189,6 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               {selected === "notifications" && <NotificationsPane />}
               {selected === "shortcuts" && <ShortcutsPane />}
               {selected === "advanced" && <AdvancedPane />}
-              {selected === "agent" && <AgentPane />}
-              {selected === "agent-models" && <AgentModelsPane />}
               {selected === "cli" && <CliRegistryPane />}
               {selected === "about" && <AboutPane />}
             </section>
@@ -519,7 +482,7 @@ function InterfacePane() {
   );
 }
 
-/** Compact pill switch — visual style matches the rest of the settings dialog
+/** Compact pill switch, visual style matches the rest of the settings dialog
  *  (no Radix dependency, no animation library; a plain accessible button). */
 function Switch({
   checked,
@@ -869,301 +832,6 @@ function RangeShortcutRow({ command }: { command: CommandDef }) {
         <Kbd keys={["Mod", "9"]} />
       </span>
     </li>
-  );
-}
-
-function AgentPane() {
-  const { t } = useTranslation();
-  const status = useAgentRuntimeStore((s) => s.status);
-  const providers = useAgentRuntimeStore((s) => s.providers);
-  const starting = useAgentRuntimeStore((s) => s.starting);
-  const loadingModels = useAgentRuntimeStore((s) => s.loadingModels);
-  const runtimeError = useAgentRuntimeStore((s) => s.error);
-  const start = useAgentRuntimeStore((s) => s.start);
-  const loadModels = useAgentRuntimeStore((s) => s.loadModels);
-  const setCredentials = useAgentRuntimeStore((s) => s.setCredentials);
-
-  const agent = useSettingsDataStore((s) => s.settings.agent);
-  const update = useSettingsDataStore((s) => s.update);
-
-  const [key, setKey] = useState("");
-  const [savingKey, setSavingKey] = useState(false);
-
-  // Spin up the runtime + load the model catalog when this pane opens.
-  useEffect(() => {
-    void (async () => {
-      await start();
-      await loadModels();
-    })();
-  }, [start, loadModels]);
-
-  const provider = providers.find((p) => p.id === agent.providerId) ?? providers[0] ?? null;
-  const modelOptions: SelectOption[] = (provider?.models ?? []).map((m) => ({
-    value: m.id,
-    label: m.name,
-  }));
-  const selectedModel = agent.modelId || provider?.defaultModel || "";
-
-  const saveKey = async () => {
-    if (!key) return;
-    setSavingKey(true);
-    try {
-      await setCredentials(agent.providerId || "opencode-go", key);
-      setKey("");
-      await loadModels();
-    } finally {
-      setSavingKey(false);
-    }
-  };
-
-  return (
-    <div>
-      <PaneHeader title={t("agent.settings.title")} description={t("agent.settings.description")} />
-
-      <Row
-        label={t("agent.settings.runtime")}
-        hint={
-          status.running
-            ? t("agent.settings.runtimeHealthy", { version: status.version ?? "" })
-            : starting
-              ? t("agent.settings.runtimeStarting")
-              : t("agent.settings.runtimeStopped")
-        }
-      >
-        <div className="flex items-center gap-[8px]">
-          <span
-            className={cn(
-              "inline-block h-[8px] w-[8px] rounded-pill",
-              status.running ? "bg-success" : "bg-muted-soft",
-            )}
-          />
-          <button
-            type="button"
-            onClick={() => void start()}
-            disabled={starting}
-            className="inline-flex h-[30px] items-center gap-[6px] rounded-sm border border-hairline-strong px-[10px] text-caption text-ink hover:bg-surface-strong/45 disabled:opacity-40"
-          >
-            <Icon
-              icon={starting ? Loader2 : RefreshCw}
-              size={13}
-              className={starting ? "animate-spin" : ""}
-            />
-            {t("agent.settings.restart")}
-          </button>
-        </div>
-      </Row>
-
-      <OpencodeCliRow />
-
-      <Row
-        label={t("agent.settings.apiKey")}
-        hint={
-          providers.length > 0
-            ? t("agent.settings.apiKeyDetectedHint")
-            : t("agent.settings.apiKeyHint")
-        }
-      >
-        <div className="flex items-center gap-[6px]">
-          <input
-            type="password"
-            value={key}
-            onChange={(e) => setKey(e.target.value)}
-            placeholder="sk-..."
-            autoComplete="off"
-            className="h-[30px] w-[200px] rounded-sm border border-hairline-strong bg-surface-card px-[8px] text-caption text-ink outline-none focus:border-ink"
-          />
-          <button
-            type="button"
-            onClick={() => void saveKey()}
-            disabled={!key || savingKey}
-            className="inline-flex h-[30px] items-center rounded-sm border border-ink bg-ink px-[12px] text-caption text-on-primary disabled:opacity-40"
-          >
-            {t("agent.settings.save")}
-          </button>
-        </div>
-      </Row>
-
-      <Row label={t("agent.settings.defaultModel")} hint={t("agent.settings.defaultModelHint")}>
-        {modelOptions.length > 0 ? (
-          <Select
-            value={selectedModel}
-            options={modelOptions}
-            ariaLabel={t("agent.settings.defaultModel")}
-            onValueChange={(v) =>
-              update("agent", { providerId: provider?.id ?? "opencode-go", modelId: v })
-            }
-          />
-        ) : (
-          <span className="text-caption text-muted">
-            {loadingModels ? t("agent.settings.loadingModels") : t("agent.settings.noModels")}
-          </span>
-        )}
-      </Row>
-
-      <Row label={t("agent.settings.visionModel")} hint={t("agent.settings.visionModelHint")}>
-        <VisionModelSelect />
-      </Row>
-
-      {runtimeError ? <p className="mt-[12px] text-caption text-danger">{runtimeError}</p> : null}
-    </div>
-  );
-}
-
-/** Where the opencode binary comes from: auto-detected on the login-shell
- *  PATH (same probe the CLI Registry uses). Surfaces the detection so the
- *  user knows nothing needs configuring — or exactly what to install. */
-function OpencodeCliRow() {
-  const { t } = useTranslation();
-  const detections = useCliDetections();
-  const cli = DEFAULT_CLI_REGISTRY.find((c) => c.id === "opencode")!;
-  const det = cliDetectionFor(cli, detections);
-
-  const hint =
-    det.status === "installed"
-      ? (det.path ?? t("agent.settings.cliDetectedNoPath"))
-      : det.status === "missing"
-        ? t("agent.settings.cliMissing", { command: cli.installCommand })
-        : t("agent.settings.cliChecking");
-
-  return (
-    <Row label={t("agent.settings.cliBinary")} hint={hint}>
-      <span className="inline-flex h-[30px] items-center gap-[7px] text-caption text-muted">
-        {det.status === "checking" ? (
-          <Icon icon={Loader2} size={12} className="animate-spin" />
-        ) : (
-          <span
-            className={cn(
-              "inline-block h-[8px] w-[8px] rounded-pill",
-              det.status === "installed" ? "bg-success" : "bg-danger",
-            )}
-          />
-        )}
-        {det.status === "installed"
-          ? t("agent.settings.cliAutoDetected")
-          : det.status === "missing"
-            ? t("agent.settings.cliNotFound")
-            : null}
-      </span>
-    </Row>
-  );
-}
-
-/** Vision-relay model: every catalog model that can see images, across
- *  providers, stored as `visionProviderId` + `visionModelId`. */
-function VisionModelSelect() {
-  const { t } = useTranslation();
-  const providers = useAgentRuntimeStore((s) => s.providers);
-  const agent = useSettingsDataStore((s) => s.settings.agent);
-  const update = useSettingsDataStore((s) => s.update);
-
-  const options: SelectOption[] = providers.flatMap((p) =>
-    p.models
-      .filter((m) => m.attachment)
-      .map((m) => ({ value: modelKey(p.id, m.id), label: `${m.name} (${p.name})` })),
-  );
-  if (options.length === 0) {
-    return <span className="text-caption text-muted">{t("agent.settings.noModels")}</span>;
-  }
-  const current = modelKey(agent.visionProviderId, agent.visionModelId);
-  return (
-    <Select
-      value={current}
-      options={withCurrent(options, current)}
-      ariaLabel={t("agent.settings.visionModel")}
-      onValueChange={(v) => {
-        const slash = v.indexOf("/");
-        if (slash === -1) return;
-        update("agent", {
-          visionProviderId: v.slice(0, slash),
-          visionModelId: v.slice(slash + 1),
-        });
-      }}
-    />
-  );
-}
-
-/** Which catalog models the composer's picker offers. Default rule: only the
- *  opencode-go provider; explicit toggles override per model. */
-function AgentModelsPane() {
-  const { t } = useTranslation();
-  const providers = useAgentRuntimeStore((s) => s.providers);
-  const loadingModels = useAgentRuntimeStore((s) => s.loadingModels);
-  const loadModels = useAgentRuntimeStore((s) => s.loadModels);
-  const start = useAgentRuntimeStore((s) => s.start);
-  const enabledModels = useSettingsDataStore((s) => s.settings.agent.enabledModels);
-  const update = useSettingsDataStore((s) => s.update);
-
-  useEffect(() => {
-    void (async () => {
-      await start();
-      await loadModels();
-    })();
-  }, [start, loadModels]);
-
-  const setEnabled = (providerId: string, modelId: string, enabled: boolean) => {
-    update("agent", {
-      enabledModels: { ...enabledModels, [modelKey(providerId, modelId)]: enabled },
-    });
-  };
-
-  const setProvider = (providerId: string, enabled: boolean) => {
-    const next = { ...enabledModels };
-    for (const p of providers) {
-      if (p.id !== providerId) continue;
-      for (const m of p.models) next[modelKey(p.id, m.id)] = enabled;
-    }
-    update("agent", { enabledModels: next });
-  };
-
-  return (
-    <div>
-      <PaneHeader
-        title={t("agent.settings.modelsTitle")}
-        description={t("agent.settings.modelsDescription")}
-      />
-      {providers.length === 0 ? (
-        <span className="text-caption text-muted">
-          {loadingModels ? t("agent.settings.loadingModels") : t("agent.settings.noModels")}
-        </span>
-      ) : (
-        providers.map((p) => {
-          const allOn = p.models.every((m) => isModelEnabled(enabledModels, p.id, m.id));
-          return (
-            <section key={p.id} className="mb-[18px]">
-              <div className="mb-[4px] flex items-center justify-between">
-                <h3 className="editorial-caps">{p.name}</h3>
-                <button
-                  type="button"
-                  onClick={() => setProvider(p.id, !allOn)}
-                  className="text-label text-muted hover:text-ink"
-                >
-                  {allOn ? t("agent.settings.disableAll") : t("agent.settings.enableAll")}
-                </button>
-              </div>
-              {p.models.map((m) => (
-                <Row
-                  key={m.id}
-                  label={m.name}
-                  hint={[
-                    m.attachment ? t("agent.settings.capVision") : null,
-                    m.reasoning ? t("agent.settings.capReasoning") : null,
-                    m.variants.length > 0 ? t("agent.settings.capVariants") : null,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-                >
-                  <Switch
-                    checked={isModelEnabled(enabledModels, p.id, m.id)}
-                    onChange={(next) => setEnabled(p.id, m.id, next)}
-                    ariaLabel={t("agent.settings.toggleModelAria", { name: m.name })}
-                  />
-                </Row>
-              ))}
-            </section>
-          );
-        })
-      )}
-    </div>
   );
 }
 

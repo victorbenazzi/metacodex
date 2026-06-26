@@ -16,7 +16,7 @@ pub struct GitInfo {
     pub behind: usize,
     /// Absolute path → single-char status code: "M"|"A"|"D"|"R"|"?"|"C"|"!"
     pub statuses: HashMap<String, String>,
-    pub stats: GitStats,
+    pub stats: Option<GitStats>,
 }
 
 #[derive(Debug, Clone, Default, Serialize)]
@@ -35,10 +35,10 @@ pub struct GitFileStats {
     pub deletions: usize,
 }
 
-pub fn git_info(root: &str) -> AppResult<Option<GitInfo>> {
+pub fn git_info(root: &str, include_stats: bool) -> AppResult<Option<GitInfo>> {
     let repo = match Repository::discover(Path::new(root)) {
         Ok(r) => r,
-        Err(_) => return Ok(None), // not a git repo — return None (frontend just hides)
+        Err(_) => return Ok(None), // not a git repo , return None (frontend just hides)
     };
 
     let workdir = match repo.workdir() {
@@ -87,7 +87,7 @@ pub fn git_info(root: &str) -> AppResult<Option<GitInfo>> {
         }
     }
 
-    let stats = diff_stats(&repo, &workdir);
+    let stats = include_stats.then(|| diff_stats(&repo, &workdir));
 
     Ok(Some(GitInfo {
         branch,
@@ -108,7 +108,7 @@ fn diff_stats(repo: &Repository, workdir: &Path) -> GitStats {
     let mut opts = DiffOptions::new();
     opts.include_untracked(true)
         .recurse_untracked_dirs(true)
-        .show_untracked_content(true)
+        .show_untracked_content(false)
         .max_size(DIFF_STATS_MAX_BLOB_BYTES);
 
     let diff = match repo.diff_tree_to_workdir_with_index(tree.as_ref(), Some(&mut opts)) {
@@ -176,7 +176,7 @@ fn status_code(s: Status) -> &'static str {
 /// Return the committed (HEAD) contents of `path` as text, or `None` when the
 /// file is untracked, the path is outside a repo, there are no commits yet, or
 /// the blob isn't valid text. Used to diff an open buffer against HEAD for the
-/// editor's change gutter — read-only, never mutates anything.
+/// editor's change gutter , read-only, never mutates anything.
 pub fn file_head_content(path: &str) -> AppResult<Option<String>> {
     let p = Path::new(path);
     let repo = match Repository::discover(p) {

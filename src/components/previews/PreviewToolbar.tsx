@@ -5,26 +5,34 @@ import { useTranslation } from "react-i18next";
 import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/cn";
 
+interface PreviewFileRef {
+  path: string;
+  grantId: string;
+}
+
 /** Bridge to the AppShell-owned "send to project" flow (mirrors `sendToTerminal`). */
-function sendToProject(path: string) {
+function sendToProject(file: PreviewFileRef) {
   (
-    window as unknown as { __metacodex?: { sendToProject?: (p: string) => void } }
-  ).__metacodex?.sendToProject?.(path);
+    window as unknown as { __metacodex?: { sendToProject?: (file: PreviewFileRef) => void } }
+  ).__metacodex?.sendToProject?.(file);
 }
 
 /** "Send to project" action, used inside preview tab headers. */
 export function SendToProjectButton({
   path,
+  grantId,
   className,
 }: {
   path: string;
+  grantId?: string;
   className?: string;
 }) {
   const { t } = useTranslation();
+  if (!grantId) return null;
   return (
     <button
       type="button"
-      onClick={() => sendToProject(path)}
+      onClick={() => sendToProject({ path, grantId })}
       className={cn(
         "inline-flex h-[22px] items-center gap-[6px] rounded-xs px-[8px] text-label text-muted",
         "hover:bg-surface-strong/55 hover:text-ink",
@@ -42,7 +50,15 @@ export function SendToProjectButton({
  * (the code editor). Shows a "Preview" badge (signals the file is unregistered
  * and ephemeral) plus the send-to-project action. `right` slots extra controls.
  */
-export function PreviewToolbar({ path, right }: { path: string; right?: ReactNode }) {
+export function PreviewToolbar({
+  path,
+  grantId,
+  right,
+}: {
+  path: string;
+  grantId?: string;
+  right?: ReactNode;
+}) {
   const { t } = useTranslation();
   return (
     <header
@@ -52,7 +68,7 @@ export function PreviewToolbar({ path, right }: { path: string; right?: ReactNod
       <span className="editorial-caps text-muted">{t("preview.badge")}</span>
       <div className="flex items-center gap-[6px]">
         {right}
-        <SendToProjectButton path={path} />
+        <SendToProjectButton path={path} grantId={grantId} />
       </div>
     </header>
   );

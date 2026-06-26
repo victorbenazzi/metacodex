@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader};
+use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Stdio};
 use std::sync::Arc;
@@ -8,6 +8,7 @@ use std::time::{Duration, Instant};
 use parking_lot::Mutex;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
+use tauri_plugin_dialog::{DialogExt, FilePath};
 
 /// In-flight `git clone` processes keyed by op_id, so the UI can abort a clone
 /// that's hanging on a slow network. Managed in `lib.rs`.
@@ -15,14 +16,53 @@ use tauri::{AppHandle, Emitter, Manager};
 pub struct CloneRegistry(Mutex<HashMap<String, Child>>);
 
 use crate::error::{AppError, AppResult};
+use crate::directory_grants::{DirectoryGrant, DirectoryGrants};
 use crate::events::{GitCloneProgressPayload, EV_GIT_CLONE_PROGRESS};
 use crate::git::{file_head_content, git_info, GitInfo};
 use crate::projects::ProjectsCache;
 use crate::util::paths;
 use crate::util::process::silent_command;
 
+fn dialog_path_to_string(path: FilePath) -> AppResult<String> {
+    let path = path
+        .into_path()
+        .map_err(|e| AppError::Other(format!("dialog path: {e}")))?;
+    Ok(path.to_string_lossy().to_string())
+}
+
 #[tauri::command]
-pub async fn git_status(app: AppHandle, root: String) -> AppResult<Option<GitInfo>> {
+pub async fn pick_clone_parent_dir(
+    title: String,
+    default_path: String,
+    app: AppHandle,
+) -> AppResult<Option<DirectoryGrant>> {
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    let mut dialog = app.dialog().file().set_title(title);
+    if !default_path.trim().is_empty() {
+        dialog = dialog.set_directory(default_path);
+    }
+    dialog.pick_folder(move |picked| {
+        let _ = tx.send(picked);
+    });
+    let picked = rx
+        .await
+        .map_err(|e| AppError::Other(format!("dialog cancelled: {e}")))?;
+    let Some(path) = picked else {
+        return Ok(None);
+    };
+    let path = dialog_path_to_string(path)?;
+    if !Path::new(&path).is_dir() {
+        return Err(AppError::NotFound(format!("not a directory: {path}")));
+    }
+    Ok(Some(app.state::<Arc<DirectoryGrants>>().grant_path(path)))
+}
+
+#[tauri::command]
+pub async fn git_status(
+    app: AppHandle,
+    root: String,
+    include_stats: Option<bool>,
+) -> AppResult<Option<GitInfo>> {
     {
         let cache = app.state::<Arc<ProjectsCache>>();
         let roots = cache.project_roots();
@@ -33,7 +73,8 @@ pub async fn git_status(app: AppHandle, root: String) -> AppResult<Option<GitInf
         }
         paths::ensure_within_roots(&root, &roots)?;
     }
-    tokio::task::spawn_blocking(move || git_info(&root))
+    let include_stats = include_stats.unwrap_or(false);
+    tokio::task::spawn_blocking(move || git_info(&root, include_stats))
         .await
         .map_err(|e| AppError::Other(format!("join: {e}")))?
 }
@@ -248,13 +289,13 @@ fn default_worktree_path(root: &str, branch_name: &str) -> PathBuf {
             _ => '-',
         })
         .collect();
-    // Windows refuses names ending in `.` or space — strip both.
+    // Windows refuses names ending in `.` or space , strip both.
     slug = slug.trim_end_matches(['.', ' ']).to_string();
     if slug.is_empty() {
         slug = "wt".into();
     }
     // Avoid DOS reserved device names (CON, PRN, …). Prefix when the slug
-    // would collide — leading underscore is legal on every FS we target.
+    // would collide , leading underscore is legal on every FS we target.
     let upper = slug.to_uppercase();
     let reserved = matches!(
         upper.as_str(),
@@ -346,7 +387,7 @@ pub async fn git_worktree_add(
             std::fs::create_dir_all(parent)
                 .map_err(|e| AppError::Other(format!("create_dir_all: {e}")))?;
         }
-        // Detect whether the branch already exists — if so, don't pass `-b`.
+        // Detect whether the branch already exists , if so, don't pass `-b`.
         let branch_exists = run_git(
             &root_clone,
             &[
@@ -452,7 +493,7 @@ fn valid_clone_url(url: &str) -> bool {
     }
     if let Some(colon) = url.find(':') {
         // A "//" right after the colon means a scheme form (e.g. file://) that
-        // wasn't in the allow-list above — reject. scp-style has no "//".
+        // wasn't in the allow-list above , reject. scp-style has no "//".
         if url[colon + 1..].starts_with("//") {
             return false;
         }
@@ -490,11 +531,11 @@ pub async fn git_clone(
     app: AppHandle,
     op_id: String,
     url: String,
-    parent_dir: String,
+    parent_grant_id: String,
     folder_name: String,
 ) -> AppResult<String> {
-    // Validation — destination lives outside any registered root, so we can't
-    // use ensure_within_roots. Tight argument checks instead.
+    // Destination lives outside any registered root, so the parent directory
+    // must come from a backend-issued directory grant.
     let url_trimmed = url.trim().to_string();
     if !valid_clone_url(&url_trimmed) {
         return Err(AppError::Other("invalid url".into()));
@@ -503,6 +544,9 @@ pub async fn git_clone(
         return Err(AppError::Other("invalid folder name".into()));
     }
     let folder = folder_name.trim().to_string();
+    let parent_dir = app
+        .state::<Arc<DirectoryGrants>>()
+        .resolve(&parent_grant_id)?;
     let parent = PathBuf::from(&parent_dir);
     if !parent.is_absolute() {
         return Err(AppError::Other("parent_dir must be absolute".into()));
@@ -532,7 +576,7 @@ pub async fn git_clone(
             .arg(dest_for_thread.as_os_str())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            // Disable interactive credential prompts — they'd hang our pipe forever.
+            // Disable interactive credential prompts , they'd hang our pipe forever.
             // The user's credential helper / SSH agent still works; only the
             // tty-prompt fallback is suppressed.
             .env("GIT_TERMINAL_PROMPT", "0")
@@ -543,7 +587,7 @@ pub async fn git_clone(
             .map_err(|e| AppError::Other(format!("git clone spawn: {e}")))?;
 
         // Read stderr line-by-line. `git clone --progress` separates progress
-        // updates with carriage returns, NOT newlines — BufRead::read_until('\r')
+        // updates with carriage returns, NOT newlines , BufRead::read_until('\r')
         // gives us each progress tick. We aggregate the last raw line so we can
         // surface it in the error message on failure.
         let stderr = child
@@ -561,20 +605,13 @@ pub async fn git_clone(
         let mut last_percent: i32 = -1;
         let mut full_stderr = String::new();
         let mut chunk: Vec<u8> = Vec::with_capacity(256);
-
-        loop {
-            chunk.clear();
-            let n = match reader.read_until(b'\n', &mut chunk) {
-                Ok(0) => break,
-                Ok(n) => n,
-                Err(_) => break,
-            };
-            // Progress ticks arrive separated by \r; split on either.
-            let raw = String::from_utf8_lossy(&chunk[..n]);
-            for part in raw.split(['\r', '\n']) {
-                let line = part.trim();
+        let mut one = [0u8; 1];
+        {
+            let mut process_line = |bytes: &[u8]| {
+                let raw = String::from_utf8_lossy(bytes);
+                let line = raw.trim();
                 if line.is_empty() {
-                    continue;
+                    return;
                 }
                 full_stderr.push_str(line);
                 full_stderr.push('\n');
@@ -582,7 +619,7 @@ pub async fn git_clone(
                     let same_phase = phase == last_phase;
                     let same_pct = (percent as i32) == last_percent;
                     let elapsed = last_emit.elapsed();
-                    // Always emit phase changes and 100%; otherwise throttle ~100ms.
+                    // Always emit phase changes and 100%; otherwise throttle roughly 100ms.
                     let should_emit = !same_phase
                         || percent == 100
                         || (!same_pct && elapsed >= Duration::from_millis(100));
@@ -600,11 +637,32 @@ pub async fn git_clone(
                         );
                     }
                 }
+            };
+
+            loop {
+                match reader.read(&mut one) {
+                    Ok(0) => break,
+                    Ok(_) if one[0] == b'\r' || one[0] == b'\n' => {
+                        process_line(&chunk);
+                        chunk.clear();
+                    }
+                    Ok(_) => {
+                        chunk.push(one[0]);
+                        if chunk.len() >= 4096 {
+                            process_line(&chunk);
+                            chunk.clear();
+                        }
+                    }
+                    Err(_) => break,
+                }
+            }
+            if !chunk.is_empty() {
+                process_line(&chunk);
             }
         }
 
         // Reclaim the child from the registry to reap it. If it's already gone,
-        // git_clone_cancel removed and killed it — report cancellation.
+        // git_clone_cancel removed and killed it , report cancellation.
         let mut child = match registry.0.lock().remove(&op_id_clone) {
             Some(c) => c,
             None => {
@@ -621,7 +679,7 @@ pub async fn git_clone(
             let _ = std::fs::remove_dir_all(&dest_for_thread);
             let trimmed = full_stderr.trim();
             // Truncate the message so a giant stderr doesn't blow up the toast.
-            // Keep the TAIL — that's where the actual fatal line lives.
+            // Keep the TAIL , that's where the actual fatal line lives.
             let msg = if trimmed.chars().count() > 2000 {
                 let tail: String = trimmed.chars().rev().take(2000).collect();
                 tail.chars().rev().collect()

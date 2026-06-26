@@ -27,6 +27,21 @@ use crate::events::{
 
 pub use session::PtySession;
 
+const PTY_FLUSH_BYTES: usize = 64 * 1024;
+const PTY_FLUSH_MS: u64 = 16;
+
+fn emit_pty_buffer(app: &AppHandle, session_id: &str, pending: &mut Vec<u8>) {
+    if pending.is_empty() {
+        return;
+    }
+    let bytes = std::mem::take(pending);
+    let payload = PtyDataPayload {
+        session_id: session_id.to_string(),
+        data_b64: STANDARD.encode(&bytes),
+    };
+    let _ = app.emit(EV_PTY_DATA, payload);
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "kind", rename_all = "lowercase")]
 pub enum PtyKind {
@@ -61,7 +76,7 @@ pub struct PtyManager {
     sessions: Arc<Mutex<HashMap<String, Arc<PtySession>>>>,
     /// JoinHandles of the per-session waiter tasks. We capture them so
     /// `kill_all` (called from the window-close handler) can await every
-    /// waiter to actually reap its child — without these handles, the tokio
+    /// waiter to actually reap its child , without these handles, the tokio
     /// runtime shutdown would abandon the waiters mid-`child.wait()` and leak
     /// the children as zombies / orphans.
     waiters: Arc<Mutex<HashMap<String, tokio::task::JoinHandle<()>>>>,
@@ -138,7 +153,7 @@ impl PtyManager {
             .try_clone_reader()
             .map_err(|e| AppError::Pty(format!("clone_reader: {e}")))?;
 
-        // Drop the slave handle — once the child has been spawned with it, we no
+        // Drop the slave handle , once the child has been spawned with it, we no
         // longer need it. Keeping it open can prevent the master from seeing EOF
         // when the child exits.
         drop(pair.slave);
@@ -148,7 +163,7 @@ impl PtyManager {
         // Windows: assign the spawned process to a KILL_ON_JOB_CLOSE Job Object
         // so dropping the session terminates the whole descendant tree (the
         // shell + `claude.cmd` + `node.exe`). Best-effort: if any Win32 call
-        // fails we still return the session — the user just loses descendant
+        // fails we still return the session , the user just loses descendant
         // cleanup, which is what we had before this change.
         #[cfg(windows)]
         let job = if pid > 0 {
@@ -187,8 +202,8 @@ impl PtyManager {
 
         // ----- reader thread: blocking std::thread, pushes chunks into channel -----
         // Bounded channel (4096 chunks of ~8KiB each ≈ 32MiB max in-flight). When
-        // the drainer can't keep up — e.g. `cat /dev/urandom`, runaway log dumps,
-        // an infinite stack trace — `blocking_send` parks the reader instead of
+        // the drainer can't keep up , e.g. `cat /dev/urandom`, runaway log dumps,
+        // an infinite stack trace , `blocking_send` parks the reader instead of
         // unbounded growth. The PTY's pipe buffer then back-pressures the child
         // process via natural SIGPIPE/EAGAIN semantics, which TUIs handle cleanly.
         //
@@ -267,13 +282,28 @@ impl PtyManager {
         let app_d = self.app_handle.clone();
         let id_d = id.clone();
         tokio::spawn(async move {
-            while let Some(chunk) = rx.recv().await {
-                let payload = PtyDataPayload {
-                    session_id: id_d.clone(),
-                    data_b64: STANDARD.encode(&chunk),
-                };
-                let _ = app_d.emit(EV_PTY_DATA, payload);
+            let mut pending = Vec::with_capacity(PTY_FLUSH_BYTES);
+            let mut ticker = tokio::time::interval(Duration::from_millis(PTY_FLUSH_MS));
+            ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+            loop {
+                tokio::select! {
+                    maybe_chunk = rx.recv() => {
+                        match maybe_chunk {
+                            Some(chunk) => {
+                                pending.extend_from_slice(&chunk);
+                                if pending.len() >= PTY_FLUSH_BYTES {
+                                    emit_pty_buffer(&app_d, &id_d, &mut pending);
+                                }
+                            }
+                            None => break,
+                        }
+                    }
+                    _ = ticker.tick() => {
+                        emit_pty_buffer(&app_d, &id_d, &mut pending);
+                    }
+                }
             }
+            emit_pty_buffer(&app_d, &id_d, &mut pending);
         });
 
         // ----- waiter task: polls try_wait + emits pty://exit + removes session -----
@@ -344,7 +374,7 @@ impl PtyManager {
                 }
             }
             // If the loop broke via cancel (kill_all or explicit kill), the child
-            // may still be alive — finish it and emit so the frontend can stop
+            // may still be alive , finish it and emit so the frontend can stop
             // showing "running". portable-pty's killer only sends SIGHUP, which a
             // HUP-ignoring child survives; if we then blocked on `child.wait()` we
             // would pin this tokio worker forever. So poll non-blockingly and
@@ -357,12 +387,9 @@ impl PtyManager {
                 let mut hard_killed = false;
                 let mut exit_code = -1;
                 loop {
-                    match child.try_wait() {
-                        Ok(Some(status)) => {
-                            exit_code = status.exit_code() as i32;
-                            break;
-                        }
-                        _ => {}
+                    if let Ok(Some(status)) = child.try_wait() {
+                        exit_code = status.exit_code() as i32;
+                        break;
                     }
                     let now = Instant::now();
                     if !hard_killed && now >= grace && pid != 0 {
@@ -414,7 +441,7 @@ impl PtyManager {
             let mut waiters = self.waiters.lock();
             std::mem::take(&mut *waiters).into_values().collect()
         };
-        // Sequential await is fine — the tasks were already in flight, so the
+        // Sequential await is fine , the tasks were already in flight, so the
         // total wall-time is bounded by the slowest, not the sum. The outer
         // timeout caps the whole reap at 2s for snappy Cmd+Q.
         let _ = tokio::time::timeout(Duration::from_secs(2), async move {
@@ -474,7 +501,7 @@ impl PtyManager {
             .collect()
     }
 
-    /// Snapshot (id, pid, current_cwd) tuples for a list of session ids — used
+    /// Snapshot (id, pid, current_cwd) tuples for a list of session ids , used
     /// by `pty_metadata_batch` to do the slow per-session work after releasing
     /// the manager's mutex. Missing sessions are silently skipped.
     pub fn sessions_for_metadata(&self, ids: &[String]) -> Vec<(String, u32, String)> {

@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { GitBranch, Check, ArrowUp, ArrowDown, GitCompare } from "lucide-react";
 
@@ -53,7 +53,7 @@ function fileBadge(name: string): string {
 /**
  * Right-docked Source Control overview: the current branch, a count, and the
  * list of changed files. Clicking a file opens its HEAD ⇄ working diff as a tab.
- * Read-only — staging/commit are out of scope for now.
+ * Read-only , staging/commit are out of scope for now.
  */
 export function SourceControlPanel({
   projectId,
@@ -88,8 +88,16 @@ export function SourceControlPanel({
   }, [git]);
 
   const count = entries.length;
+  const statusKey = useMemo(
+    () => entries.map((e) => `${e.absPath}:${e.code}`).join("\n"),
+    [entries],
+  );
   const totalAdditions = git?.stats?.additions ?? 0;
   const totalDeletions = git?.stats?.deletions ?? 0;
+
+  useEffect(() => {
+    void useGitStore.getState().refresh(projectId, projectPath, true);
+  }, [projectId, projectPath, statusKey]);
 
   return (
     <aside

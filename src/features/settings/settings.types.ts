@@ -1,23 +1,17 @@
 import { isLanguageId, type LanguageId } from "@/features/i18n/config";
 import type { ThemeMode } from "@/features/theme/theme.store";
 import { DEFAULT_LIGHT_THEME_ID, isThemeId } from "@/features/theme/themes";
-import {
-  AGENT_MODES,
-  PERMISSION_PRESETS,
-  type AgentMode,
-  type PermissionPreset,
-} from "@/features/agent/opencode";
 
 export type TerminalCursorStyle = "bar" | "block" | "underline";
 
 /** Visual style for file/folder icons in the explorer. `mono` follows the
  *  current text color (token-driven, premium minimalist look); `color` paints
  *  brand-known files with their canonical brand hex while folders + generic
- *  files stay monochrome — a focused color pop, not a rainbow. */
+ *  files stay monochrome, a focused color pop, not a rainbow. */
 export type ExplorerIconStyle = "mono" | "color";
 
 /** Global density tier. Multiplies the `--space-*` token scale by 0.85 / 1 /
- *  1.15 — touches every spacing-based surface uniformly without touching
+ *  1.15. It touches every spacing-based surface uniformly without touching
  *  per-component values. */
 export type UiDensity = "compact" | "comfortable" | "spacious";
 
@@ -39,12 +33,12 @@ export type LayoutMode = "horizontal" | "vertical";
  * The full set of user preferences persisted to `~/.metacodex/settings.json`.
  * `theme` and `language` mirror the existing theme/i18n stores (which still own
  * applying them); everything else is a tunable that maps to a hardcoded value
- * the app used to ship with — see `DEFAULT_SETTINGS`.
+ * the app used to ship with. See `DEFAULT_SETTINGS`.
  */
 export interface AppSettings {
   theme: ThemeMode;
   /** Active palette id (resolved against the theme registry). When absent the
-   *  app derives a default from `theme` (light → solar-cream, dark → mono-slate). */
+   *  app derives a default from `theme` (light to solar-cream, dark to mono-slate). */
   themeId: string;
   language: LanguageId;
   editor: {
@@ -63,7 +57,7 @@ export interface AppSettings {
     searchDebounceMs: number;
   };
   /** Launcher visibility and other interface-level toggles. The new-tab menu
-   *  reads these on every render — toggling immediately reflects in the UI. */
+   *  reads these on every render. Toggling immediately reflects in the UI. */
   interface: {
     /** Whether the "Autonomous Agents" sub-section starts expanded. Persists across sessions. */
     autonomousAgentsExpanded: boolean;
@@ -97,47 +91,6 @@ export interface AppSettings {
      *  affected tab is the active one. Default: off (the badge is enough). */
     notifyWhenFocused: boolean;
   };
-  /** Agent View runtime defaults. The opencode GO key itself is held by the
-   *  runtime (opencode's own auth store), never persisted here — this only
-   *  remembers the provider + default model the user picked. */
-  agent: {
-    providerId: string;
-    modelId: string;
-    /** Permission posture applied to new agent sessions. */
-    permissionPreset: PermissionPreset;
-    /** Single primary agent vs an orchestrator that delegates to subagents. */
-    mode: AgentMode;
-    /** Vision relay: model that describes images for non-vision chat models.
-     *  Empty = auto (first attachment-capable model in the catalog). */
-    visionProviderId: string;
-    visionModelId: string;
-    /** Which catalog models show in the composer's model picker, keyed
-     *  `providerId/modelId`. ABSENT key = the default rule (enabled only for
-     *  the opencode-go provider), so new GO models appear without migration
-     *  and everything else stays opt-in. See `isModelEnabled`. */
-    enabledModels: Record<string, boolean>;
-    /** Chosen reasoning variant per model (`providerId/modelId` → variant
-     *  name, e.g. "high"). Absent/"" = the model's default effort. */
-    variantByModel: Record<string, string>;
-    /** Selected agent entity (slug under `~/.metacodex/agents`). "" = none:
-     *  the plain chat with the user's own model/preset picks. */
-    entityId: string;
-  };
-}
-
-/** Catalog key for the per-model settings records. */
-export function modelKey(providerId: string, modelId: string): string {
-  return `${providerId}/${modelId}`;
-}
-
-/** Composer visibility rule: explicit user choice wins; otherwise only the
- *  opencode-go provider's models are shown by default. */
-export function isModelEnabled(
-  enabledModels: Record<string, boolean>,
-  providerId: string,
-  modelId: string,
-): boolean {
-  return enabledModels[modelKey(providerId, modelId)] ?? providerId === "opencode-go";
 }
 
 /** Slices of `AppSettings` that are nested objects (patchable via `update`). */
@@ -147,8 +100,7 @@ export type SettingsSliceKey =
   | "performance"
   | "interface"
   | "panels"
-  | "notifications"
-  | "agent";
+  | "notifications";
 
 /** Resize bounds for the shell panels. Conventions:
  *  - Explorer: VS Code uses ~170px floor; we sit slightly above so the path
@@ -163,7 +115,7 @@ export const PANEL_LIMITS = {
   diff: { min: 0.2, max: 0.8, default: 0.5 },
 } as const;
 
-/** Default monospace stack for the terminal — verbatim from `useXterm.ts`. */
+/** Default monospace stack for the terminal, verbatim from `useXterm.ts`. */
 export const DEFAULT_TERMINAL_FONT_FAMILY =
   '"JetBrainsMono Nerd Font Mono", "JetBrainsMono NFM", "SF Mono", ui-monospace, Menlo, monospace';
 
@@ -208,19 +160,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
     soundEnabled: true,
     notifyWhenFocused: false,
   },
-  agent: {
-    providerId: "opencode-go",
-    modelId: "",
-    permissionPreset: "ask",
-    mode: "agent",
-    // Vision relay default: Kimi K2.5 on the GO provider (cheap, sees images).
-    // The relay falls back to auto-pick if this id ever leaves the catalog.
-    visionProviderId: "opencode-go",
-    visionModelId: "kimi-k2.5",
-    enabledModels: {},
-    variantByModel: {},
-    entityId: "",
-  },
 };
 
 function clampNum(value: unknown, def: number, min: number, max: number): number {
@@ -242,23 +181,13 @@ function asObject(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
 }
 
-/** Keep only `Record<string, boolean>` entries from a raw bag (hand-edited JSON
- *  may contain non-boolean values — silently drop those). */
+/** Keep only `Record<string, boolean>` entries from a raw bag. Hand-edited JSON
+ *  may contain non-boolean values, so those are silently dropped. */
 function asBoolMap(value: unknown): Record<string, boolean> {
   const raw = asObject(value);
   const out: Record<string, boolean> = {};
   for (const [k, v] of Object.entries(raw)) {
     if (typeof v === "boolean") out[k] = v;
-  }
-  return out;
-}
-
-/** Same contract as [`asBoolMap`] for `Record<string, string>` bags. */
-function asStringMap(value: unknown): Record<string, string> {
-  const raw = asObject(value);
-  const out: Record<string, string> = {};
-  for (const [k, v] of Object.entries(raw)) {
-    if (typeof v === "string") out[k] = v;
   }
   return out;
 }
@@ -272,7 +201,7 @@ const LAYOUT_MODE_VALUES: LayoutMode[] = ["horizontal", "vertical"];
 /**
  * Coerce arbitrary (possibly hand-edited / partial) JSON into a fully-populated,
  * range-clamped `AppSettings`. Any missing or wrong-typed key falls back to its
- * default, so deleting a key — or the whole file — never crashes the app, and a
+ * default, so deleting a key or the whole file never crashes the app, and a
  * hand-typed `fontSize: 999999` can't wedge the UI.
  */
 export function mergeSettings(raw: unknown): AppSettings {
@@ -283,7 +212,6 @@ export function mergeSettings(raw: unknown): AppSettings {
   const iface = asObject(r.interface);
   const panels = asObject(r.panels);
   const notif = asObject(r.notifications);
-  const ag = asObject(r.agent);
   const D = DEFAULT_SETTINGS;
   return {
     theme: oneOf(r.theme, THEME_VALUES, D.theme),
@@ -361,17 +289,6 @@ export function mergeSettings(raw: unknown): AppSettings {
         typeof notif.notifyWhenFocused === "boolean"
           ? notif.notifyWhenFocused
           : D.notifications.notifyWhenFocused,
-    },
-    agent: {
-      providerId: str(ag.providerId, D.agent.providerId),
-      modelId: str(ag.modelId, D.agent.modelId),
-      permissionPreset: oneOf(ag.permissionPreset, PERMISSION_PRESETS, D.agent.permissionPreset),
-      mode: oneOf(ag.mode, AGENT_MODES, D.agent.mode),
-      visionProviderId: str(ag.visionProviderId, D.agent.visionProviderId),
-      visionModelId: str(ag.visionModelId, D.agent.visionModelId),
-      enabledModels: asBoolMap(ag.enabledModels),
-      variantByModel: asStringMap(ag.variantByModel),
-      entityId: str(ag.entityId, D.agent.entityId),
     },
   };
 }

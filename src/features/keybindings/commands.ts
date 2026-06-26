@@ -1,7 +1,7 @@
 import type { CommandDef, CommandId } from "./types";
 
 /**
- * The command registry. Declaration-only — it holds NO side effects. Each id
+ * The command registry is declaration-only and holds NO side effects. Each id
  * maps 1:1 to a dispatch target in `KeyboardShortcuts.tsx`, keeping the handler
  * implementations on `window.__metacodex` / the relevant stores (per CLAUDE.md).
  *
@@ -106,18 +106,6 @@ export const COMMANDS: CommandDef[] = [
     defaultBinding: ["mod+shift+u"],
     descriptionKey: "settings.shortcuts.cmd.tabJumpToNextAttention",
     category: "navigation",
-  },
-  {
-    id: "agent.newChat",
-    defaultBinding: ["mod+k"],
-    descriptionKey: "settings.shortcuts.cmd.agentNewChat",
-    category: "general",
-  },
-  {
-    id: "view.toggle",
-    defaultBinding: ["mod+e"],
-    descriptionKey: "settings.shortcuts.cmd.viewToggle",
-    category: "view",
   },
   {
     id: "diagnostics.toggle",

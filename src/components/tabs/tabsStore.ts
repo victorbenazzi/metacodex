@@ -4,7 +4,7 @@ import { basename } from "@/lib/path";
 
 /**
  * Tabs are keyed by project. Use `WORKSPACE_NULL` as the bucket for "no project
- * yet" — Day 1 the user can open terminal tabs before adding any project.
+ * yet" , Day 1 the user can open terminal tabs before adding any project.
  */
 export const WORKSPACE_NULL = "__no_project__";
 
@@ -15,7 +15,7 @@ interface TabsBucket {
 
 interface TabsState {
   byProject: Record<string, TabsBucket>;
-  /** Id of the tab currently in inline-rename edit mode (across all projects —
+  /** Id of the tab currently in inline-rename edit mode (across all projects ,
    *  only one input can be active at a time). Null when no edit is in progress. */
   editingTabId: string | null;
   openTab: (projectKey: string, tab: Tab, setActive?: boolean) => void;
@@ -45,7 +45,7 @@ interface TabsState {
     oldPath: string,
     newPath: string,
   ) => void;
-  /** Drop the bucket entirely — used when a project is removed from the app. */
+  /** Drop the bucket entirely , used when a project is removed from the app. */
   dropBucket: (projectKey: string) => void;
   getBucket: (projectKey: string) => TabsBucket;
   /** Locate an existing file-backed tab by absolute path. Used for dedup
@@ -63,7 +63,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     set((state) => {
       const cur = state.byProject[projectKey] ?? emptyBucket;
       // Dedup strategy:
-      //  1) If `tab` has a `path`, match by path — BUT scoped to the same tab
+      //  1) If `tab` has a `path`, match by path , BUT scoped to the same tab
       //     family. A diff tab and an editor tab can point at the same file and
       //     must stay independent (opening the diff of an already-open file must
       //     not just focus the editor, and vice-versa). `path` is the identity
@@ -124,7 +124,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
       const nextTabs = cur.tabs.filter((t) => !killSet.has(t.id));
       let activeTabId = cur.activeTabId;
       if (activeTabId && killSet.has(activeTabId)) {
-        // Pick the nearest surviving tab — search forward from the dead tab's
+        // Pick the nearest surviving tab , search forward from the dead tab's
         // original position, then backward; fallback to last remaining.
         const oldIdx = cur.tabs.findIndex((t) => t.id === activeTabId);
         const forward = cur.tabs
@@ -162,14 +162,25 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     set((state) => {
       const cur = state.byProject[projectKey];
       if (!cur) return state;
+      const idx = cur.tabs.findIndex((t) => t.id === tabId);
+      if (idx === -1) return state;
+      const current = cur.tabs[idx];
+      let changed = false;
+      for (const [key, value] of Object.entries(patch)) {
+        if ((current as any)[key] !== value) {
+          changed = true;
+          break;
+        }
+      }
+      if (!changed) return state;
+      const nextTabs = cur.tabs.slice();
+      nextTabs[idx] = { ...current, ...patch } as Tab;
       return {
         byProject: {
           ...state.byProject,
           [projectKey]: {
             ...cur,
-            tabs: cur.tabs.map((t) =>
-              t.id === tabId ? ({ ...t, ...patch } as Tab) : t,
-            ),
+            tabs: nextTabs,
           },
         },
       };
@@ -181,7 +192,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
       const fromIdx = cur.tabs.findIndex((t) => t.id === tabId);
       if (fromIdx === -1) return state;
       // Clamp + early-exit when the move is a no-op. Note: target index is
-      // expressed in the ORIGINAL array — after removing `from`, an index
+      // expressed in the ORIGINAL array , after removing `from`, an index
       // greater than `from` shifts down by one. We normalize first.
       const clamped = Math.max(0, Math.min(cur.tabs.length - 1, toIndex));
       if (clamped === fromIdx) return state;
@@ -279,11 +290,11 @@ export const useTabsStore = create<TabsState>((set, get) => ({
       const nextTabs = cur.tabs.map((t) => {
         if (!("path" in t) || !t.path) return t;
         // The `+ "/"` guard prevents prefix collisions: "/foo" must not match
-        // "/foobar/x.ts" — only "/foo" itself or "/foo/<child>".
+        // "/foobar/x.ts" , only "/foo" itself or "/foo/<child>".
         if (t.path !== oldPath && !t.path.startsWith(oldPath + "/")) return t;
         changed = true;
         const remapped = newPath + t.path.slice(oldPath.length);
-        // Keep `id` stable — the editor store (keyed by tabId) follows the
+        // Keep `id` stable , the editor store (keyed by tabId) follows the
         // rename automatically because its key never changes. The path-based
         // dedup in `openTab` handles re-opening the same file by its new path.
         return { ...t, path: remapped, title: basename(remapped) } as Tab;

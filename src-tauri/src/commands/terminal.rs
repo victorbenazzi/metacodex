@@ -16,8 +16,18 @@ use crate::util::paths;
 #[tauri::command]
 pub async fn pty_spawn(
     spec: PtySpawnSpec,
+    app: AppHandle,
     mgr: State<'_, PtyManager>,
 ) -> AppResult<String> {
+    if let Some(project_id) = spec.project_id.as_deref() {
+        let cache = app.state::<Arc<ProjectsCache>>();
+        let project = cache
+            .snapshot()
+            .into_iter()
+            .find(|p| p.id == project_id)
+            .ok_or_else(|| AppError::NotFound(format!("project {project_id}")))?;
+        paths::ensure_within_roots(&spec.cwd, &[project.path])?;
+    }
     mgr.spawn(spec)
 }
 
@@ -100,7 +110,7 @@ fn metadata_for_session(
 }
 
 fn detect_branch(cwd: &str) -> Option<String> {
-    // `Repository::discover` walks up to find the nearest .git — works fine
+    // `Repository::discover` walks up to find the nearest .git , works fine
     // for worktrees and nested repos. We swallow errors (no repo, perms, etc).
     let repo = git2::Repository::discover(cwd).ok()?;
     let head = repo.head().ok()?;
@@ -109,7 +119,7 @@ fn detect_branch(cwd: &str) -> Option<String> {
 
 #[cfg(target_os = "macos")]
 fn list_listening_ports(pid: u32) -> Option<Vec<ListeningPort>> {
-    // `lsof -nP -p<pid> -iTCP -sTCP:LISTEN -F nP` — `-F nP` switches to the
+    // `lsof -nP -p<pid> -iTCP -sTCP:LISTEN -F nP` , `-F nP` switches to the
     // field output mode where each record has lines tagged `p<pid>`, `n<addr>`,
     // `P<protocol>`. We only care about the `n` lines following a `p` we've
     // already filtered with `-p<pid>`. lsof times out implicitly on a quiet
@@ -174,7 +184,7 @@ fn list_listening_ports(pid: u32) -> Option<Vec<ListeningPort>> {
             _ => {}
         }
     }
-    // Dedupe identical entries — lsof prints both IPv4 and IPv6 bound on the
+    // Dedupe identical entries , lsof prints both IPv4 and IPv6 bound on the
     // same port and the user only cares once.
     out.sort_by_key(|p| (p.port, p.protocol.clone()));
     out.dedup_by(|a, b| a.port == b.port && a.protocol == b.protocol);
@@ -183,7 +193,7 @@ fn list_listening_ports(pid: u32) -> Option<Vec<ListeningPort>> {
 
 #[cfg(target_os = "windows")]
 fn list_listening_ports(pid: u32) -> Option<Vec<ListeningPort>> {
-    // Use the IP Helper API (`GetExtendedTcpTable`) via `netstat2` — sub-ms,
+    // Use the IP Helper API (`GetExtendedTcpTable`) via `netstat2` , sub-ms,
     // pure Rust, no PowerShell round-trip. We iterate every TCP socket, keep
     // only LISTEN sockets owned by `pid`, and dedupe identical IPv4/IPv6
     // entries on the same port for display.
@@ -218,7 +228,7 @@ fn list_listening_ports(pid: u32) -> Option<Vec<ListeningPort>> {
 
 #[cfg(all(unix, not(target_os = "macos")))]
 fn list_listening_ports(_pid: u32) -> Option<Vec<ListeningPort>> {
-    // Linux port discovery is out of scope for the MVP — the UI degrades
+    // Linux port discovery is out of scope for the MVP , the UI degrades
     // gracefully (chips list stays empty).
     None
 }
@@ -253,7 +263,7 @@ pub async fn pty_update_cwd(
     mgr: State<'_, PtyManager>,
 ) -> AppResult<()> {
     // If the session belongs to a project, validate the cwd is inside one of
-    // the registered roots — preventing an OSC 7 sequence from leaking a path
+    // the registered roots , preventing an OSC 7 sequence from leaking a path
     // outside the sandbox into stored state. Plain shells (no project_id) are
     // unrestricted: `cd /tmp` is a normal operation.
     let project_id = mgr.project_id_of(&session_id);

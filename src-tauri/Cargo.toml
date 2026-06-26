@@ -1,6 +1,6 @@
 [package]
 name = "metacodex"
-version = "0.0.12"
+version = "0.0.13"
 description = "metacodex: premium local-first developer workspace"
 authors = ["Victor"]
 edition = "2021"
@@ -16,8 +16,6 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = [] }
 tauri-plugin-single-instance = "2"
 tauri-plugin-dialog = "2"
-tauri-plugin-fs = "2"
-tauri-plugin-os = "2"
 tauri-plugin-clipboard-manager = "2"
 tauri-plugin-notification = "2"
 tauri-plugin-updater = "2"
@@ -41,7 +39,6 @@ grep-searcher = "0.1"
 grep-regex = "0.1"
 grep-matcher = "0.1"
 git2 = { version = "0.18", default-features = false, features = ["vendored-libgit2"] }
-reqwest = { version = "0.13", default-features = false, features = ["json"] }
 # reqwest 0.13 + rustls 0.23 no longer auto-install a process-wide crypto
 # provider. We install ring's once at startup (see lib.rs::run) so building any
 # reqwest::Client doesn't panic "No provider set". Pinned to the ring provider

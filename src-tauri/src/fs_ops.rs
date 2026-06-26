@@ -13,12 +13,12 @@ use crate::util::paths;
 
 const DEFAULT_TEXT_LIMIT: u64 = 25 * 1024 * 1024; // 25 MiB
 const DEFAULT_BYTES_LIMIT: u64 = 50 * 1024 * 1024; // 50 MiB
-const ICON_IMAGE_LIMIT: u64 = 16 * 1024 * 1024; // 16 MiB — user-picked project icon
+const ICON_IMAGE_LIMIT: u64 = 16 * 1024 * 1024; // 16 MiB, user-picked project icon
 
 /// Extensions the preview mode may open from OUTSIDE any registered project root.
 /// Read side: text/code/markdown. Kept broad because preview is a viewer, but every
 /// entry is a format the editor actually renders.
-const PREVIEW_TEXT_EXTS: &[&str] = &[
+pub(crate) const PREVIEW_TEXT_EXTS: &[&str] = &[
     "md", "markdown", "mdx", "txt", "text", "log", "rst", "adoc", "json", "jsonc", "toml", "yaml",
     "yml", "ini", "conf", "env", "csv", "tsv", "xml", "html", "htm", "css", "scss", "sass", "less",
     "js", "mjs", "cjs", "jsx", "ts", "tsx", "vue", "svelte", "py", "rs", "go", "rb", "php", "java",
@@ -27,7 +27,7 @@ const PREVIEW_TEXT_EXTS: &[&str] = &[
 ];
 
 /// Read side for binary previews (image/pdf). These are never writable.
-const PREVIEW_BINARY_EXTS: &[&str] = &[
+pub(crate) const PREVIEW_BINARY_EXTS: &[&str] = &[
     "png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "ico", "avif", "pdf",
 ];
 
@@ -49,6 +49,17 @@ fn preview_ext_allowed(path: &str, set: &[&str]) -> bool {
 pub(crate) fn preview_ext_allowed_any(path: &str) -> bool {
     preview_ext_allowed(path, PREVIEW_TEXT_EXTS) || preview_ext_allowed(path, PREVIEW_BINARY_EXTS)
 }
+
+pub(crate) fn preview_extensions() -> Vec<&'static str> {
+    let mut out = Vec::with_capacity(PREVIEW_TEXT_EXTS.len() + PREVIEW_BINARY_EXTS.len());
+    out.extend_from_slice(PREVIEW_TEXT_EXTS);
+    out.extend_from_slice(PREVIEW_BINARY_EXTS);
+    out.sort_unstable();
+    out.dedup();
+    out
+}
+
+pub(crate) const ICON_EXTS: &[&str] = &["png", "jpg", "jpeg", "gif", "webp", "svg", "ico", "bmp"];
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -216,12 +227,11 @@ pub fn read_file_bytes(
     })
 }
 
-/// Read a user-opened preview file as text (OS "Open With" / native dialog / drag-drop).
+/// Read a user-opened preview file as text.
 ///
-/// SECURITY: like `read_icon_image`, this deliberately does NOT call
+/// SECURITY: like `read_project_icon_image`, this deliberately does NOT call
 /// `require_within_roots`. A previewed file is, by definition, opened from outside
-/// any registered project root, and the OS-level open action (Finder double-click,
-/// native open dialog, or drag-drop onto the window) is the user's consent boundary.
+/// any registered project root, and the backend-issued grant is the user's consent boundary.
 /// The exception stays narrow: a text/code/markdown extension allowlist + the same
 /// 25 MiB cap as `read_file_text`.
 pub fn read_preview_text(path: &str, max_bytes: Option<u64>) -> AppResult<TextFile> {
@@ -254,15 +264,14 @@ pub fn read_preview_bytes(path: &str, max_bytes: Option<u64>) -> AppResult<Bytes
     })
 }
 
-/// Read an image the user explicitly picked (via the native file dialog) to use
+/// Read an image the user explicitly picked through the native file dialog to use
 /// as a project icon, returning it base64-encoded for the frontend to downscale.
 ///
 /// SECURITY: unlike every other fs command here, this deliberately does NOT call
 /// `require_within_roots`. A chosen icon almost always lives outside the
 /// registered project roots, and the native OS file dialog is the user's consent
 /// boundary. The exception is kept narrow: extension allowlist + size cap.
-pub fn read_icon_image(path: &str) -> AppResult<BytesFile> {
-    const ICON_EXTS: &[&str] = &["png", "jpg", "jpeg", "gif", "webp", "svg", "ico", "bmp"];
+pub fn read_project_icon_image(path: &str) -> AppResult<BytesFile> {
     let ext_ok = Path::new(path)
         .extension()
         .and_then(|s| s.to_str())
@@ -276,14 +285,14 @@ pub fn read_icon_image(path: &str) -> AppResult<BytesFile> {
     }
     let meta = Path::new(path)
         .metadata()
-        .map_err(|e| io_error("read_icon_image", e))?;
+        .map_err(|e| io_error("read_project_icon_image", e))?;
     if meta.len() > ICON_IMAGE_LIMIT {
         return Err(AppError::Other(format!(
             "icon image too large: {} bytes (max {ICON_IMAGE_LIMIT})",
             meta.len()
         )));
     }
-    let bytes = fs::read(path).map_err(|e| io_error("read_icon_image", e))?;
+    let bytes = fs::read(path).map_err(|e| io_error("read_project_icon_image", e))?;
     Ok(BytesFile {
         b64: STANDARD.encode(&bytes),
         mime: guess_mime(path),
@@ -292,103 +301,7 @@ pub fn read_icon_image(path: &str) -> AppResult<BytesFile> {
     })
 }
 
-/// Permanently delete a file or directory (recursive for directories).
-///
-/// Safety:
-///  - target must sit within a registered project root
-///  - refuses to delete a project root itself (a normalized exact match)
-///  - refuses symlinks at the top level (so we never traverse outside the sandbox)
-pub fn delete_path(app: &AppHandle, path: &str) -> AppResult<()> {
-    require_within_roots(app, path)?;
-
-    let target = Path::new(path);
-    let normalized = paths::normalize(target);
-
-    // Refuse to nuke a project root.
-    let cache = app.state::<Arc<ProjectsCache>>();
-    let roots = cache.project_roots();
-    if roots
-        .iter()
-        .any(|r| paths::normalize(Path::new(r)) == normalized)
-    {
-        return Err(AppError::PathNotAllowed(format!(
-            "refusing to delete project root: {path}"
-        )));
-    }
-
-    let meta = target
-        .symlink_metadata()
-        .map_err(|e| io_error("delete: stat", e))?;
-
-    if meta.file_type().is_symlink() {
-        // Treat symlinks themselves as files — never follow.
-        fs::remove_file(target).map_err(|e| io_error("delete: remove_file (symlink)", e))?;
-    } else if meta.is_dir() {
-        fs::remove_dir_all(target).map_err(|e| io_error("delete: remove_dir_all", e))?;
-    } else {
-        fs::remove_file(target).map_err(|e| io_error("delete: remove_file", e))?;
-    }
-    Ok(())
-}
-
-/// Rename within the same parent directory. `new_name` is a basename, not a path.
-///
-/// Safety:
-///  - `from` must sit within a registered project root
-///  - `new_name` cannot contain path separators, cannot be `.` / `..`, cannot be empty
-///  - destination must not already exist (prevents accidental clobber)
-///  - refuses to rename a project root itself
-pub fn rename_path(app: &AppHandle, from: &str, new_name: &str) -> AppResult<String> {
-    require_within_roots(app, from)?;
-
-    if new_name.is_empty()
-        || new_name == "."
-        || new_name == ".."
-        || new_name.contains('/')
-        || new_name.contains('\\')
-        || new_name.contains('\0')
-    {
-        return Err(AppError::Other(format!(
-            "invalid name: {new_name:?} (must be a non-empty basename without separators)"
-        )));
-    }
-
-    let from_path = Path::new(from);
-    let normalized_from = paths::normalize(from_path);
-
-    let cache = app.state::<Arc<ProjectsCache>>();
-    let roots = cache.project_roots();
-    if roots
-        .iter()
-        .any(|r| paths::normalize(Path::new(r)) == normalized_from)
-    {
-        return Err(AppError::PathNotAllowed(format!(
-            "refusing to rename project root: {from}"
-        )));
-    }
-
-    let parent = from_path.parent().ok_or_else(|| {
-        AppError::Other(format!("cannot rename top-level path without parent: {from}"))
-    })?;
-    let to_path = parent.join(new_name);
-
-    // The new path must still sit inside a project root (it will, by construction,
-    // but the check guards against bugs / odd `new_name` inputs that slip the
-    // earlier validation).
-    let to_str = to_path.to_string_lossy().to_string();
-    require_within_roots(app, &to_str)?;
-
-    if to_path.symlink_metadata().is_ok() {
-        return Err(AppError::Other(format!(
-            "destination already exists: {to_str}"
-        )));
-    }
-
-    fs::rename(from_path, &to_path).map_err(|e| io_error("rename", e))?;
-    Ok(to_str)
-}
-
-/// Validate a user-supplied name component used for create/rename.
+/// Validate a user-supplied name component used for create commands.
 /// Allows nested segments (`a/b/c`) for create, but rejects traversal and
 /// absolute/empty inputs.
 fn validate_relative_name(name: &str, allow_nested: bool) -> AppResult<()> {
@@ -415,7 +328,7 @@ fn validate_relative_name(name: &str, allow_nested: bool) -> AppResult<()> {
 }
 
 /// Create an empty file `name` inside `parent`. `name` may be nested
-/// (`sub/dir/file.txt`) — intermediate directories are created. Refuses to
+/// (`sub/dir/file.txt`) , intermediate directories are created. Refuses to
 /// overwrite an existing path. Returns the new absolute path.
 pub fn create_file(app: &AppHandle, parent: &str, name: &str) -> AppResult<String> {
     require_within_roots(app, parent)?;
@@ -477,7 +390,7 @@ fn is_cross_device(e: &std::io::Error) -> bool {
 }
 
 /// Move a file, falling back to copy + remove when `from` and `to` live on
-/// different volumes (`rename` returns EXDEV across mounts — a previewed file may
+/// different volumes (`rename` returns EXDEV across mounts , a previewed file may
 /// sit on an external drive while the project is on the internal disk).
 fn move_file_cross_device(from: &Path, to: &Path) -> AppResult<()> {
     match fs::rename(from, to) {
@@ -505,76 +418,11 @@ fn ensure_is_dir(path: &Path, ctx: &str) -> AppResult<()> {
     }
 }
 
-/// Move `from` into directory `to_dir`, preserving the basename.
-/// Returns the new absolute path.
-///
-/// Safety:
-///  - both `from` and the destination must sit within registered roots
-///  - refuses to move a project root
-///  - refuses to move a directory into itself or one of its own descendants
-///  - refuses a no-op (already inside `to_dir`)
-///  - refuses if the destination path already exists
-pub fn move_path(app: &AppHandle, from: &str, to_dir: &str) -> AppResult<String> {
-    require_within_roots(app, from)?;
-    require_within_roots(app, to_dir)?;
-
-    let from_path = Path::new(from);
-    let normalized_from = paths::normalize(from_path);
-
-    let cache = app.state::<Arc<ProjectsCache>>();
-    let roots = cache.project_roots();
-    if roots
-        .iter()
-        .any(|r| paths::normalize(Path::new(r)) == normalized_from)
-    {
-        return Err(AppError::PathNotAllowed(format!(
-            "refusing to move project root: {from}"
-        )));
-    }
-
-    let base = from_path
-        .file_name()
-        .ok_or_else(|| AppError::Other(format!("cannot move path without a name: {from}")))?;
-    let to_dir_path = Path::new(to_dir);
-    let normalized_to_dir = paths::normalize(to_dir_path);
-
-    // No-op: already directly inside the target dir.
-    if normalized_from.parent() == Some(normalized_to_dir.as_path()) {
-        return Err(AppError::Other(
-            "item is already in the destination folder".into(),
-        ));
-    }
-    // Circular: moving a directory into itself or a descendant.
-    if normalized_to_dir == normalized_from
-        || normalized_to_dir.starts_with(&normalized_from)
-    {
-        return Err(AppError::Other(
-            "cannot move a folder into itself or its own subfolder".into(),
-        ));
-    }
-
-    let dest = to_dir_path.join(base);
-    let dest_str = dest.to_string_lossy().to_string();
-    require_within_roots(app, &dest_str)?;
-
-    if dest.symlink_metadata().is_ok() {
-        return Err(AppError::Other(format!(
-            "destination already exists: {dest_str}"
-        )));
-    }
-
-    // The destination dir must actually be a directory.
-    ensure_is_dir(to_dir_path, "move: dest dir")?;
-
-    move_file_cross_device(from_path, &dest)?;
-    Ok(dest_str)
-}
-
 /// Move a user-opened preview file (`from`, outside any project root) INTO a
 /// project directory (`to_dir`, which MUST be within a registered root).
 /// Returns the new absolute path.
 ///
-/// SECURITY: `from` is NOT roots-checked — it is a previewed file whose consent
+/// SECURITY: `from` is NOT roots-checked , it is a previewed file whose consent
 /// boundary is the OS open action (same as `read_preview_*`). It is still validated
 /// against the preview extension allowlist so this can't be repurposed to import
 /// arbitrary files. `to_dir` IS fully roots-checked, so the file can only ever land
@@ -643,7 +491,7 @@ pub fn write_file_text(app: &AppHandle, path: &str, content: &str) -> AppResult<
 /// Atomically overwrite a user-opened preview file in place (edit + save).
 ///
 /// SECURITY: same carve-out as `read_preview_text`, WRITE variant. Restricted to the
-/// text/code allowlist only — we never write binary/image/pdf previews back, so the
+/// text/code allowlist only , we never write binary/image/pdf previews back, so the
 /// writable surface is strictly the text set.
 pub fn write_preview_text(path: &str, content: &str) -> AppResult<()> {
     if !preview_ext_allowed(path, PREVIEW_TEXT_EXTS) {

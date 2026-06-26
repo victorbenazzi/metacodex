@@ -55,12 +55,6 @@ pub fn state_dir() -> AppResult<PathBuf> {
     Ok(config_root()?.join("state"))
 }
 
-/// `~/.metacodex/agents`, one subdirectory per agent entity (its "home":
-/// AGENT.md, agent.json, memory, reports, logs; a git repo, see AGENTS_DESIGN.md).
-pub fn agents_dir() -> AppResult<PathBuf> {
-    Ok(config_root()?.join("agents"))
-}
-
 /// `~/.metacodex/state/projects.json`, the projects registry + active id.
 pub fn projects_file() -> AppResult<PathBuf> {
     Ok(state_dir()?.join("projects.json"))
@@ -71,30 +65,14 @@ pub fn workspace_dir() -> AppResult<PathBuf> {
     Ok(state_dir()?.join("workspace"))
 }
 
-/// `~/.metacodex/state/resume.json`, agent-session resume registry.
+/// `~/.metacodex/state/legacy-agent`, archived state from the removed Agent View.
+pub fn legacy_agent_dir() -> AppResult<PathBuf> {
+    Ok(state_dir()?.join("legacy-agent"))
+}
+
+/// `~/.metacodex/state/resume.json`, terminal CLI session resume registry.
 pub fn resume_file() -> AppResult<PathBuf> {
     Ok(state_dir()?.join("resume.json"))
-}
-
-/// `~/.metacodex/state/agent-ui.json`, small Agent View UI state (composer
-/// drafts, sidebar expansion choices), keyed by project directory. Opaque to
-/// Rust (the frontend owns the schema), same contract as settings.json.
-pub fn agent_ui_state_file() -> AppResult<PathBuf> {
-    Ok(state_dir()?.join("agent-ui.json"))
-}
-
-/// `~/.metacodex/state/agent-mcp.json`, MCP server registry for the Agent
-/// View (source of truth; may contain API keys, written 0600 via
-/// [`write_json_atomic_private`]).
-pub fn agent_mcp_file() -> AppResult<PathBuf> {
-    Ok(state_dir()?.join("agent-mcp.json"))
-}
-
-/// `~/.metacodex/state/opencode-config.json`, GENERATED opencode config layer
-/// (enabled MCP servers), passed to the sidecar via `OPENCODE_CONFIG`. Never
-/// hand-edited: regenerated from `agent-mcp.json` before every spawn.
-pub fn opencode_config_file() -> AppResult<PathBuf> {
-    Ok(state_dir()?.join("opencode-config.json"))
 }
 
 /// `~/.metacodex/state/last-session.log`, diagnostics ring-buffer dump on quit.
@@ -130,6 +108,39 @@ pub fn workspace_file(project_id: &str) -> AppResult<PathBuf> {
 /// Creating the deepest dir (`workspace`) implies its ancestors.
 pub fn ensure_dirs() -> AppResult<()> {
     fs::create_dir_all(workspace_dir()?)?;
+    archive_legacy_agent_state()?;
+    Ok(())
+}
+
+fn archive_legacy_agent_state() -> AppResult<()> {
+    let state = state_dir()?;
+    let legacy = legacy_agent_dir()?;
+    let root = config_root()?;
+    for path in [
+        state.join("agent-ui.json"),
+        state.join("agent-mcp.json"),
+        state.join("opencode-config.json"),
+        state.join("agent-cron.json"),
+        root.join("agents"),
+    ] {
+        if !path.exists() {
+            continue;
+        }
+        fs::create_dir_all(&legacy)?;
+        let Some(name) = path.file_name() else {
+            continue;
+        };
+        let dest = legacy.join(name);
+        if dest.exists() {
+            continue;
+        }
+        if let Err(e) = fs::rename(&path, &dest) {
+            eprintln!(
+                "[metacodex] failed to archive legacy agent state {}: {e}",
+                path.display()
+            );
+        }
+    }
     Ok(())
 }
 
@@ -147,34 +158,6 @@ pub fn read_json<T: DeserializeOwned + Default>(path: &Path) -> AppResult<T> {
                     "[metacodex] config parse failed for {}: {e}; using defaults",
                     path.display()
                 );
-                Ok(T::default())
-            }
-        },
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(T::default()),
-        Err(e) => Err(AppError::Io(e)),
-    }
-}
-
-/// Like [`read_json`], but a corrupt existing file is renamed to
-/// `<file>.corrupt` before defaults are returned. For stores whose boot path
-/// persists right after loading (cron, MCP): without the rename, one bad
-/// hand-edit would get the only copy of the data overwritten with defaults
-/// (and the MCP registry holds API keys the UI can never re-show).
-pub fn read_json_backed<T: DeserializeOwned + Default>(path: &Path) -> AppResult<T> {
-    match fs::read_to_string(path) {
-        Ok(raw) => match serde_json::from_str::<T>(&raw) {
-            Ok(value) => Ok(value),
-            Err(e) => {
-                let backup = path.with_file_name(format!(
-                    "{}.corrupt",
-                    path.file_name().and_then(|s| s.to_str()).unwrap_or("config")
-                ));
-                eprintln!(
-                    "[metacodex] config parse failed for {}: {e}; moving it to {} and using defaults",
-                    path.display(),
-                    backup.display()
-                );
-                let _ = fs::rename(path, &backup);
                 Ok(T::default())
             }
         },
@@ -212,7 +195,7 @@ pub fn read_json_opt<T: DeserializeOwned>(path: &Path) -> AppResult<Option<T>> {
 /// safe because the destination path is always app-derived: read commands take
 /// no path argument, and write commands take only opaque JSON or a guarded
 /// project id (see [`workspace_file`]). The webview can never inject an arbitrary
-/// path here. Same documented precedent as `fs_ops::read_icon_image`.
+/// path here. Same documented precedent as `fs_ops::read_project_icon_image`.
 pub fn write_json_atomic<T: Serialize>(path: &Path, value: &T) -> AppResult<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
@@ -237,60 +220,6 @@ pub fn write_json_atomic<T: Serialize>(path: &Path, value: &T) -> AppResult<()> 
     }
     let _ = fs::remove_file(&tmp);
     Err(AppError::Io(last_err.expect("retry loop ran")))
-}
-
-/// [`write_json_atomic`] with the temp file CREATED 0600, for files carrying
-/// secrets (the MCP registry holds API keys in plaintext: accepted for a
-/// local-first app, but the perms keep them to the user account). The mode is
-/// set at create time, before any byte is written, so the secret is never
-/// world-readable, even briefly.
-pub fn write_json_atomic_private<T: Serialize>(path: &Path, value: &T) -> AppResult<()> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    let json = serde_json::to_string_pretty(value)
-        .map_err(|e| AppError::Other(format!("serialize config: {e}")))?;
-    let tmp = tmp_path(path);
-    {
-        use std::io::Write;
-        let mut open = fs::OpenOptions::new();
-        open.create(true).write(true).truncate(true);
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::OpenOptionsExt;
-            open.mode(0o600);
-        }
-        let mut file = open.open(&tmp)?;
-        file.write_all(json.as_bytes())?;
-        // A pre-existing tmp (crash leftover) keeps its old mode; force it.
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            fs::set_permissions(&tmp, fs::Permissions::from_mode(0o600))?;
-        }
-    }
-    fs::rename(&tmp, path).map_err(|e| {
-        let _ = fs::remove_file(&tmp);
-        AppError::Io(e)
-    })?;
-    Ok(())
-}
-
-/// Atomic plain-text write: `<file>.metacodex.tmp.<pid>.<n>` → rename. Same
-/// SECURITY carve-out as [`write_json_atomic`] (app-derived paths under
-/// `~/.metacodex`, outside project roots). The canonical helper for AGENT.md,
-/// memory files, reports and proposals; do not hand-roll tmp→rename variants.
-pub fn write_text_atomic(path: &Path, contents: &str) -> AppResult<()> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    let tmp = tmp_path(path);
-    fs::write(&tmp, contents.as_bytes())?;
-    fs::rename(&tmp, path).map_err(|e| {
-        let _ = fs::remove_file(&tmp);
-        AppError::Io(e)
-    })?;
-    Ok(())
 }
 
 /// Unique-per-write temp path next to `path`. Uniqueness (pid + counter) keeps

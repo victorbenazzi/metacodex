@@ -1,7 +1,8 @@
 {
   "name": "metacodex",
   "private": true,
-  "version": "0.0.12",
+  "packageManager": "pnpm@9.15.9",
+  "version": "0.0.13",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -45,8 +46,6 @@
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-clipboard-manager": "^2",
     "@tauri-apps/plugin-dialog": "^2",
-    "@tauri-apps/plugin-fs": "^2",
-    "@tauri-apps/plugin-os": "^2",
     "@tauri-apps/plugin-process": "^2",
     "@tauri-apps/plugin-updater": "^2",
     "@xterm/addon-canvas": "^0.7.0",
@@ -54,7 +53,6 @@
     "@xterm/addon-web-links": "^0.11.0",
     "@xterm/xterm": "^5.5.0",
     "clsx": "^2.1.1",
-    "cronstrue": "^3.14.0",
     "i18next": "^26.2.0",
     "immer": "^10.1.1",
     "lucide-react": "^0.460.0",
@@ -67,7 +65,6 @@
     "remark-gfm": "^4.0.0",
     "shiki": "^4.1.0",
     "simple-icons": "^16.21.0",
-    "streamdown": "^2.5.0",
     "tailwind-merge": "^2.5.4",
     "zustand": "^5.0.1"
   },

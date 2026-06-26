@@ -8,8 +8,7 @@ pub async fn add_project(path: String, app: AppHandle) -> AppResult<Project> {
     projects::add(&app, path)
 }
 
-/// Create a new project folder (`directory/name`) and register it. Backs the
-/// Agent View's "Start from scratch" flow.
+/// Create a new project folder (`directory/name`) and register it.
 #[tauri::command]
 pub async fn create_project(
     directory: String,
@@ -75,16 +74,16 @@ pub async fn reveal_in_finder(path: String) -> AppResult<()> {
             .args(["-R", &path])
             .status()
             .map_err(|e| AppError::Other(format!("open -R failed: {e}")))?;
-        return Ok(());
+        Ok(())
     }
 
     #[cfg(target_os = "windows")]
     {
         // `explorer /select,<path>` needs the path quoted when it contains
-        // spaces — and `Command::args` quotes EACH arg, which mangles the
+        // spaces, and `Command::args` quotes EACH arg, which mangles the
         // `/select,` + path combo. Use raw_arg so the OS receives a single,
         // properly-quoted command line. Strip embedded quotes defensively.
-        // Also: do NOT wait on `explorer` — it returns non-zero exit codes
+        // Also: do NOT wait on `explorer`, it returns non-zero exit codes
         // even on success (selecting an existing item still yields 1), so
         // a `.status()?.success()` check would falsely report failure.
         use std::os::windows::process::CommandExt;
@@ -93,7 +92,7 @@ pub async fn reveal_in_finder(path: String) -> AppResult<()> {
             .raw_arg(format!("/select,\"{}\"", sanitized))
             .spawn()
             .map_err(|e| AppError::Other(format!("explorer failed: {e}")))?;
-        return Ok(());
+        Ok(())
     }
 
     #[cfg(all(unix, not(target_os = "macos")))]

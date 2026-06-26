@@ -21,11 +21,8 @@ export function ExplorerPanel({
   projectPath,
   onOpenFolder,
   onOpenFile,
-  onRequestDelete,
-  onRename,
   onOpenInTerminal,
   onLaunchCliInPath,
-  onMove,
 }: ExplorerPanelProps) {
   const { t } = useTranslation();
   return (
@@ -39,11 +36,8 @@ export function ExplorerPanel({
           rootPath={projectPath}
           rootName={projectName ?? ""}
           onOpenFile={onOpenFile}
-          onRequestDelete={onRequestDelete}
-          onRename={onRename}
           onOpenInTerminal={onOpenInTerminal}
           onLaunchCliInPath={onLaunchCliInPath}
-          onMove={onMove}
         />
       ) : (
         <>

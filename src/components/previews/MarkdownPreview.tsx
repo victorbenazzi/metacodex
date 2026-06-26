@@ -22,6 +22,7 @@ interface MarkdownPreviewProps {
   projectKey: string;
   mode: "preview" | "source";
   preview?: boolean;
+  previewGrantId?: string;
 }
 
 export function MarkdownPreview({
@@ -31,11 +32,17 @@ export function MarkdownPreview({
   projectKey,
   mode,
   preview = false,
+  previewGrantId,
 }: MarkdownPreviewProps) {
   const { t } = useTranslation();
   const [content, setContent] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [sourceMounted, setSourceMounted] = useState(mode === "source");
   const updateTab = useTabsStore((s) => s.updateTab);
+
+  useEffect(() => {
+    if (mode === "source") setSourceMounted(true);
+  }, [mode]);
 
   // Read the file for the rendered preview. Re-runs whenever we flip back to
   // preview so edits saved from the source editor are reflected on disk read.
@@ -46,8 +53,11 @@ export function MarkdownPreview({
     setError(null);
     (async () => {
       try {
+        if (preview && !previewGrantId) {
+          throw new Error("preview grant missing");
+        }
         const text = preview
-          ? await fsApi.readPreviewText(path)
+          ? await fsApi.readPreviewText(previewGrantId!)
           : await fsApi.readFileText(path);
         if (!cancelled) setContent(text.content);
       } catch (err: any) {
@@ -57,7 +67,7 @@ export function MarkdownPreview({
     return () => {
       cancelled = true;
     };
-  }, [path, mode, preview]);
+  }, [path, mode, preview, previewGrantId]);
 
   const toggleMode = () => {
     updateTab(projectKey, tabId, {
@@ -75,7 +85,7 @@ export function MarkdownPreview({
           {preview ? (
             <>
               <span className="editorial-caps text-muted">{t("preview.badge")}</span>
-              <SendToProjectButton path={path} />
+              <SendToProjectButton path={path} grantId={previewGrantId} />
             </>
           ) : null}
         </div>
@@ -93,24 +103,22 @@ export function MarkdownPreview({
       </header>
 
       <div className="relative flex-1 overflow-hidden">
-        {/*
-          The source editor stays mounted (just hidden in preview) so unsaved
-          edits and undo history survive mode toggles. It's a real CodeMirror
-          instance via EditorTab — Cmd+S saves, dirty state is tracked.
-        */}
-        <div
-          className="absolute inset-0"
-          style={{ display: mode === "source" ? "block" : "none" }}
-        >
-          <EditorTab
-            tabId={tabId}
-            path={path}
-            projectId={projectId}
-            projectKey={projectKey}
-            preview={preview}
-            embedded
-          />
-        </div>
+        {sourceMounted ? (
+          <div
+            className="absolute inset-0"
+            style={{ display: mode === "source" ? "block" : "none" }}
+          >
+            <EditorTab
+              tabId={tabId}
+              path={path}
+              projectId={projectId}
+              projectKey={projectKey}
+              preview={preview}
+              previewGrantId={previewGrantId}
+              embedded
+            />
+          </div>
+        ) : null}
 
         {mode === "preview" ? (
           <div className="absolute inset-0 overflow-y-auto">
@@ -170,14 +178,14 @@ function MarkdownBody({ source }: { source: string }) {
               onClick={(e) => {
                 e.preventDefault();
                 if (href.startsWith("#")) {
-                  // Internal anchor — smooth-scroll within the rendered doc.
+                  // Internal anchor , smooth-scroll within the rendered doc.
                   const id = decodeURIComponent(href.slice(1));
                   const el =
                     document.getElementById(id) ??
                     document.querySelector(`[name="${CSS.escape(id)}"]`);
                   el?.scrollIntoView({ behavior: "smooth", block: "start" });
                 } else if (/^https?:\/\//i.test(href)) {
-                  // External link — hand off to the OS browser via the opener.
+                  // External link , hand off to the OS browser via the opener.
                   void invoke(CMD.openExternalUrl, { url: href });
                 }
               }}
@@ -204,7 +212,7 @@ function MarkdownBody({ source }: { source: string }) {
               </code>
             );
           }
-          // Fenced block — react-markdown wraps it in <pre><code> and passes the
+          // Fenced block , react-markdown wraps it in <pre><code> and passes the
           // ```lang on the <code> className as `language-xxx`. We override the
           // <pre> below to a passthrough, then let ShikiCode own both elements.
           const lang = className?.replace(/.*\blanguage-/, "").split(/\s/)[0];

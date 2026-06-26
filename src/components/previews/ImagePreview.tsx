@@ -7,9 +7,10 @@ import { basename } from "@/lib/path";
 interface ImagePreviewProps {
   path: string;
   preview?: boolean;
+  previewGrantId?: string;
 }
 
-export function ImagePreview({ path, preview = false }: ImagePreviewProps) {
+export function ImagePreview({ path, preview = false, previewGrantId }: ImagePreviewProps) {
   const { t } = useTranslation();
   const [dataUrl, setDataUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -21,8 +22,11 @@ export function ImagePreview({ path, preview = false }: ImagePreviewProps) {
     setError(null);
     (async () => {
       try {
+        if (preview && !previewGrantId) {
+          throw new Error("preview grant missing");
+        }
         const f = preview
-          ? await fsApi.readPreviewBytes(path)
+          ? await fsApi.readPreviewBytes(previewGrantId!)
           : await fsApi.readFileBytes(path);
         if (cancelled) return;
         const mime = f.mime ?? "application/octet-stream";
@@ -35,7 +39,7 @@ export function ImagePreview({ path, preview = false }: ImagePreviewProps) {
     return () => {
       cancelled = true;
     };
-  }, [path, preview]);
+  }, [path, preview, previewGrantId]);
 
   return (
     <div className="relative flex h-full flex-col bg-canvas">
@@ -44,7 +48,7 @@ export function ImagePreview({ path, preview = false }: ImagePreviewProps) {
         className="flex h-[34px] shrink-0 items-center justify-between border-b border-hairline-soft px-[14px]"
       >
         <span className="editorial-caps">{t("editor.image")}</span>
-        {preview ? <SendToProjectButton path={path} /> : null}
+        {preview ? <SendToProjectButton path={path} grantId={previewGrantId} /> : null}
       </header>
       <div className="flex flex-1 items-center justify-center overflow-auto p-[24px]">
         {error ? (

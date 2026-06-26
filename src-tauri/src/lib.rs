@@ -1,11 +1,12 @@
-pub mod agent;
 pub mod commands;
 pub mod config_paths;
+pub mod directory_grants;
 pub mod error;
 pub mod events;
 pub mod fs_ops;
 pub mod git;
 pub mod open_files;
+pub mod preview_grants;
 pub mod projects;
 pub mod pty;
 pub mod search;
@@ -14,20 +15,20 @@ pub mod watcher;
 
 use std::sync::Arc;
 
+use directory_grants::DirectoryGrants;
 use open_files::PendingOpenFiles;
+use preview_grants::PreviewGrants;
 use projects::ProjectsCache;
 use pty::PtyManager;
+use commands::search::SearchRegistry;
 use tauri::{Emitter, Manager};
 use watcher::WatcherManager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // reqwest 0.13 + rustls 0.23 (pulled in via tauri-plugin-updater and the
-    // AgentRuntime HTTP client) require a process-wide crypto provider to be
-    // installed before any reqwest::Client is built, otherwise the client
-    // constructor panics "No provider set" at launch. Install ring's provider
-    // once, here, before the Tauri builder spins anything up. Idempotent: a
-    // second call returns Err with the already-installed provider; we ignore it.
+    // reqwest 0.13 + rustls 0.23, pulled in via tauri-plugin-updater, requires a
+    // process-wide crypto provider before any reqwest::Client is built.
+    // Install ring's provider once before the Tauri builder spins anything up.
     let _ = rustls::crypto::ring::default_provider().install_default();
 
     // `mut` is used only in release (the single-instance block below); debug skips it.
@@ -54,8 +55,6 @@ pub fn run() {
     }
     builder
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_fs::init())
-        .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -78,17 +77,13 @@ pub fn run() {
                     if let Some(mgr) = app.try_state::<pty::PtyManager>() {
                         mgr.kill_all().await;
                     }
-                    // Reap the opencode runtime sidecar so it doesn't outlive the app.
-                    if let Some(rt) = app.try_state::<agent::AgentRuntime>() {
-                        rt.stop();
-                    }
                     app.exit(0);
                 });
             }
         })
         .setup(|app| {
             // Ensure the ~/.metacodex tree exists before anything reads from or
-            // writes to it (CronStore::load persists a refreshed snapshot).
+            // writes to it.
             if let Err(e) = config_paths::ensure_dirs() {
                 eprintln!("[metacodex] config_paths::ensure_dirs failed: {e}");
             }
@@ -96,16 +91,11 @@ pub fn run() {
             app.manage(pty_mgr);
             app.manage(Arc::new(ProjectsCache::default()));
             app.manage(Arc::new(WatcherManager::new(app.handle().clone())));
+            app.manage(Arc::new(PreviewGrants::default()));
+            app.manage(Arc::new(DirectoryGrants::default()));
             app.manage(Arc::new(PendingOpenFiles::default()));
+            app.manage(Arc::new(SearchRegistry::default()));
             app.manage(Arc::new(commands::git::CloneRegistry::default()));
-            // opencode runtime sidecar (Agent View). Spawned lazily on first use.
-            app.manage(agent::AgentRuntime::new());
-            // Scheduled-task (cron) registry, hydrated from disk.
-            app.manage(agent::scheduler::CronStore::load());
-            // MCP server registry; regenerates the opencode config layer on boot.
-            app.manage(agent::McpStore::load());
-            // Agent entities (~/.metacodex/agents); reads are stateless scans.
-            app.manage(agent::AgentEntityStore::new());
             // Hydrate the in-memory project cache from the persisted state.
             if let Err(e) = projects::hydrate(app.handle()) {
                 eprintln!("[metacodex] projects::hydrate failed: {e}");
@@ -113,9 +103,6 @@ pub fn run() {
             // Trim resume entries older than 30 days. Best-effort: corrupt
             // files are ignored so this never blocks startup.
             commands::resume::prune_blocking(30);
-            // Start the Agent View cron scheduler (fires due tasks once a minute
-            // while the app is open).
-            agent::scheduler::start(app.handle().clone());
             // Cold-start "Open With" on Windows/Linux: macOS delivers these as
             // RunEvent::Opened (Apple Events, handled below). Other platforms
             // pass file paths via argv on the FIRST launch; the single_instance
@@ -155,20 +142,18 @@ pub fn run() {
             commands::system::open_external_url,
             commands::system::take_pending_open_files,
             commands::filesystem::read_dir,
+            commands::filesystem::pick_preview_file,
+            commands::filesystem::pick_project_icon,
             commands::filesystem::stat,
             commands::filesystem::read_file_text,
             commands::filesystem::read_file_bytes,
-            commands::filesystem::read_icon_image,
             commands::filesystem::read_preview_text,
             commands::filesystem::read_preview_bytes,
             commands::filesystem::write_preview_text,
             commands::filesystem::move_into_project,
             commands::filesystem::write_file_text,
-            commands::filesystem::delete_path,
-            commands::filesystem::rename_path,
             commands::filesystem::create_file,
             commands::filesystem::create_dir,
-            commands::filesystem::move_path,
             commands::workspace::save_workspace_state,
             commands::workspace::load_workspace_state,
             commands::settings::read_settings,
@@ -188,6 +173,7 @@ pub fn run() {
             commands::git::git_worktree_add,
             commands::git::git_worktree_remove,
             commands::git::git_merge_into,
+            commands::git::pick_clone_parent_dir,
             commands::git::git_clone,
             commands::git::git_clone_cancel,
             commands::notifications::notify_show,
@@ -197,42 +183,6 @@ pub fn run() {
             commands::resume::resume_prune,
             commands::diagnostics::write_session_log,
             commands::diagnostics::write_crash,
-            commands::agent::agent_runtime_start,
-            commands::agent::agent_runtime_status,
-            commands::agent::agent_runtime_stop,
-            commands::agent::agent_list_models,
-            commands::agent::agent_set_credentials,
-            commands::agent::agent_list_skills,
-            commands::agent::agent_cron_list,
-            commands::agent::agent_cron_create,
-            commands::agent::agent_cron_update,
-            commands::agent::agent_cron_delete,
-            commands::agent::agent_cron_set_enabled,
-            commands::agent::agent_cron_run_now,
-            commands::agent::agent_runtime_restart,
-            commands::agent::agent_mcp_list,
-            commands::agent::agent_mcp_featured,
-            commands::agent::agent_mcp_upsert,
-            commands::agent::agent_mcp_delete,
-            commands::agent::agent_mcp_set_enabled,
-            commands::agent::agent_mcp_status,
-            commands::agent::agent_entity_list,
-            commands::agent::agent_entity_create,
-            commands::agent::agent_entity_update,
-            commands::agent::agent_entity_delete,
-            commands::agent::agent_entity_memory_context,
-            commands::agent::agent_entity_memory_tree,
-            commands::agent::agent_entity_memory_read,
-            commands::agent::agent_entity_memory_write,
-            commands::agent::agent_entity_memory_delete,
-            commands::agent::agent_entity_activity,
-            commands::agent::agent_entity_proposals,
-            commands::agent::agent_entity_proposal_resolve,
-            commands::agent::agent_entity_heartbeat_read,
-            commands::agent::agent_entity_heartbeat_write,
-            commands::agent::agent_entity_status,
-            commands::agent::agent_ui_state_read,
-            commands::agent::agent_ui_state_write,
         ])
         .build(tauri::generate_context!())
         .expect("metacodex failed to start")

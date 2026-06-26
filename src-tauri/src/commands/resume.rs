@@ -7,20 +7,20 @@ use crate::error::{AppError, AppResult};
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ResumeEntry {
-    /// Local nanoid — the resume registry's primary key, distinct from
+    /// Local nanoid , the resume registry's primary key, distinct from
     /// `session_id` which is whatever the CLI prints.
     pub id: String,
     /// Project the session belongs to. `None` if captured in a no-project tab.
     pub project_id: Option<String>,
-    /// "claude-code" | "codex-cli" | "opencode" | … — the registry id.
+    /// "claude-code" | "codex-cli" | "opencode" | … , the registry id.
     pub cli_id: String,
     /// CLI-printed session token. UUID for Claude Code; format varies for others.
     pub session_id: String,
     pub cwd: String,
     pub branch: Option<String>,
-    /// RFC3339 — when the detector first saw this session id.
+    /// RFC3339 , when the detector first saw this session id.
     pub captured_at: String,
-    /// RFC3339 — bumped on every subsequent detection so prune knows what's recent.
+    /// RFC3339 , bumped on every subsequent detection so prune knows what's recent.
     pub last_seen_at: String,
 }
 
@@ -79,7 +79,7 @@ pub async fn resume_save(entry: ResumeEntry) -> AppResult<()> {
         if let Some(b) = entry.branch {
             existing.branch = Some(b);
         }
-        if !entry.project_id.is_none() {
+        if entry.project_id.is_some() {
             existing.project_id = entry.project_id;
         }
     } else {

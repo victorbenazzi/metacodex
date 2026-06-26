@@ -16,8 +16,6 @@ export type CommandId =
   | "palette.files"
   | "file.save"
   | "tab.jumpToNextAttention"
-  | "agent.newChat"
-  | "view.toggle"
   | "diagnostics.toggle";
 
 export type CommandCategory = "general" | "navigation" | "view" | "editing";
@@ -46,7 +44,7 @@ export interface CommandDef {
    *  command is resolved via the range matcher, not the static binding table. */
   range?: { from: number; to: number; bindingTemplate: string };
   /** When true, the command resolves but the global dispatcher does NOT
-   *  preventDefault — it's swallowed so another handler (e.g. CodeMirror's
+   *  preventDefault. It is swallowed so another handler (e.g. CodeMirror's
    *  Mod-s) wins. */
   passive?: boolean;
 }

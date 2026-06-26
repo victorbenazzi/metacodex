@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import type { UnlistenFn } from "@tauri-apps/api/event";
 import {
   readText as readClipboardText,
   writeText as writeClipboardText,
@@ -10,13 +9,8 @@ import i18n from "@/features/i18n/config";
 import { ptyApi } from "@/features/terminal/terminal.service";
 import { useTerminalStore } from "@/features/terminal/terminal.store";
 import type { PtySpawnSpec } from "@/features/terminal/terminal.types";
-import {
-  EV,
-  listenTo,
-  type PtyDataPayload,
-  type PtyExitPayload,
-  type PtyExitReason,
-} from "@/lib/events";
+import type { PtyExitReason } from "@/lib/events";
+import { subscribePtyData, subscribePtyExit } from "@/features/terminal/ptyEvents";
 import { base64ToUint8Array, utf8ToBase64 } from "@/lib/base64";
 import { useTabsStore, WORKSPACE_NULL } from "@/components/tabs/tabsStore";
 import { createFileLinkProvider } from "./terminalLinks";
@@ -67,7 +61,7 @@ interface TerminalTabProps {
    * Whether this tab is currently the displayed one. Drives an explicit
    * fit()/scroll-to-bottom whenever the tab transitions from hidden to shown,
    * because in WKWebView a `display:none → block` swap doesn't always fire the
-   * ResizeObserver — leaving xterm with stale cols/rows (rendered content
+   * ResizeObserver , leaving xterm with stale cols/rows (rendered content
    * looks "cut off" along the bottom).
    */
   isVisible?: boolean;
@@ -126,7 +120,7 @@ export function TerminalTab({
   }, [projectId, setLastFocused, containerRef]);
 
   // When the tab transitions from hidden (`display:none`) to visible, the
-  // container resumes having a real size — but WKWebView's ResizeObserver
+  // container resumes having a real size , but WKWebView's ResizeObserver
   // sometimes misses that transition, so the xterm renderer keeps the cols/rows
   // it had pre-hide (possibly 0 if it was first hidden). The result is content
   // clipped at the bottom and a PTY out of sync with the visible viewport.
@@ -137,14 +131,14 @@ export function TerminalTab({
   //      We poll across frames until the size stabilizes (same value twice).
   //   2. If the container size happens to match what xterm already stored,
   //      `fit.fit()` short-circuits without resizing, AND the CanvasAddon's
-  //      pixel cache stays stale from the pre-hide layout — bottom rows look
+  //      pixel cache stays stale from the pre-hide layout , bottom rows look
   //      empty until the user nudges the window. We force a `refresh()` after
   //      fit so the canvas redraws even when fit is a no-op.
   //   3. Same no-op fit case also skips `term.resize()` → skips xterm's
   //      `_afterResize` → skips `viewport.syncScrollArea(true)`. The viewport's
   //      `_scrollArea.style.height` then stays cached at whatever the buffer
   //      length was when sync last ran, so mouse-wheel-up has nothing to scroll
-  //      into — even though the scrollback IS populated. Typing the next chunk
+  //      into , even though the scrollback IS populated. Typing the next chunk
   //      of output (or anything that grows the buffer) re-syncs and unblocks
   //      scrolling, which makes the bug look like it "fixes itself". We poke
   //      the private viewport sync directly after every fit to keep the scroll
@@ -175,14 +169,14 @@ export function TerminalTab({
         lastW = w;
         lastH = h;
       }
-      // Two stable frames OR ~16 attempts (~250ms) — whichever first.
+      // Two stable frames OR ~16 attempts (~250ms) , whichever first.
       if (stableFrames < 2 && attempts++ < 16) {
         requestAnimationFrame(tick);
         return;
       }
       try {
         fit.fit();
-        // Force a full redraw — `fit.fit()` only calls `term.resize()` when
+        // Force a full redraw , `fit.fit()` only calls `term.resize()` when
         // dimensions change; if rows/cols match the pre-hide values, the
         // CanvasAddon never repaints and stale rows remain on screen.
         term.refresh(0, Math.max(0, term.rows - 1));
@@ -190,7 +184,7 @@ export function TerminalTab({
         (term as any)._core?.viewport?.syncScrollArea?.(true);
         term.scrollToBottom();
       } catch {
-        // ignore — observer below will retry
+        // ignore , observer below will retry
       }
     };
     requestAnimationFrame(tick);
@@ -201,8 +195,8 @@ export function TerminalTab({
 
   useEffect(() => {
     let cancelled = false;
-    let unlistenData: UnlistenFn | undefined;
-    let unlistenExit: UnlistenFn | undefined;
+    let unlistenData: (() => void) | undefined;
+    let unlistenExit: (() => void) | undefined;
 
     const term = termRef.current;
     const fit = fitRef.current;
@@ -211,20 +205,20 @@ export function TerminalTab({
     // Make `file:line` references in output clickable → open in the editor.
     const linkProvider = term.registerLinkProvider(createFileLinkProvider(term, cwd));
 
-    // Agent observability — OSC handlers + heuristic. Both write into the
+    // Agent observability , OSC handlers + heuristic. Both write into the
     // shared `useAgentStatusStore` keyed by tabId so the TabBar dot reacts in
     // real time. The OSC handler also funnels into `dispatchAgentNotification`
     // which gates the OS banner + chime behind user settings.
     const agentStore = useAgentStatusStore.getState();
     let lastCwdPushed: string | null = null;
-    // Resolve project key once per session — used by OSC title updates which
+    // Resolve project key once per session , used by OSC title updates which
     // hit `useTabsStore.getState().setTabTitles(projectKey, tabId, ...)`.
     const projectKey = projectId ?? WORKSPACE_NULL;
     let lastAgentTitlePushed: string | null = null;
     const oscDisposables = installOscHandlers(term, {
       onCwd: (path) => {
         // OSC 7 fires on every `cd` (oh-my-zsh `chpwd_functions`). Skip the
-        // round-trip when the value hasn't actually changed — saves IPC churn
+        // round-trip when the value hasn't actually changed , saves IPC churn
         // on prompts that re-emit cwd unconditionally.
         if (path === lastCwdPushed) return;
         lastCwdPushed = path;
@@ -265,7 +259,7 @@ export function TerminalTab({
       getStatus: () => useAgentStatusStore.getState().byTab[tabId]?.status,
       setStatus: (status, hint) => {
         // Don't downgrade an OSC-driven `needs-attention` back to `working`
-        // just because the user pressed Enter to send a follow-up — once an
+        // just because the user pressed Enter to send a follow-up , once an
         // agent is waiting, only an explicit user reply (handled implicitly
         // by the next round of output) should clear it.
         const current = useAgentStatusStore.getState().byTab[tabId]?.status;
@@ -274,7 +268,7 @@ export function TerminalTab({
       },
     });
 
-    // Auto-clear `done` after a few seconds — the user got the signal, the
+    // Auto-clear `done` after a few seconds , the user got the signal, the
     // green dot has done its job, the tab returns to neutral.
     const doneSweeper = window.setInterval(() => {
       const entry = useAgentStatusStore.getState().byTab[tabId];
@@ -291,19 +285,19 @@ export function TerminalTab({
     //
     // Two subtleties (both regressions waiting to happen):
     //   1. `attachCustomKeyEventHandler` returning false makes xterm SKIP its
-    //      normal keydown path — including the `preventDefault()` it would
+    //      normal keydown path , including the `preventDefault()` it would
     //      otherwise call. Without our own preventDefault here, WKWebView's
     //      default action inserts a `\n` into xterm's helper <textarea>,
     //      which then leaks through the `input` listener as a stray `\n`
     //      sent to the PTY immediately AFTER our `\x1b\r`. Most CLIs
     //      interpret that trailing `\n` as "submit", so the user sees their
     //      message dispatched without the newline they wanted.
-    //   2. Match on `ev.code === "Enter"` too — WKWebView in some keyboard
+    //   2. Match on `ev.code === "Enter"` too , WKWebView in some keyboard
     //      layouts (ABNT2, AZERTY) reports `ev.key` as a localized label
     //      while `ev.code` stays canonical.
     // Paste from the system clipboard into the active PTY. Uses `term.paste`
     // so the data flows through xterm's bracketed-paste machinery (the shell
-    // sees `\x1b[200~...\x1b[201~` whenever it has DECSET 2004 enabled — Bash,
+    // sees `\x1b[200~...\x1b[201~` whenever it has DECSET 2004 enabled , Bash,
     // Zsh, Fish, vim, and most TUIs request this), then through `onData` to
     // the PTY just like keyboard input.
     const pasteFromClipboard = () => {
@@ -342,7 +336,7 @@ export function TerminalTab({
         return false;
       }
       // Copy: when the user has a selection, Cmd/Ctrl+C copies it instead of
-      // sending SIGINT — same convention as VS Code's integrated terminal.
+      // sending SIGINT , same convention as VS Code's integrated terminal.
       // Without a selection we fall through so the PTY still gets `\x03`.
       const isC = ev.key === "c" || ev.key === "C" || ev.code === "KeyC";
       if (
@@ -390,11 +384,11 @@ export function TerminalTab({
       await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
       await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
       try {
-        // Skip if hidden (e.g. user switched tabs during those frames) — fitting
+        // Skip if hidden (e.g. user switched tabs during those frames) , fitting
         // a 0×0 container clamps cols to ~2; the ResizeObserver re-fits on show.
         if (containerRef.current?.clientWidth) fit.fit();
       } catch {
-        // ignore — observer below will retry
+        // ignore , observer below will retry
       }
 
       try {
@@ -431,11 +425,10 @@ export function TerminalTab({
         });
 
         let prefillWritten = false;
-        unlistenData = await listenTo<PtyDataPayload>(EV.ptyData, (e) => {
-          if (e.payload.session_id !== sessionId) return;
+        unlistenData = subscribePtyData(sessionId, (payload) => {
           // Late-arriving chunk after unmount → term is gone. Skip silently.
           if (disposedRef.current) return;
-          const bytes = base64ToUint8Array(e.payload.data_b64);
+          const bytes = base64ToUint8Array(payload.data_b64);
           try {
             term.write(bytes);
           } catch (writeErr) {
@@ -452,16 +445,15 @@ export function TerminalTab({
             }, 200);
           }
         });
-        unlistenExit = await listenTo<PtyExitPayload>(EV.ptyExit, (e) => {
-          if (e.payload.session_id !== sessionId) return;
-          const reason = (e.payload.reason ?? "normal") as PtyExitReason;
+        unlistenExit = subscribePtyExit(sessionId, (payload) => {
+          const reason = (payload.reason ?? "normal") as PtyExitReason;
           if (!disposedRef.current) {
             term.writeln(`\r\n\x1b[2m${i18n.t("terminal.processExited")}\x1b[0m`);
           }
-          setStatus(sessionId, "exited", e.payload.exit_code);
+          setStatus(sessionId, "exited", payload.exit_code);
           // Surface a sticky banner whenever the exit was anomalous.
-          if (reason !== "normal" || e.payload.exit_code !== 0) {
-            setExitInfo({ code: e.payload.exit_code, reason });
+          if (reason !== "normal" || payload.exit_code !== 0) {
+            setExitInfo({ code: payload.exit_code, reason });
           }
           // Only agent CLIs get the "done" dot + completion chime. A plain
           // shell exiting (the user typed `exit` in a Cmd+T terminal) must not
@@ -477,7 +469,7 @@ export function TerminalTab({
               sound: true,
             });
           }
-          // Clear the agent's "I am doing X" title — it's stale the moment the
+          // Clear the agent's "I am doing X" title , it's stale the moment the
           // process exits. User overrides (userTitle) stay untouched.
           useTabsStore.getState().setTabTitles(projectKey, tabId, {
             agentTitle: null,
@@ -532,11 +524,11 @@ export function TerminalTab({
           if (!f || !t || !container.clientWidth || !container.clientHeight) return;
           try {
             f.fit();
-            // Force a redraw — see the comment on the isVisible effect for the
+            // Force a redraw , see the comment on the isVisible effect for the
             // pixel-cache staleness this guards against.
             t.refresh(0, Math.max(0, t.rows - 1));
             // And force a viewport sync so mouse-wheel scroll stays alive even
-            // when fit() short-circuited — same root cause, see item (3) on
+            // when fit() short-circuited , same root cause, see item (3) on
             // the isVisible effect. This is the path hit when the Source
             // Control panel opens / closes and width changes by a small amount
             // that doesn't bump cols.

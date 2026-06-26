@@ -24,7 +24,7 @@ export interface PtyDataPayload {
 export interface PtyExitPayload {
   session_id: string;
   exit_code: number;
-  // Optional for backwards compatibility — older Rust builds emit without it.
+  // Optional for backwards compatibility , older Rust builds emit without it.
   reason?: PtyExitReason;
 }
 
@@ -51,11 +51,16 @@ export interface GitCloneProgressPayload {
   percent: number;
 }
 
-export interface OpenFilePayload {
-  paths: string[];
+export interface PreviewGrant {
+  path: string;
+  grantId: string;
 }
 
-// Rust backpressure payload uses serde camelCase — matches the field names above
+export interface OpenFilePayload {
+  files: PreviewGrant[];
+}
+
+// Rust backpressure payload uses serde camelCase , matches the field names above
 // for PtyBackpressurePayload but kept explicit here for clarity at IPC boundary.
 
 export function listenTo<T>(event: EventName, handler: EventCallback<T>): Promise<UnlistenFn> {

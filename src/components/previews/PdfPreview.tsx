@@ -8,14 +8,12 @@ import { Icon } from "@/components/ui/Icon";
 import { Button } from "@/components/ui/Button";
 import { SendToProjectButton } from "@/components/previews/PreviewToolbar";
 import { basename } from "@/lib/path";
+import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
-// pdfjs worker config. We use the unpkg-hosted worker for dev; a bundled worker
-// can be configured later via `pdfjsWorker` import + URL constructor.
 async function loadPdfjs() {
   const pdfjs = await import("pdfjs-dist");
   if (!pdfjs.GlobalWorkerOptions.workerSrc) {
-    // Use the matching version's CDN worker. pdfjs.version is set at runtime.
-    pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+    pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
   }
   return pdfjs;
 }
@@ -23,9 +21,10 @@ async function loadPdfjs() {
 interface PdfPreviewProps {
   path: string;
   preview?: boolean;
+  previewGrantId?: string;
 }
 
-export function PdfPreview({ path, preview = false }: PdfPreviewProps) {
+export function PdfPreview({ path, preview = false, previewGrantId }: PdfPreviewProps) {
   const { t } = useTranslation();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [page, setPage] = useState(1);
@@ -41,8 +40,11 @@ export function PdfPreview({ path, preview = false }: PdfPreviewProps) {
 
     (async () => {
       try {
+        if (preview && !previewGrantId) {
+          throw new Error("preview grant missing");
+        }
         const file = preview
-          ? await fsApi.readPreviewBytes(path)
+          ? await fsApi.readPreviewBytes(previewGrantId!)
           : await fsApi.readFileBytes(path);
         if (cancelled) return;
         const data = base64ToUint8Array(file.b64);
@@ -69,7 +71,7 @@ export function PdfPreview({ path, preview = false }: PdfPreviewProps) {
         d.destroy?.();
       }
     };
-  }, [path, preview]);
+  }, [path, preview, previewGrantId]);
 
   const renderPage = async (n: number) => {
     const doc = docRef.current;
@@ -97,7 +99,7 @@ export function PdfPreview({ path, preview = false }: PdfPreviewProps) {
       >
         <span className="editorial-caps truncate">{t("editor.pdfLabel", { name: basename(path) })}</span>
         <div className="flex items-center gap-[6px]">
-          {preview ? <SendToProjectButton path={path} /> : null}
+          {preview ? <SendToProjectButton path={path} grantId={previewGrantId} /> : null}
           <Button
             variant="ghost"
             size="icon"

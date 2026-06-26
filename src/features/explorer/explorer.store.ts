@@ -2,7 +2,6 @@ import { create } from "zustand";
 
 import { fsApi } from "@/features/filesystem/filesystem.service";
 import type { DirEntry } from "@/features/filesystem/filesystem.types";
-import { dirname } from "@/lib/path";
 
 export type ChildrenState = DirEntry[] | "loading" | { error: string };
 
@@ -30,7 +29,7 @@ interface ExplorerBucket {
   creating: CreatingState | null;
   /**
    * Absolute paths of entries that appeared in a directory listing since the
-   * previous refresh — used to tint "just-appeared" files (typically created
+   * previous refresh , used to tint "just-appeared" files (typically created
    * by the IA running in the terminal). Value is the Date.now() timestamp
    * when the entry was first observed; auto-cleared after RECENT_TTL_MS.
    */
@@ -48,17 +47,6 @@ interface ExplorerState {
   loadIfNeeded: (projectId: string, path: string) => Promise<void>;
   refresh: (projectId: string, path: string) => Promise<void>;
   clearProject: (projectId: string) => void;
-  /** Permanently delete a file or directory and refresh the parent listing. */
-  deleteNode: (projectId: string, path: string) => Promise<void>;
-  /**
-   * Rename a file or directory in-place. `newName` is a basename, not a path.
-   * Returns the new absolute path on success.
-   */
-  renameNode: (
-    projectId: string,
-    path: string,
-    newName: string,
-  ) => Promise<string>;
   /** Set (or clear) the selected node for a project. */
   setSelected: (projectId: string, selected: SelectedNode | null) => void;
   /** Open an inline create input inside `parentPath` (expands it first). */
@@ -76,8 +64,6 @@ interface ExplorerState {
     name: string,
     kind: CreateKind,
   ) => Promise<string>;
-  /** Move `from` into `toDir` (preserving basename). Returns the new path. */
-  moveNode: (projectId: string, from: string, toDir: string) => Promise<string>;
   /** Drop a path from the recentlyAdded map (called by the TTL timer). */
   clearRecent: (projectId: string, path: string) => void;
 }
@@ -162,7 +148,7 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
   refresh: async (projectId, path) => {
     const cur = get().byProject[projectId] ?? emptyBucket();
     // Snapshot the previous listing so we can diff after the reload.
-    // We only mark "recent" when there was a prior listing — first-time
+    // We only mark "recent" when there was a prior listing , first-time
     // loads of a folder shouldn't tint every single entry.
     const before = cur.children[path];
     const beforePaths =
@@ -252,58 +238,6 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
       };
     }),
 
-  deleteNode: async (projectId, path) => {
-    await fsApi.deletePath(path);
-    set((state) => {
-      const cur = state.byProject[projectId] ?? emptyBucket();
-      const nextExpanded = new Set<string>();
-      for (const e of cur.expanded) {
-        if (e !== path && !e.startsWith(path + "/")) nextExpanded.add(e);
-      }
-      const nextChildren: Record<string, ChildrenState> = {};
-      for (const [k, v] of Object.entries(cur.children)) {
-        if (k === path || k.startsWith(path + "/")) continue;
-        nextChildren[k] = v;
-      }
-      return {
-        byProject: {
-          ...state.byProject,
-          [projectId]: { ...cur, expanded: nextExpanded, children: nextChildren },
-        },
-      };
-    });
-    const parent = dirname(path);
-    if (parent) await get().refresh(projectId, parent);
-  },
-
-  renameNode: async (projectId, path, newName) => {
-    const newPath = await fsApi.renamePath(path, newName);
-    set((state) => {
-      const cur = state.byProject[projectId] ?? emptyBucket();
-      const nextExpanded = new Set<string>();
-      for (const e of cur.expanded) {
-        if (e === path) nextExpanded.add(newPath);
-        else if (e.startsWith(path + "/"))
-          nextExpanded.add(newPath + e.slice(path.length));
-        else nextExpanded.add(e);
-      }
-      const nextChildren: Record<string, ChildrenState> = {};
-      for (const [k, v] of Object.entries(cur.children)) {
-        if (k === path || k.startsWith(path + "/")) continue;
-        nextChildren[k] = v;
-      }
-      return {
-        byProject: {
-          ...state.byProject,
-          [projectId]: { ...cur, expanded: nextExpanded, children: nextChildren },
-        },
-      };
-    });
-    const parent = dirname(path);
-    if (parent) await get().refresh(projectId, parent);
-    return newPath;
-  },
-
   setSelected: (projectId, selected) =>
     set((state) => {
       const cur = state.byProject[projectId] ?? emptyBucket();
@@ -361,36 +295,4 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
     return newPath;
   },
 
-  moveNode: async (projectId, from, toDir) => {
-    const newPath = await fsApi.movePath(from, toDir);
-    set((state) => {
-      const cur = state.byProject[projectId] ?? emptyBucket();
-      // Remap expanded entries for the moved subtree.
-      const nextExpanded = new Set<string>();
-      for (const e of cur.expanded) {
-        if (e === from) nextExpanded.add(newPath);
-        else if (e.startsWith(from + "/"))
-          nextExpanded.add(newPath + e.slice(from.length));
-        else nextExpanded.add(e);
-      }
-      // Surface the destination folder.
-      nextExpanded.add(toDir);
-      // Drop cached children for the moved subtree.
-      const nextChildren: Record<string, ChildrenState> = {};
-      for (const [k, v] of Object.entries(cur.children)) {
-        if (k === from || k.startsWith(from + "/")) continue;
-        nextChildren[k] = v;
-      }
-      return {
-        byProject: {
-          ...state.byProject,
-          [projectId]: { ...cur, expanded: nextExpanded, children: nextChildren },
-        },
-      };
-    });
-    const srcParent = dirname(from);
-    if (srcParent) await get().refresh(projectId, srcParent);
-    await get().refresh(projectId, toDir);
-    return newPath;
-  },
 }));

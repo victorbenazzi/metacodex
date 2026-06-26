@@ -4,26 +4,27 @@ use parking_lot::Mutex;
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::events::{OpenFilePayload, EV_OPEN_FILE};
+use crate::preview_grants::{PreviewGrant, PreviewGrants};
 
 /// Files the OS asked us to open that arrived before the webview was listening
 /// (cold start: the app was launched *by* the open). Drained by the frontend via
 /// `take_pending_open_files` on mount.
 #[derive(Default)]
 pub struct PendingOpenFiles {
-    inner: Mutex<Vec<String>>,
+    inner: Mutex<Vec<PreviewGrant>>,
 }
 
 impl PendingOpenFiles {
-    pub fn push(&self, paths: &[String]) {
+    pub fn push(&self, files: &[PreviewGrant]) {
         let mut g = self.inner.lock();
-        for p in paths {
-            if !g.contains(p) {
-                g.push(p.clone());
+        for file in files {
+            if !g.iter().any(|f| f.grant_id == file.grant_id) {
+                g.push(file.clone());
             }
         }
     }
 
-    pub fn drain(&self) -> Vec<String> {
+    pub fn drain(&self) -> Vec<PreviewGrant> {
         std::mem::take(&mut *self.inner.lock())
     }
 }
@@ -44,14 +45,24 @@ pub fn deliver(app: &AppHandle, paths: Vec<String>) {
     if paths.is_empty() {
         return;
     }
-    if let Some(state) = app.try_state::<Arc<PendingOpenFiles>>() {
-        state.push(&paths);
+    let Some(grants) = app.try_state::<Arc<PreviewGrants>>() else {
+        return;
+    };
+    let files: Vec<PreviewGrant> = paths
+        .into_iter()
+        .map(|path| grants.grant_path(path))
+        .collect();
+    if files.is_empty() {
+        return;
     }
-    let _ = app.emit(EV_OPEN_FILE, OpenFilePayload { paths });
+    if let Some(state) = app.try_state::<Arc<PendingOpenFiles>>() {
+        state.push(&files);
+    }
+    let _ = app.emit(EV_OPEN_FILE, OpenFilePayload { files });
 }
 
-/// Convert the `file://` URLs from `RunEvent::Opened` (Finder double-click / "Open
-/// With") into local paths and deliver them.
+/// Convert the `file://` URLs from `RunEvent::Opened` into local paths and
+/// deliver them.
 #[cfg(target_os = "macos")]
 pub fn handle_opened(app: &AppHandle, urls: Vec<tauri::Url>) {
     let paths: Vec<String> = urls

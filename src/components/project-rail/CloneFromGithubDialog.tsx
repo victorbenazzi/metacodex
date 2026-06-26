@@ -1,14 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { documentDir } from "@tauri-apps/api/path";
 import { FolderSearch, Loader2 } from "lucide-react";
 
 import { DialogContent, DialogRoot } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { useProjectsStore } from "@/features/projects/project.store";
-import { cloneRepo, cancelClone, repoNameFromUrl } from "@/features/git/clone.service";
+import {
+  cloneRepo,
+  cancelClone,
+  pickCloneParentDir,
+  repoNameFromUrl,
+} from "@/features/git/clone.service";
 import { newId } from "@/lib/idGen";
 import { isAppError, CMD, invoke } from "@/lib/ipc";
 import { useSettingsDataStore } from "@/features/settings/settings.data.store";
@@ -35,6 +38,7 @@ export function CloneFromGithubDialog({ open, onOpenChange }: CloneFromGithubDia
 
   const [url, setUrl] = useState("");
   const [parentDir, setParentDir] = useState("");
+  const [parentGrantId, setParentGrantId] = useState<string | null>(null);
   const [folderName, setFolderName] = useState("");
   const [folderNameTouched, setFolderNameTouched] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -49,25 +53,13 @@ export function CloneFromGithubDialog({ open, onOpenChange }: CloneFromGithubDia
     if (!open) return;
     setUrl("");
     setParentDir("");
+    setParentGrantId(null);
     setFolderName("");
     setFolderNameTouched(false);
     setBusy(false);
     setErr(null);
     setProgress(null);
     cancelledRef.current = false;
-    let cancelled = false;
-    (async () => {
-      try {
-        const docs = await documentDir();
-        if (!cancelled) setParentDir(docs.replace(/\/+$/, ""));
-      } catch {
-        // documentDir can fail (sandboxed envs, missing folder) — leave empty
-        // and the user picks via "Choose…".
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
   }, [open]);
 
   // Auto-fill folder name from URL until the user manually edits it.
@@ -79,13 +71,13 @@ export function CloneFromGithubDialog({ open, onOpenChange }: CloneFromGithubDia
 
   const chooseParent = async () => {
     try {
-      const selected = await openDialog({
-        directory: true,
-        multiple: false,
-        title: t("cloneFromGithub.parent.dialogTitle"),
-      });
-      if (typeof selected === "string" && selected.length > 0) {
-        setParentDir(selected);
+      const selected = await pickCloneParentDir(
+        t("cloneFromGithub.parent.dialogTitle"),
+        parentDir,
+      );
+      if (selected) {
+        setParentDir(selected.path);
+        setParentGrantId(selected.grantId);
       }
     } catch (e) {
       console.error("[clone] choose parent failed", e);
@@ -100,6 +92,7 @@ export function CloneFromGithubDialog({ open, onOpenChange }: CloneFromGithubDia
     !busy &&
     trimmedUrl.length > 0 &&
     parentDir.length > 0 &&
+    parentGrantId !== null &&
     trimmedName.length > 0 &&
     !folderNameInvalid;
 
@@ -139,7 +132,8 @@ export function CloneFromGithubDialog({ open, onOpenChange }: CloneFromGithubDia
   };
 
   const submit = async () => {
-    if (!canSubmit) return;
+    const grantId = parentGrantId;
+    if (!canSubmit || !grantId) return;
     cancelledRef.current = false;
     const opId = `clone-${newId(10)}`;
     opIdRef.current = opId;
@@ -149,7 +143,7 @@ export function CloneFromGithubDialog({ open, onOpenChange }: CloneFromGithubDia
     try {
       const dest = await cloneRepo({
         url: trimmedUrl,
-        parentDir,
+        parentGrantId: grantId,
         folderName: trimmedName,
         opId,
         onProgress: (p) => {
@@ -259,7 +253,7 @@ export function CloneFromGithubDialog({ open, onOpenChange }: CloneFromGithubDia
                 spellCheck={false}
                 autoComplete="off"
                 value={parentDir}
-                onChange={(e) => setParentDir(e.target.value)}
+                readOnly
                 disabled={busy}
                 className="block w-full rounded-sm border border-hairline-strong bg-canvas px-[10px] py-[7px] font-mono text-caption text-ink outline-none placeholder:text-muted-soft focus:border-ink disabled:opacity-60"
                 placeholder={t("cloneFromGithub.parent.placeholder")}
@@ -336,7 +330,7 @@ export function CloneFromGithubDialog({ open, onOpenChange }: CloneFromGithubDia
  * Thin progress track. When `percent` is null we render an indeterminate state:
  * a 33%-wide fill that slides across the track on a loop, signalling "still
  * working" while `git clone` is in pre-download phases (DNS, SSH handshake,
- * "Enumerating objects" — none of which report a percentage).
+ * "Enumerating objects" , none of which report a percentage).
  */
 function ProgressBar({ percent }: { percent: number | null }) {
   const indeterminate = percent === null;

@@ -10,6 +10,8 @@ pub const EV_OPEN_FILE: &str = "app://open-file";
 
 use serde::Serialize;
 
+use crate::preview_grants::PreviewGrant;
+
 #[derive(Serialize, Clone)]
 pub struct PtyDataPayload {
     pub session_id: String,
@@ -50,10 +52,10 @@ pub struct GitCloneProgressPayload {
     pub percent: u32,
 }
 
-/// Files the OS asked us to open (Finder "Open With" / double-click / drag-drop),
-/// delivered to the frontend to open in preview mode.
+/// Files the OS asked us to open, delivered to the frontend with backend grants
+/// for preview mode.
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct OpenFilePayload {
-    pub paths: Vec<String>,
+    pub files: Vec<PreviewGrant>,
 }

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { homeDir } from "@tauri-apps/api/path";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
@@ -9,14 +9,6 @@ import { ExpandedProjectsSidebar } from "@/components/code-sidebar/ExpandedProje
 import { useCodeSidebarStore } from "@/features/ui/codeSidebar.store";
 import { WorkArea } from "@/components/tabs/WorkArea";
 import { TitleBar } from "@/app/TitleBar";
-import { useViewStore } from "@/features/ui/view.store";
-import { useAgentComposerStore } from "@/features/agent/composer.store";
-
-// Lazy-loaded so the Agent View's heavier deps (streamdown/shiki/katex/mermaid)
-// stay out of the Code View bundle and only load when the user enters Agent mode.
-const AgentView = lazy(() =>
-  import("@/components/agent/AgentView").then((m) => ({ default: m.AgentView })),
-);
 import {
   useTabsStore,
   WORKSPACE_NULL,
@@ -42,7 +34,6 @@ import {
 } from "@/features/projects/workspace.service";
 import { watcherApi } from "@/features/filesystem/watcher.service";
 import { useGitStore } from "@/features/git/git.store";
-import { useAgentOverlayPanelsStore } from "@/features/agent/overlayPanels.store";
 import { useSourceControlStore } from "@/features/source-control/sourceControl.store";
 import { useTerminalStore } from "@/features/terminal/terminal.store";
 import { ptyApi } from "@/features/terminal/terminal.service";
@@ -54,6 +45,7 @@ import {
   type FsChangedPayload,
   type FsRenamedPayload,
   type OpenFilePayload,
+  type PreviewGrant,
   type PtyBackpressurePayload,
   type PtyExitPayload,
 } from "@/lib/events";
@@ -63,6 +55,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { ResizeHandle } from "@/components/ui/ResizeHandle";
 import { PANEL_LIMITS } from "@/features/settings/settings.types";
 import { CMD, invoke } from "@/lib/ipc";
+import { fsApi } from "@/features/filesystem/filesystem.service";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import {
@@ -77,7 +70,6 @@ import { WorktreeCreateDialog } from "@/components/source-control/WorktreeCreate
 import { CloneFromGithubDialog } from "@/components/project-rail/CloneFromGithubDialog";
 import { SettingsDialog } from "@/components/settings/SettingsDialog";
 import { Toaster } from "@/components/ui/Toaster";
-import { toast } from "@/features/ui/toast.store";
 import { useResumeStore } from "@/features/resume/resume.store";
 import { recordDiag, useDiagnosticsStore } from "@/features/diagnostics/diagnostics.store";
 import { useSaveStatusStore } from "@/features/workspace/saveStatus.store";
@@ -91,18 +83,6 @@ type PendingClose = {
   /** When mode === "single", the affected tab (for personalized copy). */
   singleTab?: Tab;
 };
-
-interface PendingDelete {
-  path: string;
-  name: string;
-  isDir: boolean;
-}
-
-interface PendingMove {
-  from: string;
-  toDir: string;
-  name: string;
-}
 
 /** Heuristic: dropped paths with a file extension are previewed; extensionless
  *  paths (folders, `Makefile`, …) route to "add project". Stat can't help here , 
@@ -129,7 +109,7 @@ const EMPTY_BUCKET = { tabs: [], activeTabId: null } as {
 };
 
 // Projects sidebar column width: the icon rail when collapsed (matches the
-// `--rail-w` token), the wider Agent-style projects panel when expanded.
+// `--rail-w` token), the wider projects panel when expanded.
 const RAIL_WIDTH_PX = 48;
 const PROJECTS_PANEL_WIDTH_PX = 264;
 
@@ -245,23 +225,12 @@ export function AppShell() {
   const setEditingTabId = useTabsStore((s) => s.setEditingTabId);
 
   const [pendingClose, setPendingClose] = useState<PendingClose | null>(null);
-  const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
-  const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
   const [worktreeDialogOpen, setWorktreeDialogOpen] = useState(false);
   const [cloneDialogOpen, setCloneDialogOpen] = useState(false);
   // Preview mode: file being sent to a project (null = dialog closed) + the
   // drag-over feedback flag for the global file-drop target.
-  const [sendToProjectPath, setSendToProjectPath] = useState<string | null>(null);
+  const [sendToProjectFile, setSendToProjectFile] = useState<PreviewGrant | null>(null);
   const [dropActive, setDropActive] = useState(false);
-  const [skipDeleteInSession, setSkipDeleteInSession] = useState(false);
-  const [skipMoveInSession, setSkipMoveInSession] = useState(false);
-  const skipMoveRef = useRef(false);
-  skipMoveRef.current = skipMoveInSession;
-  // Mirror skipDeleteInSession in a ref so the latest value is visible to the
-  // checkbox handler that lives inside the dialog (which closes the dialog
-  // before re-rendering the confirm callback in some flows).
-  const skipDeleteRef = useRef(false);
-  skipDeleteRef.current = skipDeleteInSession;
 
   const activeCwd = useMemo(
     () => project?.path ?? homeDirPath ?? "/",
@@ -914,82 +883,6 @@ export function AppShell() {
     [bucket.activeTabId, bucket.tabs, projectKey, setActiveTab],
   );
 
-  const performDelete = useCallback(
-    async (target: PendingDelete) => {
-      if (!project) return;
-      try {
-        await useExplorerStore.getState().deleteNode(project.id, target.path);
-        useTabsStore.getState().closeForRemovedPath(project.id, target.path);
-      } catch (err) {
-        console.warn("[explorer] delete failed", err);
-        toast.error(
-          t("appShell.deleteFailedTitle"),
-          err instanceof Error ? err.message : String(err),
-        );
-      }
-    },
-    [project, t],
-  );
-
-  const handleRequestDelete = useCallback(
-    (path: string, name: string, isDir: boolean) => {
-      if (skipDeleteRef.current) {
-        void performDelete({ path, name, isDir });
-        return;
-      }
-      setPendingDelete({ path, name, isDir });
-    },
-    [performDelete],
-  );
-
-  const handleRename = useCallback(
-    async (path: string, newName: string, _isDir: boolean): Promise<string> => {
-      if (!project) throw new Error("no active project");
-      // The Rust command emits `fs://renamed` synchronously after the rename
-      // succeeds, the global listener calls tabsStore.remapForRename, so we
-      // don't need a local call here (would be a redundant no-op).
-      return useExplorerStore
-        .getState()
-        .renameNode(project.id, path, newName);
-    },
-    [project],
-  );
-
-  const performMove = useCallback(
-    async (from: string, toDir: string): Promise<void> => {
-      if (!project) return;
-      try {
-        // Same as handleRename: Rust emits fs://renamed which drives the tab
-        // remap centrally, no local call needed.
-        await useExplorerStore
-          .getState()
-          .moveNode(project.id, from, toDir);
-      } catch (err) {
-        console.warn("[explorer] move failed", err);
-        toast.error(
-          t("appShell.moveFailedTitle"),
-          err instanceof Error ? err.message : String(err),
-        );
-      }
-    },
-    [project, t],
-  );
-
-  const handleMove = useCallback(
-    async (from: string, toDir: string): Promise<void> => {
-      if (!project) return;
-      // No-op moves (drop into current parent) skip the dialog, almost always
-      // an accidental drag the user just dropped right back where it started.
-      if (dirname(from) === toDir) return;
-      if (skipMoveRef.current) {
-        void performMove(from, toDir);
-        return;
-      }
-      setPendingMove({ from, toDir, name: basename(from) });
-    },
-    [project, performMove],
-  );
-
   const handleOpenInTerminal = useCallback(
     (path: string, name: string) => {
       openTab(projectKey, {
@@ -1050,11 +943,12 @@ export function AppShell() {
   // `projectId: null` (the preview invariant) and lands in whatever bucket is
   // currently visible so it shows in context. Ephemeral, never persisted.
   const handleOpenPreviewFile = useCallback(
-    (path: string) => {
+    (file: PreviewGrant) => {
+      const { path, grantId } = file;
       const name = basename(path);
       const id = `pf-${path}`;
       const kind = fileKindFor(name);
-      const base = { id, title: name, projectId: null, path } as const;
+      const base = { id, title: name, projectId: null, path, previewGrantId: grantId } as const;
       let tab: Tab;
       if (kind === "markdown") {
         tab = { ...base, kind: "markdown", mode: "preview" };
@@ -1070,18 +964,12 @@ export function AppShell() {
     [openTab, projectKey],
   );
 
-  // Native file picker → preview. The OS dialog is the consent boundary that
-  // lets the preview commands read a file outside any project root.
+  // Native file picker for external previews. The picker runs in Rust and
+  // returns a backend grant, so preview IPC never trusts a raw renderer path.
   const handlePickPreviewFile = useCallback(async () => {
     try {
-      const selected = await openDialog({
-        directory: false,
-        multiple: false,
-        title: t("preview.openTitle"),
-      });
-      if (typeof selected === "string" && selected.length > 0) {
-        handleOpenPreviewFile(selected);
-      }
+      const selected = await fsApi.pickPreviewFile(t("preview.openTitle"));
+      if (selected) handleOpenPreviewFile(selected);
     } catch (err) {
       console.error("preview openDialog failed", err);
     }
@@ -1089,9 +977,9 @@ export function AppShell() {
 
   // Send-to-project: flush any unsaved edits to disk first (so the move carries
   // them), then open the picker dialog.
-  const handleSendToProject = useCallback(async (path: string) => {
-    await flushEditor(`pf-${path}`).catch(() => undefined);
-    setSendToProjectPath(path);
+  const handleSendToProject = useCallback(async (file: PreviewGrant) => {
+    await flushEditor(`pf-${file.path}`).catch(() => undefined);
+    setSendToProjectFile(file);
   }, []);
 
   // After the move succeeds: close the (ephemeral) preview tab, switch to the
@@ -1135,15 +1023,15 @@ export function AppShell() {
     let cancelled = false;
     (async () => {
       off = await listenTo<OpenFilePayload>(EV.openFile, (e) => {
-        for (const p of e.payload.paths) handleOpenPreviewFile(p);
+        for (const file of e.payload.files) handleOpenPreviewFile(file);
       });
       if (cancelled) {
         off?.();
         return;
       }
       try {
-        const pending = await invoke<string[]>(CMD.takePendingOpenFiles);
-        for (const p of pending) handleOpenPreviewFile(p);
+        const pending = await invoke<PreviewGrant[]>(CMD.takePendingOpenFiles);
+        for (const file of pending) handleOpenPreviewFile(file);
       } catch {
         // nothing queued
       }
@@ -1154,34 +1042,24 @@ export function AppShell() {
     };
   }, [handleOpenPreviewFile]);
 
-  // Global file drag-drop onto the window: files → preview, folders → add as a
-  // project. The drop target is webview-wide; the DropOverlay is purely visual.
-  // With the Agent view overlay active, a drop means "attach to the composer"
-  // instead, one window-global handler that branches, never two listeners.
+  // Global file drag-drop onto the window: files become previews, folders are
+  // added as projects. The drop target is webview-wide; the DropOverlay is
+  // purely visual.
   useEffect(() => {
     let un: (() => void) | undefined;
     let cancelled = false;
     (async () => {
       const unlisten = await getCurrentWebview().onDragDropEvent((event) => {
         const payload = event.payload;
-        const agentView = useViewStore.getState().view === "agent";
         if (payload.type === "enter" || payload.type === "over") {
-          if (agentView) useAgentComposerStore.getState().setDragHover(true);
-          else setDropActive(true);
+          setDropActive(true);
         } else if (payload.type === "drop") {
           setDropActive(false);
-          useAgentComposerStore.getState().setDragHover(false);
-          if (agentView) {
-            useAgentComposerStore.getState().addPaths(payload.paths);
-            return;
-          }
           for (const path of payload.paths) {
-            if (looksLikeFile(path)) handleOpenPreviewFile(path);
-            else void addProject(path).catch(() => undefined);
+            if (!looksLikeFile(path)) void addProject(path).catch(() => undefined);
           }
         } else {
           setDropActive(false);
-          useAgentComposerStore.getState().setDragHover(false);
         }
       });
       if (cancelled) {
@@ -1194,7 +1072,7 @@ export function AppShell() {
       cancelled = true;
       un?.();
     };
-  }, [handleOpenPreviewFile, addProject]);
+  }, [addProject]);
 
   const handleOpenDiff = useCallback(
     (path: string, status: string) => {
@@ -1284,33 +1162,12 @@ export function AppShell() {
   // The right panel currently hosts Source Control only, see
   // `SourceControlPanel.tsx`.
   // Column 1 is the projects sidebar: the icon rail when collapsed, a wider
-  // Agent-style panel (projects + nested sections) when expanded. The file
-  // explorer stays its own column (col 2) at explorerWidth.
+  // panel with projects and nested sections when expanded. The file explorer
+  // stays its own column at explorerWidth.
   const projectsColWidth = codeSidebarCollapsed ? RAIL_WIDTH_PX : PROJECTS_PANEL_WIDTH_PX;
   const gridTemplateColumns = panelOpen
     ? `${projectsColWidth}px ${explorerWidth}px minmax(0,1fr) ${sourceControlWidth}px`
     : `${projectsColWidth}px ${explorerWidth}px minmax(0,1fr)`;
-
-  // Agent View renders as an opaque overlay below the titlebar so the Code
-  // panels (and their live terminals) stay mounted underneath while in Agent
-  // mode; switching back is instant and lossless.
-  const agentMode = useViewStore((s) => s.view) === "agent";
-  // Inspect drawers over the Agent overlay (toggled from the title bar): the
-  // Code view's explorer and Source Control, docked side by side on the right
-  // edge at z-40. They
-  // share the persisted panel widths with their Code counterparts. Anything
-  // that opens a Code tab (file, diff, terminal, CLI) also reveals the Code
-  // view, otherwise the tab would open unseen under the overlay.
-  const agentExplorerOpen = useAgentOverlayPanelsStore((s) => s.explorerOpen);
-  const agentGitOpen = useAgentOverlayPanelsStore((s) => s.gitOpen);
-  const revealCode = useCallback(() => useViewStore.getState().setView("code"), []);
-  // After the first activation the AgentView stays mounted and merely hidden
-  // (visibility), so toggling Agent -> Code -> Agent keeps sidebar pane,
-  // scroll positions and expansion state instead of paying a full remount.
-  const [agentEverOpened, setAgentEverOpened] = useState(false);
-  useEffect(() => {
-    if (agentMode) setAgentEverOpened(true);
-  }, [agentMode]);
 
   return (
     <div
@@ -1328,10 +1185,9 @@ export function AppShell() {
         onNewWorktree={project ? handleOpenWorktreeDialog : undefined}
       />
 
-      {/* `contents` keeps these as direct grid items; `inert` while the Agent
-          overlay is up removes the hidden Code view from the tab order and the
-          accessibility tree (the opaque overlay already blocks pointers). */}
-      <div className="contents" inert={agentMode || undefined}>
+      {/* `contents` keeps these as direct grid items while letting this block
+          group the core code workspace in JSX. */}
+      <div className="contents">
       {codeSidebarCollapsed ? (
         <MiniProjectSidebar />
       ) : (
@@ -1346,11 +1202,8 @@ export function AppShell() {
           projectPath={project?.path}
           onOpenFolder={handleOpenFolder}
           onOpenFile={handleOpenFile}
-          onRequestDelete={handleRequestDelete}
-          onRename={handleRename}
           onOpenInTerminal={handleOpenInTerminal}
           onLaunchCliInPath={handleLaunchCliInPath}
-          onMove={handleMove}
         />
         <ResizeHandle
           side="right"
@@ -1430,32 +1283,6 @@ export function AppShell() {
         }}
       />
 
-      <DeleteNodeConfirm
-        state={pendingDelete}
-        skipChecked={skipDeleteInSession}
-        onSkipChange={setSkipDeleteInSession}
-        onCancel={() => setPendingDelete(null)}
-        onConfirm={() => {
-          if (!pendingDelete) return;
-          const target = pendingDelete;
-          setPendingDelete(null);
-          void performDelete(target);
-        }}
-      />
-
-      <MoveNodeConfirm
-        state={pendingMove}
-        skipChecked={skipMoveInSession}
-        onSkipChange={setSkipMoveInSession}
-        onCancel={() => setPendingMove(null)}
-        onConfirm={() => {
-          if (!pendingMove) return;
-          const target = pendingMove;
-          setPendingMove(null);
-          void performMove(target.from, target.toDir);
-        }}
-      />
-
       {project ? (
         <WorktreeCreateDialog
           open={worktreeDialogOpen}
@@ -1474,112 +1301,12 @@ export function AppShell() {
       />
 
       <SendToProjectDialog
-        path={sendToProjectPath}
+        file={sendToProjectFile}
         onOpenChange={(o) => {
-          if (!o) setSendToProjectPath(null);
+          if (!o) setSendToProjectFile(null);
         }}
         onSent={handleSentToProject}
       />
-
-      {agentEverOpened ? (
-        <Suspense
-          fallback={
-            agentMode ? (
-              <div className="absolute inset-x-0 bottom-0 top-[36px] z-30 bg-canvas" />
-            ) : null
-          }
-        >
-          {/* visibility (not display) hides it: scroll positions survive, and
-              the hidden subtree leaves the focus order / a11y tree. */}
-          <AgentView
-            className={
-              agentMode
-                ? "visible absolute inset-x-0 bottom-0 top-[36px] z-30"
-                : "invisible absolute inset-x-0 bottom-0 top-[36px] z-30"
-            }
-          />
-        </Suspense>
-      ) : null}
-
-      {/* Both inspect drawers dock on the RIGHT edge as one cluster, file tree
-          beside the git panel (mirroring the title-bar button order). The
-          explorer's own border-r is stripped: the seam between the two panels
-          comes from SourceControlPanel's border-l, and the cluster's outer
-          edge from the wrapper's border-l, so hairlines never double up. */}
-      {agentMode && (agentExplorerOpen || agentGitOpen) ? (
-        <div className="absolute bottom-0 right-0 top-[36px] z-40 flex shadow-elevated">
-          {agentExplorerOpen ? (
-            <div
-              className="relative border-l border-hairline [&>nav]:border-r-0"
-              style={{ width: explorerWidth }}
-            >
-              <ExplorerPanel
-                hasProject={!!project}
-                projectId={project?.id}
-                projectName={project?.name}
-                projectPath={project?.path}
-                onOpenFolder={handleOpenFolder}
-                onOpenFile={(path, name, edit) => {
-                  handleOpenFile(path, name, edit);
-                  revealCode();
-                }}
-                onRequestDelete={handleRequestDelete}
-                onRename={handleRename}
-                onOpenInTerminal={(path, name) => {
-                  handleOpenInTerminal(path, name);
-                  revealCode();
-                }}
-                onLaunchCliInPath={(cli, path, name) => {
-                  handleLaunchCliInPath(cli, path, name);
-                  revealCode();
-                }}
-                onMove={handleMove}
-              />
-              <ResizeHandle
-                side="left"
-                value={explorerWidth}
-                min={PANEL_LIMITS.explorer.min}
-                max={PANEL_LIMITS.explorer.max}
-                toDelta={(dx) => -dx}
-                onChange={handleExplorerWidthChange}
-                onReset={resetExplorerWidth}
-                ariaLabel={t("appShell.resizeExplorer")}
-              />
-            </div>
-          ) : null}
-          {agentGitOpen ? (
-            <div className="relative" style={{ width: sourceControlWidth }}>
-              {project ? (
-                <SourceControlPanel
-                  projectId={project.id}
-                  projectPath={project.path}
-                  onOpenDiff={(path, status) => {
-                    handleOpenDiff(path, status);
-                    revealCode();
-                  }}
-                />
-              ) : (
-                <aside
-                  className="h-full min-h-0 border-l border-hairline bg-canvas"
-                  aria-label={t("sourceControl.title")}
-                >
-                  <EmptyState body={t("sourceControl.noProject")} />
-                </aside>
-              )}
-              <ResizeHandle
-                side="left"
-                value={sourceControlWidth}
-                min={PANEL_LIMITS.sourceControl.min}
-                max={PANEL_LIMITS.sourceControl.max}
-                toDelta={(dx) => -dx}
-                onChange={handleSourceControlWidthChange}
-                onReset={resetSourceControlWidth}
-                ariaLabel={t("appShell.resizeSourceControl")}
-              />
-            </div>
-          ) : null}
-        </div>
-      ) : null}
       <Toaster />
     </div>
   );
@@ -1613,110 +1340,6 @@ function CloseTabsConfirm({ state, onConfirm, onCancel }: CloseTabsConfirmProps)
   );
 }
 
-interface DeleteNodeConfirmProps {
-  state: PendingDelete | null;
-  skipChecked: boolean;
-  onSkipChange: (next: boolean) => void;
-  onCancel: () => void;
-  onConfirm: () => void;
-}
-
-function DeleteNodeConfirm({
-  state,
-  skipChecked,
-  onSkipChange,
-  onCancel,
-  onConfirm,
-}: DeleteNodeConfirmProps) {
-  const { t } = useTranslation();
-  const open = state !== null;
-  const isDir = state?.isDir ?? false;
-  const title = state
-    ? isDir
-      ? t("appShell.deleteFolderTitle", { name: state.name })
-      : t("appShell.deleteFileTitle", { name: state.name })
-    : "";
-  const description = state
-    ? isDir
-      ? t("appShell.deleteFolderDescription")
-      : t("appShell.deleteFileDescription")
-    : "";
-  return (
-    <ConfirmDialog
-      open={open}
-      onOpenChange={(o) => {
-        if (!o) onCancel();
-      }}
-      tone="destructive"
-      title={title}
-      description={description}
-      details={
-        state ? (
-          <span className="font-mono text-label text-muted-soft">
-            {state.path}
-          </span>
-        ) : null
-      }
-      confirmLabel={isDir ? t("appShell.deleteConfirmFolder") : t("appShell.deleteConfirmFile")}
-      cancelLabel={t("common.cancel")}
-      onConfirm={onConfirm}
-      skipOption={{
-        label: t("appShell.deleteSkip"),
-        checked: skipChecked,
-        onChange: onSkipChange,
-      }}
-    />
-  );
-}
-
-interface MoveNodeConfirmProps {
-  state: PendingMove | null;
-  skipChecked: boolean;
-  onSkipChange: (next: boolean) => void;
-  onCancel: () => void;
-  onConfirm: () => void;
-}
-
-function MoveNodeConfirm({
-  state,
-  skipChecked,
-  onSkipChange,
-  onCancel,
-  onConfirm,
-}: MoveNodeConfirmProps) {
-  const { t } = useTranslation();
-  const open = state !== null;
-  const title = state ? t("appShell.moveTitle", { name: state.name }) : "";
-  const description = state
-    ? t("appShell.moveDescription", { toDir: state.toDir })
-    : "";
-  return (
-    <ConfirmDialog
-      open={open}
-      onOpenChange={(o) => {
-        if (!o) onCancel();
-      }}
-      tone="neutral"
-      title={title}
-      description={description}
-      details={
-        state ? (
-          <span className="font-mono text-label text-muted-soft">
-            {state.from}
-          </span>
-        ) : null
-      }
-      confirmLabel={t("appShell.moveConfirm")}
-      cancelLabel={t("common.cancel")}
-      onConfirm={onConfirm}
-      skipOption={{
-        label: t("appShell.moveSkip"),
-        checked: skipChecked,
-        onChange: onSkipChange,
-      }}
-    />
-  );
-}
 
 function confirmCopyFor(
   s: PendingClose,

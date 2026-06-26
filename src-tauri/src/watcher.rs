@@ -12,6 +12,7 @@ use tauri::{AppHandle, Emitter};
 use crate::error::{AppError, AppResult};
 
 pub const EV_FS_CHANGED: &str = "fs://changed";
+const MAX_PATHS_PER_BATCH: usize = 512;
 
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -25,7 +26,7 @@ pub struct FsChangedPayload {
 pub struct WatcherManager {
     by_project: Mutex<HashMap<String, Debouncer<notify::RecommendedWatcher>>>,
     /// Path we asked notify to watch for each project. Used to make `watch()`
-    /// idempotent — a no-op when called twice with the same (id, path) — so
+    /// idempotent , a no-op when called twice with the same (id, path) , so
     /// the rapid project-switch path doesn't drop in-flight events from the
     /// existing debouncer's 80ms window.
     paths_by_project: Mutex<HashMap<String, PathBuf>>,
@@ -43,7 +44,7 @@ impl WatcherManager {
 
     pub fn watch(&self, project_id: String, path: PathBuf) -> AppResult<()> {
         // Idempotent: if the same (project, path) pair is already wired, keep
-        // the existing debouncer alive — its in-flight events would otherwise
+        // the existing debouncer alive , its in-flight events would otherwise
         // be lost in the 80ms gap between remove() and the new insert.
         if let Some(existing) = self.paths_by_project.lock().get(&project_id) {
             if existing == &path {
@@ -99,7 +100,7 @@ impl WatcherManager {
                         Ok(rel) => requested_root.join(rel).display().to_string(),
                         Err(_) => e.path.display().to_string(),
                     })
-                    // Drop `.metacodex/worktrees/*` — those are parallel
+                    // Drop `.metacodex/worktrees/*` , those are parallel
                     // checkouts of THIS repo; the main project's git status
                     // is unaffected by edits inside them, and forwarding the
                     // events triggers redundant explorer refreshes for files
@@ -115,6 +116,10 @@ impl WatcherManager {
                 paths.dedup();
                 if paths.is_empty() {
                     return;
+                }
+                if paths.len() > MAX_PATHS_PER_BATCH {
+                    paths.clear();
+                    paths.push(requested_root.display().to_string());
                 }
                 let _ = app.emit(
                     EV_FS_CHANGED,

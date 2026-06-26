@@ -15,7 +15,7 @@ const READ_LIMIT = 25 * 1024 * 1024;
  * PTY tabs and edit files directly on disk. Without reconciliation an open
  * buffer silently diverges, and a `Cmd+S` would clobber the agent's work.
  *
- * Strategy — no Rust, no mtime. Compare fresh disk content against the buffer's
+ * Strategy , no Rust, no mtime. Compare fresh disk content against the buffer's
  * known baseline (`editor.store` `loadedContent`):
  *   - equal           → our own atomic-write echo or a no-op; ignore.
  *   - differ & clean  → reload the buffer silently.
@@ -46,17 +46,16 @@ export function useEditorReconcile() {
 
 async function reconcile(changedPaths: string[]) {
   if (changedPaths.length === 0) return;
-  const changed = new Set(changedPaths);
   const editor = useEditorStore.getState();
   const { byProject } = useTabsStore.getState();
 
   // Collect (tabId → path) for every open file-backed tab that has a live editor
-  // buffer and whose path is in the changed set. Dedupe by tabId.
+  // buffer and whose path is touched by an event path. Dedupe by tabId.
   const targets = new Map<string, string>();
   for (const bucket of Object.values(byProject)) {
     for (const tab of bucket.tabs) {
       if (!("path" in tab) || !tab.path) continue;
-      if (!changed.has(tab.path)) continue;
+      if (!matchesChangedPath(tab.path, changedPaths)) continue;
       if (!editor.get(tab.id)) continue; // no live buffer (e.g. markdown in preview)
       targets.set(tab.id, tab.path);
     }
@@ -83,4 +82,13 @@ async function reconcile(changedPaths: string[]) {
       if (cur) useEditorStore.getState().flagExternalDelete(tabId);
     }
   }
+}
+
+function matchesChangedPath(filePath: string, changedPaths: string[]): boolean {
+  for (const changedPath of changedPaths) {
+    if (filePath === changedPath) return true;
+    if (filePath.startsWith(changedPath + "/")) return true;
+    if (filePath.startsWith(changedPath + "\\")) return true;
+  }
+  return false;
 }

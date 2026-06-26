@@ -1,4 +1,3 @@
-pub mod agent;
 pub mod cli;
 pub mod diagnostics;
 pub mod filesystem;
