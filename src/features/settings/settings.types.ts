@@ -74,6 +74,7 @@ export interface AppSettings {
    *  project switches and app restarts. Widths are integers in px; the diff
    *  split is the fraction of the diff viewport occupied by the HEAD side. */
   panels: {
+    projectsWidth: number;
     explorerWidth: number;
     sourceControlWidth: number;
     diffSplitRatio: number;
@@ -110,6 +111,7 @@ export type SettingsSliceKey =
  *  - Diff split: 0.2 / 0.8 mirrors common merge-tool limits so one side never
  *    collapses to unusable. */
 export const PANEL_LIMITS = {
+  projects: { min: 220, max: 420, default: 264 },
   explorer: { min: 180, max: 480, default: 248 },
   sourceControl: { min: 240, max: 560, default: 340 },
   diff: { min: 0.2, max: 0.8, default: 0.5 },
@@ -151,6 +153,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     layoutMode: "horizontal",
   },
   panels: {
+    projectsWidth: PANEL_LIMITS.projects.default,
     explorerWidth: PANEL_LIMITS.explorer.default,
     sourceControlWidth: PANEL_LIMITS.sourceControl.default,
     diffSplitRatio: PANEL_LIMITS.diff.default,
@@ -253,6 +256,14 @@ export function mergeSettings(raw: unknown): AppSettings {
       layoutMode: oneOf(iface.layoutMode, LAYOUT_MODE_VALUES, D.interface.layoutMode),
     },
     panels: {
+      projectsWidth: Math.round(
+        clampNum(
+          panels.projectsWidth,
+          D.panels.projectsWidth,
+          PANEL_LIMITS.projects.min,
+          PANEL_LIMITS.projects.max,
+        ),
+      ),
       explorerWidth: Math.round(
         clampNum(
           panels.explorerWidth,

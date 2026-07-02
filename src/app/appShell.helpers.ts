@@ -33,4 +33,3 @@ export const EMPTY_BUCKET = { tabs: [], activeTabId: null } as {
 };
 
 export const RAIL_WIDTH_PX = 48;
-export const PROJECTS_PANEL_WIDTH_PX = 264;

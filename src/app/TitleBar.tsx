@@ -30,11 +30,8 @@ import {
   DropdownRoot,
   DropdownTrigger,
 } from "@/components/ui/DropdownMenu";
-import { TabTrailingActions } from "@/components/tabs/TabTrailingActions";
+import { SidePanelToggle } from "@/components/side-panel/SidePanelToggle";
 import { ProjectGlyph } from "@/components/project-rail/ProjectGlyph";
-import type { CliTool } from "@/features/terminal/cli-registry";
-import { useSaveStatusStore } from "@/features/workspace/saveStatus.store";
-import { useDiagnosticsStore } from "@/features/diagnostics/diagnostics.store";
 import { UpdatePill } from "@/components/updates/UpdatePill";
 
 interface TitleBarProps {
@@ -42,10 +39,6 @@ interface TitleBarProps {
   /** Sidebar collapse + add-project sit on the leading edge. */
   onOpenFolder?: () => void;
   onCloneFromGithub?: () => void;
-  /** New-tab + Source Control toggle, moved up to the right slot. */
-  onNewTerminal?: () => void;
-  onLaunchCli?: (cli: CliTool) => void;
-  onNewWorktree?: () => void;
 }
 
 /**
@@ -67,9 +60,6 @@ export function TitleBar({
   className,
   onOpenFolder,
   onCloneFromGithub,
-  onNewTerminal,
-  onLaunchCli,
-  onNewWorktree,
 }: TitleBarProps) {
   const { t } = useTranslation();
   const activeId = useProjectsStore((s) => s.activeProjectId);
@@ -196,16 +186,9 @@ export function TitleBar({
         <UpdatePill />
       </div>
 
-      {/* Right slot: new-tab actions, then the workspace save-status dot. */}
+      {/* Right slot: side panel toggle. */}
       <div className="flex items-center gap-[6px] justify-self-end">
-        {activeId && onNewTerminal && onLaunchCli ? (
-          <TabTrailingActions
-            onNewTerminal={onNewTerminal}
-            onLaunchCli={onLaunchCli}
-            onNewWorktree={onNewWorktree}
-          />
-        ) : null}
-        <SaveStatusDot />
+        <SidePanelToggle />
       </div>
 
       {/* Windows custom window controls: absolutely positioned on the trailing
@@ -304,64 +287,6 @@ function ControlButton({
       )}
     >
       {children}
-    </button>
-  );
-}
-
-/** 6px dot tracking the workspace save lifecycle. Green fades after 2s of
- *  inactivity so it doesn't linger. Red is clickable → opens the diagnostic
- *  log filtered to workspace events for quick debugging. */
-function SaveStatusDot() {
-  const { t } = useTranslation();
-  const status = useSaveStatusStore((s) => s.status);
-  const lastSavedAt = useSaveStatusStore((s) => s.lastSavedAt);
-  const setDiagOpen = useDiagnosticsStore((s) => s.setOpen);
-  const setKindFilter = useDiagnosticsStore((s) => s.setKindFilter);
-  const [showSaved, setShowSaved] = useState(false);
-
-  useEffect(() => {
-    if (status !== "saved") {
-      setShowSaved(false);
-      return;
-    }
-    setShowSaved(true);
-    const handle = setTimeout(() => setShowSaved(false), 2000);
-    return () => clearTimeout(handle);
-  }, [status, lastSavedAt]);
-
-  let color: string | null = null;
-  let title = "";
-  if (status === "saving") {
-    color = "bg-warn";
-    title = t("titleBar.saving");
-  } else if (status === "failed") {
-    color = "bg-danger";
-    title = t("titleBar.saveFailed");
-  } else if (status === "saved" && showSaved) {
-    color = "bg-success";
-    title = t("titleBar.saved");
-  }
-
-  const handleClick = () => {
-    if (status !== "failed") return;
-    setKindFilter("workspace.save");
-    setDiagOpen(true);
-  };
-
-  if (!color) {
-    return <span data-tauri-drag-region className="justify-self-end" />;
-  }
-  return (
-    <button
-      type="button"
-      onClick={handleClick}
-      title={title}
-      className={cn(
-        "justify-self-end inline-flex h-[14px] w-[14px] items-center justify-center rounded-pill transition-opacity duration-base",
-        status === "failed" ? "cursor-pointer" : "cursor-default",
-      )}
-    >
-      <span className={cn("inline-block h-[6px] w-[6px] rounded-pill", color)} />
     </button>
   );
 }

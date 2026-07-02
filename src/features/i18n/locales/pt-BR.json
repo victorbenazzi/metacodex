@@ -393,8 +393,10 @@
     "closeManyDescription_one": "{{inventory}} será interrompido. Processos em execução serão encerrados e respostas em andamento, descartadas.",
     "closeManyDescription_other": "{{inventory}} serão interrompidos. Processos em execução serão encerrados e respostas em andamento, descartadas.",
     "and": " e ",
+    "resizeProjectsPanel": "Redimensionar painel de projetos",
     "resizeExplorer": "Redimensionar painel de arquivos",
-    "resizeSourceControl": "Redimensionar painel de Source Control"
+    "resizeSourceControl": "Redimensionar painel de Source Control",
+    "resizeSidePanel": "Redimensionar painel lateral"
   },
   "terminal": {
     "notInstalled": "não instalado",
@@ -455,8 +457,8 @@
     }
   },
   "sourceControl": {
-    "toggle": "Controle de versão",
-    "title": "Controle de versão",
+    "toggle": "Git e revisão",
+    "title": "Git e revisão",
     "changedFiles_one": "{{count}} arquivo",
     "changedFiles_other": "{{count}} arquivos",
     "additions_one": "{{count}} adição",
@@ -485,6 +487,18 @@
       "mergeFailed": "Falha ao mesclar:\n\n{{error}}",
       "removeFailedTitle": "Não foi possível remover a worktree",
       "mergeFailedTitle": "Falha ao mesclar"
+    }
+  },
+  "sidePanel": {
+    "title": "Painel lateral",
+    "toggle": "Alternar painel lateral",
+    "review": "Git e revisão",
+    "toggleReview": "Git e revisão",
+    "close": "Fechar painel lateral",
+    "showTools": "Mostrar ferramentas do painel lateral",
+    "sections": {
+      "repository": "Repositório",
+      "workspace": "Área de trabalho"
     }
   },
   "worktrees": {

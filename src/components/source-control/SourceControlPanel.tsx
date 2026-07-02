@@ -50,11 +50,6 @@ function fileBadge(name: string): string {
   return ext ? ext.slice(0, 3).toUpperCase() : "TXT";
 }
 
-/**
- * Right-docked Source Control overview: the current branch, a count, and the
- * list of changed files. Clicking a file opens its HEAD ⇄ working diff as a tab.
- * Read-only , staging/commit are out of scope for now.
- */
 export function SourceControlPanel({
   projectId,
   projectPath,
@@ -100,14 +95,10 @@ export function SourceControlPanel({
   }, [projectId, projectPath, statusKey]);
 
   return (
-    <aside
-      className="flex h-full min-h-0 flex-col border-l border-hairline bg-canvas"
-      aria-label={t("sourceControl.title")}
+    <section
+      className="flex h-full min-h-0 flex-col bg-canvas"
+      aria-label={t("sidePanel.review")}
     >
-      <header className="flex h-[30px] shrink-0 items-center border-b border-hairline-soft px-[12px]">
-        <span className="editorial-caps truncate">{t("sourceControl.title")}</span>
-      </header>
-
       <WorktreesSection
         projectId={projectId}
         projectPath={projectPath}
@@ -229,6 +220,6 @@ export function SourceControlPanel({
           })}
         </div>
       )}
-    </aside>
+    </section>
   );
 }

@@ -393,8 +393,10 @@
     "closeManyDescription_one": "{{inventory}} will be stopped. Running processes will be terminated and in-progress responses discarded.",
     "closeManyDescription_other": "{{inventory}} will be stopped. Running processes will be terminated and in-progress responses discarded.",
     "and": " and ",
+    "resizeProjectsPanel": "Resize projects panel",
     "resizeExplorer": "Resize file explorer panel",
-    "resizeSourceControl": "Resize source control panel"
+    "resizeSourceControl": "Resize source control panel",
+    "resizeSidePanel": "Resize side panel"
   },
   "terminal": {
     "notInstalled": "not installed",
@@ -455,8 +457,8 @@
     }
   },
   "sourceControl": {
-    "toggle": "Source Control",
-    "title": "Source Control",
+    "toggle": "Git and Review",
+    "title": "Git and Review",
     "changedFiles_one": "{{count}} file",
     "changedFiles_other": "{{count}} files",
     "additions_one": "{{count}} addition",
@@ -485,6 +487,18 @@
       "mergeFailed": "Merge failed:\n\n{{error}}",
       "removeFailedTitle": "Could not remove worktree",
       "mergeFailedTitle": "Merge failed"
+    }
+  },
+  "sidePanel": {
+    "title": "Side panel",
+    "toggle": "Toggle side panel",
+    "review": "Git and Review",
+    "toggleReview": "Git and Review",
+    "close": "Close side panel",
+    "showTools": "Show side panel tools",
+    "sections": {
+      "repository": "Repository",
+      "workspace": "Workspace"
     }
   },
   "worktrees": {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MiniProjectSidebar } from "@/components/project-rail/MiniProjectSidebar";
 import { ExplorerPanel } from "@/components/file-explorer/ExplorerPanel";
 import { ExpandedProjectsSidebar } from "@/components/code-sidebar/ExpandedProjectsSidebar";
@@ -14,13 +14,12 @@ import { DropOverlay } from "@/components/previews/DropOverlay";
 import { useProjectsStore } from "@/features/projects/project.store";
 import { useSettingsDataStore } from "@/features/settings/settings.data.store";
 import { useSettingsStore } from "@/features/settings/settings.store";
-import { useSourceControlStore } from "@/features/source-control/sourceControl.store";
 import type { PreviewGrant } from "@/lib/events";
-import { EmptyState } from "@/components/ui/EmptyState";
 import { ResizeHandle } from "@/components/ui/ResizeHandle";
 import { PANEL_LIMITS } from "@/features/settings/settings.types";
 import { useTranslation } from "react-i18next";
-import { SourceControlPanel } from "@/components/source-control/SourceControlPanel";
+import { SidePanel } from "@/components/side-panel/SidePanel";
+import { useSidePanelStore } from "@/features/side-panel/sidePanel.store";
 import { WorktreeCreateDialog } from "@/components/source-control/WorktreeCreateDialog";
 import { CloneFromGithubDialog } from "@/components/project-rail/CloneFromGithubDialog";
 import { SettingsDialog } from "@/components/settings/SettingsDialog";
@@ -28,7 +27,6 @@ import { Toaster } from "@/components/ui/Toaster";
 import { CloseTabsConfirm } from "@/app/CloseTabsConfirm";
 import {
   EMPTY_BUCKET,
-  PROJECTS_PANEL_WIDTH_PX,
   RAIL_WIDTH_PX,
   type PendingClose,
 } from "@/app/appShell.helpers";
@@ -37,6 +35,9 @@ import { useAppBootstrap } from "@/app/hooks/useAppBootstrap";
 import { useFilesystemSync } from "@/app/hooks/useFilesystemSync";
 import { useWorkspacePersistence } from "@/app/hooks/useWorkspacePersistence";
 import { useTabActions } from "@/app/hooks/useTabActions";
+import { cn } from "@/lib/cn";
+
+const DRAWER_ANIMATION_MS = 180;
 
 export function AppShell() {
   const { t } = useTranslation();
@@ -76,16 +77,28 @@ export function AppShell() {
     [project, homeDirPath],
   );
 
-  const panelOpen = useSourceControlStore((s) => s.open);
+  const panelOpen = useSidePanelStore((s) => s.open);
   // Code sidebar collapsed -> the Files/History panel folds away to just the rail.
   const codeSidebarCollapsed = useCodeSidebarStore((s) => s.collapsed);
+  const [sidePanelMounted, setSidePanelMounted] = useState(panelOpen);
+  const [drawerAnimating, setDrawerAnimating] = useState(false);
+  const previousDrawerState = useRef({ codeSidebarCollapsed, panelOpen });
+  const drawerStateChanged =
+    previousDrawerState.current.codeSidebarCollapsed !== codeSidebarCollapsed ||
+    previousDrawerState.current.panelOpen !== panelOpen;
+  const drawerTransitionActive = drawerStateChanged || drawerAnimating;
 
   // Resizable panel widths, driven by settings, persisted to ~/.metacodex.
+  const projectsWidth = useSettingsDataStore((s) => s.settings.panels.projectsWidth);
   const explorerWidth = useSettingsDataStore((s) => s.settings.panels.explorerWidth);
   const sourceControlWidth = useSettingsDataStore(
     (s) => s.settings.panels.sourceControlWidth,
   );
   const updateSettings = useSettingsDataStore((s) => s.update);
+  const handleProjectsWidthChange = useCallback(
+    (next: number) => updateSettings("panels", { projectsWidth: Math.round(next) }),
+    [updateSettings],
+  );
   const handleExplorerWidthChange = useCallback(
     (next: number) => updateSettings("panels", { explorerWidth: Math.round(next) }),
     [updateSettings],
@@ -98,10 +111,41 @@ export function AppShell() {
     () => updateSettings("panels", { explorerWidth: PANEL_LIMITS.explorer.default }),
     [updateSettings],
   );
+  const resetProjectsWidth = useCallback(
+    () => updateSettings("panels", { projectsWidth: PANEL_LIMITS.projects.default }),
+    [updateSettings],
+  );
   const resetSourceControlWidth = useCallback(
     () => updateSettings("panels", { sourceControlWidth: PANEL_LIMITS.sourceControl.default }),
     [updateSettings],
   );
+
+  useEffect(() => {
+    if (panelOpen) {
+      setSidePanelMounted(true);
+      return undefined;
+    }
+
+    const timeout = window.setTimeout(
+      () => setSidePanelMounted(false),
+      DRAWER_ANIMATION_MS,
+    );
+    return () => window.clearTimeout(timeout);
+  }, [panelOpen]);
+
+  useEffect(() => {
+    previousDrawerState.current = { codeSidebarCollapsed, panelOpen };
+    if (!drawerStateChanged) {
+      return undefined;
+    }
+
+    setDrawerAnimating(true);
+    const timeout = window.setTimeout(
+      () => setDrawerAnimating(false),
+      DRAWER_ANIMATION_MS,
+    );
+    return () => window.clearTimeout(timeout);
+  }, [codeSidebarCollapsed, panelOpen]);
 
   useWorkspacePersistence(project, projects, bucket);
 
@@ -123,19 +167,21 @@ export function AppShell() {
 
   // CSS-grid template: the variable-width columns interpolate the current
   // settings so resizing rerenders only this style + the dragged column.
-  // The right panel currently hosts Source Control only, see
-  // `SourceControlPanel.tsx`.
+  // The right panel hosts the Codex-style side panel.
   // Column 1 is the projects sidebar: the icon rail when collapsed, a wider
   // panel with projects and nested sections when expanded. The file explorer
   // stays its own column at explorerWidth.
-  const projectsColWidth = codeSidebarCollapsed ? RAIL_WIDTH_PX : PROJECTS_PANEL_WIDTH_PX;
-  const gridTemplateColumns = panelOpen
-    ? `${projectsColWidth}px ${explorerWidth}px minmax(0,1fr) ${sourceControlWidth}px`
-    : `${projectsColWidth}px ${explorerWidth}px minmax(0,1fr)`;
+  const projectsColWidth = codeSidebarCollapsed ? RAIL_WIDTH_PX : projectsWidth;
+  const sidePanelColWidth = panelOpen ? sourceControlWidth : 0;
+  const gridTemplateColumns = `${projectsColWidth}px ${explorerWidth}px minmax(0,1fr) ${sidePanelColWidth}px`;
 
   return (
     <div
-      className="relative grid h-screen w-screen grid-rows-[36px_minmax(0,1fr)] bg-canvas text-ink"
+      className={cn(
+        "relative grid h-screen w-screen grid-rows-[36px_minmax(0,1fr)] bg-canvas text-ink",
+        drawerTransitionActive &&
+          "transition-[grid-template-columns] duration-base ease-out motion-reduce:transition-none",
+      )}
       style={{ gridTemplateColumns }}
     >
       <DropOverlay active={dropActive} />
@@ -143,19 +189,49 @@ export function AppShell() {
         className="col-span-full"
         onOpenFolder={actions.openFolder}
         onCloneFromGithub={actions.cloneFromGithub}
-        onNewTerminal={actions.newTerminal}
-        onLaunchCli={actions.launchCli}
-        onNewWorktree={project ? actions.openWorktreeDialog : undefined}
       />
 
       {/* `contents` keeps these as direct grid items while letting this block
           group the core code workspace in JSX. */}
       <div className="contents">
-        {codeSidebarCollapsed ? (
-          <MiniProjectSidebar />
-        ) : (
-          <ExpandedProjectsSidebar onOpenFolder={actions.openFolder} />
-        )}
+        <div className="relative min-w-0">
+          <div className="absolute inset-0 overflow-hidden">
+            <div
+              aria-hidden={!codeSidebarCollapsed}
+              className={cn(
+                "absolute inset-0 transition-[opacity,transform] duration-base ease-out motion-reduce:transition-none",
+                codeSidebarCollapsed
+                  ? "translate-x-0 opacity-100"
+                  : "pointer-events-none -translate-x-[10px] opacity-0",
+              )}
+            >
+              <MiniProjectSidebar />
+            </div>
+            <div
+              aria-hidden={codeSidebarCollapsed}
+              className={cn(
+                "absolute inset-y-0 left-0 h-full transition-[opacity,transform] duration-base ease-out motion-reduce:transition-none",
+                codeSidebarCollapsed
+                  ? "pointer-events-none -translate-x-[14px] opacity-0"
+                  : "translate-x-0 opacity-100",
+              )}
+              style={{ width: projectsWidth }}
+            >
+              <ExpandedProjectsSidebar onOpenFolder={actions.openFolder} />
+            </div>
+          </div>
+          <ResizeHandle
+            side="right"
+            value={projectsWidth}
+            min={PANEL_LIMITS.projects.min}
+            max={PANEL_LIMITS.projects.max}
+            toDelta={(dx) => dx}
+            onChange={handleProjectsWidthChange}
+            onReset={resetProjectsWidth}
+            ariaLabel={t("appShell.resizeProjectsPanel")}
+            enabled={!codeSidebarCollapsed}
+          />
+        </div>
 
         <div className="relative min-w-0">
           <ExplorerPanel
@@ -202,22 +278,29 @@ export function AppShell() {
           onOpenPreviewFile={actions.pickPreviewFile}
         />
 
-        {panelOpen ? (
+        {panelOpen || sidePanelMounted ? (
           <div className="relative min-w-0">
-            {project ? (
-              <SourceControlPanel
-                projectId={project.id}
-                projectPath={project.path}
-                onOpenDiff={actions.openDiff}
-              />
-            ) : (
-              <aside
-                className="h-full min-h-0 border-l border-hairline bg-canvas"
-                aria-label={t("sourceControl.title")}
+            <div
+              aria-hidden={!panelOpen}
+              className="absolute inset-0 overflow-hidden"
+            >
+              <div
+                className={cn(
+                  "absolute inset-y-0 right-0 h-full transition-[opacity,transform] duration-base ease-out motion-reduce:transition-none",
+                  panelOpen
+                    ? "translate-x-0 opacity-100"
+                    : "pointer-events-none translate-x-[16px] opacity-0",
+                )}
+                style={{ width: sourceControlWidth }}
               >
-                <EmptyState body={t("sourceControl.noProject")} />
-              </aside>
-            )}
+                <SidePanel
+                  project={project}
+                  onNewTerminal={actions.newTerminal}
+                  onLaunchCli={actions.launchCli}
+                  onOpenDiff={actions.openDiff}
+                />
+              </div>
+            </div>
             <ResizeHandle
               side="left"
               value={sourceControlWidth}
@@ -228,7 +311,8 @@ export function AppShell() {
               toDelta={(dx) => -dx}
               onChange={handleSourceControlWidthChange}
               onReset={resetSourceControlWidth}
-              ariaLabel={t("appShell.resizeSourceControl")}
+              ariaLabel={t("appShell.resizeSidePanel")}
+              enabled={panelOpen}
             />
           </div>
         ) : null}
