@@ -8,7 +8,7 @@ import { basename } from "@/lib/path";
  */
 export const WORKSPACE_NULL = "__no_project__";
 
-interface TabsBucket {
+export interface TabsBucket {
   tabs: Tab[];
   activeTabId: string | null;
 }

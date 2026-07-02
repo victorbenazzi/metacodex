@@ -19,6 +19,7 @@ import { useThemeStore } from "@/features/theme/theme.store";
 import { searchApi } from "@/features/search/search.service";
 import { fuzzyScore } from "@/lib/fuzzy";
 import { basename } from "@/lib/path";
+import { getAppCommands } from "@/app/appCommands";
 
 interface PaletteCommand {
   id: string;
@@ -31,18 +32,6 @@ type PaletteItem =
   | { kind: "file"; key: string; primary: string; secondary: string; abs: string }
   | { kind: "command"; key: string; primary: string; secondary: string; cmd: PaletteCommand };
 
-// Runtime handlers attached by AppShell on window.__metacodex.
-interface MetacodexApi {
-  newTerminal?: () => void;
-  openFolder?: () => void;
-  closeActiveTab?: () => void;
-  openFile?: (path: string, name: string) => void;
-  pickPreviewFile?: () => void;
-}
-function api(): MetacodexApi {
-  return ((window as unknown as { __metacodex?: MetacodexApi }).__metacodex) ?? {};
-}
-
 // Per-project file-list cache so reopening the palette feels instant.
 const fileCache = new Map<string, { files: string[]; ts: number }>();
 const CACHE_TTL = 4000;
@@ -51,12 +40,12 @@ const MAX_RESULTS = 200;
 // Localized at render time (titleKey → t). `run` never depends on language.
 const COMMAND_DEFS: { id: string; titleKey: string; hint?: string; run: () => void }[] = [
   { id: "go-to-file", titleKey: "commandPalette.goToFile", hint: "⌘P", run: () => useCommandPaletteStore.getState().openFiles() },
-  { id: "new-terminal", titleKey: "commandPalette.newTerminal", hint: "⌘T", run: () => api().newTerminal?.() },
-  { id: "open-folder", titleKey: "commandPalette.openFolder", hint: "⌘O", run: () => api().openFolder?.() },
-  { id: "open-file-preview", titleKey: "commandPalette.openFilePreview", run: () => api().pickPreviewFile?.() },
+  { id: "new-terminal", titleKey: "commandPalette.newTerminal", hint: "⌘T", run: () => getAppCommands()?.newTerminal() },
+  { id: "open-folder", titleKey: "commandPalette.openFolder", hint: "⌘O", run: () => getAppCommands()?.openFolder() },
+  { id: "open-file-preview", titleKey: "commandPalette.openFilePreview", run: () => getAppCommands()?.pickPreviewFile() },
   { id: "search", titleKey: "commandPalette.searchFiles", hint: "⇧⌘F", run: () => useSearchUiStore.getState().setOpen(true) },
   { id: "settings", titleKey: "commandPalette.settings", hint: "⌘,", run: () => useSettingsStore.getState().setOpen(true) },
-  { id: "close-tab", titleKey: "commandPalette.closeTab", hint: "⌘W", run: () => api().closeActiveTab?.() },
+  { id: "close-tab", titleKey: "commandPalette.closeTab", hint: "⌘W", run: () => getAppCommands()?.closeActiveTab() },
   {
     id: "toggle-theme",
     titleKey: "commandPalette.toggleTheme",
@@ -171,7 +160,7 @@ export function CommandPalette() {
   const choose = (i: number) => {
     const item = items[i];
     if (!item) return;
-    if (item.kind === "file") api().openFile?.(item.abs, basename(item.abs));
+    if (item.kind === "file") getAppCommands()?.openFile(item.abs, basename(item.abs));
     else item.cmd.run();
     close();
   };

@@ -4,17 +4,12 @@ import { useTranslation } from "react-i18next";
 
 import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/cn";
+import { getAppCommands } from "@/app/appCommands";
+import type { PreviewGrant } from "@/lib/events";
 
-interface PreviewFileRef {
-  path: string;
-  grantId: string;
-}
-
-/** Bridge to the AppShell-owned "send to project" flow (mirrors `sendToTerminal`). */
-function sendToProject(file: PreviewFileRef) {
-  (
-    window as unknown as { __metacodex?: { sendToProject?: (file: PreviewFileRef) => void } }
-  ).__metacodex?.sendToProject?.(file);
+/** Bridge to the AppShell-owned "send to project" flow. */
+function sendToProject(file: PreviewGrant) {
+  getAppCommands()?.sendToProject(file);
 }
 
 /** "Send to project" action, used inside preview tab headers. */

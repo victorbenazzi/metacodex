@@ -3,7 +3,7 @@ import type { CommandDef, CommandId } from "./types";
 /**
  * The command registry is declaration-only and holds NO side effects. Each id
  * maps 1:1 to a dispatch target in `KeyboardShortcuts.tsx`, keeping the handler
- * implementations on `window.__metacodex` / the relevant stores (per CLAUDE.md).
+ * implementations in `appCommands` or the relevant stores (per CLAUDE.md).
  *
  * `mod` = Cmd on macOS, Ctrl elsewhere. Order in this array is the display order
  * in Settings and the deterministic tie-break order for conflicting bindings.

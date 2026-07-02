@@ -1,6 +1,7 @@
 import type { Terminal, ILink, ILinkProvider } from "@xterm/xterm";
 
 import { usePendingGotoStore } from "@/features/search/search.store";
+import { getAppCommands } from "@/app/appCommands";
 
 // Matches things like `src/app/AppShell.tsx:42`, `./foo.rs:10:5`, `/abs/x.py:3`.
 // Requiring a real `.ext` before the first `:` keeps timestamps (12:34:56) and
@@ -10,7 +11,7 @@ const FILE_LINE_RE = /((?:\.{0,2}\/)?(?:[\w.-]+\/)*[\w.-]+\.[\w]+):(\d+)(?::(\d+
 /**
  * xterm link provider that turns `file:line[:col]` references in terminal
  * output into clickable links which open the file in the editor at that line.
- * Paths resolve against the session's `cwd` (its initial cwd — if you `cd`, the
+ * Paths resolve against the session's `cwd` (its initial cwd, if you `cd`, the
  * stored value won't follow, so relative links can miss; absolute paths always
  * work).
  */
@@ -48,9 +49,7 @@ function openInEditor(cwd: string, rel: string, lineNo: number) {
   const name = abs.split("/").pop() ?? abs;
   // Schedule the line jump before opening so the editor honours it on mount.
   usePendingGotoStore.getState().set(`f-${abs}`, lineNo);
-  (
-    window as unknown as { __metacodex?: { openFile?: (p: string, n: string) => void } }
-  ).__metacodex?.openFile?.(abs, name);
+  getAppCommands()?.openFile(abs, name);
 }
 
 function resolvePath(cwd: string, p: string): string {

@@ -13,7 +13,7 @@ interface TabsBucketLike {
 }
 
 interface WorkAreaProps {
-  /** Active project's tabs — drives the TabBar and the empty-state decision. */
+  /** Active project's tabs. Drives the TabBar and the empty-state decision. */
   tabs: Tab[];
   activeTabId: string | null;
   /**
@@ -62,7 +62,7 @@ export function WorkArea({
   project,
 }: WorkAreaProps) {
   // TabContent always lives at the same JSX position regardless of whether the
-  // active project has tabs — otherwise React would unmount the whole tab tree
+  // active project has tabs. Otherwise React would unmount the whole tab tree
   // (and kill the PTYs/editors of OTHER projects mounted underneath) every time
   // the user lands on a project with an empty bucket.
   const hasActiveTabs = tabs.length > 0;

@@ -67,7 +67,7 @@ export function TabContextMenu({
     <ContextMenuRoot
       onOpenChange={(open) => {
         // Promote tab to active on right-click so the user sees which tab the
-        // menu refers to — matches VS Code / Linear behavior.
+        // menu refers to. Matches VS Code / Linear behavior.
         if (open && !isActive) onSelect?.();
       }}
     >

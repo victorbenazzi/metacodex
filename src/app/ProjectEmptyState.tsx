@@ -26,7 +26,7 @@ function getLucideIcon(name: string): Lucide.LucideIcon {
 }
 
 /**
- * Shown in the work area when a project IS open but has no tabs yet — distinct
+ * Shown in the work area when a project is open but has no tabs yet, distinct
  * from `WelcomeScreen` (no project at all). Same editorial language: project
  * icon + name as the hero, then the two ways to start working (a terminal, or a
  * dedicated button per AI agent). Reuses the project tile's icon/color logic so
@@ -87,7 +87,7 @@ export function ProjectEmptyState({ project, onNewTerminal, onLaunchCli }: Proje
           {t("projectEmpty.tagline")}
         </p>
 
-        {/* Resume tile group — only renders when there are recent sessions for
+        {/* Resume tile group only renders when there are recent sessions for
             this project. Lives before the terminal/agent CTAs so it grabs
             attention as the "fast lane" back to in-flight work. */}
         <div className="mt-[28px] max-w-[640px]">
@@ -151,4 +151,3 @@ export function ProjectEmptyState({ project, onNewTerminal, onLaunchCli }: Proje
     </div>
   );
 }
-

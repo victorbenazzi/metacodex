@@ -46,7 +46,7 @@ interface NewTabActions {
   onNewWorktree?: () => void;
 }
 
-// Polymorphic body — the SAME items are rendered inside a Radix DropdownMenu
+// Polymorphic body. The SAME items are rendered inside a Radix DropdownMenu
 // (when triggered by the "+" button) or inside a Radix ContextMenu (when
 // triggered by right-clicking the tab bar background). Future tweaks to the
 // launcher (new sections, ordering, badges) should live here only.
@@ -77,7 +77,7 @@ export function NewTabBody({ actions, C }: { actions: NewTabActions; C: MenuComp
   const codingAgents = visible.filter((cli) => cliCategory(cli) === "coding");
   const autonomousAgents = visible.filter((cli) => cliCategory(cli) === "autonomous");
 
-  // No install-state hint on launcher rows — the install guide surfaces inside
+  // No install-state hint on launcher rows. The install guide surfaces inside
   // the tab via CliMissingPanel after the user clicks. Settings > CLI Registry
   // is the canonical place to inspect detection state.
   const renderAgent = (cli: CliTool) => {

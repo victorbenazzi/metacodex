@@ -6,56 +6,45 @@ import { useSettingsStore } from "@/features/settings/settings.store";
 import { useSearchUiStore } from "@/features/search/search.store";
 import { useCommandPaletteStore } from "@/features/command-palette/command-palette.store";
 import { useDiagnosticsStore } from "@/features/diagnostics/diagnostics.store";
-
-interface MetacodexApi {
-  newTerminal?: () => void;
-  openFolder?: () => void;
-  cloneFromGithub?: () => void;
-  closeActiveTab?: () => void;
-  switchProject?: (n: number) => void;
-  jumpToNextAttention?: () => void;
-  renameActiveTab?: () => void;
-  moveActiveTab?: (delta: -1 | 1) => void;
-  activateAdjacentTab?: (delta: -1 | 1) => void;
-}
+import { getAppCommands } from "@/app/appCommands";
 
 /**
  * Route a resolved command to its side effect. Implementations stay on
- * `window.__metacodex` (set by AppShell) or the relevant feature stores. This
+ * `appCommands` (registered by AppShell) or the relevant feature stores. This
  * function only dispatches, keeping the keybindings registry side-effect-free.
  */
 function dispatchCommand(cmd: ResolvedCommand) {
-  const api = (window as any).__metacodex as MetacodexApi | undefined;
+  const api = getAppCommands();
   switch (cmd.id) {
     case "terminal.new":
-      api?.newTerminal?.();
+      api?.newTerminal();
       break;
     case "folder.open":
-      api?.openFolder?.();
+      api?.openFolder();
       break;
     case "folder.clone":
-      api?.cloneFromGithub?.();
+      api?.cloneFromGithub();
       break;
     case "tab.close":
-      api?.closeActiveTab?.();
+      api?.closeActiveTab();
       break;
     case "tab.rename":
-      api?.renameActiveTab?.();
+      api?.renameActiveTab();
       break;
     case "tab.moveLeft":
-      api?.moveActiveTab?.(-1);
+      api?.moveActiveTab(-1);
       break;
     case "tab.moveRight":
-      api?.moveActiveTab?.(1);
+      api?.moveActiveTab(1);
       break;
     case "tab.next":
-      api?.activateAdjacentTab?.(1);
+      api?.activateAdjacentTab(1);
       break;
     case "tab.previous":
-      api?.activateAdjacentTab?.(-1);
+      api?.activateAdjacentTab(-1);
       break;
     case "project.switch":
-      if (cmd.arg) api?.switchProject?.(cmd.arg);
+      if (cmd.arg) api?.switchProject(cmd.arg);
       break;
     case "settings.open":
       useSettingsStore.getState().setOpen(true);
@@ -73,7 +62,7 @@ function dispatchCommand(cmd: ResolvedCommand) {
       // Passive commands return before dispatch; this case is for exhaustiveness.
       break;
     case "tab.jumpToNextAttention":
-      api?.jumpToNextAttention?.();
+      api?.jumpToNextAttention();
       break;
     case "diagnostics.toggle":
       useDiagnosticsStore.getState().toggle();

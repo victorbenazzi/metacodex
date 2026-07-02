@@ -16,12 +16,12 @@ interface TabTooltipProps {
  *
  * Information density tier list:
  *   1. Tab name (always).
- *   2. Branch — only when there is a git repo at the tab's cwd. The label is
+ *   2. Branch: only when there is a git repo at the tab's cwd. The label is
  *      monospace because branch names contain `/` and `-` that read better in
  *      mono.
- *   3. cwd — relative-from-HOME when possible, else absolute, truncated middle
+ *   3. cwd: relative-from-HOME when possible, else absolute, truncated middle
  *      so the basename is always visible.
- *   4. Listening ports — chips. Empty section is hidden.
+ *   4. Listening ports: chips. Empty section is hidden.
  *
  * Skipped on file tabs (editor/markdown/image/pdf): they don't have a process
  * behind them; we leave the simple title-only tooltip alone elsewhere.
@@ -39,7 +39,7 @@ export function TabTooltip({ tab }: TabTooltipProps) {
   });
   const meta = useTabMetadataStore((s) => (sessionId ? s.bySessionId[sessionId] : undefined));
 
-  // Show a discreet origin line when the displayed title isn't the default —
+  // Show a discreet origin line when the displayed title isn't the default.
   // user-rename always wins over agent-rename in `resolveTabTitle`, so the
   // precedence here mirrors that.
   const titleOrigin = tab.userTitle

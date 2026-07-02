@@ -27,7 +27,7 @@ interface TabTrailingActionsProps {
 /**
  * Pill-shaped group living at the right end of the tab bar. Bundles the
  * Source Control panel toggle (with a change-count badge) and the "+" new-tab
- * dropdown into a single rounded card with a hairline border — same visual
+ * dropdown into a single rounded card with a hairline border. Same visual
  * language as Linear / Vercel's segmented action groups.
  *
  * The SC toggle is hidden when there's no active project (its store is global,
@@ -45,7 +45,7 @@ export function TabTrailingActions({
   const activeId = useProjectsStore((s) => s.activeProjectId);
   const git = useGitStore((s) => (activeId ? s.byProject[activeId] : null));
   const changeCount = git ? Object.keys(git.statuses).length : 0;
-  // Avoid hydrating the SC toggle before the projects store is ready — would
+  // Avoid hydrating the SC toggle before the projects store is ready. It would
   // otherwise pop in/out as `activeProjectId` resolves on cold start.
   const [mounted, setMounted] = useState(false);
   useEffect(() => {

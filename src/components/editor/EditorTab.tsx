@@ -39,6 +39,7 @@ import { stickyScroll } from "./stickyScroll";
 import { scopesAt } from "./codeScopes";
 import { ext, basename } from "@/lib/path";
 import { cn } from "@/lib/cn";
+import { getAppCommands } from "@/app/appCommands";
 
 interface EditorTabProps {
   tabId: string;
@@ -192,11 +193,7 @@ export function EditorTab({
                 const text = sel.empty
                   ? view.state.doc.lineAt(sel.head).text
                   : view.state.sliceDoc(sel.from, sel.to);
-                (
-                  window as unknown as {
-                    __metacodex?: { sendToTerminal?: (t: string) => void };
-                  }
-                ).__metacodex?.sendToTerminal?.(text);
+                getAppCommands()?.sendToTerminal(text);
                 return true;
               },
             },

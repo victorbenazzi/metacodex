@@ -45,7 +45,7 @@ Paths OUTSIDE project roots are reachable only through unforgeable grants minted
 
 ### Shell layout (post v0.0.12 redesign)
 
-- `src/app/AppShell.tsx` owns the CSS grid: a 36px title bar row over columns [projects sidebar | explorer | center | source control (optional right panel)].
+- `src/app/AppShell.tsx` owns only the CSS grid and top-level composition: a 36px title bar row over columns [projects sidebar | explorer | center | source control (optional right panel)]. Bootstrap, filesystem sync, workspace persistence and tab actions live in `src/app/hooks/`.
 - The projects sidebar has two forms, toggled from the title bar and persisted in `features/ui/codeSidebar.store.ts` (localStorage): the collapsed icon rail (`components/project-rail/MiniProjectSidebar.tsx`) and the expanded list (`components/code-sidebar/ExpandedProjectsSidebar.tsx` + `CodeProjectGroup.tsx`) with nested per-project sections: Histórico (resume registry), and in vertical layout also Agentes, Terminais and Arquivos (open file tabs).
 - **Projects reorder by drag in BOTH sidebar forms** through the shared `components/ui/useListReorder.tsx` hook (pointer events, 8px threshold, trailing-click suppression, `data-no-drag` opt-out for nested interactive regions). Do NOT add `setPointerCapture` there: capturing suppresses the nested button's click under composed Radix Slots in WKWebView (see the hook's note). The context menu also offers Move up / Move down as the keyboard-friendly path. Order persists via `reorder_projects`.
 - **Active project identity:** accent bar + medium label on the expanded row (`SidebarRow` `accent` prop), accent bar + tinted glyph on the rail tile, and glyph + name in the title bar center. **Per-project session status** (worst of the per-tab agent statuses, plus session count) renders as a dot on the row and as a tile corner badge: rollup in `features/terminal/projectStatus.ts`, dot in `components/project-rail/ProjectStatusDot.tsx`, tone mapping shared with the tab dot in `components/tabs/statusTone.ts`.
@@ -66,7 +66,7 @@ Zustand stores per feature (`src/features/<feature>/*.store.ts`):
 - `diagnostics/diagnostics.store.ts`: the Cmd+Shift+D diagnostic log panel.
 - `updates/updates.store.ts`: updater lifecycle (silent boot check, `UpdatePill`, About pane).
 - `ui/codeSidebar.store.ts` (collapsed + per-project expansion, localStorage) and `ui/toast.store.ts`.
-- Never reach across stores inside a component; derive in `AppShell` or selectors. Tabs are keyed by project: switching projects swaps the visible bucket; terminals from other projects stay alive in memory.
+- Never reach across stores inside a component; derive in `AppShell`, app hooks or selectors. Cross-surface commands go through `src/app/appCommands.ts`, registered by `AppShell` and read by keyboard shortcuts, command palette, editor keymaps and preview controls. Tabs are keyed by project: switching projects swaps the visible bucket; terminals from other projects stay alive in memory.
 
 ### Persistence (`~/.metacodex/`)
 
@@ -87,7 +87,7 @@ Plain, pretty-printed, hand-editable JSON written atomically (tmp then rename) v
 
 `config_paths::ensure_dirs()` runs in `lib.rs` setup before `projects::hydrate`. The settings/keybindings commands pass an opaque `serde_json::Value`: the frontend owns the schema + validation (`settings.types.ts::mergeSettings` clamps every field), so adding a pref needs no Rust recompile.
 
-`AppShell.tsx` saves a `WorkspaceState` per project, debounced (`workspaceSaveDebounceMs`, default 350), with a flush handshake on quit (`app://before-quit`). **Terminals and CLI tabs are intentionally NOT persisted**; only `editor | markdown | image | pdf` round-trip through `SerializedTab` (`commands/workspace.rs`). `hydratedWorkspaces: Set<string>` guards against clobbering persisted state with an empty bucket right after a project switch.
+`src/app/hooks/useWorkspacePersistence.ts` saves a `WorkspaceState` per project, debounced (`workspaceSaveDebounceMs`, default 350), with a flush handshake on quit (`app://before-quit`). **Terminals and CLI tabs are intentionally NOT persisted**; only `editor | markdown | image | pdf` round-trip through `SerializedTab` (`commands/workspace.rs`). A per-project `hydrationStatus` map (`pending | loaded | failed`) guards against clobbering persisted state with an empty bucket after a failed or not-yet-finished load.
 
 ### PTY model
 
@@ -112,7 +112,7 @@ Also load-bearing: terminal `lineHeight` stays 1.0 (box-drawing glyphs), never `
 
 ### File watcher
 
-One `notify_debouncer_mini::Debouncer` per project root, owned by `WatcherManager`. `AppShell` calls `watcherApi.watch/unwatch` on project switch; `projects::remove` ALSO unwatches on the backend (authoritative teardown, the frontend call is best-effort). `watch()` is idempotent per (id, path). Emitted paths have their canonicalized prefix rewritten back to the requested root (FSEvents resolves symlinks/firmlinks; the explorer caches by the raw root, so without the rewrite events would never match). `fs://changed` carries `{ projectId, paths }`; the AppShell listener refreshes dir + subtree (macOS coalesces bursts into dir-level events) and throttles git status.
+One `notify_debouncer_mini::Debouncer` per project root, owned by `WatcherManager`. `src/app/hooks/useFilesystemSync.ts` calls `watcherApi.watch/unwatch` on project switch; `projects::remove` ALSO unwatches on the backend (authoritative teardown, the frontend call is best-effort). `watch()` is idempotent per (id, path). Emitted paths have their canonicalized prefix rewritten back to the requested root (FSEvents resolves symlinks/firmlinks; the explorer caches by the raw root, so without the rewrite events would never match). `fs://changed` carries `{ projectId, paths }`; the filesystem sync hook refreshes dir + subtree (macOS coalesces bursts into dir-level events) and throttles git status.
 
 ### Theming
 
@@ -133,7 +133,7 @@ One `notify_debouncer_mini::Debouncer` per project root, owned by `WatcherManage
 - **Atomic writes** for files: `<path>.<ext>.metacodex.tmp` then rename (`fs_ops::write_file_text`, `config_paths::write_json_atomic`).
 - **Popup motion:** all popups share one pure-opacity fade (no slide/scale, no backdrop-blur). Opacity-only is load-bearing (transform breaks modal centering).
 - **Floating placement:** every floating element keeps an 8px viewport margin and opens AWAY from the nearest screen edge. Prefer Radix primitives (`DropdownMenu`/`ContextMenu`/`Select`/`Tooltip`); the shared wrappers in `components/ui/` already default `collisionPadding={8}`. See `MENU_UX_PLAN.md`.
-- **Keyboard shortcuts** are rebindable: declare in `features/keybindings/commands.ts`, route in `KeyboardShortcuts.tsx::dispatchCommand` (via `window.__metacodex` handlers attached by AppShell, or stores). The global handler ignores plain/Alt bindings while a text field is focused (Mod combos still fire; xterm's helper textarea is exempt). Editor-scoped shortcuts stay in CodeMirror's keymap.
+- **Keyboard shortcuts** are rebindable: declare in `features/keybindings/commands.ts`, route in `KeyboardShortcuts.tsx::dispatchCommand` (via `getAppCommands()` from `src/app/appCommands.ts`, or stores). The global handler ignores plain/Alt bindings while a text field is focused (Mod combos still fire; xterm's helper textarea is exempt). Editor-scoped shortcuts stay in CodeMirror's keymap.
 - **Drag & drop:** pointer events + manual gesture tracking, never HTML5 drag (WKWebView cancels `dragstart` through composed Radix Slots). For vertical list reorder, reuse `components/ui/useListReorder.tsx` instead of hand-rolling the gesture.
 - **Path aliases:** `@/*` maps to `src/*`. **IDs:** `nanoid` via `lib/idGen.ts` on the frontend; UUIDv4 in Rust. **Strict TS:** `noUnusedLocals`/`noUnusedParameters` on.
 - **Tauri capabilities** live in `src-tauri/capabilities/default.json`; new plugin permissions must be added there or the IPC silently rejects.
@@ -144,13 +144,14 @@ One `notify_debouncer_mini::Debouncer` per project root, owned by `WatcherManage
 | You want to… | Start here |
 |---|---|
 | Add a new Tauri command | `src-tauri/src/commands/<area>.rs` + register in `lib.rs::invoke_handler!` + mirror in `src/lib/ipc.ts::CMD` |
-| Change app shell layout | `src/app/AppShell.tsx` (grid template lives there) |
+| Change app shell layout | `src/app/AppShell.tsx` (grid template lives there); use `src/app/hooks/*` for bootstrap, filesystem sync, persistence and tab actions |
 | Projects sidebar (rail / expanded, reorder, status dots) | `components/project-rail/*`, `components/code-sidebar/*`, `components/ui/useListReorder.tsx`, `features/terminal/projectStatus.ts`, `features/ui/codeSidebar.store.ts` |
 | Title bar (project identity, branch, updates, save dot) | `src/app/TitleBar.tsx` |
-| Add a new tab kind | `src/components/tabs/types.ts` (union) → `TabContent.tsx` (renderer) → `AppShell.handleOpenFile` (routing) → Arquivos section in `CodeProjectGroup.tsx` (vertical layout) |
+| Add a new tab kind | `src/components/tabs/types.ts` (union) → `TabContent.tsx` (renderer) → `useTabActions.openFile` / `openPreviewFile` (routing) → Arquivos section in `CodeProjectGroup.tsx` (vertical layout) |
 | Add a new CLI to the launcher | `src/features/terminal/cli-registry.ts::DEFAULT_CLI_REGISTRY` |
-| Add/change a user setting | `src/features/settings/settings.types.ts` (`AppSettings` + `DEFAULT_SETTINGS` + `mergeSettings`) → consumer → control in `SettingsDialog.tsx` + i18n keys (both locales) |
+| Add/change a user setting | `src/features/settings/settings.types.ts` (`AppSettings` + `DEFAULT_SETTINGS` + `mergeSettings`) → consumer → pane in `components/settings/panes/` + i18n keys (both locales) |
 | Add/rebind a keyboard shortcut | `src/features/keybindings/commands.ts` → dispatch in `KeyboardShortcuts.tsx` |
+| Add an app-wide UI command | `src/app/appCommands.ts` + implementation in `src/app/hooks/useTabActions.ts` or the relevant store-backed dispatcher |
 | Source Control panel / worktrees | `src/components/source-control/*` + `features/git/*`; Rust in `commands/git.rs` |
 | Clone from GitHub | `components/project-rail/CloneFromGithubDialog.tsx` + `commands/git.rs::git_clone` (+ `git://clone-progress`) |
 | Resume registry (recent CLI sessions) | `features/resume/*` + `components/resume/ResumeCards.tsx` + Histórico rows in `CodeProjectGroup.tsx`; Rust `commands/resume.rs` |
