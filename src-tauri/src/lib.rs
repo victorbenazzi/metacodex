@@ -74,6 +74,15 @@ pub fn run() {
                     // Frontend flush budget. If the listener takes longer the
                     // app still exits, we don't risk hanging the user on quit.
                     tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+                    // Clones first: their disk cleanup (partial dest removal)
+                    // is the potentially slow part, start it earliest. Without
+                    // this, an in-flight `git clone` outlives the app as an
+                    // orphan and leaves a half-written destination behind.
+                    if let Some(clones) =
+                        app.try_state::<std::sync::Arc<commands::git::CloneRegistry>>()
+                    {
+                        clones.abort_all();
+                    }
                     if let Some(mgr) = app.try_state::<pty::PtyManager>() {
                         mgr.kill_all().await;
                     }
@@ -166,9 +175,6 @@ pub fn run() {
             commands::search::list_files,
             commands::git::git_status,
             commands::git::git_file_head_content,
-            commands::git::git_branch_list,
-            commands::git::git_checkout,
-            commands::git::git_create_branch,
             commands::git::git_worktree_list,
             commands::git::git_worktree_add,
             commands::git::git_worktree_remove,

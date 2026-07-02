@@ -31,4 +31,11 @@ impl DirectoryGrants {
             .cloned()
             .ok_or_else(|| AppError::PathNotAllowed("unknown directory grant".into()))
     }
+
+    /// Drop a grant once its purpose is fulfilled (a clone SUCCEEDED into the
+    /// granted parent). Not called on failure/cancel: the clone dialog keeps
+    /// the same grant id across retries, so revoking earlier would break them.
+    pub fn revoke(&self, grant_id: &str) {
+        self.by_id.lock().remove(grant_id);
+    }
 }

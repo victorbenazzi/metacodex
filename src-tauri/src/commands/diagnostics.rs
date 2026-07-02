@@ -8,7 +8,10 @@ use crate::error::AppResult;
 /// before app quit (handshake via `app://before-quit`).
 ///
 /// Caps the payload at 2 MB (cutting the head, not the tail) so a runaway
-/// log buffer can't bloat the disk.
+/// log buffer can't bloat the disk. Plain non-atomic write BY DESIGN: this
+/// runs inside the ~300ms quit budget, and a torn log is acceptable for a
+/// best-effort diagnostics dump (tmp+rename+fsync would spend quit time for
+/// no user-facing gain).
 #[tauri::command]
 pub async fn write_session_log(payload: String) -> AppResult<()> {
     let path = config_paths::last_session_log_file()?;
@@ -31,9 +34,5 @@ pub async fn write_session_log(payload: String) -> AppResult<()> {
 #[tauri::command]
 pub async fn write_crash(payload: String) -> AppResult<()> {
     let path = config_paths::last_crash_file()?;
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    fs::write(&path, payload.as_bytes())?;
-    Ok(())
+    config_paths::write_string_atomic(&path, &payload)
 }

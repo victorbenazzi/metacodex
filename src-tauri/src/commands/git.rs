@@ -10,10 +10,36 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_dialog::{DialogExt, FilePath};
 
+/// An in-flight `git clone` child plus the destination it is writing into.
+/// The dest rides along because the worker's own partial-clone cleanup never
+/// runs once `app.exit(0)` kills the process at quit.
+pub struct CloneEntry {
+    pub child: Child,
+    pub dest: PathBuf,
+}
+
 /// In-flight `git clone` processes keyed by op_id, so the UI can abort a clone
-/// that's hanging on a slow network. Managed in `lib.rs`.
+/// that's hanging on a slow network and the quit path can reap stragglers.
+/// Managed in `lib.rs`.
 #[derive(Default)]
-pub struct CloneRegistry(Mutex<HashMap<String, Child>>);
+pub struct CloneRegistry(Mutex<HashMap<String, CloneEntry>>);
+
+impl CloneRegistry {
+    /// Kill and reap every in-flight clone and remove its partial destination.
+    /// Called from the quit handler; kill/wait/cleanup happen outside the lock
+    /// (kill+wait on a SIGKILLed child returns immediately).
+    pub fn abort_all(&self) {
+        let entries: Vec<(String, CloneEntry)> = {
+            let mut map = self.0.lock();
+            map.drain().collect()
+        };
+        for (_op_id, mut entry) in entries {
+            let _ = entry.child.kill();
+            let _ = entry.child.wait();
+            let _ = std::fs::remove_dir_all(&entry.dest);
+        }
+    }
+}
 
 use crate::error::{AppError, AppResult};
 use crate::directory_grants::{DirectoryGrant, DirectoryGrants};
@@ -95,99 +121,6 @@ pub async fn git_file_head_content(app: AppHandle, path: String) -> AppResult<Op
     tokio::task::spawn_blocking(move || file_head_content(&path))
         .await
         .map_err(|e| AppError::Other(format!("join: {e}")))?
-}
-
-// -- Branch management ---------------------------------------------------------
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BranchInfo {
-    pub name: String,
-    pub current: bool,
-}
-
-/// Local branches of the repo at `root`, most-recently-committed first. The
-/// current branch is flagged via `%(HEAD)` (`*`).
-#[tauri::command]
-pub async fn git_branch_list(app: AppHandle, root: String) -> AppResult<Vec<BranchInfo>> {
-    ensure_root_allowed(&app, &root)?;
-    tokio::task::spawn_blocking(move || {
-        let out = run_git(
-            &root,
-            &[
-                "for-each-ref",
-                "--sort=-committerdate",
-                "--format=%(HEAD)\t%(refname:short)",
-                "refs/heads/",
-            ],
-        )?;
-        if !out.status.success() {
-            return Err(AppError::Other(format!(
-                "git branch list failed: {}",
-                String::from_utf8_lossy(&out.stderr).trim()
-            )));
-        }
-        let text = String::from_utf8_lossy(&out.stdout);
-        let branches = text
-            .lines()
-            .filter_map(|line| {
-                let mut parts = line.splitn(2, '\t');
-                let head = parts.next().unwrap_or("");
-                let name = parts.next().unwrap_or("").trim();
-                if name.is_empty() {
-                    return None;
-                }
-                Some(BranchInfo {
-                    name: name.to_string(),
-                    current: head == "*",
-                })
-            })
-            .collect();
-        Ok(branches)
-    })
-    .await
-    .map_err(|e| AppError::Other(format!("join: {e}")))?
-}
-
-/// Switch the working tree at `root` to an existing local branch.
-#[tauri::command]
-pub async fn git_checkout(app: AppHandle, root: String, branch: String) -> AppResult<()> {
-    ensure_root_allowed(&app, &root)?;
-    if !valid_branch_name(&branch) {
-        return Err(AppError::Other(format!("invalid branch name: {branch}")));
-    }
-    tokio::task::spawn_blocking(move || {
-        let out = run_git(&root, &["checkout", branch.as_str()])?;
-        if !out.status.success() {
-            return Err(AppError::Other(
-                String::from_utf8_lossy(&out.stderr).trim().to_string(),
-            ));
-        }
-        Ok(())
-    })
-    .await
-    .map_err(|e| AppError::Other(format!("join: {e}")))?
-}
-
-/// Create a new branch off the current HEAD and switch to it.
-#[tauri::command]
-pub async fn git_create_branch(app: AppHandle, root: String, name: String) -> AppResult<()> {
-    ensure_root_allowed(&app, &root)?;
-    let name = name.trim().to_string();
-    if !valid_branch_name(&name) {
-        return Err(AppError::Other(format!("invalid branch name: {name}")));
-    }
-    tokio::task::spawn_blocking(move || {
-        let out = run_git(&root, &["checkout", "-b", name.as_str()])?;
-        if !out.status.success() {
-            return Err(AppError::Other(
-                String::from_utf8_lossy(&out.stderr).trim().to_string(),
-            ));
-        }
-        Ok(())
-    })
-    .await
-    .map_err(|e| AppError::Other(format!("join: {e}")))?
 }
 
 // -- Worktree primitives -------------------------------------------------------
@@ -566,6 +499,10 @@ pub async fn git_clone(
     let dest_for_thread = dest.clone();
     let op_id_clone = op_id.clone();
     let registry = app.state::<Arc<CloneRegistry>>().inner().clone();
+    // Captured before the closure moves `app`. Revoked only on SUCCESS: the
+    // clone dialog keeps the same grant id across failed attempts, so an
+    // earlier revoke would break retry.
+    let dir_grants = app.state::<Arc<DirectoryGrants>>().inner().clone();
 
     tokio::task::spawn_blocking(move || -> AppResult<String> {
         let mut child = silent_command("git")
@@ -596,9 +533,16 @@ pub async fn git_clone(
             .ok_or_else(|| AppError::Other("git clone: no stderr pipe".into()))?;
         let mut reader = BufReader::new(stderr);
 
-        // Register the child (stderr already detached) so git_clone_cancel can
-        // kill it. Killing closes stderr → the read loop hits EOF → we reap below.
-        registry.0.lock().insert(op_id_clone.clone(), child);
+        // Register the child (stderr already detached) so git_clone_cancel and
+        // the quit-time abort_all can kill it. Killing closes stderr → the
+        // read loop hits EOF → we reap below.
+        registry.0.lock().insert(
+            op_id_clone.clone(),
+            CloneEntry {
+                child,
+                dest: dest_for_thread.clone(),
+            },
+        );
 
         let mut last_emit = Instant::now() - Duration::from_secs(1);
         let mut last_phase = String::new();
@@ -664,7 +608,7 @@ pub async fn git_clone(
         // Reclaim the child from the registry to reap it. If it's already gone,
         // git_clone_cancel removed and killed it , report cancellation.
         let mut child = match registry.0.lock().remove(&op_id_clone) {
-            Some(c) => c,
+            Some(entry) => entry.child,
             None => {
                 let _ = std::fs::remove_dir_all(&dest_for_thread);
                 return Err(AppError::Other("clone cancelled".into()));
@@ -689,6 +633,8 @@ pub async fn git_clone(
             return Err(AppError::Other(msg));
         }
 
+        // Purpose fulfilled: the granted parent dir received its clone.
+        dir_grants.revoke(&parent_grant_id);
         Ok(dest_str)
     })
     .await
@@ -701,10 +647,12 @@ pub async fn git_clone(
 #[tauri::command]
 pub async fn git_clone_cancel(app: AppHandle, op_id: String) -> AppResult<()> {
     let registry = app.state::<Arc<CloneRegistry>>();
-    let child = registry.0.lock().remove(&op_id);
-    if let Some(mut c) = child {
-        let _ = c.kill();
-        let _ = c.wait();
+    let entry = registry.0.lock().remove(&op_id);
+    if let Some(mut entry) = entry {
+        let _ = entry.child.kill();
+        let _ = entry.child.wait();
+        // Partial-dest cleanup stays with the still-alive worker (it sees the
+        // missing registry entry and removes the dest), same as before.
     }
     Ok(())
 }

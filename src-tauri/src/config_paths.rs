@@ -200,13 +200,33 @@ pub fn read_json_opt<T: DeserializeOwned>(path: &Path) -> AppResult<Option<T>> {
 /// project id (see [`workspace_file`]). The webview can never inject an arbitrary
 /// path here. Same documented precedent as `fs_ops::read_project_icon_image`.
 pub fn write_json_atomic<T: Serialize>(path: &Path, value: &T) -> AppResult<()> {
+    let json = serde_json::to_string_pretty(value)
+        .map_err(|e| AppError::Other(format!("serialize config: {e}")))?;
+    write_string_atomic(path, &json)
+}
+
+/// Atomic, durable string write: `<file>.metacodex.tmp` + write + `sync_all`,
+/// then rename. The `sync_all` puts the data on disk BEFORE the rename makes
+/// it visible, so a power loss right after the rename can't leave a truncated
+/// or zero-length file. No parent-dir fsync on purpose: losing the rename
+/// itself just means the OLD version survives, which is acceptable for config
+/// files and avoids a second fsync on the settings hot path.
+/// Shares the SECURITY carve-out documented on [`write_json_atomic`].
+pub fn write_string_atomic(path: &Path, contents: &str) -> AppResult<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
-    let json = serde_json::to_string_pretty(value)
-        .map_err(|e| AppError::Other(format!("serialize config: {e}")))?;
     let tmp = tmp_path(path);
-    fs::write(&tmp, json.as_bytes())?;
+    let written = (|| -> std::io::Result<()> {
+        use std::io::Write;
+        let mut f = fs::File::create(&tmp)?;
+        f.write_all(contents.as_bytes())?;
+        f.sync_all()
+    })();
+    if let Err(e) = written {
+        let _ = fs::remove_file(&tmp);
+        return Err(AppError::Io(e));
+    }
     // Windows: AV / OneDrive briefly hold handles on the destination during
     // scans; retry the atomic rename twice with short backoff before surfacing.
     let mut last_err: Option<std::io::Error> = None;
