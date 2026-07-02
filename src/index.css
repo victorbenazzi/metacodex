@@ -54,12 +54,11 @@
     cursor: pointer;
   }
 
+  /* Theme-aware: --selection ships light/dark defaults in tokens.css and is
+     re-tuned per syntax theme by applyTheme(), so global text selection always
+     matches the editor's. */
   ::selection {
-    background-color: rgba(40, 42, 54, 0.16);
-  }
-
-  [data-theme="dark"] ::selection {
-    background-color: rgba(138, 138, 243, 0.28);
+    background-color: var(--selection);
   }
 
   button {

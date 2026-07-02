@@ -65,13 +65,14 @@ export function WelcomeScreen({
             }}
           />
           <h1
-            className="font-display tracking-[-0.02em] text-ink"
+            className="font-display tracking-display text-ink"
             style={{ fontSize: "clamp(56px, 7vw, 88px)", lineHeight: 1.02, fontWeight: 500 }}
           >
             metacodex
           </h1>
         </div>
 
+        {/* 18px is a one-off hero size (sanctioned exception to the type scale). */}
         <p className="mt-[12px] max-w-[520px] font-display text-[18px] leading-[1.5] text-body">
           {t("welcome.tagline")}
         </p>

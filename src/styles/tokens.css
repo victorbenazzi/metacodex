@@ -83,6 +83,16 @@
      dark-theme --on-primary is near-black and would fail AA on this blue. */
   --on-update: #ffffff;
 
+  /* Windows close-control hover: Microsoft's convention red. Same value in
+     both themes (a platform color, not a theme color). */
+  --win-close: #e81123;
+
+  /* BackgroundGrain: the two faint radial spots behind editorial empty
+     states. Warm ink tint, same in both themes (over the dark canvas they
+     read as near-invisible texture, which is intended). */
+  --grain-spot-a: rgba(38, 37, 30, 0.04);
+  --grain-spot-b: rgba(38, 37, 30, 0.025);
+
   /* Diff / git change gutter */
   --diff-add: #1f9b73;
   --diff-modify: #4d6f97;

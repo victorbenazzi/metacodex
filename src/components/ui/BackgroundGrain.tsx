@@ -10,7 +10,7 @@ export function BackgroundGrain() {
       className="pointer-events-none absolute inset-0 z-0"
       style={{
         background:
-          "radial-gradient(900px 600px at 18% 12%, rgba(38,37,30,0.04), transparent 60%), radial-gradient(900px 600px at 82% 88%, rgba(38,37,30,0.025), transparent 60%)",
+          "radial-gradient(900px 600px at 18% 12%, var(--grain-spot-a), transparent 60%), radial-gradient(900px 600px at 82% 88%, var(--grain-spot-b), transparent 60%)",
       }}
     >
       <svg className="h-full w-full opacity-[0.035]" xmlns="http://www.w3.org/2000/svg">

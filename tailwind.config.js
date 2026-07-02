@@ -40,6 +40,8 @@ export default {
         danger: "var(--danger)",
         warn: "var(--warn)",
         "on-update": "var(--on-update)",
+        "update-blue-strong": "var(--update-blue-strong)",
+        "win-close": "var(--win-close)",
 
         // Project palette swatches (warm/neutral)
         "p-1": "#7c7666",
@@ -76,6 +78,9 @@ export default {
         // Uppercase eyebrow tracking. One token, one utility: no more ad-hoc
         // tracking-[0.0Nem] per component.
         label: "var(--tracking-label)",
+        // Display-heading tightening for hero surfaces (Welcome, empty
+        // states, markdown H1). One utility instead of ad-hoc negative values.
+        display: "-0.015em",
       },
       transitionDuration: {
         // Motion tokens are the single source of truth: bare `transition-*`

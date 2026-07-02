@@ -68,7 +68,7 @@ export function ProjectEmptyState({ project, onNewTerminal, onLaunchCli }: Proje
           </span>
           <div className="min-w-0">
             <h1
-              className="truncate font-display tracking-[-0.02em] text-ink"
+              className="truncate font-display tracking-display text-ink"
               style={{ fontSize: "clamp(36px, 4.6vw, 56px)", lineHeight: 1.04, fontWeight: 500 }}
             >
               {project.name}
@@ -82,6 +82,7 @@ export function ProjectEmptyState({ project, onNewTerminal, onLaunchCli }: Proje
           </div>
         </div>
 
+        {/* 18px is a one-off hero size (sanctioned exception to the type scale). */}
         <p className="mt-[16px] max-w-[520px] font-display text-[18px] leading-[1.5] text-body">
           {t("projectEmpty.tagline")}
         </p>

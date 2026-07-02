@@ -171,9 +171,9 @@ export function ResizeHandle({
                 "left-1/2 -translate-x-1/2",
           "transition-colors duration-fast ease-out",
           dragging
-            ? "bg-[var(--primary)]"
+            ? "bg-primary"
             : hovering
-              ? "bg-[var(--hairline-strong)]"
+              ? "bg-hairline-strong"
               : "bg-transparent",
         )}
       />

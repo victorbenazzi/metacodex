@@ -52,7 +52,7 @@ export function CliMissingPanel({ cli, onRetry, onOpenInTerminal }: CliMissingPa
         </div>
 
         <h1
-          className="font-display text-display font-medium tracking-[-0.015em] text-ink"
+          className="font-display text-display font-medium text-ink"
           style={{ lineHeight: 1.05 }}
         >
           {cli.label}

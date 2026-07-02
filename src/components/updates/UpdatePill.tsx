@@ -26,8 +26,8 @@ export function UpdatePill() {
     status.kind === "downloading" || status.kind === "installing";
 
   const colorClass = isError
-    ? "border-[var(--warn)]/45 bg-[var(--warn)]/12 text-[var(--warn)] hover:bg-[var(--warn)]/18"
-    : "border-[var(--update-blue-strong)] bg-[var(--update-blue-strong)] text-on-update hover:brightness-110";
+    ? "border-warn/45 bg-warn/12 text-warn hover:bg-warn/18"
+    : "border-update-blue-strong bg-update-blue-strong text-on-update hover:brightness-110";
 
   let label: string;
   let LeftIcon = Download;

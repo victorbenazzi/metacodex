@@ -12,7 +12,6 @@
     "copy": "copy",
     "copied": "copied",
     "docs": "Docs",
-    "imagesFilter": "Images",
     "closeDialog": "Close dialog",
     "close": "Close",
     "dismiss": "Dismiss",
@@ -38,7 +37,6 @@
   "welcome": {
     "eyebrow": "Welcome",
     "tagline": "A quiet, local-first workspace for code, with a real native terminal and your favourite AI coding CLIs one keystroke away.",
-    "openFolder": "Open folder",
     "openProject": "Open project",
     "openProjectMenu": {
       "local": "Open folder…",
@@ -217,10 +215,7 @@
   },
   "cli": {
     "dangerous": "dangerous",
-    "needsConfig": "needs config",
-    "needsConfigTooltip": "Needs configuration or installation",
-    "checkingTooltip": "Checking installation…",
-    "notInstalledTooltip": "Not installed. Click to open install help."
+    "needsConfig": "needs config"
   },
   "codeSidebar": {
     "projects": "Projects",
@@ -251,7 +246,6 @@
   "explorer": {
     "ariaLabel": "File explorer",
     "title": "Explorer",
-    "renameFailed": "Could not rename",
     "noProject": "No project open",
     "noProjectBody": "Open a local folder to browse files. Your folders stay on disk, metacodex only stores workspace metadata.",
     "openFolder": "Open Folder",
@@ -264,9 +258,6 @@
   "tree": {
     "openInTerminal": "Open in new terminal",
     "openCliHere": "Open CLI in this folder",
-    "rename": "Rename",
-    "deleteFolder": "Delete folder",
-    "deleteFile": "Delete file",
     "open": "Open",
     "revealInFinder": "Reveal in Finder",
     "copyPath": "Copy path",
@@ -307,7 +298,6 @@
   },
   "projectRail": {
     "ariaLabel": "Project rail",
-    "openFolder": "Open folder",
     "addProject": "Add project",
     "settings": "Settings",
     "openSettings": "Open settings",
@@ -366,24 +356,18 @@
       "needsAttention": "Needs your input",
       "done": "Done"
     },
-    "jumpToNextAttention": "Jump to next agent waiting",
-    "jumpAllIdle": "All agents idle",
     "newWorktree": "New worktree…"
   },
   "notifications": {
-    "agentDone": "Agent finished",
-    "agentNeedsAttention": "Agent needs you"
+    "agentDone": "Agent finished"
   },
   "resume": {
     "titleProject": "Pick up where you left off in {{name}}",
     "titleGlobal": "Pick up where you left off",
-    "empty": "No recent agent sessions.",
     "resumeButton": "Resume",
     "discardButton": "Discard",
     "lastSeen": "{{ago}} ago",
-    "cliUnavailable": "{{cli}} not installed",
-    "confirmDiscardTitle": "Forget this session?",
-    "confirmDiscardBody": "It will no longer appear in resume lists. The agent's own history (if any) is not touched."
+    "cliUnavailable": "{{cli}} not installed"
   },
   "tabInspector": {
     "tooltip": {
@@ -392,21 +376,6 @@
   },
   "appShell": {
     "openFolderTitle": "Open folder",
-    "deleteFailed": "Could not delete:\n\n{{error}}",
-    "moveFailed": "Could not move:\n\n{{error}}",
-    "deleteFailedTitle": "Could not delete",
-    "moveFailedTitle": "Could not move",
-    "deleteFileTitle": "Delete \"{{name}}\"?",
-    "deleteFolderTitle": "Delete the folder \"{{name}}\"?",
-    "deleteFileDescription": "The file will be deleted from disk. This action cannot be undone.",
-    "deleteFolderDescription": "The folder and all of its contents will be deleted from disk. This action cannot be undone.",
-    "deleteConfirmFile": "Delete",
-    "deleteConfirmFolder": "Delete folder",
-    "deleteSkip": "Don't ask again this session",
-    "moveTitle": "Move \"{{name}}\"?",
-    "moveDescription": "Move into {{toDir}}/",
-    "moveConfirm": "Move",
-    "moveSkip": "Don't confirm moves this session",
     "closeAgentTitle": "Close {{title}}?",
     "closeAgentDescription": "The agent session is active. Any in-progress response will be discarded.",
     "closeAgentConfirm": "Close agent",
@@ -530,8 +499,7 @@
       "create": "Create worktree",
       "createAndLaunch": "Create + launch",
       "creating": "Creating…",
-      "branchInvalid": "Branch name can only contain letters, numbers, dots, dashes, slashes and underscores.",
-      "branchExists": "Branch already exists."
+      "branchInvalid": "Branch name can only contain letters, numbers, dots, dashes, slashes and underscores."
     },
     "merge": {
       "title": "Merge {{branch}}",

@@ -155,14 +155,16 @@ function MarkdownBody({ source }: { source: string }) {
       components={{
         h1: (p) => (
           <h1
-            className="mt-0 font-display text-[34px] font-medium tracking-[-0.01em] text-ink"
+            // 34px is a one-off display size for the prose hero (sanctioned
+            // exception to the type scale); tracking comes from the token.
+            className="mt-0 font-display text-[34px] font-medium tracking-display text-ink"
             style={{ lineHeight: 1.1 }}
           >
             {p.children}
           </h1>
         ),
         h2: (p) => (
-          <h2 className="mt-[28px] font-display text-display-s font-medium tracking-[-0.005em] text-ink">
+          <h2 className="mt-[28px] font-display text-display-s font-medium text-ink">
             {p.children}
           </h2>
         ),

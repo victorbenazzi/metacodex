@@ -229,7 +229,7 @@ function SidebarRow({
 function PaneHeader({ title, description }: { title: string; description?: string }) {
   return (
     <header className="mb-[20px]">
-      <h2 className="font-display text-display-s font-medium tracking-[-0.005em] text-ink">
+      <h2 className="font-display text-display-s font-medium text-ink">
         {title}
       </h2>
       {description ? <p className="mt-[4px] text-ui text-muted">{description}</p> : null}
@@ -970,12 +970,12 @@ function AboutPane() {
     <div>
       <PaneHeader title={t("settings.about.title")} />
       <h1
-        className="font-display text-display font-medium tracking-[-0.015em] text-ink"
+        className="font-display text-display font-medium text-ink"
         style={{ lineHeight: 1.05 }}
       >
         metacodex
       </h1>
-      <p className="mt-[10px] font-display text-[16px] leading-[1.5] text-body">
+      <p className="mt-[10px] font-display text-title leading-[1.5] text-body">
         {t("settings.about.tagline")}
       </p>
       <ul className="mt-[20px] flex flex-col gap-[6px]">
@@ -999,7 +999,7 @@ function AboutPane() {
           <button
             type="button"
             onClick={handleInstall}
-            className="inline-flex items-center gap-[6px] rounded-sm border border-[var(--update-blue-strong)] bg-[var(--update-blue-strong)] px-[10px] py-[5px] font-mono text-label leading-none text-on-update transition duration-fast hover:brightness-110"
+            className="inline-flex items-center gap-[6px] rounded-sm border border-update-blue-strong bg-update-blue-strong px-[10px] py-[5px] font-mono text-label leading-none text-on-update transition duration-fast hover:brightness-110"
             title={t("updates.pill.available", { version: updateStatus.version })}
           >
             <Icon icon={Download} size={10} strokeWidth={2} />

@@ -299,7 +299,7 @@ function ControlButton({
       className={cn(
         "inline-flex h-[36px] w-[46px] items-center justify-center text-muted transition-colors",
         danger
-          ? "hover:bg-[#E81123] hover:text-white"
+          ? "hover:bg-win-close hover:text-white"
           : "hover:bg-surface-strong/55 hover:text-ink",
       )}
     >

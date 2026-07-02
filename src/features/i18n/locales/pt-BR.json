@@ -12,7 +12,6 @@
     "copy": "copiar",
     "copied": "copiado",
     "docs": "Docs",
-    "imagesFilter": "Imagens",
     "closeDialog": "Fechar",
     "close": "Fechar",
     "dismiss": "Dispensar",
@@ -38,7 +37,6 @@
   "welcome": {
     "eyebrow": "Bem-vindo",
     "tagline": "Um espaço de trabalho silencioso e local-first para código, com um terminal nativo de verdade e suas CLIs de IA favoritas a um atalho de distância.",
-    "openFolder": "Abrir pasta",
     "openProject": "Abrir projeto",
     "openProjectMenu": {
       "local": "Abrir pasta…",
@@ -217,10 +215,7 @@
   },
   "cli": {
     "dangerous": "perigoso",
-    "needsConfig": "requer config",
-    "needsConfigTooltip": "Requer configuração ou instalação",
-    "checkingTooltip": "Verificando instalação…",
-    "notInstalledTooltip": "Não instalado. Clique para abrir a ajuda de instalação."
+    "needsConfig": "requer config"
   },
   "codeSidebar": {
     "projects": "Projetos",
@@ -251,7 +246,6 @@
   "explorer": {
     "ariaLabel": "Explorador de arquivos",
     "title": "Explorador",
-    "renameFailed": "Não foi possível renomear",
     "noProject": "Nenhum projeto aberto",
     "noProjectBody": "Abra uma pasta local para navegar pelos arquivos. Suas pastas ficam no disco, o metacodex só guarda metadados do workspace.",
     "openFolder": "Abrir pasta",
@@ -264,9 +258,6 @@
   "tree": {
     "openInTerminal": "Abrir em novo terminal",
     "openCliHere": "Abrir CLI nesta pasta",
-    "rename": "Renomear",
-    "deleteFolder": "Apagar pasta",
-    "deleteFile": "Apagar arquivo",
     "open": "Abrir",
     "revealInFinder": "Revelar no Finder",
     "copyPath": "Copiar caminho",
@@ -307,7 +298,6 @@
   },
   "projectRail": {
     "ariaLabel": "Trilha de projetos",
-    "openFolder": "Abrir pasta",
     "addProject": "Adicionar projeto",
     "settings": "Configurações",
     "openSettings": "Abrir configurações",
@@ -366,24 +356,18 @@
       "needsAttention": "Aguarda você",
       "done": "Concluído"
     },
-    "jumpToNextAttention": "Pular para o próximo agente aguardando",
-    "jumpAllIdle": "Todos os agentes ociosos",
     "newWorktree": "Nova worktree…"
   },
   "notifications": {
-    "agentDone": "Agente concluído",
-    "agentNeedsAttention": "Agente aguarda você"
+    "agentDone": "Agente concluído"
   },
   "resume": {
     "titleProject": "Retome de onde parou em {{name}}",
     "titleGlobal": "Retome de onde parou",
-    "empty": "Nenhuma sessão recente.",
     "resumeButton": "Retomar",
     "discardButton": "Descartar",
     "lastSeen": "há {{ago}}",
-    "cliUnavailable": "{{cli}} não instalado",
-    "confirmDiscardTitle": "Esquecer esta sessão?",
-    "confirmDiscardBody": "Não aparecerá mais nas listas. O histórico do agente (se houver) não é alterado."
+    "cliUnavailable": "{{cli}} não instalado"
   },
   "tabInspector": {
     "tooltip": {
@@ -392,21 +376,6 @@
   },
   "appShell": {
     "openFolderTitle": "Abrir pasta",
-    "deleteFailed": "Não foi possível apagar:\n\n{{error}}",
-    "moveFailed": "Não foi possível mover:\n\n{{error}}",
-    "deleteFailedTitle": "Não foi possível apagar",
-    "moveFailedTitle": "Não foi possível mover",
-    "deleteFileTitle": "Apagar \"{{name}}\"?",
-    "deleteFolderTitle": "Apagar a pasta \"{{name}}\"?",
-    "deleteFileDescription": "O arquivo será apagado do disco. Esta ação não pode ser desfeita.",
-    "deleteFolderDescription": "A pasta e todo o seu conteúdo serão apagados do disco. Esta ação não pode ser desfeita.",
-    "deleteConfirmFile": "Apagar",
-    "deleteConfirmFolder": "Apagar pasta",
-    "deleteSkip": "Não perguntar novamente nesta sessão",
-    "moveTitle": "Mover \"{{name}}\"?",
-    "moveDescription": "Mover para {{toDir}}/",
-    "moveConfirm": "Mover",
-    "moveSkip": "Não confirmar movimentações nesta sessão",
     "closeAgentTitle": "Encerrar {{title}}?",
     "closeAgentDescription": "A sessão do agente está ativa. Qualquer resposta em andamento será descartada.",
     "closeAgentConfirm": "Encerrar agente",
@@ -530,8 +499,7 @@
       "create": "Criar worktree",
       "createAndLaunch": "Criar e iniciar",
       "creating": "Criando…",
-      "branchInvalid": "Nome só pode conter letras, números, pontos, traços, barras e underscores.",
-      "branchExists": "Branch já existe."
+      "branchInvalid": "Nome só pode conter letras, números, pontos, traços, barras e underscores."
     },
     "merge": {
       "title": "Mesclar {{branch}}",

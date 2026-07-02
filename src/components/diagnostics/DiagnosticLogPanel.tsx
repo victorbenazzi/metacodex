@@ -33,9 +33,9 @@ const KIND_META: Record<DiagKind, { letter: string; tone: "ink" | "success" | "w
 
 const TONE_CLASSES: Record<"ink" | "success" | "warn" | "danger", string> = {
   ink: "text-muted",
-  success: "text-[var(--success)]",
-  warn: "text-[var(--warn)]",
-  danger: "text-[var(--danger)]",
+  success: "text-success",
+  warn: "text-warn",
+  danger: "text-danger",
 };
 
 function fmtTime(ts: number): string {
