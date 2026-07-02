@@ -31,13 +31,13 @@ import {
   DropdownTrigger,
 } from "@/components/ui/DropdownMenu";
 import { TabTrailingActions } from "@/components/tabs/TabTrailingActions";
+import { ProjectGlyph } from "@/components/project-rail/ProjectGlyph";
 import type { CliTool } from "@/features/terminal/cli-registry";
 import { useSaveStatusStore } from "@/features/workspace/saveStatus.store";
 import { useDiagnosticsStore } from "@/features/diagnostics/diagnostics.store";
 import { UpdatePill } from "@/components/updates/UpdatePill";
 
 interface TitleBarProps {
-  workspaceName?: string;
   className?: string;
   /** Sidebar collapse + add-project sit on the leading edge. */
   onOpenFolder?: () => void;
@@ -64,7 +64,6 @@ interface TitleBarProps {
  * recognized as a drag and the window can't be moved.
  */
 export function TitleBar({
-  workspaceName,
   className,
   onOpenFolder,
   onCloneFromGithub,
@@ -74,6 +73,9 @@ export function TitleBar({
 }: TitleBarProps) {
   const { t } = useTranslation();
   const activeId = useProjectsStore((s) => s.activeProjectId);
+  const activeProject = useProjectsStore(
+    (s) => s.projects.find((p) => p.id === s.activeProjectId) ?? null,
+  );
   const git = useGitStore((s) => (activeId ? s.byProject[activeId] : null));
   const codeCollapsed = useCodeSidebarStore((s) => s.collapsed);
   const toggleCodeSidebar = useCodeSidebarStore((s) => s.toggleCollapsed);
@@ -151,12 +153,21 @@ export function TitleBar({
         data-tauri-drag-region
         className="flex items-center justify-self-center gap-[12px]"
       >
-        {workspaceName ? (
-          <span data-tauri-drag-region className="font-mono text-label text-ink">
-            {workspaceName}
+        {activeProject ? (
+          <span
+            data-tauri-drag-region
+            className="inline-flex items-center gap-[6px] font-mono text-label text-ink"
+            title={activeProject.path}
+          >
+            {/* pointer-events:none keeps mousedown on the glyph hitting the
+                drag-region span, so the window still drags from here. */}
+            <span data-tauri-drag-region className="pointer-events-none inline-flex">
+              <ProjectGlyph project={activeProject} size={13} />
+            </span>
+            {activeProject.name}
           </span>
         ) : null}
-        {workspaceName && git && git.branch ? (
+        {activeProject && git && git.branch ? (
           <span data-tauri-drag-region className="h-[10px] w-px bg-hairline-strong" />
         ) : null}
         {git && git.branch ? (
@@ -214,6 +225,7 @@ export function TitleBar({
  * the destructive action is unmistakable.
  */
 function WindowsControls() {
+  const { t } = useTranslation();
   const [maximized, setMaximized] = useState(false);
 
   useEffect(() => {
@@ -244,17 +256,21 @@ function WindowsControls() {
 
   return (
     <div className="absolute right-0 top-0 flex h-[36px]">
-      <ControlButton onClick={minimize} title="Minimize" ariaLabel="Minimize window">
+      <ControlButton
+        onClick={minimize}
+        title={t("titleBar.minimize")}
+        ariaLabel={t("titleBar.minimize")}
+      >
         <Icon icon={Minus} size={12} strokeWidth={1.6} />
       </ControlButton>
       <ControlButton
         onClick={toggleMax}
-        title={maximized ? "Restore" : "Maximize"}
-        ariaLabel={maximized ? "Restore window" : "Maximize window"}
+        title={maximized ? t("titleBar.restore") : t("titleBar.maximize")}
+        ariaLabel={maximized ? t("titleBar.restore") : t("titleBar.maximize")}
       >
         <Icon icon={maximized ? Copy : Square} size={11} strokeWidth={1.6} />
       </ControlButton>
-      <ControlButton onClick={close} title="Close" ariaLabel="Close window" danger>
+      <ControlButton onClick={close} title={t("titleBar.close")} ariaLabel={t("titleBar.close")} danger>
         <Icon icon={X} size={13} strokeWidth={1.6} />
       </ControlButton>
     </div>
@@ -296,6 +312,7 @@ function ControlButton({
  *  inactivity so it doesn't linger. Red is clickable → opens the diagnostic
  *  log filtered to workspace events for quick debugging. */
 function SaveStatusDot() {
+  const { t } = useTranslation();
   const status = useSaveStatusStore((s) => s.status);
   const lastSavedAt = useSaveStatusStore((s) => s.lastSavedAt);
   const setDiagOpen = useDiagnosticsStore((s) => s.setOpen);
@@ -315,14 +332,14 @@ function SaveStatusDot() {
   let color: string | null = null;
   let title = "";
   if (status === "saving") {
-    color = "bg-[var(--warn)]";
-    title = "Saving workspace…";
+    color = "bg-warn";
+    title = t("titleBar.saving");
   } else if (status === "failed") {
-    color = "bg-[var(--danger)]";
-    title = "Workspace save failed";
+    color = "bg-danger";
+    title = t("titleBar.saveFailed");
   } else if (status === "saved" && showSaved) {
-    color = "bg-[var(--success)]";
-    title = "Workspace saved";
+    color = "bg-success";
+    title = t("titleBar.saved");
   }
 
   const handleClick = () => {

@@ -121,6 +121,9 @@ fn archive_legacy_agent_state() -> AppResult<()> {
         state.join("agent-mcp.json"),
         state.join("opencode-config.json"),
         state.join("agent-cron.json"),
+        state.join("agent-drafts.json"),
+        state.join("opencode-runtime.json"),
+        state.join("opencode.log"),
         root.join("agents"),
     ] {
         if !path.exists() {

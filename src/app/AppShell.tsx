@@ -1176,7 +1176,6 @@ export function AppShell() {
     >
       <DropOverlay active={dropActive} />
       <TitleBar
-        workspaceName={project?.name}
         className="col-span-full"
         onOpenFolder={handleOpenFolder}
         onCloneFromGithub={handleCloneFromGithub}

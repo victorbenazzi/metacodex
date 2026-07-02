@@ -235,7 +235,18 @@
     "projectOptions": "Project options",
     "resumeAria": "Resume {{cli}} session",
     "endTerminal": "Close terminal",
-    "endAgent": "Close agent"
+    "endAgent": "Close agent",
+    "arquivos": "Files",
+    "closeFile": "Close file"
+  },
+  "titleBar": {
+    "minimize": "Minimize window",
+    "maximize": "Maximize window",
+    "restore": "Restore window",
+    "close": "Close window",
+    "saving": "Saving workspace…",
+    "saveFailed": "Workspace save failed",
+    "saved": "Workspace saved"
   },
   "explorer": {
     "ariaLabel": "File explorer",
@@ -301,12 +312,16 @@
     "settings": "Settings",
     "openSettings": "Open settings",
     "switchTo": "Switch to {{name}}",
+    "sessions_one": "{{count}} session",
+    "sessions_other": "{{count}} sessions",
     "removeTitle": "Remove project from metacodex?",
     "removeDescription": "This only removes the project from your workspace. The folder on disk is not affected.",
     "removeBodySuffix": " will be removed from the rail.",
     "menu": {
       "rename": "Rename in metacodex…",
       "revealInFinder": "Reveal in Finder",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
       "color": "Color",
       "icon": "Icon",
       "changeImage": "Change image…",

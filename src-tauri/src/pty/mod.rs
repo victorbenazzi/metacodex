@@ -215,7 +215,7 @@ impl PtyManager {
         let app_pressure = self.app_handle.clone();
         let id_for_pressure = id.clone();
         let session_for_reader = session.clone();
-        std::thread::Builder::new()
+        let reader_spawned = std::thread::Builder::new()
             .name(format!("pty-reader-{id_for_thread}"))
             .spawn(move || {
                 let mut reader = reader;
@@ -275,8 +275,15 @@ impl PtyManager {
                         }
                     }
                 }
-            })
-            .map_err(|e| AppError::Pty(format!("reader thread: {e}")))?;
+            });
+        if let Err(e) = reader_spawned {
+            // The session was already registered, but the waiter and drainer
+            // below never spawn without a reader: nothing would ever reap the
+            // child or evict the map entry. Undo both before bailing.
+            self.sessions.lock().remove(&id);
+            session.kill();
+            return Err(AppError::Pty(format!("reader thread: {e}")));
+        }
 
         // ----- drainer task: emits pty://data events -----
         let app_d = self.app_handle.clone();

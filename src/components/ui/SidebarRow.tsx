@@ -11,6 +11,9 @@ interface SidebarRowProps extends HTMLAttributes<HTMLDivElement> {
   title?: string;
   onActivate: () => void;
   trailing?: ReactNode;
+  /** CSS color for the active-row identity bar (e.g. the project accent).
+   *  Rendered only while `active`; omit for rows without an identity color. */
+  accent?: string;
 }
 
 /**
@@ -25,24 +28,31 @@ interface SidebarRowProps extends HTMLAttributes<HTMLDivElement> {
  * a Radix `asChild` trigger (the Code row wraps it in a context menu).
  */
 export const SidebarRow = forwardRef<HTMLDivElement, SidebarRowProps>(function SidebarRow(
-  { active, leading, label, title, onActivate, trailing, className, ...rest },
+  { active, leading, label, title, onActivate, trailing, accent, className, ...rest },
   ref,
 ) {
   return (
     <div
       ref={ref}
       className={cn(
-        "group/proj flex w-full items-center gap-[8px] rounded-md px-[10px] py-[6px] text-ui transition-colors duration-fast",
+        "group/proj relative flex w-full items-center gap-[8px] rounded-md px-[10px] py-[6px] text-ui transition-colors duration-fast",
         active ? "bg-surface-strong/45 text-ink" : "text-body hover:bg-surface-strong/30",
         className,
       )}
       {...rest}
     >
+      {active && accent ? (
+        <span
+          aria-hidden
+          className="absolute left-0 top-1/2 h-[14px] w-[2px] -translate-y-1/2 rounded-pill"
+          style={{ backgroundColor: accent }}
+        />
+      ) : null}
       {leading}
       <button
         type="button"
         onClick={onActivate}
-        className="min-w-0 flex-1 truncate text-left outline-none"
+        className={cn("min-w-0 flex-1 truncate text-left outline-none", active && "font-medium")}
         title={title}
       >
         {label}

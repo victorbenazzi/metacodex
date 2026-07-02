@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState, type PointerEvent as RPointerEvent } from "react";
+import { useState } from "react";
 import { Settings } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Icon } from "@/components/ui/Icon";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { Kbd } from "@/components/ui/Kbd";
+import { ReorderDropLine, useListReorder } from "@/components/ui/useListReorder";
 import { ProjectTile } from "./ProjectTile";
 import { ProjectContextMenu } from "./ProjectContextMenu";
 import { RenameProjectDialog } from "./RenameProjectDialog";
@@ -14,15 +15,11 @@ import { useSettingsStore } from "@/features/settings/settings.store";
 import type { Project } from "@/features/projects/project.types";
 import { cn } from "@/lib/cn";
 
-// Minimum pointer travel before a press becomes a drag. Below this, the press
-// is treated as a click (setActive). 8px is roomy enough to absorb the small
-// pointer oscillation a MacBook trackpad emits during a deliberate tap — at
-// 4px those taps were silently flipping into "drag" mode and suppressing the
-// click, which is the "I can't switch projects" symptom on trackpad users.
-const DRAG_THRESHOLD_PX = 8;
-
 // Collapsed form of the Code projects sidebar (the icon rail). The expand
 // toggle and add-project controls live in the title bar; Settings stays here.
+// Drag-to-reorder is the shared `useListReorder` gesture (same one the
+// expanded sidebar uses); activation happens on pointerup because the tile's
+// click is unreliable under WKWebView (see the hook's WKWebView note).
 export function MiniProjectSidebar() {
   const { t } = useTranslation();
   const projects = useProjectsStore((s) => s.projects);
@@ -34,185 +31,14 @@ export function MiniProjectSidebar() {
   const [removeTarget, setRemoveTarget] = useState<Project | null>(null);
   const setSettingsOpen = useSettingsStore((s) => s.setOpen);
 
-  // Drag state.
-  //  - draggingId: the project currently being dragged (drives the dim-in-place + ghost).
-  //  - dropIndex: insertion slot (0..projects.length) where the dragged tile would land.
-  //  - pointerPos: viewport-space pointer position used to anchor the ghost.
-  const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [dropIndex, setDropIndex] = useState<number | null>(null);
-  const [pointerPos, setPointerPos] = useState<{ x: number; y: number } | null>(null);
-  // Set by pointermove when the gesture escalates to a drag; drained by the
-  // next click on the same tile so a drop doesn't also activate the project.
-  const suppressClickRef = useRef(false);
-  // Timestamp of the most recent pointerup-driven activation. Lets the
-  // onClick handler bail when the click fires right after the pointerup
-  // (the common path on platforms where the click event isn't broken) —
-  // and gracefully degrade when click never arrives (WKWebView + composed
-  // Radix Slots), since the timestamp is naturally stale by the next press.
-  const lastPointerActivationRef = useRef(0);
+  const drag = useListReorder({
+    ids: projects.map((p) => p.id),
+    onReorder: (ids) => void reorder(ids),
+    onPressActivate: (id) => void setActive(id),
+  });
 
-  // One DOM ref per tile wrapper. Used during drag to compute which gap the
-  // pointer is currently over and where to draw the drop indicator.
-  const tileRefs = useRef<Map<string, HTMLDivElement>>(new Map());
-  const railRef = useRef<HTMLDivElement | null>(null);
-  const setTileRef = (id: string) => (el: HTMLDivElement | null) => {
-    if (el) tileRefs.current.set(id, el);
-    else tileRefs.current.delete(id);
-  };
-
-  // Global cursor while dragging — applied as a body class so EVERY element
-  // (including buttons that opt into cursor:pointer) shows the grabbing cursor.
-  useEffect(() => {
-    if (!draggingId) return;
-    document.body.classList.add("is-reordering-projects");
-    return () => {
-      document.body.classList.remove("is-reordering-projects");
-    };
-  }, [draggingId]);
-
-  const computeDropIndex = (clientY: number): number => {
-    // Walk visible tiles top-down; the first one whose midpoint sits below the
-    // pointer is the insertion slot. Falling through past all of them means
-    // "append to end".
-    for (let i = 0; i < projects.length; i++) {
-      const el = tileRefs.current.get(projects[i].id);
-      if (!el) continue;
-      const rect = el.getBoundingClientRect();
-      if (clientY < rect.top + rect.height / 2) return i;
-    }
-    return projects.length;
-  };
-
-  const onTilePointerDown =
-    (id: string) => (e: RPointerEvent<HTMLDivElement>) => {
-      // Only left-button presses initiate drag. Right-click falls through to
-      // the Radix ContextMenu trigger nested inside; middle/etc. are ignored.
-      if (e.button !== 0) return;
-      // Skip when the press originated on an interactive overlay (e.g. the
-      // context menu itself was open and the click closes it). Heuristic:
-      // [data-radix-*] descendants.
-      const target = e.target as HTMLElement | null;
-      if (target?.closest("[role=menu]")) return;
-
-      // IMPORTANT: do NOT call setPointerCapture here. In WKWebView, capturing
-      // a pointer on this wrapper div consistently SUPPRESSES the `click`
-      // event on the nested <button> (which is asChild'd by TooltipTrigger +
-      // ContextMenuTrigger — two composed Radix Slots, a known-broken combo
-      // in WKWebView per MEMORY's "Drag = pointer events" note). Without
-      // capture, window-level pointermove/pointerup listeners are enough to
-      // track the gesture, and the child button's onClick fires normally.
-      // For drags that escape the rail bounds, window listeners receive the
-      // events anyway — capture is unnecessary.
-
-      const startX = e.clientX;
-      const startY = e.clientY;
-      let dragging = false;
-      let localDropIndex: number | null = null;
-
-      const onMove = (ev: PointerEvent) => {
-        if (!dragging) {
-          const dx = ev.clientX - startX;
-          const dy = ev.clientY - startY;
-          if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
-          dragging = true;
-          suppressClickRef.current = true;
-          setDraggingId(id);
-        }
-        const idx = computeDropIndex(ev.clientY);
-        localDropIndex = idx;
-        setDropIndex(idx);
-        setPointerPos({ x: ev.clientX, y: ev.clientY });
-      };
-
-      const cleanup = () => {
-        window.removeEventListener("pointermove", onMove);
-        window.removeEventListener("pointerup", onUp);
-        window.removeEventListener("pointercancel", onCancel);
-      };
-
-      const onUp = () => {
-        cleanup();
-        if (dragging && localDropIndex != null) {
-          const sourceIdx = projects.findIndex((p) => p.id === id);
-          // Drops at the source's own slots (`i` and `i+1`) are no-ops; skip.
-          if (
-            sourceIdx >= 0 &&
-            localDropIndex !== sourceIdx &&
-            localDropIndex !== sourceIdx + 1
-          ) {
-            const ids = projects.map((p) => p.id);
-            const [moved] = ids.splice(sourceIdx, 1);
-            const insertAt =
-              localDropIndex > sourceIdx ? localDropIndex - 1 : localDropIndex;
-            ids.splice(insertAt, 0, moved);
-            void reorder(ids);
-          }
-        } else if (!dragging) {
-          // Belt-and-suspenders: even though there's no pointer capture in
-          // play, Radix Slot composition has been known to swallow the
-          // child button's click. Activating from pointerup guarantees the
-          // project actually switches. The lastPointerActivation timestamp
-          // gate below prevents double-fire when the click DOES arrive.
-          lastPointerActivationRef.current = performance.now();
-          void setActive(id);
-        }
-        setDraggingId(null);
-        setDropIndex(null);
-        setPointerPos(null);
-      };
-
-      const onCancel = () => {
-        cleanup();
-        setDraggingId(null);
-        setDropIndex(null);
-        setPointerPos(null);
-      };
-
-      window.addEventListener("pointermove", onMove);
-      window.addEventListener("pointerup", onUp);
-      window.addEventListener("pointercancel", onCancel);
-    };
-
-  const onTileClick = (id: string) => () => {
-    // Drag end already fired setActive — don't double-activate.
-    if (suppressClickRef.current) {
-      suppressClickRef.current = false;
-      return;
-    }
-    // pointerup already activated within the last 250ms — skip. After 250ms,
-    // assume this is a genuine standalone click (e.g. keyboard Enter on a
-    // focused tile, where there was no pointerup).
-    if (performance.now() - lastPointerActivationRef.current < 250) return;
-    void setActive(id);
-  };
-
-  // Indicator visibility: hide on the two slots adjacent to the source tile,
-  // since dropping there is a no-op (and the visual line would be misleading).
-  const sourceIdx = draggingId
-    ? projects.findIndex((p) => p.id === draggingId)
-    : -1;
-  const showDropIndicator =
-    draggingId !== null &&
-    dropIndex !== null &&
-    dropIndex !== sourceIdx &&
-    dropIndex !== sourceIdx + 1;
-
-  const indicatorY = (() => {
-    if (!showDropIndicator || dropIndex === null || !railRef.current) return null;
-    if (dropIndex === projects.length) {
-      const last = projects[projects.length - 1];
-      const el = last ? tileRefs.current.get(last.id) : null;
-      if (!el) return null;
-      return el.offsetTop + el.offsetHeight + 3;
-    }
-    const target = projects[dropIndex];
-    const el = target ? tileRefs.current.get(target.id) : null;
-    if (!el) return null;
-    return el.offsetTop - 5;
-  })();
-
-  const draggingProject = draggingId
-    ? projects.find((p) => p.id === draggingId) ?? null
+  const draggingProject = drag.draggingId
+    ? projects.find((p) => p.id === drag.draggingId) ?? null
     : null;
 
   return (
@@ -221,59 +47,39 @@ export function MiniProjectSidebar() {
         className="atmosphere-soft relative flex h-full w-full flex-col items-center overflow-hidden border-r border-hairline"
         aria-label={t("projectRail.ariaLabel")}
       >
-        <div
-          ref={railRef}
-          className="relative flex flex-1 flex-col items-center gap-[8px] overflow-y-auto overflow-x-hidden px-[8px] py-[14px]"
-        >
-          {/* Drop indicator — absolutely positioned in the rail's flow so the
-              surrounding tiles don't reflow as the pointer moves between gaps.
-              Bookended with two small caps to give the line a deliberate,
-              non-default look that reads at a glance against any tile color. */}
-          {indicatorY !== null ? (
-            <span
-              aria-hidden
-              className="pointer-events-none absolute left-[6px] right-[6px] flex items-center"
-              style={{ top: `${indicatorY - 1}px`, height: "3px" }}
-            >
-              <span className="h-[6px] w-[6px] -ml-[1px] rounded-pill bg-ink" />
-              <span className="h-[2px] flex-1 bg-ink" />
-              <span className="h-[6px] w-[6px] -mr-[1px] rounded-pill bg-ink" />
-            </span>
-          ) : null}
+        <div className="relative flex flex-1 flex-col items-center gap-[8px] overflow-y-auto overflow-x-hidden px-[8px] py-[14px]">
+          {drag.indicatorTop !== null ? <ReorderDropLine top={drag.indicatorTop} /> : null}
 
-          {projects.map((p) => {
-            const isBeingDragged = draggingId === p.id;
-            return (
-              <div
-                key={p.id}
-                ref={setTileRef(p.id)}
-                onPointerDown={onTilePointerDown(p.id)}
-                // touch-action: none prevents the WebView from interpreting
-                // vertical pointer drags as page scroll, which would cancel
-                // pointermove before we cross the drag threshold.
-                className={cn(
-                  "relative touch-none transition-opacity duration-fast",
-                  isBeingDragged ? "opacity-30" : "opacity-100",
-                  // cursor: grab signals draggability; switches to grabbing
-                  // globally via body.is-reordering-projects.
-                  "cursor-grab active:cursor-grabbing",
-                )}
+          {projects.map((p) => (
+            <div
+              key={p.id}
+              ref={drag.itemRef(p.id)}
+              {...drag.getItemProps(p.id)}
+              // touch-action: none prevents the WebView from interpreting
+              // vertical pointer drags as page scroll, which would cancel
+              // pointermove before we cross the drag threshold.
+              className={cn(
+                "relative touch-none transition-opacity duration-fast",
+                drag.draggingId === p.id ? "opacity-30" : "opacity-100",
+                // cursor: grab signals draggability; switches to grabbing
+                // globally via body.is-reordering-projects.
+                "cursor-grab active:cursor-grabbing",
+              )}
+            >
+              <ProjectContextMenu
+                project={p}
+                onRequestRename={() => setRenameTarget(p)}
+                onRequestRemove={() => setRemoveTarget(p)}
               >
-                <ProjectContextMenu
+                <ProjectTile
                   project={p}
-                  onRequestRename={() => setRenameTarget(p)}
-                  onRequestRemove={() => setRemoveTarget(p)}
-                >
-                  <ProjectTile
-                    project={p}
-                    active={p.id === activeProjectId}
-                    isDragging={false}
-                    onClick={onTileClick(p.id)}
-                  />
-                </ProjectContextMenu>
-              </div>
-            );
-          })}
+                  active={p.id === activeProjectId}
+                  isDragging={false}
+                  onClick={() => void setActive(p.id)}
+                />
+              </ProjectContextMenu>
+            </div>
+          ))}
         </div>
 
         <div className="flex w-full shrink-0 flex-col items-center gap-[6px] border-t border-hairline-soft py-[10px]">
@@ -296,13 +102,13 @@ export function MiniProjectSidebar() {
 
       {/* Floating drag ghost — viewport-fixed and pointer-events:none so it
           glides under the cursor without intercepting events from the rail. */}
-      {draggingProject && pointerPos ? (
+      {draggingProject && drag.pointerPos ? (
         <div
           aria-hidden
           className="pointer-events-none fixed z-[1000]"
           style={{
-            top: pointerPos.y,
-            left: pointerPos.x,
+            top: drag.pointerPos.y,
+            left: drag.pointerPos.x,
             transform: "translate(-50%, -50%) rotate(-3deg)",
           }}
         >

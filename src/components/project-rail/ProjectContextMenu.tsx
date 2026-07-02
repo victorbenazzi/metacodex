@@ -1,6 +1,16 @@
 import { useEffect, useState, type ReactNode } from "react";
 import * as RCM from "@radix-ui/react-context-menu";
-import { Pencil, Trash2, Paintbrush, FolderOpen, Shapes, ImagePlus, ImageOff } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  Pencil,
+  Trash2,
+  Paintbrush,
+  FolderOpen,
+  Shapes,
+  ImagePlus,
+  ImageOff,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { CMD, invoke } from "@/lib/ipc";
@@ -42,7 +52,19 @@ export function ProjectContextMenu({
 }: ProjectContextMenuProps) {
   const { t } = useTranslation();
   const updateMeta = useProjectsStore((s) => s.updateMeta);
+  const projects = useProjectsStore((s) => s.projects);
+  const reorder = useProjectsStore((s) => s.reorder);
   const hasCustomIcon = isCustomIcon(project.icon);
+
+  // Keyboard-friendly alternative to drag-reorder: swap with the neighbor.
+  const index = projects.findIndex((p) => p.id === project.id);
+  const moveBy = (delta: number) => {
+    const to = index + delta;
+    if (index < 0 || to < 0 || to >= projects.length) return;
+    const ids = projects.map((p) => p.id);
+    [ids[index], ids[to]] = [ids[to], ids[index]];
+    void reorder(ids);
+  };
 
   const handlePickIcon = async () => {
     try {
@@ -73,6 +95,20 @@ export function ProjectContextMenu({
         <ContextMenuItem onSelect={revealInFinder}>
           <Icon icon={FolderOpen} size={12} className="text-muted" />
           {t("projectRail.menu.revealInFinder")}
+        </ContextMenuItem>
+
+        <ContextMenuSeparator />
+
+        <ContextMenuItem disabled={index <= 0} onSelect={() => moveBy(-1)}>
+          <Icon icon={ArrowUp} size={12} className="text-muted" />
+          {t("projectRail.menu.moveUp")}
+        </ContextMenuItem>
+        <ContextMenuItem
+          disabled={index < 0 || index >= projects.length - 1}
+          onSelect={() => moveBy(1)}
+        >
+          <Icon icon={ArrowDown} size={12} className="text-muted" />
+          {t("projectRail.menu.moveDown")}
         </ContextMenuItem>
 
         <ContextMenuSeparator />

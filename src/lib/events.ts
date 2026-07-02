@@ -4,8 +4,6 @@ export const EV = {
   ptyData: "pty://data",
   ptyExit: "pty://exit",
   ptyBackpressure: "pty://backpressure",
-  projectChanged: "project://changed",
-  fsError: "fs://error",
   fsChanged: "fs://changed",
   fsRenamed: "fs://renamed",
   beforeQuit: "app://before-quit",
@@ -15,7 +13,8 @@ export const EV = {
 
 export type EventName = (typeof EV)[keyof typeof EV];
 
-export type PtyExitReason = "normal" | "reader_error" | "killed" | "drainer_stalled" | "spawn_failed";
+// Mirrors the reasons Rust actually emits (see events.rs::PtyExitPayload).
+export type PtyExitReason = "normal" | "reader_error" | "killed" | "drainer_stalled";
 
 export interface PtyDataPayload {
   session_id: string;

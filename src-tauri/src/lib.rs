@@ -180,7 +180,6 @@ pub fn run() {
             commands::resume::resume_list,
             commands::resume::resume_save,
             commands::resume::resume_discard,
-            commands::resume::resume_prune,
             commands::diagnostics::write_session_log,
             commands::diagnostics::write_crash,
         ])

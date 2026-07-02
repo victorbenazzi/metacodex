@@ -93,6 +93,17 @@ export function KeyboardShortcuts() {
       const kb = useKeybindingsStore.getState();
       // While a Settings chip is capturing a new combo, don't dispatch globally.
       if (kb.captureActive) return;
+      // Don't hijack plain/Alt keys while the user types in a text field:
+      // Alt+Left/Right must stay the OS word-jump, F2 must not rename tabs
+      // mid-typing. Mod-based combos (Cmd+T, Cmd+W...) still dispatch. xterm's
+      // hidden helper textarea is exempt so shortcuts keep working while a
+      // terminal is focused (xterm handles its own keys).
+      const el = e.target instanceof HTMLElement ? e.target : null;
+      const inTextField =
+        !!el &&
+        (el.isContentEditable || !!el.closest("input, textarea, select")) &&
+        !el.closest(".xterm");
+      if (inTextField && !e.metaKey && !e.ctrlKey) return;
       const cmd = kb.resolve(e);
       if (!cmd) return;
       if (cmd.passive) return;

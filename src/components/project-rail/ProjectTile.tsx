@@ -2,12 +2,15 @@ import { forwardRef, useMemo, useState, type ButtonHTMLAttributes } from "react"
 import { useTranslation } from "react-i18next";
 
 import { Tooltip } from "@/components/ui/Tooltip";
+import { statusTone } from "@/components/tabs/statusTone";
 import { cn } from "@/lib/cn";
 import { tileIconColor } from "@/features/projects/color";
 import { isCustomIcon } from "@/features/projects/customIcon.service";
 import { useThemeStore } from "@/features/theme/theme.store";
+import { useProjectAgentStatus } from "@/features/terminal/projectStatus";
 import type { Project } from "@/features/projects/project.types";
 import { lookupLucide, monogram } from "./projectIdentity";
+import { ProjectStatusDot } from "./ProjectStatusDot";
 
 interface ProjectTileProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   project: Project;
@@ -45,12 +48,24 @@ export const ProjectTile = forwardRef<HTMLButtonElement, ProjectTileProps>(funct
   const mark = useMemo(() => monogram(project.name), [project.name]);
   const accent = tileIconColor(project.color, theme);
 
+  // Aggregated session status: a corner badge on the tile (decorative; the
+  // tile's own tooltip carries the readable label, so we don't nest tooltips).
+  const { status: aggStatus, urgency: aggUrgency, sessionCount } = useProjectAgentStatus(
+    project.id,
+  );
+  const aggTone = aggStatus ? statusTone(aggStatus, aggUrgency) : null;
+
   return (
     <Tooltip
       content={
         <span className="flex flex-col gap-[2px]">
           <span className="font-medium">{project.name}</span>
           <span className="font-mono text-[10px] text-muted">{project.path}</span>
+          {aggTone ? (
+            <span className="font-mono text-[10px] text-muted">
+              {t(aggTone.labelKey)} · {t("projectRail.sessions", { count: sessionCount })}
+            </span>
+          ) : null}
         </span>
       }
       side="right"
@@ -117,6 +132,14 @@ export const ProjectTile = forwardRef<HTMLButtonElement, ProjectTileProps>(funct
             aria-hidden
             className="absolute -left-[8px] top-1/2 h-[16px] w-[2px] -translate-y-1/2 rounded-pill bg-accent"
           />
+        ) : null}
+        {aggStatus ? (
+          <span
+            aria-hidden
+            className="absolute -right-[3px] -top-[3px] grid place-items-center rounded-pill bg-canvas p-[2px]"
+          >
+            <ProjectStatusDot status={aggStatus} urgency={aggUrgency} />
+          </span>
         ) : null}
       </button>
     </Tooltip>

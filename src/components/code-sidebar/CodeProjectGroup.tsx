@@ -18,12 +18,18 @@ import { newId } from "@/lib/idGen";
 import { basename } from "@/lib/path";
 import { agoShort } from "@/lib/time";
 import { CMD, invoke } from "@/lib/ipc";
+import { FileIcon } from "@/components/file-explorer/FileIcon";
 import { ProjectGlyph } from "@/components/project-rail/ProjectGlyph";
 import { ProjectContextMenu } from "@/components/project-rail/ProjectContextMenu";
+import { ProjectStatusDot } from "@/components/project-rail/ProjectStatusDot";
 import { NewTabBody, DROPDOWN_COMPONENTS } from "@/components/tabs/NewTabMenu";
 import { TabStatusDot } from "@/components/tabs/TabStatusDot";
+import { statusTone } from "@/components/tabs/statusTone";
 import { useProjectsStore } from "@/features/projects/project.store";
+import { tileIconColor } from "@/features/projects/color";
 import { useSettingsDataStore } from "@/features/settings/settings.data.store";
+import { useThemeStore } from "@/features/theme/theme.store";
+import { useProjectAgentStatus } from "@/features/terminal/projectStatus";
 import { useCodeSidebarStore } from "@/features/ui/codeSidebar.store";
 import { useResumeStore } from "@/features/resume/resume.store";
 import { buildResumeTab } from "@/features/resume/resumeLaunch";
@@ -35,20 +41,22 @@ import { useTerminalStore } from "@/features/terminal/terminal.store";
 import { useTabMetadataStore, type ListeningPort } from "@/features/terminal/tabMetadata.store";
 import type { Project } from "@/features/projects/project.types";
 import type { ResumeEntry } from "@/features/resume/resume.service";
-import type { Tab } from "@/components/tabs/types";
+import { resolveTabTitle, type Tab } from "@/components/tabs/types";
 
 const HISTORY_CAP = 6;
 const STAGGER_CAP = 10;
 const STAGGER_STEP_MS = 24;
 
 /**
- * One project parent row over its nested Code sections. Mirrors the Agent
- * sidebar's ProjectGroup (both build on the shared `SidebarRow`). In
- * `horizontal` layout the section list is just Histórico (the open items live
- * in the top tab bar, so the sidebar never duplicates them). In `vertical`
- * layout it adds Terminais (shells) and Agentes (agent CLIs, with their
- * listening-port chips), and clicking a row makes that tab the single center
- * pane. Empty sections stay hidden.
+ * One project parent row over its nested Code sections (built on the shared
+ * `SidebarRow`). In `horizontal` layout the section list is just Histórico
+ * (the open items live in the top tab bar, so the sidebar never duplicates
+ * them). In `vertical` layout (no top tab bar) it adds
+ * Agentes (agent CLIs, with their listening-port chips), Terminais (shells)
+ * and Arquivos (open file tabs), and clicking a row makes that tab the single
+ * center pane. Empty sections stay hidden. The parent row also carries the
+ * project-level rollups: the accent bar + medium label when active, and the
+ * aggregated session status dot (working / needs-attention / done).
  */
 export function CodeProjectGroup({
   project,
@@ -92,6 +100,27 @@ export function CodeProjectGroup({
     () => (bucket?.tabs ?? []).filter((tab) => tab.kind === "cli"),
     [bucket],
   );
+  // Open file tabs (editor/markdown/image/pdf/diff). In vertical layout the
+  // top tab bar is gone, so this section is the ONLY place these tabs can be
+  // switched or closed from.
+  const arquivos = useMemo(
+    () =>
+      (bucket?.tabs ?? []).filter(
+        (tab) => tab.kind !== "terminal" && tab.kind !== "cli",
+      ),
+    [bucket],
+  );
+
+  // Project-level rollup: worst per-tab status + live session count. Drives
+  // the always-visible dot on the parent row so "which project is running or
+  // waiting on me" reads without expanding anything.
+  const { status: aggStatus, urgency: aggUrgency, sessionCount } = useProjectAgentStatus(
+    project.id,
+  );
+  const aggTone = aggStatus ? statusTone(aggStatus, aggUrgency) : null;
+
+  const theme = useThemeStore((s) => s.effective);
+  const accent = tileIconColor(project.color, theme);
 
   const sessions = useTerminalStore((s) => s.sessions);
   const portsBySession = useTabMetadataStore((s) => s.bySessionId);
@@ -152,9 +181,12 @@ export function CodeProjectGroup({
     void invoke(CMD.revealInFinder, { path: project.path });
   };
 
-  const showOpen = vertical; // Terminais/Agentes only live here in vertical layout
+  // Open tab sections (Agentes/Terminais/Arquivos) only live here in vertical
+  // layout; in horizontal layout the top tab bar already shows them.
+  const showOpen = vertical;
   const hasContent =
-    historico.length > 0 || (showOpen && (terminais.length > 0 || agentes.length > 0));
+    historico.length > 0 ||
+    (showOpen && (terminais.length > 0 || agentes.length > 0 || arquivos.length > 0));
   let staggerIndex = 0;
   const nextDelay = () => `${Math.min(staggerIndex++, STAGGER_CAP) * STAGGER_STEP_MS}ms`;
 
@@ -174,6 +206,7 @@ export function CodeProjectGroup({
       >
         <SidebarRow
           active={active}
+          accent={accent}
           leading={<ProjectGlyph project={project} size={16} />}
           label={project.name}
           title={project.path}
@@ -182,7 +215,28 @@ export function CodeProjectGroup({
             setProjectExpanded(project.id, true);
           }}
           trailing={
-            <div className="flex items-center gap-[1px]">
+            <div className="flex items-center gap-[1px]" data-no-drag>
+              {aggStatus && aggTone ? (
+                <Tooltip
+                  content={
+                    <span className="flex flex-col gap-[2px]">
+                      <span className="font-medium">{t(aggTone.labelKey)}</span>
+                      <span className="font-mono text-[10px] text-muted">
+                        {t("projectRail.sessions", { count: sessionCount })}
+                      </span>
+                    </span>
+                  }
+                  side="bottom"
+                >
+                  <span className="mr-[5px] inline-flex">
+                    <ProjectStatusDot
+                      status={aggStatus}
+                      urgency={aggUrgency}
+                      label={t(aggTone.labelKey)}
+                    />
+                  </span>
+                </Tooltip>
+              ) : null}
               <DropdownRoot>
                 <Tooltip content={t("codeSidebar.newInProject")} side="bottom">
                   <DropdownTrigger asChild>
@@ -241,45 +295,63 @@ export function CodeProjectGroup({
       </ProjectContextMenu>
 
       {!collapsed && hasContent ? (
-        <SidebarNest>
-          {historico.length > 0 ? (
-            <Section label={t("codeSidebar.historico")} count={historico.length}>
-              {historico.map((entry) => (
-                <HistoricoRow key={entry.id} entry={entry} delay={nextDelay()} onResume={resume} />
-              ))}
-            </Section>
-          ) : null}
+        // data-no-drag: presses on nested rows never start a project reorder;
+        // only the parent row above is a drag handle (see useListReorder).
+        <div data-no-drag>
+          <SidebarNest>
+            {historico.length > 0 ? (
+              <Section label={t("codeSidebar.historico")} count={historico.length}>
+                {historico.map((entry) => (
+                  <HistoricoRow key={entry.id} entry={entry} delay={nextDelay()} onResume={resume} />
+                ))}
+              </Section>
+            ) : null}
 
-          {showOpen && agentes.length > 0 ? (
-            <Section label={t("codeSidebar.agentes")} count={agentes.length}>
-              {agentes.map((tab) => (
-                <TabRow
-                  key={tab.id}
-                  tab={tab}
-                  ports={portsByTabId[tab.id] ?? []}
-                  delay={nextDelay()}
-                  onFocus={focusTab}
-                  onClose={closeTabHere}
-                />
-              ))}
-            </Section>
-          ) : null}
+            {showOpen && agentes.length > 0 ? (
+              <Section label={t("codeSidebar.agentes")} count={agentes.length}>
+                {agentes.map((tab) => (
+                  <TabRow
+                    key={tab.id}
+                    tab={tab}
+                    ports={portsByTabId[tab.id] ?? []}
+                    delay={nextDelay()}
+                    onFocus={focusTab}
+                    onClose={closeTabHere}
+                  />
+                ))}
+              </Section>
+            ) : null}
 
-          {showOpen && terminais.length > 0 ? (
-            <Section label={t("codeSidebar.terminais")} count={terminais.length}>
-              {terminais.map((tab) => (
-                <TabRow
-                  key={tab.id}
-                  tab={tab}
-                  ports={portsByTabId[tab.id] ?? []}
-                  delay={nextDelay()}
-                  onFocus={focusTab}
-                  onClose={closeTabHere}
-                />
-              ))}
-            </Section>
-          ) : null}
-        </SidebarNest>
+            {showOpen && terminais.length > 0 ? (
+              <Section label={t("codeSidebar.terminais")} count={terminais.length}>
+                {terminais.map((tab) => (
+                  <TabRow
+                    key={tab.id}
+                    tab={tab}
+                    ports={portsByTabId[tab.id] ?? []}
+                    delay={nextDelay()}
+                    onFocus={focusTab}
+                    onClose={closeTabHere}
+                  />
+                ))}
+              </Section>
+            ) : null}
+
+            {showOpen && arquivos.length > 0 ? (
+              <Section label={t("codeSidebar.arquivos")} count={arquivos.length}>
+                {arquivos.map((tab) => (
+                  <FileRow
+                    key={tab.id}
+                    tab={tab}
+                    delay={nextDelay()}
+                    onFocus={focusTab}
+                    onClose={closeTabHere}
+                  />
+                ))}
+              </Section>
+            ) : null}
+          </SidebarNest>
+        </div>
       ) : null}
     </div>
   );
@@ -407,7 +479,7 @@ function TabRow({
   return (
     <RowShell
       leading={leading}
-      label={tab.title}
+      label={resolveTabTitle(tab)}
       trailing={
         <span className="flex shrink-0 items-center gap-[4px]">
           {ports.slice(0, 2).map((p) => (
@@ -425,6 +497,41 @@ function TabRow({
       onClick={() => onFocus(tab.id)}
       onClose={() => onClose(tab.id)}
       closeLabel={t(tab.kind === "cli" ? "codeSidebar.endAgent" : "codeSidebar.endTerminal")}
+    />
+  );
+}
+
+/** A single open file tab (editor/markdown/image/pdf/diff). In vertical
+ *  layout this is the only surface where file tabs can be switched or closed,
+ *  since the top tab bar is hidden there. Shows the unsaved-changes dot. */
+function FileRow({
+  tab,
+  delay,
+  onFocus,
+  onClose,
+}: {
+  tab: Tab;
+  delay: string;
+  onFocus: (tabId: string) => void;
+  onClose: (tabId: string) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <RowShell
+      leading={<FileIcon isDir={false} filename={tab.title} size={12} />}
+      label={tab.title}
+      trailing={
+        tab.dirty ? (
+          <span
+            aria-label={t("tabs.unsavedChanges")}
+            className="inline-block h-[5px] w-[5px] shrink-0 rounded-pill bg-ink/60"
+          />
+        ) : undefined
+      }
+      delay={delay}
+      onClick={() => onFocus(tab.id)}
+      onClose={() => onClose(tab.id)}
+      closeLabel={t("codeSidebar.closeFile")}
     />
   );
 }

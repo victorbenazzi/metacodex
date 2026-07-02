@@ -255,6 +255,11 @@ pub fn remove(app: &AppHandle, id: &str) -> AppResult<()> {
     }
     save_file(&file)?;
     app.state::<Arc<ProjectsCache>>().replace(file.projects);
+    // Backend-authoritative watcher teardown. The frontend also calls
+    // `unwatch_project`, but that call is best-effort (errors swallowed); if
+    // it never lands, the debouncer would keep emitting fs://changed for a
+    // project the app no longer knows about.
+    app.state::<Arc<crate::watcher::WatcherManager>>().unwatch(id);
     Ok(())
 }
 

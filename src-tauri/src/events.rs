@@ -1,8 +1,6 @@
 pub const EV_PTY_DATA: &str = "pty://data";
 pub const EV_PTY_EXIT: &str = "pty://exit";
 pub const EV_PTY_BACKPRESSURE: &str = "pty://backpressure";
-pub const EV_PROJECT_CHANGED: &str = "project://changed";
-pub const EV_FS_ERROR: &str = "fs://error";
 pub const EV_FS_RENAMED: &str = "fs://renamed";
 pub const EV_BEFORE_QUIT: &str = "app://before-quit";
 pub const EV_GIT_CLONE_PROGRESS: &str = "git://clone-progress";

@@ -1,5 +1,6 @@
-import { forwardRef } from "react";
+import { forwardRef, useEffect, useState } from "react";
 import { ChevronDown, FileText, FolderOpen, Github, TerminalSquare } from "lucide-react";
+import { getVersion } from "@tauri-apps/api/app";
 import { useTranslation } from "react-i18next";
 
 import { Icon } from "@/components/ui/Icon";
@@ -173,10 +174,21 @@ function PrincipleCard({ label, body }: { label: string; body: string }) {
 }
 
 function FooterMeta() {
+  // Real bundle version (the About pane does the same); never hardcode it.
+  const [version, setVersion] = useState<string | null>(null);
+  useEffect(() => {
+    void getVersion()
+      .then(setVersion)
+      .catch(() => undefined);
+  }, []);
   return (
     <footer className="mt-auto flex flex-wrap items-center gap-x-[14px] gap-y-[4px] pb-[28px] pt-[40px] font-mono text-label text-muted-soft">
-      <span>v0.0.1</span>
-      <span aria-hidden>·</span>
+      {version ? (
+        <>
+          <span>v{version}</span>
+          <span aria-hidden>·</span>
+        </>
+      ) : null}
       <span>alpha</span>
     </footer>
   );

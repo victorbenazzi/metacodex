@@ -82,6 +82,16 @@ fn ensure_no_symlink_below_root(root: &Path, target: &Path) -> Result<(), AppErr
 /// Reject a path that doesn't sit inside any of the registered project roots.
 pub fn ensure_within_roots(target: &str, roots: &[String]) -> Result<(), AppError> {
     let target = Path::new(target);
+    // Fail closed on `..` segments: `normalize` collapses them lexically
+    // BEFORE the kernel resolves symlinks, so `<root>/link/../x` would erase
+    // the symlinked component from the walk below while the real fs op still
+    // traverses it. No legitimate caller sends `..`.
+    if target
+        .components()
+        .any(|c| matches!(c, std::path::Component::ParentDir))
+    {
+        return Err(AppError::PathNotAllowed(target.display().to_string()));
+    }
     match matching_root(target, roots) {
         Some(root) => ensure_no_symlink_below_root(&root, target),
         None => Err(AppError::PathNotAllowed(target.display().to_string())),
@@ -91,6 +101,26 @@ pub fn ensure_within_roots(target: &str, roots: &[String]) -> Result<(), AppErro
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn rejects_parent_dir_segments() {
+        // Even when the path normalizes back inside the root, `..` must fail
+        // closed: it can hide a symlinked component from the symlink walk
+        // (e.g. `<root>/link/../inside.txt` never inspects `link`).
+        let base = std::env::temp_dir().join(format!(
+            "metacodex-paths-dotdot-{}",
+            uuid::Uuid::new_v4().simple()
+        ));
+        let root = base.join("root");
+        std::fs::create_dir_all(root.join("sub")).unwrap();
+
+        let roots = vec![root.to_string_lossy().to_string()];
+        let target = root.join("sub").join("..").join("inside.txt");
+        let err = ensure_within_roots(&target.to_string_lossy(), &roots).unwrap_err();
+        assert!(matches!(err, AppError::PathNotAllowed(_)));
+
+        let _ = std::fs::remove_dir_all(base);
+    }
 
     #[cfg(unix)]
     #[test]

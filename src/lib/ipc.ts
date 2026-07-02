@@ -89,7 +89,6 @@ export const CMD = {
   resumeList: "resume_list",
   resumeSave: "resume_save",
   resumeDiscard: "resume_discard",
-  resumePrune: "resume_prune",
 
   // diagnostics
   diagWriteSessionLog: "write_session_log",

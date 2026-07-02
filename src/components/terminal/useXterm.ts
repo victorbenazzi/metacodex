@@ -3,11 +3,10 @@ import { Terminal, type ITheme } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { CanvasAddon } from "@xterm/addon-canvas";
-import { invoke } from "@tauri-apps/api/core";
 
 import { useThemeStore } from "@/features/theme/theme.store";
 import { useSettingsDataStore } from "@/features/settings/settings.data.store";
-import { CMD } from "@/lib/ipc";
+import { CMD, invoke } from "@/lib/ipc";
 
 /** Read a CSS variable from :root / [data-theme]. */
 function readVar(name: string): string {

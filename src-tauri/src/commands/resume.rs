@@ -109,25 +109,9 @@ pub async fn resume_discard(id: String) -> AppResult<()> {
     write_all(entries)
 }
 
-#[tauri::command]
-pub async fn resume_prune(older_than_days: u32) -> AppResult<u32> {
-    let mut entries = read_all()?;
-    let cutoff = Utc::now() - chrono::Duration::days(older_than_days as i64);
-    let before = entries.len() as u32;
-    entries.retain(|e| {
-        chrono::DateTime::parse_from_rfc3339(&e.last_seen_at)
-            .map(|t| t.with_timezone(&Utc) >= cutoff)
-            .unwrap_or(true) // keep entries with unparseable dates
-    });
-    let removed = before - entries.len() as u32;
-    if removed > 0 {
-        write_all(entries)?;
-    }
-    Ok(removed)
-}
-
-/// Synchronous variant for `lib.rs::setup`. Best-effort: ignore errors so a
-/// corrupt resume.json doesn't block startup.
+/// Startup pruning for `lib.rs::setup`. Best-effort: ignore errors so a
+/// corrupt resume.json doesn't block startup. (The old `resume_prune` IPC
+/// command was removed: nothing in the frontend ever called it.)
 pub fn prune_blocking(older_than_days: u32) {
     let _ = (|| -> AppResult<()> {
         let mut entries = read_all()?;
