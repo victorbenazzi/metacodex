@@ -21,7 +21,7 @@ jobs:
       SIGN: ${{ secrets.APPLE_CERTIFICATE != '' }}
     strategy:
       # Don't cancel the macOS build if Windows/Linux flakes (and vice-versa).
-      # Each platform is independent — a Windows toolchain hiccup shouldn't
+      # Each platform is independent. A Windows toolchain hiccup shouldn't
       # block shipping the macOS DMG.
       fail-fast: false
       matrix:
@@ -60,7 +60,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: pnpm
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -154,7 +153,7 @@ jobs:
             - **Linux x64** → `metacodex_*_amd64.deb` or `metacodex-*.x86_64.rpm`
 
             ### Auto-update
-            Already running a previous version? metacodex will check for this release on next launch and show an **Update** pill in the top bar. One click — download, install, relaunch. No reinstall.
+            Already running a previous version? metacodex will check for this release on next launch and show an **Update** pill in the top bar. One click: download, install, relaunch. No reinstall.
 
             ### macOS signature notice
             These builds are signed with a stable self-signed certificate, so macOS keeps the permissions you grant across auto-updates. They are NOT notarized by Apple, so on first install macOS still quarantines them. After dragging metacodex into `/Applications`, run once in Terminal:
@@ -169,7 +168,7 @@ jobs:
             Windows builds are unsigned. The first launch shows "Windows protected your PC". Click **More info → Run anyway** (one-time). An EV signing cert is on the roadmap.
 
             Full instructions: [README → installation](https://github.com/victorbenazzi/metacodex#install).
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
           includeUpdaterJson: true
           args: ${{ matrix.args }}
