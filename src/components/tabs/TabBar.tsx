@@ -1,10 +1,8 @@
 import {
-  useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
   useState,
-  type PointerEvent as RPointerEvent,
   type ReactNode,
 } from "react";
 import { X, TerminalSquare, GitCompare } from "lucide-react";
@@ -22,6 +20,7 @@ import { TabStatusDot } from "./TabStatusDot";
 import { TabTooltip } from "./TabTooltip";
 import { TabWorktreePill } from "./TabWorktreePill";
 import { Tooltip } from "@/components/ui/Tooltip";
+import { useListReorder } from "@/components/ui/useListReorder";
 import { useTabsStore } from "./tabsStore";
 
 interface TabBarProps {
@@ -74,13 +73,13 @@ function renderTabIcon(tab: Tab, active: boolean): ReactNode {
   );
 }
 
-/* Initial estimate for the trailing strip's width — replaced on first paint by
+/* Initial estimate for the trailing strip's width, replaced on first paint by
    a ResizeObserver measuring the real strip. Used so the scroll container's
    right-padding and the fade gradient line up exactly with the strip's edge,
    even when its contents (e.g. the SC change-count) grow. */
 const TRAILING_PX_FALLBACK = 44;
 /* Pointer travel before a press promotes to a drag. Matches MiniProjectSidebar's
-   tuned threshold — small enough that a deliberate drag feels immediate, large
+   tuned threshold: small enough that a deliberate drag feels immediate, large
    enough that pointer oscillation during a tap doesn't fire it accidentally. */
 const DRAG_THRESHOLD_PX = 6;
 /* While dragging, start auto-scrolling the bar horizontally once the pointer
@@ -117,29 +116,26 @@ export function TabBar({
     trailing ? TRAILING_PX_FALLBACK : 0,
   );
 
-  // Inline rename — at most one tab can be in edit mode across the whole app,
+  // Inline rename: at most one tab can be in edit mode across the whole app,
   // so the bit lives in the global store. We read it as a selector so unrelated
   // tab updates don't re-render the bar.
   const editingTabId = useTabsStore((s) => s.editingTabId);
   const setEditingTabId = useTabsStore((s) => s.setEditingTabId);
 
-  // Drag state.
-  //   - draggingId: the tab being dragged (drives the dim-in-place + ghost).
-  //   - dropIndex: insertion slot (0..tabs.length) where the dragged tab would land.
-  //   - pointerPos: viewport-space pointer position used to anchor the ghost.
-  const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [dropIndex, setDropIndex] = useState<number | null>(null);
-  const [pointerPos, setPointerPos] = useState<{ x: number; y: number } | null>(null);
-  // Drained by the next click on the same tab so a drop doesn't also re-select.
-  const suppressClickRef = useRef(false);
-
-  // Per-tab DOM refs — used during drag to compute the insertion slot from
-  // the current pointer X.
-  const tabRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
-  const setTabRef = (id: string) => (el: HTMLButtonElement | null) => {
-    if (el) tabRefs.current.set(id, el);
-    else tabRefs.current.delete(id);
-  };
+  const drag = useListReorder({
+    ids: tabs.map((tab) => tab.id),
+    onReorder: (_orderedIds, id, insertAt) => onMoveTab(id, insertAt),
+    axis: "x",
+    thresholdPx: DRAG_THRESHOLD_PX,
+    bodyClass: "is-reordering-tabs",
+    dragDisabled: (id) => editingTabId === id || tabs.length < 2,
+    autoScroll: {
+      containerRef: scrollRef,
+      edgePx: AUTO_SCROLL_EDGE_PX,
+      maxPerFrame: AUTO_SCROLL_MAX_PER_FRAME,
+      endInsetPx: trailingWidth,
+    },
+  });
 
   useEffect(() => {
     const el = trailingRef.current;
@@ -155,7 +151,7 @@ export function TabBar({
   }, [trailing]);
 
   // VS Code-style wheel → horizontal scroll. React's onWheel is passive, so
-  // preventDefault() is silently ignored — we attach a native listener with
+  // preventDefault() is silently ignored, so we attach a native listener with
   // { passive: false } and consume the event ourselves.
   useEffect(() => {
     const el = scrollRef.current;
@@ -174,12 +170,12 @@ export function TabBar({
     return () => el.removeEventListener("wheel", handler);
   }, []);
 
-  // Custom 1px scroll thumb. Native scrollbar is hidden in CSS — we draw our
+  // Custom 1px scroll thumb. Native scrollbar is hidden in CSS, so we draw our
   // own line so the indicator is persistent (macOS overlay scrollbars would
   // otherwise vanish when idle) and uses a guaranteed high-contrast color.
   // The thumb sits flush against the bottom border, overlapping it where the
-  // scroll is positioned — visually reads as "part of the border lights up
-  // where you are in the scroll range".
+  // scroll is positioned. Visually this reads as the border lighting up
+  // where you are in the scroll range.
   useEffect(() => {
     const el = scrollRef.current;
     const thumb = thumbRef.current;
@@ -228,7 +224,7 @@ export function TabBar({
   }, [trailing, trailingWidth]);
 
   // After a layout change (tabs added/removed/active changes), keep the active
-  // tab visible — scroll it into view if it's offscreen, accounting for the
+  // tab visible: scroll it into view if it's offscreen, accounting for the
   // reserved trailing-menu strip on the right.
   useEffect(() => {
     const el = scrollRef.current;
@@ -251,181 +247,22 @@ export function TabBar({
     }
   }, [activeTabId, tabs.length, trailing, trailingWidth]);
 
-  // ---------- Drag-to-reorder ----------
-
-  // Global cursor while dragging — applied as a body class so EVERY element
-  // (including buttons that opt into cursor:pointer) shows the grabbing cursor.
-  useEffect(() => {
-    if (!draggingId) return;
-    document.body.classList.add("is-reordering-tabs");
-    return () => {
-      document.body.classList.remove("is-reordering-tabs");
-    };
-  }, [draggingId]);
-
-  const computeDropIndex = useCallback((clientX: number): number => {
-    // Walk visible tabs left-to-right; first one whose midpoint sits right of
-    // the pointer is the insertion slot. Falling through past all of them
-    // means "append to end".
-    for (let i = 0; i < tabs.length; i++) {
-      const el = tabRefs.current.get(tabs[i].id);
-      if (!el) continue;
-      const rect = el.getBoundingClientRect();
-      if (clientX < rect.left + rect.width / 2) return i;
-    }
-    return tabs.length;
-  }, [tabs]);
-
-  const onTabPointerDown = (id: string) => (e: RPointerEvent<HTMLButtonElement>) => {
-    // Only left-button presses initiate drag. Right-click falls through to
-    // the Radix ContextMenu trigger; middle-click is handled by onAuxClick.
-    if (e.button !== 0) return;
-    // Don't drag from a press on the close (X) button — it lives inside the
-    // same <button>, but its `onClick` handles closing.
-    const target = e.target as HTMLElement | null;
-    if (target?.closest("[data-tab-close]")) return;
-    // Don't drag while in edit mode — the input owns pointer events.
-    if (editingTabId === id) return;
-    // Skip when there's nothing to reorder.
-    if (tabs.length < 2) return;
-
-    // IMPORTANT: do NOT call setPointerCapture. In WKWebView, capturing a
-    // pointer on a button nested inside composed Radix Slots (TabContextMenu +
-    // Tooltip) suppresses the `click` event — see MEMORY note
-    // "Drag = pointer events". Window listeners are enough to track the gesture.
-
-    const startX = e.clientX;
-    const startY = e.clientY;
-    let dragging = false;
-    let localDropIndex: number | null = null;
-    let autoScrollRaf = 0;
-    let autoScrollLastX = startX;
-
-    const tickAutoScroll = () => {
-      const el = scrollRef.current;
-      if (!el) {
-        autoScrollRaf = 0;
-        return;
-      }
-      const rect = el.getBoundingClientRect();
-      const fromLeft = autoScrollLastX - rect.left;
-      const fromRight = rect.right - trailingWidth - autoScrollLastX;
-      let delta = 0;
-      if (fromLeft < AUTO_SCROLL_EDGE_PX) {
-        const ratio = 1 - Math.max(0, fromLeft) / AUTO_SCROLL_EDGE_PX;
-        delta = -ratio * AUTO_SCROLL_MAX_PER_FRAME;
-      } else if (fromRight < AUTO_SCROLL_EDGE_PX) {
-        const ratio = 1 - Math.max(0, fromRight) / AUTO_SCROLL_EDGE_PX;
-        delta = ratio * AUTO_SCROLL_MAX_PER_FRAME;
-      }
-      if (delta !== 0) {
-        const before = el.scrollLeft;
-        el.scrollLeft = before + delta;
-        // After scrolling, recompute the drop slot — the tabs shifted under
-        // the (stationary) pointer.
-        const idx = computeDropIndex(autoScrollLastX);
-        localDropIndex = idx;
-        setDropIndex(idx);
-      }
-      autoScrollRaf = requestAnimationFrame(tickAutoScroll);
-    };
-
-    const onMove = (ev: PointerEvent) => {
-      if (!dragging) {
-        const dx = ev.clientX - startX;
-        const dy = ev.clientY - startY;
-        // Only commit to a drag once horizontal travel beats the threshold —
-        // a vertical drag is just a stray gesture, leave it alone.
-        if (Math.abs(dx) < DRAG_THRESHOLD_PX && Math.abs(dy) < DRAG_THRESHOLD_PX) {
-          return;
-        }
-        dragging = true;
-        suppressClickRef.current = true;
-        setDraggingId(id);
-        autoScrollRaf = requestAnimationFrame(tickAutoScroll);
-      }
-      autoScrollLastX = ev.clientX;
-      const idx = computeDropIndex(ev.clientX);
-      localDropIndex = idx;
-      setDropIndex(idx);
-      setPointerPos({ x: ev.clientX, y: ev.clientY });
-    };
-
-    const cleanup = () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("pointercancel", onCancel);
-      window.removeEventListener("keydown", onKey, true);
-      if (autoScrollRaf) cancelAnimationFrame(autoScrollRaf);
-    };
-
-    const onUp = () => {
-      cleanup();
-      if (dragging && localDropIndex != null) {
-        const sourceIdx = tabs.findIndex((tt) => tt.id === id);
-        // Drops at the source's own slots (`i` and `i+1`) are no-ops; skip.
-        if (
-          sourceIdx >= 0 &&
-          localDropIndex !== sourceIdx &&
-          localDropIndex !== sourceIdx + 1
-        ) {
-          const insertAt =
-            localDropIndex > sourceIdx ? localDropIndex - 1 : localDropIndex;
-          onMoveTab(id, insertAt);
-        }
-      }
-      setDraggingId(null);
-      setDropIndex(null);
-      setPointerPos(null);
-    };
-
-    const onCancel = () => {
-      cleanup();
-      setDraggingId(null);
-      setDropIndex(null);
-      setPointerPos(null);
-    };
-
-    const onKey = (ke: KeyboardEvent) => {
-      if (ke.key === "Escape" && dragging) {
-        ke.preventDefault();
-        ke.stopPropagation();
-        onCancel();
-      }
-    };
-
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-    window.addEventListener("pointercancel", onCancel);
-    window.addEventListener("keydown", onKey, true);
-  };
-
-  const onTabClick = (id: string) => () => {
-    // The pointerup that ended a drag pre-set this flag — drain and skip the
-    // select to avoid jumping focus to whatever tab the user just dropped onto.
-    if (suppressClickRef.current) {
-      suppressClickRef.current = false;
-      return;
-    }
-    onSelect(id);
-  };
-
-  // Drop indicator X — center of the gap between two tabs.
+  // Drop indicator X: center of the gap between two tabs.
   const indicatorLeft = (() => {
-    if (draggingId === null || dropIndex === null) return null;
-    const sourceIdx = tabs.findIndex((tt) => tt.id === draggingId);
-    // Hide on the two slots adjacent to the source — dropping there is a no-op.
-    if (dropIndex === sourceIdx || dropIndex === sourceIdx + 1) return null;
+    if (drag.draggingId === null || drag.dropIndex === null) return null;
+    const sourceIdx = tabs.findIndex((tt) => tt.id === drag.draggingId);
+    // Hide on the two slots adjacent to the source. Dropping there is a no-op.
+    if (drag.dropIndex === sourceIdx || drag.dropIndex === sourceIdx + 1) return null;
     const el = scrollRef.current;
     if (!el) return null;
-    if (dropIndex >= tabs.length) {
+    if (drag.dropIndex >= tabs.length) {
       const last = tabs[tabs.length - 1];
-      const lastEl = last ? tabRefs.current.get(last.id) : null;
+      const lastEl = last ? drag.getItemEl(last.id) : null;
       if (!lastEl) return null;
       return lastEl.offsetLeft + lastEl.offsetWidth - el.scrollLeft - 1;
     }
-    const target = tabs[dropIndex];
-    const targetEl = target ? tabRefs.current.get(target.id) : null;
+    const target = tabs[drag.dropIndex];
+    const targetEl = target ? drag.getItemEl(target.id) : null;
     if (!targetEl) return null;
     return targetEl.offsetLeft - el.scrollLeft - 1;
   })();
@@ -437,7 +274,7 @@ export function TabBar({
       data-tauri-drag-region
     >
       {/* The scroll container fills the row exactly. The native scrollbar is
-          forced to 1px and sits flush against the bottom border — when there's
+          forced to 1px and sits flush against the bottom border. When there's
           overflow, it reads as a slightly brighter 1px segment along the
           existing hairline, never as a separate visual band. */}
       <div
@@ -461,7 +298,7 @@ export function TabBar({
           const isProcessTab = tab.kind === "terminal" || tab.kind === "cli";
           const renamable = isRenamableTab(tab);
           const editing = editingTabId === tab.id;
-          const beingDragged = draggingId === tab.id;
+          const beingDragged = drag.draggingId === tab.id;
           const displayedTitle = resolveTabTitle(tab);
 
           return (
@@ -503,14 +340,14 @@ export function TabBar({
               >
               <button
                 type="button"
-                ref={setTabRef(tab.id)}
+                ref={drag.itemRef(tab.id)}
+                {...drag.getItemProps(tab.id)}
                 data-tab-id={tab.id}
-                onPointerDown={onTabPointerDown(tab.id)}
-                onClick={onTabClick(tab.id)}
+                onClick={() => onSelect(tab.id)}
                 onDoubleClick={(e) => {
                   if (!renamable) return;
                   // Don't escalate to a select after a double-click on the
-                  // title — entering edit mode is the whole point.
+                  // title. Entering edit mode is the whole point.
                   e.preventDefault();
                   e.stopPropagation();
                   setEditingTabId(tab.id);
@@ -525,7 +362,7 @@ export function TabBar({
                 }}
                 className={cn(
                   "group relative flex h-[34px] min-w-[140px] max-w-[220px] shrink-0 items-center gap-[8px] border-r border-hairline px-[10px]",
-                  "transition-colors duration-fast",
+                  "touch-none transition-colors duration-fast",
                   active
                     ? "bg-canvas text-ink"
                     : "bg-canvas-soft text-muted hover:bg-surface-strong/40 hover:text-body",
@@ -533,8 +370,9 @@ export function TabBar({
                 )}
                 aria-current={active ? "page" : undefined}
               >
-                {/* Dirty marker sits LEFT of the icon — VS Code / Cursor / JetBrains
-                    convention. Reading order: state → identity → name → controls. */}
+                {/* Dirty marker sits left of the icon, matching VS Code,
+                    Cursor and JetBrains. Reading order: state, identity,
+                    name, controls. */}
                 {tab.dirty ? (
                   <span
                     className="h-[6px] w-[6px] shrink-0 rounded-pill bg-ink"
@@ -559,11 +397,11 @@ export function TabBar({
                     {displayedTitle}
                   </span>
                 )}
-                {/* Worktree pill sits at the trailing edge, just before close —
-                    branch identity is metadata, not part of the title scan. */}
+                {/* Worktree pill sits at the trailing edge, just before close.
+                    Branch identity is metadata, not part of the title scan. */}
                 <TabWorktreePill tab={tab} />
                 <span
-                  data-tab-close
+                  data-no-drag
                   role="button"
                   tabIndex={-1}
                   onPointerDown={(e) => {
@@ -591,7 +429,7 @@ export function TabBar({
         })}
       </div>
 
-      {/* Drop indicator — absolutely positioned in the bar (NOT inside the
+      {/* Drop indicator is absolutely positioned in the bar (not inside the
           scroll container) so the indicator stays put while we recompute it
           from scrollLeft. Vertical line at the gap between two tabs. */}
       {indicatorLeft !== null ? (
@@ -619,7 +457,7 @@ export function TabBar({
           </div>
         </>
       ) : null}
-      {/* Custom 1px scroll thumb. Sits flush with the bottom border — when
+      {/* Custom 1px scroll thumb. Sits flush with the bottom border. When
           tabs overflow, a high-contrast segment of the border lights up to
           show scroll position. Width/transform driven by JS in the effect
           above. */}
@@ -630,19 +468,19 @@ export function TabBar({
         style={{ width: 0, backgroundColor: "var(--scrollbar-tab-thumb)", opacity: 0 }}
       />
 
-      {/* Floating drag ghost — viewport-fixed, pointer-events:none so the
+      {/* Floating drag ghost: viewport-fixed, pointer-events:none so the
           underlying tabs can still receive pointermove. */}
-      {draggingId && pointerPos
+      {drag.draggingId && drag.pointerPos
         ? (() => {
-            const dragged = tabs.find((tt) => tt.id === draggingId);
+            const dragged = tabs.find((tt) => tt.id === drag.draggingId);
             if (!dragged) return null;
             return (
               <div
                 aria-hidden
                 className="pointer-events-none fixed z-[60] flex h-[34px] min-w-[140px] max-w-[220px] items-center gap-[8px] rounded-sm border border-hairline bg-canvas px-[10px] font-mono text-caption text-ink shadow-lg"
                 style={{
-                  left: pointerPos.x + 10,
-                  top: pointerPos.y - 10,
+                  left: drag.pointerPos.x + 10,
+                  top: drag.pointerPos.y - 10,
                 }}
               >
                 {renderTabIcon(dragged, true)}
