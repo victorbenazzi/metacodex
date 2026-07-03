@@ -23,6 +23,10 @@ VS Code-style file navigation. Cursor-grade visual calm. Claude Code, Codex CLI,
 
 ---
 
+<div align="center">
+  <img src="./public/preview.png" alt="metacodex — file explorer, welcome view and the AI CLI launcher" width="900">
+</div>
+
 ## What is metacodex?
 
 metacodex is a desktop app that puts the **file tree, the editor, the terminal, and your AI coding agent in the same window**, without throwing away the things developers actually rely on (real PTYs, real `$SHELL -l`, real git, your `.zshrc`).

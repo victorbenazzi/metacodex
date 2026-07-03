@@ -23,6 +23,10 @@ Navegação de arquivos no estilo VS Code. Calma visual de Cursor. Claude Code, 
 
 ---
 
+<div align="center">
+  <img src="./public/preview.png" alt="metacodex — explorador de arquivos, tela inicial e o launcher de CLIs de IA" width="900">
+</div>
+
 ## O que é o metacodex?
 
 metacodex é um app desktop que coloca **árvore de arquivos, editor, terminal e seu agente de IA na mesma janela**, sem abrir mão das coisas que dev de verdade depende (PTY real, `$SHELL -l` real, git real, seu `.zshrc`).
