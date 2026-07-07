@@ -179,7 +179,7 @@ function ProjectChip({
           draggable={false}
         />
       ) : LucideIcon ? (
-        <LucideIcon size={13} strokeWidth={1.7} color={accent} aria-hidden />
+        <LucideIcon size={14} strokeWidth={1.6} color={accent} aria-hidden />
       ) : (
         <span className="font-display text-caption leading-none" style={{ color: accent }}>
           {project.name.slice(0, 1).toUpperCase()}

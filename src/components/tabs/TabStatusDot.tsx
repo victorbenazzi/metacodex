@@ -38,7 +38,7 @@ export function TabStatusDot({ tabId }: TabStatusDotProps) {
         <span className="flex flex-col gap-[2px]">
           <span className="font-medium">{t(tone.labelKey)}</span>
           {entry.hint ? (
-            <span className="font-mono text-[10px] text-muted">{entry.hint}</span>
+            <span className="font-mono text-micro text-muted">{entry.hint}</span>
           ) : null}
         </span>
       }

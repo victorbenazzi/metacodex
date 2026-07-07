@@ -115,7 +115,7 @@ export function SearchDialog() {
           <RD.Title className="sr-only">{t("search.title")}</RD.Title>
 
           <header className="flex items-center gap-[10px] border-b border-hairline-soft px-[14px] py-[10px]">
-            <Icon icon={Search} size={13} className="text-muted" />
+            <Icon icon={Search} size={14} className="text-muted" />
             <SearchInput
               query={query}
               setQuery={setQuery}
@@ -246,7 +246,7 @@ function ToggleButton({
           : "text-muted hover:bg-surface-strong/55 hover:text-ink",
       )}
     >
-      <Icon icon={I} size={11} />
+      <Icon icon={I} size={12} />
     </button>
   );
 }
@@ -278,7 +278,7 @@ function ResultsList({
                     onClick={() => onResultClick(file.path, m.line)}
                     className="group flex w-full items-baseline gap-[10px] rounded-sm px-[10px] py-[3px] text-left hover:bg-surface-strong/45"
                   >
-                    <span className="w-[36px] shrink-0 text-right font-mono text-[10px] text-muted-soft">
+                    <span className="w-[36px] shrink-0 text-right font-mono text-micro text-muted-soft">
                       {m.line}
                     </span>
                     <span className="flex-1 truncate font-mono text-caption text-body">

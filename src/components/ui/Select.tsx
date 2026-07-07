@@ -39,7 +39,7 @@ export function Select({ value, onValueChange, options, ariaLabel, className }: 
       >
         <RS.Value />
         <RS.Icon asChild>
-          <Icon icon={ChevronDown} size={13} className="text-muted" />
+          <Icon icon={ChevronDown} size={12} className="text-muted" />
         </RS.Icon>
       </RS.Trigger>
       <RS.Portal>

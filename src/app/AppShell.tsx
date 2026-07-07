@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MiniProjectSidebar } from "@/components/project-rail/MiniProjectSidebar";
 import { ExplorerPanel } from "@/components/file-explorer/ExplorerPanel";
+import { ExplorerTogglePill } from "@/components/file-explorer/ExplorerTogglePill";
 import { ExpandedProjectsSidebar } from "@/components/code-sidebar/ExpandedProjectsSidebar";
 import { useCodeSidebarStore } from "@/features/ui/codeSidebar.store";
 import { WorkArea } from "@/components/tabs/WorkArea";
@@ -38,6 +39,11 @@ import { useTabActions } from "@/app/hooks/useTabActions";
 import { cn } from "@/lib/cn";
 
 const DRAWER_ANIMATION_MS = 180;
+// Horizontal breathing room around the floating sidebar cards: window edge to
+// card and card to card. The VERTICAL gaps (title bar to card, card to window
+// bottom) are both 4px, hardcoded in the top-[4px]/bottom-[4px] classes below,
+// so the cards sit symmetrically between the chrome rows.
+const PANEL_GAP_PX = 8;
 
 export function AppShell() {
   const { t } = useTranslation();
@@ -80,11 +86,16 @@ export function AppShell() {
   const panelOpen = useSidePanelStore((s) => s.open);
   // Code sidebar collapsed -> the Files/History panel folds away to just the rail.
   const codeSidebarCollapsed = useCodeSidebarStore((s) => s.collapsed);
+  // Explorer collapsed -> the file-explorer column folds to zero width; the
+  // toggle pill on the seam is the way back.
+  const explorerCollapsed = useCodeSidebarStore((s) => s.explorerCollapsed);
+  const toggleExplorerCollapsed = useCodeSidebarStore((s) => s.toggleExplorerCollapsed);
   const [sidePanelMounted, setSidePanelMounted] = useState(panelOpen);
   const [drawerAnimating, setDrawerAnimating] = useState(false);
-  const previousDrawerState = useRef({ codeSidebarCollapsed, panelOpen });
+  const previousDrawerState = useRef({ codeSidebarCollapsed, explorerCollapsed, panelOpen });
   const drawerStateChanged =
     previousDrawerState.current.codeSidebarCollapsed !== codeSidebarCollapsed ||
+    previousDrawerState.current.explorerCollapsed !== explorerCollapsed ||
     previousDrawerState.current.panelOpen !== panelOpen;
   const drawerTransitionActive = drawerStateChanged || drawerAnimating;
 
@@ -134,7 +145,7 @@ export function AppShell() {
   }, [panelOpen]);
 
   useEffect(() => {
-    previousDrawerState.current = { codeSidebarCollapsed, panelOpen };
+    previousDrawerState.current = { codeSidebarCollapsed, explorerCollapsed, panelOpen };
     if (!drawerStateChanged) {
       return undefined;
     }
@@ -145,7 +156,7 @@ export function AppShell() {
       DRAWER_ANIMATION_MS,
     );
     return () => window.clearTimeout(timeout);
-  }, [codeSidebarCollapsed, panelOpen]);
+  }, [codeSidebarCollapsed, explorerCollapsed, panelOpen]);
 
   useWorkspacePersistence(project, projects, bucket);
 
@@ -167,18 +178,26 @@ export function AppShell() {
 
   // CSS-grid template: the variable-width columns interpolate the current
   // settings so resizing rerenders only this style + the dragged column.
-  // The right panel hosts the Codex-style side panel.
-  // Column 1 is the projects sidebar: the icon rail when collapsed, a wider
-  // panel with projects and nested sections when expanded. The file explorer
-  // stays its own column at explorerWidth.
+  // Floating-panel layout: the sidebars (projects, explorer, side panel) are
+  // rounded cards separated from the window edges and from each other by
+  // fixed gap COLUMNS baked into the template. Gaps adjacent to a collapsed
+  // panel collapse to 0 with it, so they slide in the same
+  // grid-template-columns transition as the panel widths. The work area stays
+  // flush with the window (no card).
   const projectsColWidth = codeSidebarCollapsed ? RAIL_WIDTH_PX : projectsWidth;
+  const explorerColWidth = explorerCollapsed ? 0 : explorerWidth;
+  const explorerGap = explorerCollapsed ? 0 : PANEL_GAP_PX;
   const sidePanelColWidth = panelOpen ? sourceControlWidth : 0;
-  const gridTemplateColumns = `${projectsColWidth}px ${explorerWidth}px minmax(0,1fr) ${sidePanelColWidth}px`;
+  const sidePanelGap = panelOpen ? PANEL_GAP_PX : 0;
+  const gridTemplateColumns =
+    `${PANEL_GAP_PX}px ${projectsColWidth}px ${PANEL_GAP_PX}px ` +
+    `${explorerColWidth}px ${explorerGap}px minmax(0,1fr) ` +
+    `${sidePanelGap}px ${sidePanelColWidth}px ${sidePanelGap}px`;
 
   return (
     <div
       className={cn(
-        "relative grid h-screen w-screen grid-rows-[36px_minmax(0,1fr)] bg-canvas text-ink",
+        "relative grid h-screen w-screen grid-rows-[var(--title-bar-h)_minmax(0,1fr)] bg-canvas text-ink",
         drawerTransitionActive &&
           "transition-[grid-template-columns] duration-base ease-out motion-reduce:transition-none",
       )}
@@ -192,10 +211,16 @@ export function AppShell() {
       />
 
       {/* `contents` keeps these as direct grid items while letting this block
-          group the core code workspace in JSX. */}
+          group the core code workspace in JSX. The empty divs are the gap
+          columns of the floating-panel template: auto-placement needs a child
+          per column to land each panel in the right slot. */}
       <div className="contents">
+        <div aria-hidden />
         <div className="relative min-w-0">
-          <div className="absolute inset-0 overflow-hidden">
+          {/* The vertical gap lives on the clip container: absolute children
+              resolve against the padding box, so padding on the wrapper would
+              not inset them. */}
+          <div className="absolute inset-x-0 bottom-[4px] top-[4px] overflow-hidden">
             <div
               aria-hidden={!codeSidebarCollapsed}
               className={cn(
@@ -230,20 +255,40 @@ export function AppShell() {
             onReset={resetProjectsWidth}
             ariaLabel={t("appShell.resizeProjectsPanel")}
             enabled={!codeSidebarCollapsed}
+            className="bottom-[4px] top-[4px] h-auto"
           />
         </div>
 
+        <div aria-hidden />
         <div className="relative min-w-0">
-          <ExplorerPanel
-            hasProject={!!project}
-            projectId={project?.id}
-            projectName={project?.name}
-            projectPath={project?.path}
-            onOpenFolder={actions.openFolder}
-            onOpenFile={actions.openFile}
-            onOpenInTerminal={actions.openInTerminal}
-            onLaunchCliInPath={actions.launchCliInPath}
-          />
+          {/* Same drawer recipe as the projects sidebar / side panel: the
+              content keeps its full width inside an overflow-hidden clip so
+              the grid column can slide to zero without reflowing the tree. */}
+          <div
+            aria-hidden={explorerCollapsed}
+            className="absolute inset-x-0 bottom-[4px] top-[4px] overflow-hidden"
+          >
+            <div
+              className={cn(
+                "absolute inset-y-0 left-0 h-full transition-[opacity,transform] duration-base ease-out motion-reduce:transition-none",
+                explorerCollapsed
+                  ? "pointer-events-none -translate-x-[14px] opacity-0"
+                  : "translate-x-0 opacity-100",
+              )}
+              style={{ width: explorerWidth }}
+            >
+              <ExplorerPanel
+                hasProject={!!project}
+                projectId={project?.id}
+                projectName={project?.name}
+                projectPath={project?.path}
+                onOpenFolder={actions.openFolder}
+                onOpenFile={actions.openFile}
+                onOpenInTerminal={actions.openInTerminal}
+                onLaunchCliInPath={actions.launchCliInPath}
+              />
+            </div>
+          </div>
           <ResizeHandle
             side="right"
             value={explorerWidth}
@@ -253,9 +298,24 @@ export function AppShell() {
             onChange={handleExplorerWidthChange}
             onReset={resetExplorerWidth}
             ariaLabel={t("appShell.resizeExplorer")}
-          />
+            enabled={!explorerCollapsed}
+            className="bottom-[4px] top-[4px] h-auto"
+          >
+            <ExplorerTogglePill collapsed={false} onToggle={toggleExplorerCollapsed} />
+          </ResizeHandle>
+          {explorerCollapsed ? (
+            // The handle is gone while collapsed; park the pill straddling
+            // the projects card's trailing edge (this column is 0px wide and
+            // sits after the 8px gap, so `left:-16px` + 16px width centers
+            // the pill on that edge). The wrapper is inert, only the pill
+            // takes pointer events.
+            <div className="pointer-events-none absolute -left-[16px] top-0 z-30 h-full w-[16px]">
+              <ExplorerTogglePill collapsed onToggle={toggleExplorerCollapsed} />
+            </div>
+          ) : null}
         </div>
 
+        <div aria-hidden />
         <WorkArea
           project={project}
           tabs={bucket.tabs}
@@ -278,44 +338,50 @@ export function AppShell() {
           onOpenPreviewFile={actions.pickPreviewFile}
         />
 
-        {panelOpen || sidePanelMounted ? (
-          <div className="relative min-w-0">
-            <div
-              aria-hidden={!panelOpen}
-              className="absolute inset-0 overflow-hidden"
-            >
+        <div aria-hidden />
+        {/* The wrapper stays mounted even while the panel is closed so grid
+            auto-placement keeps every sibling in its template column. */}
+        <div className="relative min-w-0">
+          {panelOpen || sidePanelMounted ? (
+            <>
               <div
-                className={cn(
-                  "absolute inset-y-0 right-0 h-full transition-[opacity,transform] duration-base ease-out motion-reduce:transition-none",
-                  panelOpen
-                    ? "translate-x-0 opacity-100"
-                    : "pointer-events-none translate-x-[16px] opacity-0",
-                )}
-                style={{ width: sourceControlWidth }}
+                aria-hidden={!panelOpen}
+                className="absolute inset-x-0 bottom-[4px] top-[4px] overflow-hidden"
               >
-                <SidePanel
-                  project={project}
-                  onNewTerminal={actions.newTerminal}
-                  onLaunchCli={actions.launchCli}
-                  onOpenDiff={actions.openDiff}
-                />
+                <div
+                  className={cn(
+                    "absolute inset-y-0 right-0 h-full transition-[opacity,transform] duration-base ease-out motion-reduce:transition-none",
+                    panelOpen
+                      ? "translate-x-0 opacity-100"
+                      : "pointer-events-none translate-x-[16px] opacity-0",
+                  )}
+                  style={{ width: sourceControlWidth }}
+                >
+                  <SidePanel
+                    project={project}
+                    onNewTerminal={actions.newTerminal}
+                    onLaunchCli={actions.launchCli}
+                    onOpenDiff={actions.openDiff}
+                  />
+                </div>
               </div>
-            </div>
-            <ResizeHandle
-              side="left"
-              value={sourceControlWidth}
-              min={PANEL_LIMITS.sourceControl.min}
-              max={PANEL_LIMITS.sourceControl.max}
-              // Panel sits on the right edge of the window: dragging RIGHT
-              // shrinks it, dragging LEFT grows it. Invert the pointer delta.
-              toDelta={(dx) => -dx}
-              onChange={handleSourceControlWidthChange}
-              onReset={resetSourceControlWidth}
-              ariaLabel={t("appShell.resizeSidePanel")}
-              enabled={panelOpen}
-            />
-          </div>
-        ) : null}
+              <ResizeHandle
+                side="left"
+                value={sourceControlWidth}
+                min={PANEL_LIMITS.sourceControl.min}
+                max={PANEL_LIMITS.sourceControl.max}
+                // Panel sits on the right edge of the window: dragging RIGHT
+                // shrinks it, dragging LEFT grows it. Invert the pointer delta.
+                toDelta={(dx) => -dx}
+                onChange={handleSourceControlWidthChange}
+                onReset={resetSourceControlWidth}
+                ariaLabel={t("appShell.resizeSidePanel")}
+                enabled={panelOpen}
+                className="bottom-[4px] top-[4px] h-auto"
+              />
+            </>
+          ) : null}
+        </div>
       </div>
 
       <SettingsDialog open={settingsDialogOpen} onOpenChange={setSettingsDialogOpen} />

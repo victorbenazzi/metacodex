@@ -135,12 +135,15 @@
   --space-lg: calc(24px * var(--density-multiplier));
   --space-xl: calc(32px * var(--density-multiplier));
 
-  /* Type scale. The chrome operates on a strict 4-tier scale (label, caption,
-     ui, title) plus a reading tier (content, for chat/markdown prose) and 3
-     display tiers (display-s, display, display-l) reserved for hero surfaces.
-     Anything outside this range is a sign the surface drifted out of system.
-     Letter-spacing for uppercase eyebrows is exposed as --tracking-label
-     (Tailwind `tracking-label`) so eyebrow rows stay consistent. */
+  /* Type scale. The chrome operates on a strict 5-tier scale (micro, label,
+     caption, ui, title) plus a reading tier (content, for chat/markdown prose)
+     and 3 display tiers (display-s, display, display-l) reserved for hero
+     surfaces. Anything outside this range is a sign the surface drifted out of
+     system. --tracking-label (Tailwind `tracking-label`) is reserved for
+     uppercase micro badges/chips (Badge); section eyebrows are sentence case
+     via `.editorial-caps` and do not use it. `micro` is the mono metadata tier
+     (badges, counters, timestamps). */
+  --fs-micro: 10px;
   --fs-label: 11px;
   --fs-caption: 12px;
   --fs-ui: 13px;
@@ -153,9 +156,14 @@
   --tracking-label: 0.06em;
 
   /* Fonts */
-  --font-sans: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  /* Default UI face is SF Pro (the macOS system font, via -apple-system),
+     falling back to Inter, then Menlo, then the platform system face. Display
+     reuses the same stack: at display sizes macOS automatically applies the
+     SF Pro Display optical variant. Tailwind's font-sans/mono/display read
+     these vars, so this block is the single source of truth. */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Inter", "Menlo", system-ui, sans-serif;
   --font-mono: "JetBrainsMono Nerd Font Mono", "JetBrainsMono NFM", "SF Mono", ui-monospace, Menlo, monospace;
-  --font-display: "Fraunces", "Iowan Old Style", "Apple Garamond", "Times New Roman", serif;
+  --font-display: -apple-system, BlinkMacSystemFont, "Inter", "Menlo", system-ui, sans-serif;
 
   /* Motion */
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -182,7 +190,18 @@
   /* Layout */
   --rail-w: 48px;
   --explorer-w: 248px;
-  --title-bar-h: 36px;
+  /* Taller than a bare macOS title bar so the traffic lights (repositioned
+     via `trafficLightPosition` in tauri.conf.json) and the window controls
+     sit vertically centered with breathing room above, matching the floating
+     panel layout. Sync rule for tauri.conf.json: tao/wry treat the `y` there
+     as EXTRA title-bar-container height (NOT the top inset), and the button
+     center lands at roughly y - 2pt. Calibrated empirically on macOS 15:
+     y = 24 centers the lights at ~22pt = half of this 44px bar. */
+  --title-bar-h: 44px;
+  /* Single height for every panel header strip (explorer, projects sidebar,
+     side panel, diagnostics) and the tab bar, so the top line of all columns
+     stays coplanar. The 36px title bar is a separate concern (drag region). */
+  --panel-header-h: 34px;
 
   /* Terminal palette (warm, neutral ANSI) */
   --term-bg: var(--canvas);

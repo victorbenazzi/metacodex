@@ -2,7 +2,7 @@ import * as Lucide from "lucide-react";
 import { TerminalSquare } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { BackgroundGrain } from "@/components/ui/BackgroundGrain";
+import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { Kbd } from "@/components/ui/Kbd";
 import { CLI_BRAND_ICONS } from "@/components/icons/brand";
@@ -43,38 +43,33 @@ export function ProjectEmptyState({ project, onNewTerminal, onLaunchCli }: Proje
 
   return (
     <div className="relative flex h-full w-full overflow-hidden bg-canvas">
-      <BackgroundGrain />
-
-      <div className="relative z-10 mx-auto flex w-full max-w-[760px] flex-col px-[40px] pt-[88px]">
+      <div className="relative z-10 mx-auto flex w-full max-w-[760px] flex-col px-[40px] pt-[64px]">
         <span className="editorial-caps">{t("projectEmpty.eyebrow")}</span>
 
         {/* Hero: project icon + name + path */}
-        <div className="mt-[18px] flex items-center gap-[18px]">
+        <div className="mt-[14px] flex items-center gap-[14px]">
           <span
             aria-hidden
-            className="flex shrink-0 items-center justify-center rounded-lg border border-hairline"
-            style={{ width: 64, height: 64, backgroundColor: bg }}
+            className="flex shrink-0 items-center justify-center rounded-md border border-hairline"
+            style={{ width: 44, height: 44, backgroundColor: bg }}
           >
             {usesCustom ? (
               <img
                 src={project.icon}
                 alt=""
                 draggable={false}
-                className="h-[30px] w-[30px] object-contain"
+                className="h-[22px] w-[22px] object-contain"
               />
             ) : (
-              <FallbackIcon size={28} strokeWidth={1.6} color={iconColor} />
+              <FallbackIcon size={20} strokeWidth={1.6} color={iconColor} />
             )}
           </span>
           <div className="min-w-0">
-            <h1
-              className="truncate font-display tracking-display text-ink"
-              style={{ fontSize: "clamp(36px, 4.6vw, 56px)", lineHeight: 1.04, fontWeight: 500 }}
-            >
+            <h1 className="break-words font-display text-display-s font-medium text-ink">
               {project.name}
             </h1>
             <p
-              className="mt-[4px] truncate font-mono text-caption text-muted-soft"
+              className="mt-[2px] truncate font-mono text-caption text-muted-soft"
               title={project.path}
             >
               {project.path}
@@ -82,8 +77,7 @@ export function ProjectEmptyState({ project, onNewTerminal, onLaunchCli }: Proje
           </div>
         </div>
 
-        {/* 18px is a one-off hero size (sanctioned exception to the type scale). */}
-        <p className="mt-[16px] max-w-[520px] font-display text-[18px] leading-[1.5] text-body">
+        <p className="mt-[16px] max-w-[520px] text-content text-body">
           {t("projectEmpty.tagline")}
         </p>
 
@@ -100,19 +94,11 @@ export function ProjectEmptyState({ project, onNewTerminal, onLaunchCli }: Proje
 
         {/* Primary: open a terminal */}
         <div className="mt-[28px]">
-          <button
-            type="button"
-            onClick={onNewTerminal}
-            className={cn(
-              "press-feedback inline-flex h-[36px] items-center gap-[8px] rounded-sm bg-ink px-[16px] text-ui font-medium text-on-primary",
-              "transition-colors duration-fast hover:bg-primary-active",
-              "focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[3px]",
-            )}
-          >
+          <Button variant="primary" size="md" onClick={onNewTerminal}>
             <Icon icon={TerminalSquare} size={14} className="text-on-primary" />
             <span>{t("projectEmpty.openTerminal")}</span>
             <Kbd keys={["Mod", "T"]} className="ml-[6px] text-on-primary/70" />
-          </button>
+          </Button>
         </div>
 
         {/* One button per AI agent */}
@@ -129,7 +115,7 @@ export function ProjectEmptyState({ project, onNewTerminal, onLaunchCli }: Proje
                   type="button"
                   onClick={() => onLaunchCli(cli)}
                   className={cn(
-                    "inline-flex h-[48px] w-full items-center gap-[10px] rounded-sm border border-hairline bg-canvas-soft px-[12px] text-left",
+                    "inline-flex h-[48px] w-full items-center gap-[10px] rounded-md border border-hairline bg-canvas-soft px-[12px] text-left",
                     "transition-colors duration-fast hover:border-hairline-strong hover:bg-surface-strong/40",
                     "focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[2px]",
                   )}

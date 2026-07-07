@@ -97,7 +97,7 @@ export function MarkdownPreview({
             "hover:bg-surface-strong/55 hover:text-ink",
           )}
         >
-          <Icon icon={mode === "preview" ? Pencil : Eye} size={11} />
+          <Icon icon={mode === "preview" ? Pencil : Eye} size={12} />
           {mode === "preview" ? t("editor.editSource") : t("editor.showPreview")}
         </button>
       </header>
@@ -324,7 +324,7 @@ function CopyCodeButton({ code }: { code: string }) {
         "hover:text-ink group-hover:opacity-100 focus-visible:opacity-100",
       )}
     >
-      <Icon icon={copied ? Check : Copy} size={11} />
+      <Icon icon={copied ? Check : Copy} size={12} />
       {copied ? t("common.copied") : t("common.copy")}
     </button>
   );

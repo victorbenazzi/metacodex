@@ -171,7 +171,7 @@ export function ProjectContextMenu({
                 <div className="text-label font-medium text-body">
                   {hasCustomIcon ? t("projectRail.menu.changeImage") : t("projectRail.menu.chooseFromComputer")}
                 </div>
-                <div className="text-[10px] text-muted">
+                <div className="text-micro text-muted">
                   {t("projectRail.menu.imageHint")}
                 </div>
               </div>
@@ -310,7 +310,7 @@ function LazyIcon({
       {Comp ? (
         <Comp
           size={14}
-          strokeWidth={1.7}
+          strokeWidth={1.6}
           color={selected ? iconColor : "var(--body)"}
         />
       ) : (

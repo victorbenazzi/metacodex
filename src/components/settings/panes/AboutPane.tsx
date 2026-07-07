@@ -13,6 +13,7 @@ import { getVersion } from "@tauri-apps/api/app";
 import { Icon } from "@/components/ui/Icon";
 import { PaneHeader } from "@/components/settings/SettingsPrimitives";
 import { CMD, invoke } from "@/lib/ipc";
+import { isMac, isWindows } from "@/lib/platform";
 import { useUpdatesStore } from "@/features/updates/updates.store";
 import {
   checkForUpdatesManual,
@@ -80,7 +81,8 @@ export function AboutPane() {
           <span className="text-ink">{version ?? "…"}</span>
         </li>
         <li className="font-mono text-label text-muted">
-          {t("settings.about.platform")} <span className="text-ink">macOS · Apple Silicon</span>
+          {t("settings.about.platform")}{" "}
+          <span className="text-ink">{isMac ? "macOS" : isWindows ? "Windows" : "Linux"}</span>
         </li>
         <li className="font-mono text-label text-muted">
           {t("settings.about.stack")}{" "}
@@ -98,7 +100,7 @@ export function AboutPane() {
             className="inline-flex items-center gap-[6px] rounded-sm border border-update-blue-strong bg-update-blue-strong px-[10px] py-[5px] font-mono text-label leading-none text-on-update transition duration-fast hover:brightness-110"
             title={t("updates.pill.available", { version: updateStatus.version })}
           >
-            <Icon icon={Download} size={10} strokeWidth={2} />
+            <Icon icon={Download} size={10} />
             <span>{t("updates.pill.available", { version: updateStatus.version })}</span>
           </button>
         ) : (
@@ -111,7 +113,6 @@ export function AboutPane() {
             <Icon
               icon={isChecking ? Loader2 : RefreshCw}
               size={10}
-              strokeWidth={2}
               className={isChecking ? "animate-spin" : undefined}
             />
             <span>
@@ -124,7 +125,7 @@ export function AboutPane() {
 
         {!isChecking && !isAvailable && lastResult === "up-to-date" && (
           <span className="inline-flex items-center gap-[4px] font-mono text-label text-success">
-            <Icon icon={CheckCircle2} size={10} strokeWidth={2} />
+            <Icon icon={CheckCircle2} size={10} />
             {t("settings.about.upToDate")}
           </span>
         )}
@@ -138,7 +139,7 @@ export function AboutPane() {
             className="inline-flex items-center gap-[4px] font-mono text-label text-warn"
             title={updateStatus.message}
           >
-            <Icon icon={CircleAlert} size={10} strokeWidth={2} />
+            <Icon icon={CircleAlert} size={10} />
             {t("settings.about.checkFailed")}
           </span>
         )}

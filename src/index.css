@@ -82,34 +82,25 @@
   /* Atmosphere, a faint lavender glow bleeding from the left corners, layered
      UNDER the surface color (backgrounds always paint behind content, so this
      never touches text contrast). The gradient itself is theme-defined via
-     --atmosphere in tokens.css. `-soft` sits on sidebars/rails (canvas-soft),
-     `-canvas` on the main work surface. */
+     --atmosphere in tokens.css. `-soft` sits on the projects sidebar's
+     floating card (surface-card + glow), `-canvas` on the main work surface. */
   .atmosphere-soft {
-    background: var(--atmosphere), var(--canvas-soft);
+    background: var(--atmosphere), var(--surface-card);
   }
   .atmosphere-canvas {
     background: var(--atmosphere), var(--canvas);
   }
 
-  /* Editorial caps label, used for section labels and titles */
+  /* Editorial section label, used for section labels and titles. Historical
+     name: it used to be all-caps mono; titles are now sentence case in the
+     default UI face (SF Pro) by design. Source strings must already be
+     "First letter only" capitalized. */
   .editorial-caps {
-    font-family: var(--font-mono);
-    font-size: 10px;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
+    font-family: var(--font-sans);
+    font-size: var(--fs-label);
+    letter-spacing: 0.02em;
     color: var(--muted);
     font-weight: 500;
-  }
-
-  /* Tab indicator: 2px print-style underline */
-  .tab-indicator {
-    position: absolute;
-    bottom: -1px;
-    left: 10px;
-    right: 10px;
-    height: 2px;
-    background-color: var(--ink);
-    border-radius: 2px 2px 0 0;
   }
 
   /* Drag region for native window */

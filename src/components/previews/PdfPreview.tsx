@@ -107,7 +107,7 @@ export function PdfPreview({ path, preview = false, previewGrantId }: PdfPreview
             disabled={page <= 1}
             aria-label={t("editor.previousPage")}
           >
-            <Icon icon={ChevronLeft} size={13} />
+            <Icon icon={ChevronLeft} size={14} />
           </Button>
           <span className="font-mono text-label text-muted">
             {page} / {pageCount || "…"}
@@ -119,7 +119,7 @@ export function PdfPreview({ path, preview = false, previewGrantId }: PdfPreview
             disabled={page >= pageCount}
             aria-label={t("editor.nextPage")}
           >
-            <Icon icon={ChevronRight} size={13} />
+            <Icon icon={ChevronRight} size={14} />
           </Button>
         </div>
       </header>

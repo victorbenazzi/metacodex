@@ -62,6 +62,7 @@
       "general": "Geral",
       "appearance": "Aparência",
       "interface": "Interface",
+      "accessibility": "Acessibilidade",
       "editor": "Editor",
       "terminal": "Terminal",
       "notifications": "Notificações",
@@ -79,10 +80,7 @@
       "projectStorageHint": "O metacodex nunca altera suas pastas no disco.",
       "saveWorkspace": "Salvar estado do workspace",
       "saveWorkspaceHint": "Abas abertas e pastas expandidas são restauradas ao reabrir.",
-      "alwaysOn": "Sempre ligado",
-      "restoreTerminals": "Restaurar terminais",
-      "restoreTerminalsHint": "Sessões de terminal nunca são reabertas automaticamente, por design.",
-      "off": "Desligado"
+      "alwaysOn": "Sempre ligado"
     },
     "appearance": {
       "title": "Aparência",
@@ -116,6 +114,15 @@
       "launcherVisibilityHint": "Escolha quais agentes aparecem no menu +. Os ocultos continuam instalados e podem ser abertos a partir de um terminal.",
       "autonomousTag": "autônomo",
       "toggleAria": "Alternar {{name}} no launcher"
+    },
+    "accessibility": {
+      "title": "Acessibilidade",
+      "description": "Deixe toda a interface mais fácil de ler.",
+      "uiScale": "Escala da interface",
+      "uiScaleHint": "Aplica zoom na janela inteira: fontes, ícones e layout escalam juntos, como o zoom de janela do VS Code. O texto do editor e do terminal também escala.",
+      "uiScaleSmall": "Pequena",
+      "uiScaleDefault": "Padrão",
+      "uiScaleLarge": "Grande"
     },
     "editor": {
       "title": "Editor",
@@ -215,7 +222,7 @@
   },
   "cli": {
     "dangerous": "perigoso",
-    "needsConfig": "requer config"
+    "needsConfig": "Requer config"
   },
   "codeSidebar": {
     "projects": "Projetos",
@@ -246,6 +253,8 @@
   "explorer": {
     "ariaLabel": "Explorador de arquivos",
     "title": "Explorador",
+    "collapse": "Fechar explorador",
+    "expand": "Abrir explorador",
     "noProject": "Nenhum projeto aberto",
     "noProjectBody": "Abra uma pasta local para navegar pelos arquivos. Suas pastas ficam no disco, o metacodex só guarda metadados do workspace.",
     "openFolder": "Abrir pasta",
@@ -333,8 +342,8 @@
   },
   "tabs": {
     "newTerminal": "Novo terminal",
-    "codingAgents": "Agentes de Programação",
-    "autonomousAgents": "Agentes Autônomos",
+    "codingAgents": "Agentes de programação",
+    "autonomousAgents": "Agentes autônomos",
     "editRegistry": "Editar registro de CLIs…",
     "newTab": "Nova aba",
     "unsavedChanges": "Alterações não salvas",
@@ -399,12 +408,12 @@
     "resizeSidePanel": "Redimensionar painel lateral"
   },
   "terminal": {
-    "notInstalled": "não instalado",
+    "notInstalled": "Não instalado",
     "configure": "configurar",
     "piNotConfigured": "O Pi CLI ainda não está configurado.",
     "piNotConfiguredBody": " Adicione o comando de instalação e o nome do executável no registro de CLIs do metacodex.",
-    "installCommand": "comando de instalação",
-    "orViaNpm": "ou via npm",
+    "installCommand": "Comando de instalação",
+    "orViaNpm": "Ou via npm",
     "openInTerminal": "Abrir no terminal",
     "retryDetection": "Detectar de novo",
     "copyInstall": "Copiar comando de instalação",
@@ -420,8 +429,8 @@
     }
   },
   "editor": {
-    "couldNotRead": "não foi possível ler",
-    "binaryFile": "arquivo binário",
+    "couldNotRead": "Não foi possível ler",
+    "binaryFile": "Arquivo binário",
     "binaryBody": "Este arquivo parece ser binário. O MVP do metacodex só edita arquivos de texto.",
     "saved": "Salvo",
     "reloaded": "Recarregado do disco",
@@ -438,8 +447,8 @@
     "lossy": "UTF-8 (lossy)",
     "editSource": "Editar fonte",
     "showPreview": "Ver preview",
-    "image": "imagem",
-    "pdfLabel": "pdf · {{name}}",
+    "image": "Imagem",
+    "pdfLabel": "PDF · {{name}}",
     "previousPage": "Página anterior",
     "nextPage": "Próxima página"
   },
@@ -494,7 +503,6 @@
     "toggle": "Alternar painel lateral",
     "review": "Git e revisão",
     "toggleReview": "Git e revisão",
-    "close": "Fechar painel lateral",
     "showTools": "Mostrar ferramentas do painel lateral",
     "sections": {
       "repository": "Repositório",

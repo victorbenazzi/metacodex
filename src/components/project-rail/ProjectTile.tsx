@@ -60,9 +60,9 @@ export const ProjectTile = forwardRef<HTMLButtonElement, ProjectTileProps>(funct
       content={
         <span className="flex flex-col gap-[2px]">
           <span className="font-medium">{project.name}</span>
-          <span className="font-mono text-[10px] text-muted">{project.path}</span>
+          <span className="font-mono text-micro text-muted">{project.path}</span>
           {aggTone ? (
-            <span className="font-mono text-[10px] text-muted">
+            <span className="font-mono text-micro text-muted">
               {t(aggTone.labelKey)} · {t("projectRail.sessions", { count: sessionCount })}
             </span>
           ) : null}
@@ -110,8 +110,8 @@ export const ProjectTile = forwardRef<HTMLButtonElement, ProjectTileProps>(funct
           />
         ) : LucideIcon ? (
           <LucideIcon
-            size={15}
-            strokeWidth={1.7}
+            size={16}
+            strokeWidth={1.6}
             color={active ? accent : undefined}
             className={active ? undefined : "text-muted"}
             aria-hidden

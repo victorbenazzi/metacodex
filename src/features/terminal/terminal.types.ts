@@ -27,4 +27,8 @@ export interface PtySpawnSpec {
   kind: { kind: "plain" } | { kind: "cli"; command: string };
   label: string;
   cli_id?: string;
+  /** App theme kind at spawn time. The backend exports it as COLORFGBG so
+      background-detecting TUIs (Claude Code, vim, ...) pick the right theme.
+      Injected centrally by `ptyApi.spawn`; callers never set it. */
+  theme_kind?: "light" | "dark";
 }

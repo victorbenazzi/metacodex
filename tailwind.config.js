@@ -56,14 +56,22 @@ export default {
       borderColor: {
         DEFAULT: "var(--hairline)",
       },
+      // Families resolve through the tokens.css vars (single source of truth);
+      // font-display was previously unregistered here, so the class silently
+      // emitted nothing and hero titles fell back to the sans stack.
       fontFamily: {
-        sans: ["Inter", "system-ui", "-apple-system", "BlinkMacSystemFont", '"Segoe UI"', "sans-serif"],
-        mono: ['"JetBrains Mono"', '"SF Mono"', "ui-monospace", "Menlo", "monospace"],
+        sans: ["var(--font-sans)"],
+        mono: ["var(--font-mono)"],
+        display: ["var(--font-display)"],
       },
       fontSize: {
-        // Strict 4-tier UI scale + content (prose) + 3 display tiers. Driven
-        // by --fs-* tokens. `label` carries no letter-spacing: uppercase
-        // eyebrows opt in via `tracking-label`.
+        // Strict 5-tier UI scale + content (prose) + 3 display tiers. Driven
+        // by --fs-* tokens. `label` carries no letter-spacing: `tracking-label`
+        // is reserved for uppercase micro badges/chips (section titles are
+        // sentence case via .editorial-caps). `micro` is the mono metadata
+        // tier (badges, counters, timestamps). New tiers MUST also be
+        // registered in src/lib/cn.ts or twMerge drops the class silently.
+        micro: ["var(--fs-micro)", { lineHeight: "1.4" }],
         label: ["var(--fs-label)", { lineHeight: "1.4" }],
         caption: ["var(--fs-caption)", { lineHeight: "1.4" }],
         ui: ["var(--fs-ui)", { lineHeight: "1.5" }],

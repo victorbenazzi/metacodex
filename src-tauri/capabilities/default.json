@@ -12,6 +12,7 @@
     "core:window:allow-close",
     "core:window:allow-is-maximized",
     "core:webview:default",
+    "core:webview:allow-set-webview-zoom",
     "core:event:default",
     "core:path:default",
     "dialog:default",

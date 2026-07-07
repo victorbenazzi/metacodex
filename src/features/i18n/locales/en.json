@@ -62,6 +62,7 @@
       "general": "General",
       "appearance": "Appearance",
       "interface": "Interface",
+      "accessibility": "Accessibility",
       "editor": "Editor",
       "terminal": "Terminal",
       "notifications": "Notifications",
@@ -79,10 +80,7 @@
       "projectStorageHint": "metacodex never modifies your folders on disk.",
       "saveWorkspace": "Save workspace state",
       "saveWorkspaceHint": "Open tabs and expanded folders restore on relaunch.",
-      "alwaysOn": "Always on",
-      "restoreTerminals": "Restore terminals",
-      "restoreTerminalsHint": "Terminal sessions are never auto-respawned on relaunch, by design.",
-      "off": "Off"
+      "alwaysOn": "Always on"
     },
     "appearance": {
       "title": "Appearance",
@@ -116,6 +114,15 @@
       "launcherVisibilityHint": "Choose which agents appear in the + menu. Hidden agents stay installed and can still be launched from a terminal.",
       "autonomousTag": "autonomous",
       "toggleAria": "Toggle {{name}} in the launcher"
+    },
+    "accessibility": {
+      "title": "Accessibility",
+      "description": "Make the whole interface easier to read.",
+      "uiScale": "UI scale",
+      "uiScaleHint": "Zooms the entire window: fonts, icons and layout scale together, like the window zoom in VS Code. Editor and terminal text scale too.",
+      "uiScaleSmall": "Small",
+      "uiScaleDefault": "Default",
+      "uiScaleLarge": "Large"
     },
     "editor": {
       "title": "Editor",
@@ -215,7 +222,7 @@
   },
   "cli": {
     "dangerous": "dangerous",
-    "needsConfig": "needs config"
+    "needsConfig": "Needs config"
   },
   "codeSidebar": {
     "projects": "Projects",
@@ -246,6 +253,8 @@
   "explorer": {
     "ariaLabel": "File explorer",
     "title": "Explorer",
+    "collapse": "Close explorer",
+    "expand": "Open explorer",
     "noProject": "No project open",
     "noProjectBody": "Open a local folder to browse files. Your folders stay on disk, metacodex only stores workspace metadata.",
     "openFolder": "Open Folder",
@@ -333,8 +342,8 @@
   },
   "tabs": {
     "newTerminal": "New Terminal",
-    "codingAgents": "Coding Agents",
-    "autonomousAgents": "Autonomous Agents",
+    "codingAgents": "Coding agents",
+    "autonomousAgents": "Autonomous agents",
     "editRegistry": "Edit CLI registry…",
     "newTab": "New tab",
     "unsavedChanges": "Unsaved changes",
@@ -399,12 +408,12 @@
     "resizeSidePanel": "Resize side panel"
   },
   "terminal": {
-    "notInstalled": "not installed",
+    "notInstalled": "Not installed",
     "configure": "configure",
     "piNotConfigured": "Pi CLI is not configured yet.",
     "piNotConfiguredBody": " Add the install command and executable name in the metacodex CLI registry.",
-    "installCommand": "install command",
-    "orViaNpm": "or via npm",
+    "installCommand": "Install command",
+    "orViaNpm": "Or via npm",
     "openInTerminal": "Open in terminal",
     "retryDetection": "Retry detection",
     "copyInstall": "Copy install command",
@@ -420,8 +429,8 @@
     }
   },
   "editor": {
-    "couldNotRead": "could not read",
-    "binaryFile": "binary file",
+    "couldNotRead": "Could not read",
+    "binaryFile": "Binary file",
     "binaryBody": "This file looks binary. metacodex MVP only edits text files.",
     "saved": "Saved",
     "reloaded": "Reloaded from disk",
@@ -438,8 +447,8 @@
     "lossy": "UTF-8 (lossy)",
     "editSource": "Edit source",
     "showPreview": "Show preview",
-    "image": "image",
-    "pdfLabel": "pdf · {{name}}",
+    "image": "Image",
+    "pdfLabel": "PDF · {{name}}",
     "previousPage": "Previous page",
     "nextPage": "Next page"
   },
@@ -494,7 +503,6 @@
     "toggle": "Toggle side panel",
     "review": "Git and Review",
     "toggleReview": "Git and Review",
-    "close": "Close side panel",
     "showTools": "Show side panel tools",
     "sections": {
       "repository": "Repository",

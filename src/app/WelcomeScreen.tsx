@@ -1,18 +1,17 @@
-import { forwardRef, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronDown, FileText, FolderOpen, Github, TerminalSquare } from "lucide-react";
 import { getVersion } from "@tauri-apps/api/app";
 import { useTranslation } from "react-i18next";
 
+import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { Kbd } from "@/components/ui/Kbd";
-import { BackgroundGrain } from "@/components/ui/BackgroundGrain";
 import {
   DropdownContent,
   DropdownItem,
   DropdownRoot,
   DropdownTrigger,
 } from "@/components/ui/DropdownMenu";
-import { cn } from "@/lib/cn";
 import { ResumeCards } from "@/components/resume/ResumeCards";
 
 interface WelcomeScreenProps {
@@ -38,82 +37,66 @@ export function WelcomeScreen({
   const { t } = useTranslation();
   return (
     <div className="relative flex h-full w-full overflow-hidden bg-canvas">
-      <BackgroundGrain />
-
-      <div className="relative z-10 mx-auto flex w-full max-w-[760px] flex-col px-[40px] pt-[88px]">
+      <div className="relative z-10 mx-auto flex w-full max-w-[760px] flex-col px-[40px] pt-[64px]">
         <span className="editorial-caps">{t("welcome.eyebrow")}</span>
 
-        <div className="mt-[18px] flex items-center gap-[20px]">
+        <div className="mt-[16px] flex items-center gap-[16px]">
           <img
             src="/black-metacodex-icon.png"
             alt=""
             draggable={false}
-            className="select-none dark:hidden"
-            style={{
-              width: "clamp(48px, 6vw, 76px)",
-              height: "clamp(48px, 6vw, 76px)",
-            }}
+            className="h-[40px] w-[40px] select-none dark:hidden"
           />
           <img
             src="/white-metacodex-icon.png"
             alt=""
             draggable={false}
-            className="hidden select-none dark:block"
-            style={{
-              width: "clamp(48px, 6vw, 76px)",
-              height: "clamp(48px, 6vw, 76px)",
-            }}
+            className="hidden h-[40px] w-[40px] select-none dark:block"
           />
-          <h1
-            className="font-display tracking-display text-ink"
-            style={{ fontSize: "clamp(56px, 7vw, 88px)", lineHeight: 1.02, fontWeight: 500 }}
-          >
-            metacodex
-          </h1>
+          <h1 className="font-display text-display font-medium text-ink">metacodex</h1>
         </div>
 
-        {/* 18px is a one-off hero size (sanctioned exception to the type scale). */}
-        <p className="mt-[12px] max-w-[520px] font-display text-[18px] leading-[1.5] text-body">
+        <p className="mt-[12px] max-w-[520px] text-content text-body">
           {t("welcome.tagline")}
         </p>
 
-        <div className="mt-[36px] flex items-center gap-[10px]">
+        <div className="mt-[32px] flex items-center gap-[10px]">
           <DropdownRoot>
             <DropdownTrigger asChild>
-              <PrimaryAction>
+              <Button variant="primary" size="md">
                 <Icon icon={FolderOpen} size={14} className="text-on-primary" />
                 <span>{t("welcome.openProject")}</span>
                 <Icon icon={ChevronDown} size={12} className="ml-[2px] text-on-primary/80" />
-              </PrimaryAction>
+              </Button>
             </DropdownTrigger>
             <DropdownContent align="start">
               <DropdownItem
                 onSelect={onOpenFolder}
                 trailing={<Kbd keys={["Mod", "O"]} />}
               >
-                <Icon icon={FolderOpen} size={13} className="text-muted" />
+                <Icon icon={FolderOpen} size={12} className="text-muted" />
                 {t("welcome.openProjectMenu.local")}
               </DropdownItem>
               <DropdownItem
                 onSelect={onCloneFromGithub}
                 trailing={<Kbd keys={["Mod", "Shift", "O"]} />}
               >
-                <Icon icon={Github} size={13} className="text-muted" />
+                <Icon icon={Github} size={12} className="text-muted" />
                 {t("welcome.openProjectMenu.github")}
               </DropdownItem>
             </DropdownContent>
           </DropdownRoot>
 
-          <SecondaryAction onClick={onOpenTerminal}>
+          <Button variant="outline" size="md" onClick={onOpenTerminal}>
             <Icon icon={TerminalSquare} size={14} />
             <span>{t("welcome.openTerminal")}</span>
             <Kbd keys={["Mod", "T"]} className="ml-[6px]" />
-          </SecondaryAction>
+          </Button>
 
-          <SecondaryAction onClick={onOpenPreviewFile}>
+          <Button variant="outline" size="md" onClick={onOpenPreviewFile}>
             <Icon icon={FileText} size={14} />
             <span>{t("welcome.openFile")}</span>
-          </SecondaryAction>
+          </Button>
         </div>
 
         <div className="mt-[64px] grid max-w-[640px] grid-cols-2 gap-[1px] overflow-hidden rounded-sm border border-hairline bg-hairline">
@@ -128,40 +111,6 @@ export function WelcomeScreen({
         <FooterMeta />
       </div>
     </div>
-  );
-}
-
-const PrimaryAction = forwardRef<HTMLButtonElement, React.ButtonHTMLAttributes<HTMLButtonElement>>(
-  function PrimaryAction({ children, className, type = "button", ...props }, ref) {
-    return (
-      <button
-        ref={ref}
-        type={type}
-        className={cn(
-          "press-feedback inline-flex h-[36px] items-center gap-[8px] rounded-sm bg-ink px-[16px] text-ui font-medium text-on-primary",
-          "transition-colors duration-fast hover:bg-primary-active focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[3px]",
-          className,
-        )}
-        {...props}
-      >
-        {children}
-      </button>
-    );
-  },
-);
-
-function SecondaryAction({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "inline-flex h-[36px] items-center gap-[8px] rounded-sm border border-hairline-strong bg-canvas px-[16px] text-ui font-medium text-ink",
-        "transition-colors duration-fast hover:bg-surface-strong/40",
-      )}
-    >
-      {children}
-    </button>
   );
 }
 

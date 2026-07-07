@@ -176,15 +176,15 @@ export function DiffTab({ path, projectId, status }: DiffTabProps) {
 
   return (
     <div className="flex h-full w-full flex-col bg-canvas">
-      <div className="flex shrink-0 items-center gap-[10px] border-b border-hairline bg-canvas-soft px-[14px] py-[6px]">
-        <span className={cn("font-mono text-[10px]", gitColorForBadge(status))}>
+      <div className="flex shrink-0 items-center gap-[10px] border-b border-hairline-soft bg-canvas-soft px-[14px] py-[6px]">
+        <span className={cn("font-mono text-micro", gitColorForBadge(status))}>
           {status}
         </span>
         <span className="truncate font-mono text-caption text-ink">{basename(path)}</span>
         <span className="shrink-0 text-label text-muted-soft">
           {t("diff.comparedWithHead")}
         </span>
-        <span className="ml-auto shrink-0 editorial-caps text-[10px] text-muted-soft">
+        <span className="ml-auto shrink-0 editorial-caps text-micro text-muted-soft">
           {t(gitStatusLabelKey(status))}
         </span>
       </div>

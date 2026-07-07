@@ -11,7 +11,7 @@ export function FileIcon({
   isDir,
   isOpen,
   filename,
-  size = 13,
+  size = 12,
   className,
 }: {
   isDir: boolean;

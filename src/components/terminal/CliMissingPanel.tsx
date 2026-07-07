@@ -39,7 +39,7 @@ export function CliMissingPanel({ cli, onRetry, onOpenInTerminal }: CliMissingPa
           </span>
           {cli.dangerLevel === "dangerous" && (
             <Badge tone="warn">
-              <Icon icon={AlertTriangle} size={10} strokeWidth={2} />
+              <Icon icon={AlertTriangle} size={10} />
               {t("cli.dangerous")}
             </Badge>
           )}
@@ -90,7 +90,7 @@ export function CliMissingPanel({ cli, onRetry, onOpenInTerminal }: CliMissingPa
               size="md"
               onClick={() => onOpenInTerminal(installCmd)}
             >
-              <Icon icon={Terminal} size={13} className="text-on-primary" />
+              <Icon icon={Terminal} size={14} className="text-on-primary" />
               {t("terminal.openInTerminal")}
             </Button>
           ) : null}
@@ -160,7 +160,7 @@ function InstallBlock({ command, secondary }: { command: string; secondary?: boo
         )}
         aria-label={t("terminal.copyInstall")}
       >
-        <Icon icon={Copy} size={11} />
+        <Icon icon={Copy} size={12} />
         {copied ? t("common.copied") : t("common.copy")}
       </button>
     </div>

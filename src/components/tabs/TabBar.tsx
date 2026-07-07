@@ -15,7 +15,7 @@ import { cn } from "@/lib/cn";
 import type { CliTool } from "@/features/terminal/cli-registry";
 import { isRenamableTab, resolveTabTitle, type Tab } from "./types";
 import { TabContextMenu } from "./TabContextMenu";
-import { NewTabContextMenu } from "./NewTabMenu";
+import { NewTabContextMenu, NewTabMenu } from "./NewTabMenu";
 import { TabStatusDot } from "./TabStatusDot";
 import { TabTooltip } from "./TabTooltip";
 import { TabWorktreePill } from "./TabWorktreePill";
@@ -49,27 +49,28 @@ interface TabBarProps {
 //     so the tab bar visually matches the sidebar entry.
 //   - Terminal tabs → generic terminal mark.
 function renderTabIcon(tab: Tab, active: boolean): ReactNode {
-  const tone = active ? "text-ink" : "text-muted-soft";
+  // The active pill is ink-inverted, so its glyphs swap to the on-primary tone.
+  const tone = active ? "text-on-primary" : "text-muted-soft";
 
   if (tab.kind === "terminal") {
-    return <Icon icon={TerminalSquare} size={13} className={tone} />;
+    return <Icon icon={TerminalSquare} size={12} className={tone} />;
   }
   if (tab.kind === "cli") {
     const BrandIcon = CLI_BRAND_ICONS[tab.cliId];
     if (BrandIcon) {
       return (
-        <span className="inline-flex h-[13px] w-[13px] shrink-0 items-center justify-center">
-          <BrandIcon size={13} />
+        <span className="inline-flex h-[12px] w-[12px] shrink-0 items-center justify-center">
+          <BrandIcon size={12} />
         </span>
       );
     }
-    return <Icon icon={TerminalSquare} size={13} className={tone} />;
+    return <Icon icon={TerminalSquare} size={12} className={tone} />;
   }
   if (tab.kind === "diff") {
-    return <Icon icon={GitCompare} size={13} className={tone} />;
+    return <Icon icon={GitCompare} size={12} className={tone} />;
   }
   return (
-    <FileIcon isDir={false} filename={tab.path} size={13} className={tone} />
+    <FileIcon isDir={false} filename={tab.path} size={12} className={tone} />
   );
 }
 
@@ -270,7 +271,7 @@ export function TabBar({
   return (
     <NewTabContextMenu onNewTerminal={onNewTerminal} onLaunchCli={onLaunchCli}>
     <div
-      className="relative z-20 h-[34px] border-b border-hairline bg-canvas-soft"
+      className="relative z-20 h-[34px]"
       data-tauri-drag-region
     >
       {/* The scroll container fills the row exactly. The native scrollbar is
@@ -280,7 +281,7 @@ export function TabBar({
       <div
         ref={scrollRef}
         className={cn(
-          "tab-scroll absolute inset-x-0 top-0 bottom-0 flex min-w-0 items-stretch overflow-x-auto overflow-y-hidden",
+          "tab-scroll absolute inset-x-0 top-0 bottom-0 flex min-w-0 items-center gap-[4px] overflow-x-auto overflow-y-hidden px-[6px]",
         )}
         // Reserve room on the right so tabs don't slide under the
         // absolutely-positioned trailing strip. Width is measured dynamically
@@ -361,11 +362,11 @@ export function TabBar({
                   e.stopPropagation();
                 }}
                 className={cn(
-                  "group relative flex h-[34px] min-w-[140px] max-w-[220px] shrink-0 items-center gap-[8px] border-r border-hairline px-[10px]",
+                  "group relative flex h-[26px] min-w-[120px] max-w-[220px] shrink-0 items-center gap-[7px] rounded-md px-[10px]",
                   "touch-none transition-colors duration-fast",
                   active
-                    ? "bg-canvas text-ink"
-                    : "bg-canvas-soft text-muted hover:bg-surface-strong/40 hover:text-body",
+                    ? "bg-ink text-on-primary"
+                    : "text-muted hover:bg-canvas-soft hover:text-body",
                   beingDragged && "opacity-40",
                 )}
                 aria-current={active ? "page" : undefined}
@@ -375,7 +376,10 @@ export function TabBar({
                     name, controls. */}
                 {tab.dirty ? (
                   <span
-                    className="h-[6px] w-[6px] shrink-0 rounded-pill bg-ink"
+                    className={cn(
+                      "h-[6px] w-[6px] shrink-0 rounded-pill",
+                      active ? "bg-on-primary" : "bg-ink",
+                    )}
                     aria-label={t("tabs.unsavedChanges")}
                   />
                 ) : null}
@@ -393,7 +397,7 @@ export function TabBar({
                     onCancel={() => setEditingTabId(null)}
                   />
                 ) : (
-                  <span className="flex-1 truncate text-left font-mono text-caption tracking-tight">
+                  <span className="flex-1 truncate text-left text-caption">
                     {displayedTitle}
                   </span>
                 )}
@@ -413,20 +417,25 @@ export function TabBar({
                     onClose(tab.id);
                   }}
                   className={cn(
-                    "inline-flex h-[18px] w-[18px] items-center justify-center rounded-xs text-muted opacity-0 transition-all duration-fast",
-                    "hover:bg-surface-strong/80 hover:text-ink group-hover:opacity-100",
-                    active && "opacity-60",
+                    "inline-flex h-[18px] w-[18px] items-center justify-center rounded-xs opacity-0 transition-all duration-fast group-hover:opacity-100",
+                    active
+                      ? "text-on-primary opacity-60 hover:opacity-100"
+                      : "text-muted hover:bg-surface-strong hover:text-ink",
                   )}
                   aria-label={t("tabs.closeTab")}
                 >
-                  <Icon icon={X} size={11} />
+                  <Icon icon={X} size={12} />
                 </span>
-                {active ? <span className="tab-indicator" /> : null}
               </button>
               </Tooltip>
             </TabContextMenu>
           );
         })}
+        {/* New-tab button rides right after the last pill, Codex-style. Same
+            dropdown body as the bar's right-click menu. */}
+        <div className="ml-[2px] flex shrink-0 items-center">
+          <NewTabMenu onNewTerminal={onNewTerminal} onLaunchCli={onLaunchCli} />
+        </div>
       </div>
 
       {/* Drop indicator is absolutely positioned in the bar (not inside the
@@ -435,7 +444,7 @@ export function TabBar({
       {indicatorLeft !== null ? (
         <span
           aria-hidden
-          className="pointer-events-none absolute top-0 bottom-0 z-[8] w-[2px] bg-ink"
+          className="pointer-events-none absolute top-[5px] bottom-[5px] z-[8] w-[2px] rounded-pill bg-ink"
           style={{ left: `${indicatorLeft}px` }}
         />
       ) : null}
@@ -445,13 +454,13 @@ export function TabBar({
           {/* Subtle fade so a tab being scrolled in/out doesn't crash into the
               hard edge of the trailing strip. */}
           <div
-            className="pointer-events-none absolute top-0 bottom-0 w-[18px] bg-gradient-to-r from-transparent to-canvas-soft"
+            className="pointer-events-none absolute top-0 bottom-0 w-[18px] bg-gradient-to-r from-transparent to-canvas"
             style={{ right: trailingWidth }}
             aria-hidden="true"
           />
           <div
             ref={trailingRef}
-            className="absolute right-0 top-0 bottom-0 z-10 flex items-center gap-[6px] bg-canvas-soft px-[10px]"
+            className="absolute right-0 top-0 bottom-0 z-10 flex items-center gap-[6px] bg-canvas px-[10px]"
           >
             {trailing}
           </div>
@@ -477,7 +486,7 @@ export function TabBar({
             return (
               <div
                 aria-hidden
-                className="pointer-events-none fixed z-[60] flex h-[34px] min-w-[140px] max-w-[220px] items-center gap-[8px] rounded-sm border border-hairline bg-canvas px-[10px] font-mono text-caption text-ink shadow-lg"
+                className="pointer-events-none fixed z-[60] flex h-[26px] min-w-[120px] max-w-[220px] items-center gap-[7px] rounded-md border border-hairline bg-canvas px-[10px] text-caption text-ink shadow-drag"
                 style={{
                   left: drag.pointerPos.x + 10,
                   top: drag.pointerPos.y - 10,
@@ -559,8 +568,10 @@ function TabRenameInput({ initial, onCommit, onCancel }: TabRenameInputProps) {
       }}
       onBlur={commit}
       className={cn(
-        "flex-1 min-w-0 truncate rounded-xs border border-accent/60 bg-surface-strong/45 px-[4px]",
-        "text-left font-mono text-caption tracking-tight text-ink",
+        // Solid canvas: the input must stay readable over the ink-inverted
+        // active pill, so it cannot be translucent.
+        "flex-1 min-w-0 truncate rounded-xs border border-accent/60 bg-canvas px-[4px]",
+        "text-left text-caption text-ink",
         "outline-none focus:border-accent focus:outline-none",
       )}
     />

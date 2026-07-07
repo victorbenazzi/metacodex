@@ -10,6 +10,7 @@ const twMerge = extendTailwindMerge({
       "font-size": [
         {
           text: [
+            "micro",
             "label",
             "caption",
             "ui",

@@ -27,7 +27,7 @@ export function ExplorerPanel({
   const { t } = useTranslation();
   return (
     <nav
-      className="flex h-full w-full flex-col overflow-hidden border-r border-hairline bg-canvas"
+      className="flex h-full w-full flex-col overflow-hidden rounded-lg border border-hairline bg-surface-card"
       aria-label={t("explorer.ariaLabel")}
     >
       {hasProject && projectId && projectPath ? (
@@ -41,7 +41,7 @@ export function ExplorerPanel({
         />
       ) : (
         <>
-          <header className="flex h-[30px] shrink-0 items-center justify-between border-b border-hairline-soft px-[14px]">
+          <header className="flex h-[var(--panel-header-h)] shrink-0 items-center justify-between border-b border-hairline-soft px-[12px]">
             <span className="editorial-caps">{t("explorer.title")}</span>
           </header>
           <ExplorerEmpty onOpenFolder={onOpenFolder} />
@@ -68,7 +68,7 @@ function ExplorerEmpty({ onOpenFolder }: { onOpenFolder: () => void }) {
         type="button"
         onClick={onOpenFolder}
         className={cn(
-          "mt-[4px] inline-flex h-[28px] items-center gap-[6px] rounded-sm border border-hairline-strong bg-canvas px-[12px] text-caption font-medium text-ink",
+          "mt-[4px] inline-flex h-[28px] items-center gap-[6px] rounded-sm border border-hairline-strong bg-transparent px-[12px] text-caption font-medium text-ink",
           "hover:bg-surface-strong/40 transition-colors",
         )}
       >

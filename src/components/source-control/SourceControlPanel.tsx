@@ -96,7 +96,7 @@ export function SourceControlPanel({
 
   return (
     <section
-      className="flex h-full min-h-0 flex-col bg-canvas"
+      className="flex h-full min-h-0 flex-col"
       aria-label={t("sidePanel.review")}
     >
       <WorktreesSection
@@ -105,22 +105,22 @@ export function SourceControlPanel({
         onOpenInTerminal={openTerminalAt}
       />
 
-      <div className="shrink-0 border-b border-hairline-soft px-[14px] py-[12px]">
+      <div className="shrink-0 border-b border-hairline-soft px-[12px] py-[12px]">
         {git?.branch ? (
           <div className="flex min-w-0 items-center gap-[6px] font-mono text-caption">
-            <Icon icon={GitBranch} size={11} strokeWidth={2} className="shrink-0 text-muted-soft" />
+            <Icon icon={GitBranch} size={12} className="shrink-0 text-muted-soft" />
             <span className="min-w-0 truncate text-body" title={git.branch}>{git.branch}</span>
             {git.ahead > 0 || git.behind > 0 ? (
               <span className="ml-auto inline-flex shrink-0 items-center gap-[6px] font-mono text-label tabular-nums text-muted">
                 {git.ahead > 0 ? (
                   <span className="inline-flex items-center gap-[1px]">
-                    <Icon icon={ArrowUp} size={10} strokeWidth={2} />
+                    <Icon icon={ArrowUp} size={10} />
                     {git.ahead}
                   </span>
                 ) : null}
                 {git.behind > 0 ? (
                   <span className="inline-flex items-center gap-[1px]">
-                    <Icon icon={ArrowDown} size={10} strokeWidth={2} />
+                    <Icon icon={ArrowDown} size={10} />
                     {git.behind}
                   </span>
                 ) : null}
@@ -175,17 +175,17 @@ export function SourceControlPanel({
                   aria-label={`${t(gitStatusLabelKey(code))}: ${rel}`}
                   className="flex min-w-0 items-center gap-[8px] rounded-xs px-[6px] py-[5px] text-left transition-colors duration-fast focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-hairline-strong"
                 >
-                  <span className="inline-flex h-[18px] min-w-[25px] shrink-0 items-center justify-center rounded-xs border border-hairline bg-surface-card px-[4px] font-mono text-[10px] leading-none tracking-tight text-muted-soft">
+                  <span className="inline-flex h-[18px] min-w-[25px] shrink-0 items-center justify-center rounded-xs border border-hairline bg-surface-card px-[4px] font-mono text-micro leading-none tracking-tight text-muted-soft">
                     {fileBadge(name)}
                   </span>
-                  <span className="min-w-0 flex-1 truncate font-mono text-caption text-body group-hover:text-ink">
+                  <span className="min-w-0 flex-1 truncate font-mono text-mono text-body group-hover:text-ink">
                     {showDir ? <span className="text-muted">{dir}/</span> : null}
                     <span className="text-ink">{name}</span>
                   </span>
                   <Tooltip content={t(gitStatusLabelKey(code))} side="left">
                     <span
                       className={cn(
-                        "inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-xs bg-surface-strong/45 font-mono text-[10px] leading-none",
+                        "inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-xs bg-surface-strong/45 font-mono text-micro leading-none",
                         gitColorForBadge(code),
                       )}
                       onClick={(e) => e.stopPropagation()}
@@ -212,7 +212,7 @@ export function SourceControlPanel({
                       "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-hairline-strong",
                     )}
                   >
-                    <Icon icon={GitCompare} size={13} strokeWidth={1.8} />
+                    <Icon icon={GitCompare} size={12} />
                   </button>
                 </Tooltip>
               </div>

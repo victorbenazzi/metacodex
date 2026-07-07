@@ -15,12 +15,13 @@ interface ResizeHandleProps {
    *  px-based widths; for a 0–1 ratio it's `dx / containerWidth`. */
   toDelta: (dxPx: number) => number;
   /**
-   * Where the 1px rail sits within the 8px hit zone:
-   *   - "left"   — rail on the LEFT edge of the hit zone. Use when the handle
-   *                lives on the LEFT edge of the panel it sizes (the source-
-   *                control panel's leading edge).
-   *   - "right"  — rail on the RIGHT edge. Use for handles on the RIGHT edge
-   *                of a panel (the explorer panel's trailing edge).
+   * Which panel edge the handle sits on. In the floating-panel shell the
+   * panels are separated by an 8px gap column; the hit zone occupies that gap
+   * entirely and the 1px rail paints at the gap's midpoint:
+   *   - "left"   — handle in the gap BEFORE the panel it sizes (the side
+   *                panel's leading edge).
+   *   - "right"  — handle in the gap AFTER a panel (the explorer card's
+   *                trailing edge).
    *   - "center" — rail centered within the hit zone. Use when the handle
    *                free-floats over a parent that's not its own panel (the
    *                diff-split seam between two editors).
@@ -46,6 +47,13 @@ interface ResizeHandleProps {
   ariaLabel?: string;
   /** When false, hides the handle entirely (e.g. panel collapsed). */
   enabled?: boolean;
+  /**
+   * Optional affordances layered inside the hit zone (e.g. the explorer's
+   * collapse pill). The root carries the `group` class so children can reveal
+   * themselves via `group-hover:*`. Children are unmounted while dragging so
+   * a resize gesture can never end on top of (and activate) one of them.
+   */
+  children?: React.ReactNode;
 }
 
 /**
@@ -76,6 +84,7 @@ export function ResizeHandle({
   style,
   ariaLabel,
   enabled = true,
+  children,
 }: ResizeHandleProps) {
   const [dragging, setDragging] = useState(false);
   const [hovering, setHovering] = useState(false);
@@ -136,11 +145,12 @@ export function ResizeHandle({
 
   if (!enabled) return null;
 
-  // Default edge offsets (-4px) put the 8px hit zone half-inside and half-
-  // outside the panel border. Callers that supply their own `style` (e.g.
-  // free-floating diff seam) skip these by overriding the offset properties.
+  // Default edge offsets (-8px) hang the 8px hit zone fully outside the panel,
+  // covering the gap column between two floating cards. Callers that supply
+  // their own `style` (e.g. free-floating diff seam) skip these by overriding
+  // the offset properties.
   const defaultEdgeClass =
-    side === "right" ? "-right-[4px]" : side === "left" ? "-left-[4px]" : "";
+    side === "right" ? "-right-[8px]" : side === "left" ? "-left-[8px]" : "";
 
   return (
     <div
@@ -161,14 +171,18 @@ export function ResizeHandle({
       <span
         aria-hidden
         className={cn(
-          "pointer-events-none absolute top-0 h-full w-px",
+          // The hit zone spans the whole gap between two cards; the rail
+          // paints ON the sized panel's edge (overlaying its 1px border) so
+          // hover/drag reads as the card border lighting up, never a loose
+          // line floating in the gap. It is inset 12px (the card radius) from
+          // both ends so it hugs only the straight run of the edge. "center"
+          // (diff seam) has no card edge, so it stays at the zone's middle.
+          "pointer-events-none absolute w-px",
           side === "right"
-            ? "right-0"
+            ? "-left-px bottom-[12px] top-[12px]"
             : side === "left"
-              ? "left-0"
-              : // center: position rail at the geometric middle of the 8px hit
-                // zone (left: 50%, translateX(-50%) below).
-                "left-1/2 -translate-x-1/2",
+              ? "-right-px bottom-[12px] top-[12px]"
+              : "left-1/2 top-0 h-full -translate-x-1/2",
           "transition-colors duration-fast ease-out",
           dragging
             ? "bg-primary"
@@ -177,6 +191,7 @@ export function ResizeHandle({
               : "bg-transparent",
         )}
       />
+      {dragging ? null : children}
     </div>
   );
 }

@@ -35,7 +35,7 @@ export const SidebarRow = forwardRef<HTMLDivElement, SidebarRowProps>(function S
     <div
       ref={ref}
       className={cn(
-        "group/proj relative flex w-full items-center gap-[8px] rounded-md px-[10px] py-[6px] text-ui transition-colors duration-fast",
+        "group/proj relative flex w-full items-center gap-[8px] rounded-sm px-[10px] py-[6px] text-ui transition-colors duration-fast",
         active ? "bg-surface-strong/45 text-ink" : "text-body hover:bg-surface-strong/30",
         className,
       )}
@@ -89,7 +89,6 @@ export function SidebarChevron({
       <Icon
         icon={ChevronDown}
         size={12}
-        strokeWidth={2.25}
         className={cn("transition-transform duration-fast", collapsed && "-rotate-90")}
       />
     </button>

@@ -15,6 +15,8 @@ export type ThemeKind = "light" | "dark";
 export interface ThemeChrome {
   canvas: string;
   canvasSoft: string;
+  /** Elevated surface: dialogs, cards and the floating sidebar panels
+      (projects, explorer, side panel) all sit on this over `canvas`. */
   surfaceCard: string;
   surfaceStrong: string;
 

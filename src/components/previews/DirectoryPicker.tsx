@@ -109,7 +109,7 @@ export function DirectoryPicker({
               className={cn("transition-transform duration-fast", isOpen && "rotate-90")}
             />
           </button>
-          <Icon icon={Folder} size={13} className="shrink-0 text-muted" />
+          <Icon icon={Folder} size={12} className="shrink-0 text-muted" />
           <span className="truncate">{label}</span>
         </div>
         {isOpen ? (

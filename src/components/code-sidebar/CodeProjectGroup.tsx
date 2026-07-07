@@ -221,7 +221,7 @@ export function CodeProjectGroup({
                   content={
                     <span className="flex flex-col gap-[2px]">
                       <span className="font-medium">{t(aggTone.labelKey)}</span>
-                      <span className="font-mono text-[10px] text-muted">
+                      <span className="font-mono text-micro text-muted">
                         {t("projectRail.sessions", { count: sessionCount })}
                       </span>
                     </span>
@@ -241,7 +241,7 @@ export function CodeProjectGroup({
                 <Tooltip content={t("codeSidebar.newInProject")} side="bottom">
                   <DropdownTrigger asChild>
                     <button type="button" aria-label={t("codeSidebar.newInProject")} className={trailingBtn}>
-                      <Icon icon={Plus} size={13} strokeWidth={2.25} />
+                      <Icon icon={Plus} size={12} />
                     </button>
                   </DropdownTrigger>
                 </Tooltip>
@@ -257,7 +257,7 @@ export function CodeProjectGroup({
                 <Tooltip content={t("codeSidebar.projectOptions")} side="bottom">
                   <DropdownTrigger asChild>
                     <button type="button" aria-label={t("codeSidebar.projectOptions")} className={trailingBtn}>
-                      <Icon icon={MoreHorizontal} size={14} strokeWidth={2} />
+                      <Icon icon={MoreHorizontal} size={12} />
                     </button>
                   </DropdownTrigger>
                 </Tooltip>
@@ -361,10 +361,10 @@ function Section({ label, count, children }: { label: string; count: number; chi
   return (
     <div className="pt-[4px]">
       <div className="flex items-center justify-between px-[8px] pb-[1px] pt-[2px]">
-        <span className="text-label font-medium uppercase tracking-label text-muted-soft">
+        <span className="text-label font-medium text-muted-soft">
           {label}
         </span>
-        <span className="font-mono text-[10px] tabular-nums text-muted-soft">{count}</span>
+        <span className="font-mono text-micro tabular-nums text-muted-soft">{count}</span>
       </div>
       <div className="flex flex-col gap-[1px]">{children}</div>
     </div>
@@ -390,7 +390,7 @@ function RowShell({ leading, label, trailing, delay, title, ariaLabel, onClick, 
     <div
       style={{ animationDelay: delay }}
       className={cn(
-        "group/row flex w-full animate-rise items-center gap-[8px] rounded-md px-[8px] py-[4px] text-caption text-body transition-colors duration-fast motion-reduce:animate-none",
+        "group/row flex w-full animate-rise items-center gap-[8px] rounded-sm px-[8px] py-[4px] text-ui text-body transition-colors duration-fast motion-reduce:animate-none",
         "hover:bg-surface-strong/40 hover:text-ink",
       )}
     >
@@ -415,7 +415,7 @@ function RowShell({ leading, label, trailing, delay, title, ariaLabel, onClick, 
           }}
           className="opacity-0 transition-opacity duration-fast focus-visible:opacity-100 group-hover/row:opacity-100"
         >
-          <Icon icon={X} size={12} strokeWidth={2} />
+          <Icon icon={X} size={12} />
         </IconButton>
       ) : null}
     </div>
@@ -438,10 +438,10 @@ function HistoricoRow({
   const primary = entry.branch || basename(entry.cwd) || label;
   return (
     <RowShell
-      leading={BrandIcon ? <BrandIcon size={13} /> : <Icon icon={SquareTerminal} size={12} />}
+      leading={BrandIcon ? <BrandIcon size={12} /> : <Icon icon={SquareTerminal} size={12} />}
       label={primary}
       trailing={
-        <span className="shrink-0 font-mono text-[10px] tabular-nums text-muted-soft">
+        <span className="shrink-0 font-mono text-micro tabular-nums text-muted-soft">
           {agoShort(entry.lastSeenAt)}
         </span>
       }
@@ -472,7 +472,7 @@ function TabRow({
   const cliId = tab.kind === "cli" ? tab.cliId : undefined;
   const BrandIcon = cliId ? CLI_BRAND_ICONS[cliId] : undefined;
   const leading = BrandIcon ? (
-    <BrandIcon size={13} />
+    <BrandIcon size={12} />
   ) : (
     <Icon icon={tab.kind === "cli" ? Bot : SquareTerminal} size={12} />
   );
@@ -485,7 +485,7 @@ function TabRow({
           {ports.slice(0, 2).map((p) => (
             <span
               key={`${p.address}:${p.port}`}
-              className="rounded-xs border border-hairline px-[4px] font-mono text-[10px] tabular-nums text-muted-soft"
+              className="rounded-xs border border-hairline px-[4px] font-mono text-micro tabular-nums text-muted-soft"
             >
               :{p.port}
             </span>

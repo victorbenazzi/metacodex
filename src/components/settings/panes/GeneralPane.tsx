@@ -43,10 +43,6 @@ export function GeneralPane() {
       <Row label={t("settings.general.saveWorkspace")} hint={t("settings.general.saveWorkspaceHint")}>
         <Badge>{t("settings.general.alwaysOn")}</Badge>
       </Row>
-
-      <Row label={t("settings.general.restoreTerminals")} hint={t("settings.general.restoreTerminalsHint")}>
-        <Badge>{t("settings.general.off")}</Badge>
-      </Row>
     </div>
   );
 }

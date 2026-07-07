@@ -1,9 +1,11 @@
-/* Custom thin scrollbar — invisible until hovered/scrolled. */
+/* Custom thin scrollbar — invisible until hovered/scrolled.
 
-* {
-  scrollbar-width: thin;
-  scrollbar-color: var(--hairline-strong) transparent;
-}
+   Deliberately NO `scrollbar-width` / `scrollbar-color` here: when the
+   standard properties are set, WebKit/Chromium IGNORE the ::-webkit-scrollbar
+   pseudo styles below and paint a native thin scrollbar instead (an opaque
+   light track that reads as a stripe artifact next to the terminal on light
+   themes). The webkit pseudos are the styling path both shipped engines
+   (WKWebView, WebView2) support. */
 
 *::-webkit-scrollbar {
   width: 10px;

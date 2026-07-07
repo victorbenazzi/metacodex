@@ -3,13 +3,13 @@ import { FilePlus, FolderPlus, Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Icon } from "@/components/ui/Icon";
+import { IconButton } from "@/components/ui/IconButton";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { Kbd } from "@/components/ui/Kbd";
 import { useExplorerStore, type CreateKind } from "@/features/explorer/explorer.store";
 import { useSearchUiStore } from "@/features/search/search.store";
 import { TreeNode, CreateRow, type TreeNodeActions } from "./TreeNode";
 import { basename, dirname } from "@/lib/path";
-import { cn } from "@/lib/cn";
 
 interface FileExplorerProps extends TreeNodeActions {
   projectId: string;
@@ -60,23 +60,15 @@ export function FileExplorer({
     shortcut?: React.ReactNode,
   ) => (
     <Tooltip content={label} shortcut={shortcut} side="bottom">
-      <button
-        type="button"
-        onClick={onClick}
-        className={cn(
-          "inline-flex h-[22px] w-[22px] items-center justify-center rounded-xs",
-          "text-muted hover:bg-surface-strong/55 hover:text-ink",
-        )}
-        aria-label={label}
-      >
-        <Icon icon={icon} size={12} />
-      </button>
+      <IconButton size="md" onClick={onClick} aria-label={label}>
+        <Icon icon={icon} size={14} />
+      </IconButton>
     </Tooltip>
   );
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <header className="flex h-[30px] shrink-0 items-center justify-between gap-[6px] border-b border-hairline-soft px-[12px]">
+      <header className="flex h-[var(--panel-header-h)] shrink-0 items-center justify-between gap-[6px] border-b border-hairline-soft px-[12px]">
         <span className="editorial-caps truncate" title={rootPath}>
           {rootName}
         </span>
@@ -140,7 +132,7 @@ export function FileExplorer({
             <p className="font-mono text-label text-danger">
               {t("explorer.couldNotReadFolder")}
             </p>
-            <p className="mt-[2px] font-mono text-[10px] text-muted-soft" title={rootChildren.error}>
+            <p className="mt-[2px] font-mono text-micro text-muted-soft" title={rootChildren.error}>
               {rootChildren.error.slice(0, 80)}
             </p>
             <button

@@ -74,9 +74,12 @@ export function TitleBar({
     <header
       data-tauri-drag-region
       className={cn(
-        "relative grid h-[36px] grid-cols-[1fr_auto_1fr] items-center select-none border-b border-hairline bg-canvas",
+        "relative grid h-[var(--title-bar-h)] grid-cols-[1fr_auto_1fr] items-center select-none bg-canvas",
+        // macOS: traffic lights sit at x=16 (tauri.conf.json) and the green
+        // light ends around 82px; 94px keeps a 12px gap between the lights
+        // and the first control.
         isMac
-          ? "pl-[78px] pr-[16px]"
+          ? "pl-[94px] pr-[16px]"
           : isWindows
             ? "pl-[14px] pr-[138px]"
             : "pl-[14px] pr-[14px]",
@@ -103,7 +106,7 @@ export function TitleBar({
                 "hover:bg-surface-strong/55 hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-hairline-strong",
               )}
             >
-              <Icon icon={codeCollapsed ? PanelLeftOpen : PanelLeftClose} size={15} />
+              <Icon icon={codeCollapsed ? PanelLeftOpen : PanelLeftClose} size={14} />
             </button>
           </Tooltip>
           <DropdownRoot>
@@ -118,20 +121,20 @@ export function TitleBar({
                     "data-[state=open]:bg-surface-strong/55 data-[state=open]:text-ink",
                   )}
                 >
-                  <Icon icon={FolderPlus} size={15} />
+                  <Icon icon={FolderPlus} size={14} />
                 </button>
               </DropdownTrigger>
             </Tooltip>
             <DropdownContent align="start" sideOffset={6}>
               <DropdownItem onSelect={() => onOpenFolder?.()} trailing={<Kbd keys={["Mod", "O"]} />}>
-                <Icon icon={FolderOpen} size={13} className="text-muted" />
+                <Icon icon={FolderOpen} size={12} className="text-muted" />
                 {t("welcome.openProjectMenu.local")}
               </DropdownItem>
               <DropdownItem
                 onSelect={() => onCloneFromGithub?.()}
                 trailing={<Kbd keys={["Mod", "Shift", "O"]} />}
               >
-                <Icon icon={Github} size={13} className="text-muted" />
+                <Icon icon={Github} size={12} className="text-muted" />
                 {t("welcome.openProjectMenu.github")}
               </DropdownItem>
             </DropdownContent>
@@ -152,7 +155,7 @@ export function TitleBar({
             {/* pointer-events:none keeps mousedown on the glyph hitting the
                 drag-region span, so the window still drags from here. */}
             <span data-tauri-drag-region className="pointer-events-none inline-flex">
-              <ProjectGlyph project={activeProject} size={13} />
+              <ProjectGlyph project={activeProject} size={12} />
             </span>
             {activeProject.name}
           </span>
@@ -165,19 +168,19 @@ export function TitleBar({
             data-tauri-drag-region
             className="inline-flex items-center gap-[5px] font-mono text-label text-muted"
           >
-            <Icon icon={GitBranch} size={10} strokeWidth={2} />
+            <Icon icon={GitBranch} size={10} />
             <span data-tauri-drag-region className="text-ink">
               {git.branch}
             </span>
             {git.ahead > 0 ? (
               <span data-tauri-drag-region className="inline-flex items-center text-muted-soft">
-                <Icon icon={ArrowUp} size={9} strokeWidth={2} />
+                <Icon icon={ArrowUp} size={10} />
                 {git.ahead}
               </span>
             ) : null}
             {git.behind > 0 ? (
               <span data-tauri-drag-region className="inline-flex items-center text-muted-soft">
-                <Icon icon={ArrowDown} size={9} strokeWidth={2} />
+                <Icon icon={ArrowDown} size={10} />
                 {git.behind}
               </span>
             ) : null}
@@ -238,23 +241,23 @@ function WindowsControls() {
   };
 
   return (
-    <div className="absolute right-0 top-0 flex h-[36px]">
+    <div className="absolute right-0 top-0 flex h-[var(--title-bar-h)]">
       <ControlButton
         onClick={minimize}
         title={t("titleBar.minimize")}
         ariaLabel={t("titleBar.minimize")}
       >
-        <Icon icon={Minus} size={12} strokeWidth={1.6} />
+        <Icon icon={Minus} size={12} />
       </ControlButton>
       <ControlButton
         onClick={toggleMax}
         title={maximized ? t("titleBar.restore") : t("titleBar.maximize")}
         ariaLabel={maximized ? t("titleBar.restore") : t("titleBar.maximize")}
       >
-        <Icon icon={maximized ? Copy : Square} size={11} strokeWidth={1.6} />
+        <Icon icon={maximized ? Copy : Square} size={12} />
       </ControlButton>
       <ControlButton onClick={close} title={t("titleBar.close")} ariaLabel={t("titleBar.close")} danger>
-        <Icon icon={X} size={13} strokeWidth={1.6} />
+        <Icon icon={X} size={12} />
       </ControlButton>
     </div>
   );
@@ -280,7 +283,7 @@ function ControlButton({
       title={title}
       aria-label={ariaLabel}
       className={cn(
-        "inline-flex h-[36px] w-[46px] items-center justify-center text-muted transition-colors",
+        "inline-flex h-[var(--title-bar-h)] w-[46px] items-center justify-center text-muted transition-colors",
         danger
           ? "hover:bg-win-close hover:text-white"
           : "hover:bg-surface-strong/55 hover:text-ink",

@@ -76,7 +76,6 @@ export function UpdatePill() {
       <Icon
         icon={LeftIcon}
         size={10}
-        strokeWidth={2}
         className={spinning ? "animate-spin" : undefined}
       />
       <span>{label}</span>

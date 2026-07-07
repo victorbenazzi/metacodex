@@ -25,7 +25,7 @@ export function SidePanelToggle() {
           open && "bg-surface-strong/70 text-ink",
         )}
       >
-        <Icon icon={open ? PanelRightClose : PanelRightOpen} size={15} />
+        <Icon icon={open ? PanelRightClose : PanelRightOpen} size={14} />
       </button>
     </Tooltip>
   );

@@ -75,12 +75,12 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-canvas px-8 text-ink">
         <div className="max-w-[560px] rounded-lg border border-hairline bg-surface-card p-8 shadow-elevated">
-          <div className="text-caption uppercase tracking-label text-muted">metacodex</div>
+          <div className="text-caption text-muted">metacodex</div>
           <h1 className="mt-2 text-display-s font-semibold tracking-tight">
             Something broke unexpectedly
           </h1>
           <p className="mt-3 text-content text-body">
-            The interface hit an error and stopped rendering. Reload to recover —
+            The interface hit an error and stopped rendering. Reload to recover:
             your open files and projects are safe on disk. A crash report has
             been saved to <span className="font-mono text-caption">~/.metacodex/state/last-crash.json</span>.
           </p>

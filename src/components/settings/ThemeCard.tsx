@@ -99,7 +99,7 @@ export function ThemeCard({ theme, selected, onSelect }: ThemeCardProps) {
         }}
       >
         <span className="text-caption font-medium text-ink">{theme.name}</span>
-        <span className="font-mono text-[10px] uppercase tracking-label text-muted-soft">
+        <span className="font-mono text-micro uppercase tracking-label text-muted-soft">
           {theme.kind}
         </span>
       </div>

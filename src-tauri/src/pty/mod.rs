@@ -59,6 +59,12 @@ pub struct PtySpawnSpec {
     pub label: String,
     #[serde(default)]
     pub cli_id: Option<String>,
+    /// App theme kind at spawn time ("light" | "dark"). Exported as
+    /// COLORFGBG so background-detecting TUIs (Claude Code, vim, ...) start
+    /// with colors matching the app theme instead of assuming a dark
+    /// terminal.
+    #[serde(default)]
+    pub theme_kind: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -135,6 +141,14 @@ impl PtyManager {
         cmd.env_clear();
         for (k, v) in shell::build_env(Path::new(&spec.cwd)) {
             cmd.env(k, v);
+        }
+        // rxvt convention read by background-detecting TUIs: "fg;bg" in ANSI
+        // indices. Light terminal = dark text (0) on white (15); dark = the
+        // inverse. xterm.js also answers OSC 11 queries with the real theme
+        // background; this covers tools that only look at the env var.
+        if let Some(kind) = spec.theme_kind.as_deref() {
+            let colorfgbg = if kind == "light" { "0;15" } else { "15;0" };
+            cmd.env("COLORFGBG", colorfgbg);
         }
 
         let child = pair

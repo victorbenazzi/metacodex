@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { homeDir } from "@tauri-apps/api/path";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 
 import { useEditorReconcile } from "@/features/editor/useEditorReconcile";
 import { preloadCliDetections } from "@/features/terminal/cli-detection";
 import { useProjectsStore } from "@/features/projects/project.store";
 import { useSettingsDataStore } from "@/features/settings/settings.data.store";
-import { UI_DENSITY_MULTIPLIER } from "@/features/settings/settings.types";
+import { UI_DENSITY_MULTIPLIER, UI_SCALE_FACTOR } from "@/features/settings/settings.types";
 import { useKeybindingsStore } from "@/features/keybindings/keybindings.store";
 import { useResumeStore } from "@/features/resume/resume.store";
 import {
@@ -29,6 +30,7 @@ export function useAppBootstrap(): { homeDirPath: string | null } {
   const keybindingsHydrated = useKeybindingsStore((s) => s.hydrated);
   const hydrateKeybindings = useKeybindingsStore((s) => s.hydrate);
   const uiDensity = useSettingsDataStore((s) => s.settings.interface.uiDensity);
+  const uiScale = useSettingsDataStore((s) => s.settings.accessibility.uiScale);
 
   useEffect(() => {
     if (!projectsHydrated) hydrateProjects();
@@ -44,6 +46,17 @@ export function useAppBootstrap(): { homeDirPath: string | null } {
       String(UI_DENSITY_MULTIPLIER[uiDensity]),
     );
   }, [uiDensity]);
+
+  // Native webview zoom (VS Code style window zoom). Fires at mount with the
+  // default factor (visual no-op) and again once the persisted value hydrates
+  // or the user changes it. Failure is non-fatal: the app stays at 1.0 but the
+  // setting persists, so a binary carrying the zoom capability picks it up on
+  // the next launch.
+  useEffect(() => {
+    getCurrentWebview()
+      .setZoom(UI_SCALE_FACTOR[uiScale])
+      .catch((err) => console.warn("[accessibility] setZoom failed", err));
+  }, [uiScale]);
 
   useEffect(() => {
     if (!keybindingsHydrated) hydrateKeybindings();

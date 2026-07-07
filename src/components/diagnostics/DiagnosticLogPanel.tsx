@@ -68,19 +68,19 @@ function DiagRow({ entry, onPickSession }: DiagRowProps) {
             <button
               type="button"
               onClick={() => onPickSession(entry.sessionId!)}
-              className="font-mono text-[10px] text-muted-soft hover:text-ink"
+              className="font-mono text-micro text-muted-soft hover:text-ink"
               title={entry.sessionId}
             >
               s:{entry.sessionId.slice(0, 6)}
             </button>
           ) : null}
           {entry.tabId ? (
-            <span className="font-mono text-[10px] text-muted-soft" title={entry.tabId}>
+            <span className="font-mono text-micro text-muted-soft" title={entry.tabId}>
               t:{entry.tabId.slice(0, 6)}
             </span>
           ) : null}
           {entry.projectId ? (
-            <span className="font-mono text-[10px] text-muted-soft" title={entry.projectId}>
+            <span className="font-mono text-micro text-muted-soft" title={entry.projectId}>
               p:{entry.projectId.slice(0, 6)}
             </span>
           ) : null}
@@ -139,28 +139,28 @@ export function DiagnosticLogPanel() {
     <div
       role="dialog"
       aria-label={t("diagnostics.title")}
-      className="fixed right-0 top-0 z-[60] flex h-screen w-[480px] flex-col border-l border-hairline bg-canvas-soft shadow-elevated"
+      className="fixed right-0 top-0 z-[60] flex h-screen w-[480px] flex-col border-l border-hairline bg-canvas shadow-elevated"
     >
-      <div className="flex h-[44px] flex-none items-center justify-between gap-[var(--space-sm)] border-b border-hairline px-[var(--space-base)]">
+      <div className="flex h-[var(--panel-header-h)] flex-none items-center justify-between gap-[var(--space-sm)] border-b border-hairline-soft px-[var(--space-base)]">
         <div className="flex items-center gap-[var(--space-xs)] text-ui font-medium text-ink">
-          <FileBadge size={14} className="text-muted" />
+          <FileBadge size={14} strokeWidth={1.6} className="text-muted" />
           {t("diagnostics.title")}
           <span className="font-mono text-label text-muted-soft">{filtered.length}/{entries.length}</span>
         </div>
         <div className="flex items-center gap-[2px]">
-          <IconButton size="lg" onClick={clear} title={t("diagnostics.clear")} aria-label={t("diagnostics.clear")}>
-            <Trash2 size={14} />
+          <IconButton size="md" onClick={clear} title={t("diagnostics.clear")} aria-label={t("diagnostics.clear")}>
+            <Trash2 size={14} strokeWidth={1.6} />
           </IconButton>
           <IconButton
-            size="lg"
+            size="md"
             onClick={handleCopy}
             title={t("diagnostics.copyToClipboard")}
             aria-label={t("diagnostics.copyToClipboard")}
           >
-            <Copy size={14} />
+            <Copy size={14} strokeWidth={1.6} />
           </IconButton>
-          <IconButton size="lg" onClick={() => setOpen(false)} title={t("common.close")} aria-label={t("common.close")}>
-            <X size={14} />
+          <IconButton size="md" onClick={() => setOpen(false)} title={t("common.close")} aria-label={t("common.close")}>
+            <X size={14} strokeWidth={1.6} />
           </IconButton>
         </div>
       </div>
@@ -181,7 +181,7 @@ export function DiagnosticLogPanel() {
             title={filters.sessionIdFilter}
           >
             s:{filters.sessionIdFilter.slice(0, 6)}
-            <X size={11} />
+            <X size={12} strokeWidth={1.6} />
           </button>
         ) : null}
       </div>

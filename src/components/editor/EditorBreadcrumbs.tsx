@@ -19,7 +19,7 @@ export function EditorBreadcrumbs({ tabId, fileName }: { tabId: string; fileName
       {parts.map((p, i) => (
         <span key={i} className="flex shrink-0 items-center">
           {i > 0 ? (
-            <Icon icon={ChevronRight} size={11} className="mx-[1px] text-muted-soft" />
+            <Icon icon={ChevronRight} size={10} className="mx-[1px] text-muted-soft" />
           ) : null}
           <span className={cn(i === parts.length - 1 && i > 0 ? "text-ink" : "")}>{p}</span>
         </span>

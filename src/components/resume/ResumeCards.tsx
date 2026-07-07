@@ -82,16 +82,16 @@ export function ResumeCards({ projectId, title, limit = 5 }: ResumeCardsProps) {
                     {cli?.label ?? entry.cliId}
                   </span>
                   {entry.branch ? (
-                    <span className="inline-flex items-center gap-[3px] font-mono text-[10px] text-muted">
+                    <span className="inline-flex items-center gap-[3px] font-mono text-micro text-muted">
                       <Icon icon={GitBranch} size={10} />
                       {entry.branch}
                     </span>
                   ) : null}
                 </div>
-                <div className="truncate font-mono text-[10px] text-muted-soft" title={entry.cwd}>
+                <div className="truncate font-mono text-micro text-muted-soft" title={entry.cwd}>
                   {entry.cwd}
                 </div>
-                <div className="font-mono text-[10px] text-muted-soft">
+                <div className="font-mono text-micro text-muted-soft">
                   {t("resume.lastSeen", { ago: agoShort(entry.lastSeenAt) })}
                 </div>
               </div>
@@ -101,12 +101,12 @@ export function ResumeCards({ projectId, title, limit = 5 }: ResumeCardsProps) {
                     {t("resume.resumeButton")}
                   </Button>
                 ) : (
-                  <span className="text-[10px] text-warn">
+                  <span className="text-micro text-warn">
                     {t("resume.cliUnavailable", { cli: cli?.label ?? entry.cliId })}
                   </span>
                 )}
                 <IconButton onClick={() => void discard(entry.id)} aria-label={t("resume.discardButton")}>
-                  <Icon icon={Trash2} size={11} />
+                  <Icon icon={Trash2} size={12} />
                 </IconButton>
               </div>
             </li>

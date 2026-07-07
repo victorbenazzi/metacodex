@@ -1,9 +1,5 @@
-import {
-  ChevronLeft,
-  GitBranch,
-  PanelRightClose,
-  SquareTerminal,
-} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ChevronLeft, GitBranch, SquareTerminal } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -56,14 +52,72 @@ export function SidePanel({
     setOpen(false);
   };
 
+  // Height choreography: in launcher mode the card hugs its content; opening
+  // Git and Review expands it to the full column. A flex-grow transition can't
+  // animate this (the review content is taller than the column, so the
+  // resolved height snaps to full on the first frame), so both endpoints are
+  // measured in px and the transition runs on `height`:
+  //   - frameH: the available column height (ResizeObserver on the frame).
+  //   - launcherH: the launcher's natural content height, measured from the
+  //     scroll container while observing the inner block (the scroll box
+  //     itself doesn't resize when its CONTENT changes, the block does).
+  // launcherH intentionally survives while review is open: it's the target
+  // the collapse animates back to.
+  const frameRef = useRef<HTMLDivElement | null>(null);
+  const launcherScrollRef = useRef<HTMLDivElement | null>(null);
+  const launcherBlockRef = useRef<HTMLDivElement | null>(null);
+  const [frameH, setFrameH] = useState<number | null>(null);
+  const [launcherH, setLauncherH] = useState<number | null>(null);
+
+  useEffect(() => {
+    const el = frameRef.current;
+    if (!el) return;
+    const sync = () => setFrameH(el.clientHeight);
+    sync();
+    const ro = new ResizeObserver(sync);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const block = launcherBlockRef.current;
+    const scroll = launcherScrollRef.current;
+    if (!block || !scroll) return;
+    // Measure the CONTENT block, never the scroll box: scrollHeight is floored
+    // at the box's own height, so while the card is still expanded (collapse
+    // in flight) it would report the full column and wedge the card open.
+    const sync = () => {
+      const cs = getComputedStyle(scroll);
+      const pad = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+      // +2 for the card's top/bottom borders.
+      setLauncherH(Math.ceil(block.offsetHeight + pad) + 2);
+    };
+    sync();
+    const ro = new ResizeObserver(sync);
+    ro.observe(block);
+    return () => ro.disconnect();
+  }, [activeTool]);
+
+  const collapsedH =
+    launcherH !== null && frameH !== null ? Math.min(launcherH, frameH) : null;
+  const asideHeight =
+    activeTool === "review" ? frameH ?? undefined : collapsedH ?? undefined;
+
   return (
+    <div ref={frameRef} className="h-full min-h-0">
     <aside
-      className="flex h-full min-h-0 flex-col border-l border-hairline bg-canvas"
+      className={cn(
+        "flex min-h-0 flex-col overflow-hidden rounded-lg border border-hairline bg-surface-card",
+        "transition-[height] duration-base ease-out motion-reduce:transition-none",
+      )}
+      // Undefined until the first measurement: the card renders height:auto,
+      // which visually equals the measured collapsed height, so nothing jumps.
+      style={{ height: asideHeight }}
       aria-label={t("sidePanel.title")}
     >
       {activeTool === "review" ? (
         <>
-          <header className="flex h-[34px] shrink-0 items-center gap-[6px] border-b border-hairline-soft bg-canvas-soft px-[8px]">
+          <header className="flex h-[var(--panel-header-h)] shrink-0 items-center gap-[6px] border-b border-hairline-soft px-[8px]">
             <Tooltip content={t("sidePanel.showTools")} side="bottom">
               <IconButton
                 aria-label={t("sidePanel.showTools")}
@@ -73,24 +127,15 @@ export function SidePanel({
                 <Icon icon={ChevronLeft} size={14} />
               </IconButton>
             </Tooltip>
-            <div className="flex min-w-0 flex-1 items-center gap-[7px] font-mono text-caption text-ink">
-              <Icon icon={GitBranch} size={12} strokeWidth={1.8} className="shrink-0" />
+            <div className="flex min-w-0 flex-1 items-center gap-[7px] text-caption text-ink">
+              <Icon icon={GitBranch} size={12} className="shrink-0" />
               <span className="truncate">{t("sidePanel.review")}</span>
               {changeCount > 0 ? (
-                <span className="shrink-0 text-[10px] tabular-nums text-muted-soft">
+                <span className="shrink-0 text-micro tabular-nums text-muted-soft">
                   {changeCount > 99 ? "99+" : changeCount}
                 </span>
               ) : null}
             </div>
-            <Tooltip content={t("sidePanel.close")} side="bottom">
-              <IconButton
-                aria-label={t("sidePanel.close")}
-                size="md"
-                onClick={() => setOpen(false)}
-              >
-                <Icon icon={PanelRightClose} size={14} />
-              </IconButton>
-            </Tooltip>
           </header>
           <div className="min-h-0 flex-1">
             {project ? (
@@ -107,15 +152,24 @@ export function SidePanel({
           </div>
         </>
       ) : (
-        <div className="flex min-h-0 flex-1 overflow-y-auto px-[20px] py-[28px]">
-          <div className="m-auto w-full max-w-[420px] space-y-[18px]">
+        <div
+          ref={launcherScrollRef}
+          className="flex min-h-0 flex-1 overflow-y-auto px-[20px] py-[16px]"
+        >
+          {/* self-start opts out of the flex row's default align stretch: the
+              block must keep its natural content height at all times, it is
+              the source of truth for the card's collapsed height. */}
+          <div
+            ref={launcherBlockRef}
+            className="mx-auto w-full max-w-[420px] self-start space-y-[18px]"
+          >
             <LauncherSection label={t("sidePanel.sections.repository")}>
               <LauncherRow
-                icon={<Icon icon={GitBranch} size={13} />}
+                icon={<Icon icon={GitBranch} size={14} />}
                 label={t("sidePanel.review")}
                 trailing={
                   changeCount > 0 ? (
-                    <span className="font-mono text-[10px] tabular-nums text-muted-soft">
+                    <span className="font-mono text-micro tabular-nums text-muted-soft">
                       {changeCount > 99 ? "99+" : changeCount}
                     </span>
                   ) : null
@@ -126,7 +180,7 @@ export function SidePanel({
 
             <LauncherSection label={t("sidePanel.sections.workspace")}>
               <LauncherRow
-                icon={<Icon icon={SquareTerminal} size={13} />}
+                icon={<Icon icon={SquareTerminal} size={14} />}
                 label={t("tabs.newTerminal")}
                 trailing={<Kbd keys={["Mod", "T"]} />}
                 onClick={() => openLauncherAction(onNewTerminal)}
@@ -160,6 +214,7 @@ export function SidePanel({
         </div>
       )}
     </aside>
+    </div>
   );
 }
 
@@ -193,7 +248,7 @@ function LauncherRow({ icon, label, trailing, onClick }: LauncherRowProps) {
       type="button"
       onClick={onClick}
       className={cn(
-        "flex h-[40px] w-full items-center gap-[11px] rounded-sm bg-surface-strong/20 px-[11px] text-left text-ui text-body",
+        "flex h-[40px] w-full items-center gap-[10px] rounded-sm bg-surface-strong/20 px-[12px] text-left text-ui text-body",
         "border border-transparent transition-colors duration-fast hover:border-hairline-soft hover:bg-surface-strong/50 hover:text-ink",
         "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-hairline-strong",
       )}
@@ -217,7 +272,7 @@ function AgentLauncherRow({ cli, onClick }: { cli: CliTool; onClick: () => void 
             <BrandIcon size={14} />
           </span>
         ) : (
-          <Icon icon={SquareTerminal} size={13} />
+          <Icon icon={SquareTerminal} size={14} />
         )
       }
       label={cli.label}

@@ -23,6 +23,21 @@ export const UI_DENSITY_MULTIPLIER: Record<UiDensity, number> = {
   spacious: 1.15,
 };
 
+/** Global UI scale tier. Applied as a native webview zoom factor (like the
+ *  window zoom in VS Code), so fonts, icons, spacing, editor and terminal all
+ *  scale together, including hardcoded px values CSS tokens cannot reach. */
+export type UiScale = "small" | "default" | "large";
+
+/** Webview zoom factor each scale tier maps to. Kept here next to the type so
+ *  the bootstrap consumer and the Accessibility pane agree on the same scale.
+ *  The downward step is gentler than the upward one so the 11px label tier
+ *  stays legible at `small`. */
+export const UI_SCALE_FACTOR: Record<UiScale, number> = {
+  small: 0.9,
+  default: 1,
+  large: 1.15,
+};
+
 /** Workspace layout. `horizontal` keeps open items in the top tab bar (the
  *  sidebar then carries only projects + history). `vertical` hides the tab bar
  *  and drives the single center pane from the sidebar's per-project sections
@@ -92,6 +107,12 @@ export interface AppSettings {
      *  affected tab is the active one. Default: off (the badge is enough). */
     notifyWhenFocused: boolean;
   };
+  /** Accessibility preferences. `uiScale` drives a native webview zoom applied
+   *  at bootstrap (see `useAppBootstrap`), independent from `uiDensity` (which
+   *  only multiplies spacing tokens). */
+  accessibility: {
+    uiScale: UiScale;
+  };
 }
 
 /** Slices of `AppSettings` that are nested objects (patchable via `update`). */
@@ -101,7 +122,8 @@ export type SettingsSliceKey =
   | "performance"
   | "interface"
   | "panels"
-  | "notifications";
+  | "notifications"
+  | "accessibility";
 
 /** Resize bounds for the shell panels. Conventions:
  *  - Explorer: VS Code uses ~170px floor; we sit slightly above so the path
@@ -163,6 +185,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
     soundEnabled: true,
     notifyWhenFocused: false,
   },
+  accessibility: {
+    uiScale: "default",
+  },
 };
 
 function clampNum(value: unknown, def: number, min: number, max: number): number {
@@ -200,6 +225,7 @@ const CURSOR_VALUES: TerminalCursorStyle[] = ["bar", "block", "underline"];
 const ICON_STYLE_VALUES: ExplorerIconStyle[] = ["mono", "color"];
 const DENSITY_VALUES: UiDensity[] = ["compact", "comfortable", "spacious"];
 const LAYOUT_MODE_VALUES: LayoutMode[] = ["horizontal", "vertical"];
+const UI_SCALE_VALUES: UiScale[] = ["small", "default", "large"];
 
 /**
  * Coerce arbitrary (possibly hand-edited / partial) JSON into a fully-populated,
@@ -215,6 +241,7 @@ export function mergeSettings(raw: unknown): AppSettings {
   const iface = asObject(r.interface);
   const panels = asObject(r.panels);
   const notif = asObject(r.notifications);
+  const a11y = asObject(r.accessibility);
   const D = DEFAULT_SETTINGS;
   return {
     theme: oneOf(r.theme, THEME_VALUES, D.theme),
@@ -300,6 +327,9 @@ export function mergeSettings(raw: unknown): AppSettings {
         typeof notif.notifyWhenFocused === "boolean"
           ? notif.notifyWhenFocused
           : D.notifications.notifyWhenFocused,
+    },
+    accessibility: {
+      uiScale: oneOf(a11y.uiScale, UI_SCALE_VALUES, D.accessibility.uiScale),
     },
   };
 }

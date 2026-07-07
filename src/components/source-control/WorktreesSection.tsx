@@ -107,7 +107,7 @@ export function WorktreesSection({
             {t("sourceControl.worktrees.title")}
           </span>
           {visible.length > 0 ? (
-            <span className="font-mono text-[10px] text-muted-soft">
+            <span className="font-mono text-micro text-muted-soft">
               {visible.length}
             </span>
           ) : null}
@@ -149,7 +149,7 @@ export function WorktreesSection({
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-[6px]">
-                      <Icon icon={GitBranch} size={11} className="text-muted" />
+                      <Icon icon={GitBranch} size={12} className="text-muted" />
                       <span className="truncate font-mono text-caption text-ink">
                         {w.branch ?? basename(w.path)}
                       </span>
@@ -162,13 +162,13 @@ export function WorktreesSection({
                         />
                       ) : null}
                       {w.locked ? (
-                        <span className="rounded-xs border border-hairline px-[4px] py-0 font-mono text-[10px] uppercase text-muted">
+                        <span className="rounded-xs border border-hairline px-[4px] py-0 font-mono text-micro uppercase text-muted">
                           {t("sourceControl.worktrees.locked")}
                         </span>
                       ) : null}
                     </div>
                     <div
-                      className="truncate font-mono text-[10px] text-muted-soft"
+                      className="truncate font-mono text-micro text-muted-soft"
                       title={w.path}
                     >
                       {w.path}
@@ -283,7 +283,7 @@ function IconButton({
         "hover:bg-surface-strong/55 hover:text-ink",
       )}
     >
-      <Icon icon={icon} size={11} className={spinning ? "animate-spin" : ""} />
+      <Icon icon={icon} size={12} className={spinning ? "animate-spin" : ""} />
     </button>
   );
 }

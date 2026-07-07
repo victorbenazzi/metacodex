@@ -12,6 +12,7 @@ import {
   Info,
   LayoutPanelLeft,
   Bell,
+  PersonStanding,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -22,6 +23,7 @@ import { cn } from "@/lib/cn";
 import { GeneralPane } from "@/components/settings/panes/GeneralPane";
 import { AppearancePane } from "@/components/settings/panes/AppearancePane";
 import { InterfacePane } from "@/components/settings/panes/InterfacePane";
+import { AccessibilityPane } from "@/components/settings/panes/AccessibilityPane";
 import { EditorPane } from "@/components/settings/panes/EditorPane";
 import { TerminalPane } from "@/components/settings/panes/TerminalPane";
 import { NotificationsPane } from "@/components/settings/panes/NotificationsPane";
@@ -39,6 +41,7 @@ type CategoryId =
   | "general"
   | "appearance"
   | "interface"
+  | "accessibility"
   | "editor"
   | "terminal"
   | "notifications"
@@ -57,6 +60,7 @@ const CATEGORIES: Category[] = [
   { id: "general", labelKey: "settings.nav.general", icon: Sliders },
   { id: "appearance", labelKey: "settings.nav.appearance", icon: Palette },
   { id: "interface", labelKey: "settings.nav.interface", icon: LayoutPanelLeft },
+  { id: "accessibility", labelKey: "settings.nav.accessibility", icon: PersonStanding },
   { id: "editor", labelKey: "settings.nav.editor", icon: FileCode },
   { id: "terminal", labelKey: "settings.nav.terminal", icon: SquareTerminal },
   { id: "notifications", labelKey: "settings.nav.notifications", icon: Bell },
@@ -96,7 +100,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             </div>
             <RD.Close asChild>
               <IconButton aria-label={t("settings.close")}>
-                <Icon icon={X} size={13} />
+                <Icon icon={X} size={14} />
               </IconButton>
             </RD.Close>
           </header>
@@ -117,6 +121,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               {selected === "general" && <GeneralPane />}
               {selected === "appearance" && <AppearancePane />}
               {selected === "interface" && <InterfacePane />}
+              {selected === "accessibility" && <AccessibilityPane />}
               {selected === "editor" && <EditorPane />}
               {selected === "terminal" && <TerminalPane />}
               {selected === "notifications" && <NotificationsPane />}
@@ -153,7 +158,7 @@ function SidebarRow({
           : "text-body hover:bg-surface-strong/40 hover:text-ink",
       )}
     >
-      <Icon icon={category.icon} size={13} className={active ? "text-ink" : "text-muted"} />
+      <Icon icon={category.icon} size={14} className={active ? "text-ink" : "text-muted"} />
       <span className="text-ui font-medium">{t(category.labelKey)}</span>
     </button>
   );

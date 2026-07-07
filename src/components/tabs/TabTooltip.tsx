@@ -52,22 +52,22 @@ export function TabTooltip({ tab }: TabTooltipProps) {
     <div className="flex max-w-[320px] flex-col gap-[6px]">
       <span className="text-caption font-medium text-ink truncate">{resolveTabTitle(tab)}</span>
       {titleOrigin ? (
-        <span className="text-[10px] text-muted-soft">{t(titleOrigin)}</span>
+        <span className="text-micro text-muted-soft">{t(titleOrigin)}</span>
       ) : null}
 
       {meta?.branch ? (
         <span className="flex items-center gap-[5px] text-label text-body">
-          <Icon icon={GitBranch} size={11} className="text-muted" />
+          <Icon icon={GitBranch} size={10} className="text-muted" />
           <span className="font-mono">{meta.branch}</span>
         </span>
       ) : null}
 
       {meta?.cwd ? (
-        <span className="block truncate font-mono text-[10px] text-muted" title={meta.cwd}>
+        <span className="block truncate font-mono text-micro text-muted" title={meta.cwd}>
           {meta.cwd}
         </span>
       ) : "cwd" in tab && tab.cwd ? (
-        <span className="block truncate font-mono text-[10px] text-muted" title={tab.cwd}>
+        <span className="block truncate font-mono text-micro text-muted" title={tab.cwd}>
           {tab.cwd}
         </span>
       ) : null}
@@ -77,7 +77,7 @@ export function TabTooltip({ tab }: TabTooltipProps) {
           {meta.listeningPorts.map((p) => (
             <span
               key={`${p.protocol}-${p.port}`}
-              className="inline-flex items-center rounded-xs border border-hairline px-[5px] py-[1px] font-mono text-[10px] tabular-nums text-body"
+              className="inline-flex items-center rounded-xs border border-hairline px-[5px] py-[1px] font-mono text-micro tabular-nums text-body"
             >
               {p.address === "*" || p.address === "0.0.0.0" ? "localhost" : p.address}:
               {p.port}
@@ -87,7 +87,7 @@ export function TabTooltip({ tab }: TabTooltipProps) {
       ) : null}
 
       {meta == null && sessionId ? (
-        <span className="text-[10px] text-muted-soft">{t("tabInspector.tooltip.noMetadata")}</span>
+        <span className="text-micro text-muted-soft">{t("tabInspector.tooltip.noMetadata")}</span>
       ) : null}
     </div>
   );

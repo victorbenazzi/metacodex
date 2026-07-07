@@ -105,13 +105,13 @@ export function NewTabBody({ actions, C }: { actions: NewTabActions; C: MenuComp
         trailing={<Kbd keys={["Mod", "T"]} />}
         className={itemClass}
       >
-        <Icon icon={SquareTerminal} size={13} className="text-muted" />
+        <Icon icon={SquareTerminal} size={12} className="text-muted" />
         <span className="font-medium">{t("tabs.newTerminal")}</span>
       </C.Item>
 
       {actions.onNewWorktree ? (
         <C.Item onSelect={actions.onNewWorktree} className={itemClass}>
-          <Icon icon={GitBranch} size={13} className="text-muted" />
+          <Icon icon={GitBranch} size={12} className="text-muted" />
           <span className="font-medium">{t("tabs.newWorktree")}</span>
         </C.Item>
       ) : null}
@@ -132,7 +132,7 @@ export function NewTabBody({ actions, C }: { actions: NewTabActions; C: MenuComp
             onSelect={() =>
               updateSettings("interface", { autonomousAgentsExpanded: !autonomousExpanded })
             }
-            className={cn(itemClass, "uppercase tracking-label")}
+            className={itemClass}
             trailing={
               <Icon
                 icon={autonomousExpanded ? ChevronDown : ChevronRight}
@@ -141,7 +141,7 @@ export function NewTabBody({ actions, C }: { actions: NewTabActions; C: MenuComp
               />
             }
           >
-            <span className="text-[10px] font-medium text-muted">
+            <span className="text-micro font-medium text-muted">
               {t("tabs.autonomousAgents")}
             </span>
           </C.Item>

@@ -112,7 +112,7 @@ export const TreeNode = memo(function TreeNode({
           type="button"
           onClick={handleClick}
           className={cn(
-            "group flex w-full items-center gap-[6px] py-[3px] text-left font-mono text-caption",
+            "group flex w-full items-center gap-[8px] py-[3px] text-left font-mono text-mono",
             "focus-visible:outline-none",
             hidden ? "text-muted" : "text-body",
             isSelected
@@ -135,12 +135,12 @@ export const TreeNode = memo(function TreeNode({
           />
           <span className={cn("truncate", gitColorForName(gitStatus))}>{entry.name}</span>
           <span className="ml-auto flex items-center gap-[6px] pr-[8px]">
-            {entry.isSymlink ? <span className="text-[10px] text-muted-soft">↗</span> : null}
+            {entry.isSymlink ? <span className="text-micro text-muted-soft">↗</span> : null}
             {gitStatus ? (
               <Tooltip content={t(gitStatusLabelKey(gitStatus))} side="left">
                 <span
                   className={cn(
-                    "inline-flex h-[14px] min-w-[12px] items-center justify-center font-mono text-[10px] leading-none",
+                    "inline-flex h-[14px] min-w-[12px] items-center justify-center font-mono text-micro leading-none",
                     gitColorForBadge(gitStatus),
                   )}
                   // Hovering only this glyph reveals the status meaning , the
@@ -158,13 +158,13 @@ export const TreeNode = memo(function TreeNode({
         {entry.isDir ? (
           <>
             <ContextMenuItem onSelect={() => onOpenInTerminal(entry.path, entry.name)}>
-              <Icon icon={SquareTerminal} size={13} className="text-muted" />
+              <Icon icon={SquareTerminal} size={12} className="text-muted" />
               {t("tree.openInTerminal")}
             </ContextMenuItem>
             <ContextMenuSub
               trigger={
                 <>
-                  <Icon icon={Sparkles} size={13} className="text-muted" />
+                  <Icon icon={Sparkles} size={12} className="text-muted" />
                   {t("tree.openCliHere")}
                 </>
               }
@@ -180,27 +180,27 @@ export const TreeNode = memo(function TreeNode({
             </ContextMenuSub>
             <ContextMenuSeparator />
             <ContextMenuItem onSelect={revealInFinder}>
-              <Icon icon={FolderOpen} size={13} className="text-muted" />
+              <Icon icon={FolderOpen} size={12} className="text-muted" />
               {t("tree.revealInFinder")}
             </ContextMenuItem>
             <ContextMenuItem onSelect={copyPath}>
-              <Icon icon={Copy} size={13} className="text-muted" />
+              <Icon icon={Copy} size={12} className="text-muted" />
               {t("tree.copyPath")}
             </ContextMenuItem>
           </>
         ) : (
           <>
             <ContextMenuItem onSelect={() => onOpenFile(entry.path, entry.name)}>
-              <Icon icon={FolderOpen} size={13} className="text-muted" />
+              <Icon icon={FolderOpen} size={12} className="text-muted" />
               {t("tree.open")}
             </ContextMenuItem>
             <ContextMenuSeparator />
             <ContextMenuItem onSelect={revealInFinder}>
-              <Icon icon={FolderOpen} size={13} className="text-muted" />
+              <Icon icon={FolderOpen} size={12} className="text-muted" />
               {t("tree.revealInFinder")}
             </ContextMenuItem>
             <ContextMenuItem onSelect={copyPath}>
-              <Icon icon={Copy} size={13} className="text-muted" />
+              <Icon icon={Copy} size={12} className="text-muted" />
               {t("tree.copyPath")}
             </ContextMenuItem>
           </>
@@ -279,7 +279,7 @@ export function CreateRow({
 
   return (
     <div
-      className="flex w-full items-center gap-[6px] py-[3px] font-mono text-caption text-body"
+      className="flex w-full items-center gap-[8px] py-[3px] font-mono text-mono text-body"
       style={{ paddingLeft: indentPx }}
       title={error ?? undefined}
     >
@@ -315,7 +315,7 @@ export function CreateRow({
         }}
         className={cn(
           "min-w-0 flex-1 rounded-xs border bg-surface-strong/45 px-[6px] py-[1px]",
-          "text-caption text-ink outline-none",
+          "text-mono text-ink outline-none",
           error ? "border-danger focus:border-danger" : "border-accent/60 focus:border-accent",
         )}
         spellCheck={false}

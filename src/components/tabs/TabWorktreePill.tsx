@@ -32,9 +32,9 @@ export function TabWorktreePill({ tab }: TabWorktreePillProps) {
   return (
     <span
       title={t("worktrees.tab.branchPill", { branch: worktree.branch })}
-      className="inline-flex max-w-[110px] shrink-0 items-center gap-[3px] rounded-xs border border-hairline px-[4px] py-[1px] font-mono text-[10px] tabular-nums text-muted"
+      className="inline-flex max-w-[110px] shrink-0 items-center gap-[3px] rounded-xs border border-hairline px-[4px] py-[1px] font-mono text-micro tabular-nums text-muted"
     >
-      <Icon icon={GitBranch} size={9} />
+      <Icon icon={GitBranch} size={10} />
       <span className="truncate">{worktree.branch}</span>
     </span>
   );

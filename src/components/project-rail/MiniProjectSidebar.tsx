@@ -44,7 +44,7 @@ export function MiniProjectSidebar() {
   return (
     <>
       <aside
-        className="atmosphere-soft relative flex h-full w-full flex-col items-center overflow-hidden border-r border-hairline"
+        className="atmosphere-soft relative flex h-full w-full flex-col items-center overflow-hidden rounded-lg border border-hairline"
         aria-label={t("projectRail.ariaLabel")}
       >
         <div className="relative flex flex-1 flex-col items-center gap-[8px] overflow-y-auto overflow-x-hidden px-[8px] py-[14px]">
@@ -94,7 +94,7 @@ export function MiniProjectSidebar() {
               )}
               aria-label={t("projectRail.openSettings")}
             >
-              <Icon icon={Settings} size={13} />
+              <Icon icon={Settings} size={14} />
             </button>
           </Tooltip>
         </div>

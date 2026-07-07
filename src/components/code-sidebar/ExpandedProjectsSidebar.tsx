@@ -54,10 +54,10 @@ export function ExpandedProjectsSidebar({ onOpenFolder }: ExpandedProjectsSideba
   return (
     <>
       <aside
-        className="atmosphere-soft flex h-full w-full flex-col overflow-hidden border-r border-hairline"
+        className="atmosphere-soft flex h-full w-full flex-col overflow-hidden rounded-lg border border-hairline"
         aria-label={t("codeSidebar.projects")}
       >
-        <header className="flex h-[30px] shrink-0 items-center border-b border-hairline-soft px-[14px]">
+        <header className="flex h-[var(--panel-header-h)] shrink-0 items-center border-b border-hairline-soft px-[12px]">
           <span className="editorial-caps truncate">{t("codeSidebar.projects")}</span>
         </header>
 
@@ -72,9 +72,9 @@ export function ExpandedProjectsSidebar({ onOpenFolder }: ExpandedProjectsSideba
               <button
                 type="button"
                 onClick={onOpenFolder}
-                className="inline-flex h-[28px] items-center gap-[6px] rounded-sm border border-hairline-strong bg-canvas px-[12px] text-caption font-medium text-ink transition-colors hover:bg-surface-strong/40"
+                className="inline-flex h-[28px] items-center gap-[6px] rounded-sm border border-hairline-strong bg-transparent px-[12px] text-caption font-medium text-ink transition-colors hover:bg-surface-strong/40"
               >
-                <Icon icon={FolderOpen} size={13} className="text-muted" />
+                <Icon icon={FolderOpen} size={12} className="text-muted" />
                 {t("explorer.openFolder")}
               </button>
             </div>
@@ -102,13 +102,13 @@ export function ExpandedProjectsSidebar({ onOpenFolder }: ExpandedProjectsSideba
           )}
         </div>
 
-        <footer className="border-t border-hairline-soft px-[8px] py-[6px]">
+        <footer className="border-t border-hairline-soft px-[8px] py-[4px]">
           <button
             type="button"
             onClick={() => setSettingsOpen(true)}
-            className="flex w-full items-center gap-[10px] rounded-sm px-[10px] py-[7px] text-left text-ui text-body transition-colors hover:bg-surface-strong/40 hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-hairline-strong"
+            className="flex w-full items-center gap-[10px] rounded-sm px-[10px] py-[6px] text-left text-ui text-body transition-colors hover:bg-surface-strong/40 hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-hairline-strong"
           >
-            <Icon icon={Settings} size={13} className="text-muted" />
+            <Icon icon={Settings} size={14} className="text-muted" />
             {t("projectRail.settings")}
           </button>
         </footer>

@@ -114,7 +114,7 @@ export function DropdownSubTrigger({
       )}
     >
       <span className="flex items-center gap-[10px] whitespace-nowrap">{children}</span>
-      <ChevronRight size={13} strokeWidth={2} className="shrink-0 text-muted" />
+      <ChevronRight size={12} strokeWidth={1.6} className="shrink-0 text-muted" />
     </RDM.SubTrigger>
   );
 }
