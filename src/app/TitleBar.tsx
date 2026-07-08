@@ -7,6 +7,7 @@ import {
   FolderPlus,
   FolderOpen,
   Github,
+  Server,
   PanelLeftClose,
   PanelLeftOpen,
   Minus,
@@ -39,6 +40,7 @@ interface TitleBarProps {
   /** Sidebar collapse + add-project sit on the leading edge. */
   onOpenFolder?: () => void;
   onCloneFromGithub?: () => void;
+  onConnectSsh?: () => void;
 }
 
 /**
@@ -60,6 +62,7 @@ export function TitleBar({
   className,
   onOpenFolder,
   onCloneFromGithub,
+  onConnectSsh,
 }: TitleBarProps) {
   const { t } = useTranslation();
   const activeId = useProjectsStore((s) => s.activeProjectId);
@@ -136,6 +139,10 @@ export function TitleBar({
               >
                 <Icon icon={Github} size={12} className="text-muted" />
                 {t("welcome.openProjectMenu.github")}
+              </DropdownItem>
+              <DropdownItem onSelect={() => onConnectSsh?.()}>
+                <Icon icon={Server} size={12} className="text-muted" />
+                {t("welcome.openProjectMenu.ssh")}
               </DropdownItem>
             </DropdownContent>
           </DropdownRoot>

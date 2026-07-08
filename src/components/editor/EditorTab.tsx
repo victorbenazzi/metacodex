@@ -31,6 +31,8 @@ import { languageFor, languageLabel } from "@/features/editor/language-map";
 import { useEditorStatusStore } from "@/features/editor/editor-status.store";
 import { gitApi } from "@/features/git/git.service";
 import { useGitStore } from "@/features/git/git.store";
+import { useProjectsStore } from "@/features/projects/project.store";
+import { isRemoteProject } from "@/features/projects/project.types";
 import { buildEditorTheme } from "./editorTheme";
 import { EditorStatusBar } from "./EditorStatusBar";
 import { EditorBreadcrumbs } from "./EditorBreadcrumbs";
@@ -95,11 +97,16 @@ export function EditorTab({
   const pendingGotoLine = usePendingGotoStore((s) => s.byTab[tabId]);
   const setStatus = useEditorStatusStore((s) => s.setStatus);
   const clearStatus = useEditorStatusStore((s) => s.clear);
+  const project = useProjectsStore((s) =>
+    projectId ? s.projects.find((p) => p.id === projectId) ?? null : null,
+  );
+  const remoteProject = isRemoteProject(project);
+  const workspaceProjectId = !preview && projectId ? projectId : undefined;
   // Re-fetch HEAD for the change gutter whenever this project's git state moves
   // (commit, checkout, stage). The object identity changes on every refresh.
   // Preview files live outside any repo , skip git entirely.
   const gitInfo = useGitStore((s) =>
-    !preview && projectId ? s.byProject[projectId] : undefined,
+    !preview && projectId && !remoteProject ? s.byProject[projectId] : undefined,
   );
 
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -123,7 +130,7 @@ export function EditorTab({
         }
         const text = preview
           ? await fsApi.readPreviewText(previewGrantId!, 25 * 1024 * 1024)
-          : await fsApi.readFileText(path, 25 * 1024 * 1024);
+          : await fsApi.readFileText(path, 25 * 1024 * 1024, workspaceProjectId);
         if (cancelled) return;
         // Heuristic binary detection on the first 8 KiB
         const sample = text.content.slice(0, 8192);
@@ -246,7 +253,7 @@ export function EditorTab({
 
         // Seed the change gutter with the file's committed (HEAD) text. Preview
         // files aren't in a repo , skip the HEAD lookup entirely.
-        if (!preview) {
+        if (!preview && !remoteProject) {
           void gitApi
             .fileHeadContent(path)
             .then((head) => {
@@ -301,7 +308,7 @@ export function EditorTab({
   // Refresh the change gutter when this project's git state moves (commit,
   // checkout, …). The initial fetch is handled by the build effect above.
   useEffect(() => {
-    if (preview) return;
+    if (preview || remoteProject) return;
     const view = viewRef.current;
     if (!view) return;
     void gitApi
@@ -348,7 +355,7 @@ export function EditorTab({
         if (!previewGrantId) throw new Error("preview grant missing");
         await fsApi.writePreviewText(previewGrantId, content);
       } else {
-        await fsApi.writeFileText(path, content);
+        await fsApi.writeFileText(path, content, workspaceProjectId);
       }
       // The baseline always advances to what we just wrote (that IS what's on
       // disk now). But only clear `dirty` if the live doc still equals `content`:

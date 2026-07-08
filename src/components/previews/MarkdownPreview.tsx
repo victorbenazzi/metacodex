@@ -58,7 +58,7 @@ export function MarkdownPreview({
         }
         const text = preview
           ? await fsApi.readPreviewText(previewGrantId!)
-          : await fsApi.readFileText(path);
+          : await fsApi.readFileText(path, undefined, projectId || undefined);
         if (!cancelled) setContent(text.content);
       } catch (err: any) {
         if (!cancelled) setError(err?.message ?? String(err));

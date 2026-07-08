@@ -7,7 +7,8 @@ use crate::error::{AppError, AppResult};
 use crate::events::{FsRenamedPayload, EV_FS_RENAMED};
 use crate::fs_ops::{self, BytesFile, DirEntry, FileMeta, TextFile};
 use crate::preview_grants::{PreviewGrant, PreviewGrants};
-use crate::projects::ProjectsCache;
+use crate::projects::{Project, ProjectOrigin, ProjectsCache};
+use crate::remote_access;
 
 /// Look up the owning project id for `path` and emit `fs://renamed` so the
 /// frontend can update open editor tabs without losing their unsaved buffer.
@@ -70,6 +71,14 @@ async fn pick_file_path(
 
 fn resolve_preview_path(app: &AppHandle, grant_id: &str) -> AppResult<String> {
     app.state::<Arc<PreviewGrants>>().resolve(grant_id)
+}
+
+fn project_by_id(app: &AppHandle, project_id: &str) -> AppResult<Project> {
+    app.state::<Arc<ProjectsCache>>()
+        .snapshot()
+        .into_iter()
+        .find(|p| p.id == project_id)
+        .ok_or_else(|| AppError::NotFound(format!("project {project_id}")))
 }
 
 #[tauri::command]
@@ -212,4 +221,142 @@ pub async fn create_file(parent: String, name: String, app: AppHandle) -> AppRes
 #[tauri::command]
 pub async fn create_dir(parent: String, name: String, app: AppHandle) -> AppResult<String> {
     blocking(move || fs_ops::create_dir(&app, &parent, &name)).await
+}
+
+#[tauri::command]
+pub async fn workspace_read_dir(
+    project_id: String,
+    path: String,
+    app: AppHandle,
+) -> AppResult<Vec<DirEntry>> {
+    blocking(move || {
+        let project = project_by_id(&app, &project_id)?;
+        match project.origin {
+            ProjectOrigin::Local => fs_ops::read_dir(&app, &path),
+            ProjectOrigin::Ssh {
+                access_id,
+                remote_path,
+            } => remote_access::read_dir(&access_id, &remote_path, &path),
+        }
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn workspace_stat(
+    project_id: String,
+    path: String,
+    app: AppHandle,
+) -> AppResult<FileMeta> {
+    blocking(move || {
+        let project = project_by_id(&app, &project_id)?;
+        match project.origin {
+            ProjectOrigin::Local => fs_ops::stat(&app, &path),
+            ProjectOrigin::Ssh {
+                access_id,
+                remote_path,
+            } => remote_access::stat(&access_id, &remote_path, &path),
+        }
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn workspace_read_file_text(
+    project_id: String,
+    path: String,
+    max_bytes: Option<u64>,
+    app: AppHandle,
+) -> AppResult<TextFile> {
+    blocking(move || {
+        let project = project_by_id(&app, &project_id)?;
+        match project.origin {
+            ProjectOrigin::Local => fs_ops::read_file_text(&app, &path, max_bytes),
+            ProjectOrigin::Ssh {
+                access_id,
+                remote_path,
+            } => remote_access::read_file_text(&access_id, &remote_path, &path, max_bytes),
+        }
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn workspace_read_file_bytes(
+    project_id: String,
+    path: String,
+    max_bytes: Option<u64>,
+    app: AppHandle,
+) -> AppResult<BytesFile> {
+    blocking(move || {
+        let project = project_by_id(&app, &project_id)?;
+        match project.origin {
+            ProjectOrigin::Local => fs_ops::read_file_bytes(&app, &path, max_bytes),
+            ProjectOrigin::Ssh {
+                access_id,
+                remote_path,
+            } => remote_access::read_file_bytes(&access_id, &remote_path, &path, max_bytes),
+        }
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn workspace_write_file_text(
+    project_id: String,
+    path: String,
+    content: String,
+    app: AppHandle,
+) -> AppResult<()> {
+    blocking(move || {
+        let project = project_by_id(&app, &project_id)?;
+        match project.origin {
+            ProjectOrigin::Local => fs_ops::write_file_text(&app, &path, &content),
+            ProjectOrigin::Ssh {
+                access_id,
+                remote_path,
+            } => remote_access::write_file_text(&access_id, &remote_path, &path, &content),
+        }
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn workspace_create_file(
+    project_id: String,
+    parent: String,
+    name: String,
+    app: AppHandle,
+) -> AppResult<String> {
+    blocking(move || {
+        let project = project_by_id(&app, &project_id)?;
+        match project.origin {
+            ProjectOrigin::Local => fs_ops::create_file(&app, &parent, &name),
+            ProjectOrigin::Ssh {
+                access_id,
+                remote_path,
+            } => remote_access::create_file(&access_id, &remote_path, &parent, &name),
+        }
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn workspace_create_dir(
+    project_id: String,
+    parent: String,
+    name: String,
+    app: AppHandle,
+) -> AppResult<String> {
+    blocking(move || {
+        let project = project_by_id(&app, &project_id)?;
+        match project.origin {
+            ProjectOrigin::Local => fs_ops::create_dir(&app, &parent, &name),
+            ProjectOrigin::Ssh {
+                access_id,
+                remote_path,
+            } => remote_access::create_dir(&access_id, &remote_path, &parent, &name),
+        }
+    })
+    .await
 }

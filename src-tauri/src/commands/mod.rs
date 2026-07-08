@@ -4,6 +4,7 @@ pub mod filesystem;
 pub mod git;
 pub mod notifications;
 pub mod projects;
+pub mod remote_access;
 pub mod resume;
 pub mod search;
 pub mod settings;

@@ -13,10 +13,44 @@ pub struct Project {
     pub id: String,
     pub name: String,
     pub path: String,
+    #[serde(default)]
+    pub origin: ProjectOrigin,
     pub color: String,
     pub icon: String,
     pub created_at: String,
     pub last_opened_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum ProjectOrigin {
+    Local,
+    Ssh {
+        access_id: String,
+        remote_path: String,
+    },
+}
+
+impl Default for ProjectOrigin {
+    fn default() -> Self {
+        Self::Local
+    }
+}
+
+impl Project {
+    pub fn is_local(&self) -> bool {
+        matches!(self.origin, ProjectOrigin::Local)
+    }
+
+    pub fn ssh_origin(&self) -> Option<(&str, &str)> {
+        match &self.origin {
+            ProjectOrigin::Ssh {
+                access_id,
+                remote_path,
+            } => Some((access_id.as_str(), remote_path.as_str())),
+            ProjectOrigin::Local => None,
+        }
+    }
 }
 
 /// On-disk shape of `~/.metacodex/state/projects.json`: the registry plus the
@@ -46,7 +80,12 @@ impl ProjectsCache {
         self.inner.read().clone()
     }
     pub fn project_roots(&self) -> Vec<String> {
-        self.inner.read().iter().map(|p| p.path.clone()).collect()
+        self.inner
+            .read()
+            .iter()
+            .filter(|p| p.is_local())
+            .map(|p| p.path.clone())
+            .collect()
     }
 
     /// Find the project (id, path) whose root is a prefix of `path`. Picks the
@@ -55,7 +94,7 @@ impl ProjectsCache {
     pub fn find_owner(&self, path: &str) -> Option<(String, String)> {
         let normalized = crate::util::paths::normalize(std::path::Path::new(path));
         let mut best: Option<(String, String, usize)> = None;
-        for p in self.inner.read().iter() {
+        for p in self.inner.read().iter().filter(|p| p.is_local()) {
             let root = crate::util::paths::normalize(std::path::Path::new(&p.path));
             if normalized == root || normalized.starts_with(&root) {
                 let depth = root.components().count();
@@ -202,6 +241,7 @@ pub fn add(app: &AppHandle, path: String) -> AppResult<Project> {
         id: new_id(),
         name: basename(&path),
         path: path.clone(),
+        origin: ProjectOrigin::Local,
         color: assign_color(&file.projects),
         icon: "Folder".into(),
         created_at: now.clone(),
@@ -211,6 +251,65 @@ pub fn add(app: &AppHandle, path: String) -> AppResult<Project> {
     save_file(&file)?;
     app.state::<Arc<ProjectsCache>>().replace(file.projects);
     Ok(project)
+}
+
+pub fn add_remote(
+    app: &AppHandle,
+    access_id: String,
+    remote_path: String,
+    name: Option<String>,
+) -> AppResult<Project> {
+    let remote_path = crate::remote_access::normalize_remote_path(&remote_path)?;
+    let mut file = load_file()?;
+    if let Some(existing) = file.projects.iter().find(|p| {
+        matches!(
+            &p.origin,
+            ProjectOrigin::Ssh {
+                access_id: existing_access_id,
+                remote_path: existing_remote_path,
+            } if existing_access_id == &access_id && existing_remote_path == &remote_path
+        )
+    }) {
+        let id = existing.id.clone();
+        let now = Utc::now().to_rfc3339();
+        for p in file.projects.iter_mut() {
+            if p.id == id {
+                p.last_opened_at = now.clone();
+            }
+        }
+        save_file(&file)?;
+        app.state::<Arc<ProjectsCache>>()
+            .replace(file.projects.clone());
+        return Ok(file.projects.into_iter().find(|p| p.id == id).unwrap());
+    }
+
+    let trimmed_name = name.map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
+    let now = Utc::now().to_rfc3339();
+    let project = Project {
+        id: new_id(),
+        name: trimmed_name.unwrap_or_else(|| remote_basename(&remote_path)),
+        path: remote_path.clone(),
+        origin: ProjectOrigin::Ssh {
+            access_id,
+            remote_path,
+        },
+        color: assign_color(&file.projects),
+        icon: "Server".into(),
+        created_at: now.clone(),
+        last_opened_at: now,
+    };
+    file.projects.push(project.clone());
+    save_file(&file)?;
+    app.state::<Arc<ProjectsCache>>().replace(file.projects);
+    Ok(project)
+}
+
+fn remote_basename(path: &str) -> String {
+    path.trim_end_matches('/')
+        .rsplit('/')
+        .find(|s| !s.is_empty())
+        .unwrap_or(path)
+        .to_string()
 }
 
 /// Create a brand-new project folder under `directory` and register it. `name`

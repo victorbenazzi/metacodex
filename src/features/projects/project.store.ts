@@ -16,6 +16,7 @@ interface ProjectsState {
 
   hydrate: () => Promise<void>;
   add: (path: string) => Promise<Project>;
+  addRemote: (accessId: string, path: string, name?: string) => Promise<Project>;
   create: (directory: string, name: string) => Promise<Project>;
   remove: (id: string) => Promise<void>;
   rename: (id: string, name: string) => Promise<Project>;
@@ -67,6 +68,8 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
   },
 
   add: (path) => projectsApi.add(path).then((p) => absorbProject(get, set, p)),
+  addRemote: (accessId, path, name) =>
+    projectsApi.addRemote(accessId, path, name).then((p) => absorbProject(get, set, p)),
   create: (directory, name) =>
     projectsApi.create(directory, name).then((p) => absorbProject(get, set, p)),
 

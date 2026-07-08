@@ -9,13 +9,14 @@ use serde::Serialize;
 use tauri::{AppHandle, Manager, State};
 
 use crate::error::{AppError, AppResult};
-use crate::projects::ProjectsCache;
-use crate::pty::{PtyManager, PtySessionInfo, PtySpawnSpec};
+use crate::projects::{ProjectOrigin, ProjectsCache};
+use crate::pty::{PtyKind, PtyManager, PtySessionInfo, PtySpawnSpec};
+use crate::remote_access;
 use crate::util::paths;
 
 #[tauri::command]
 pub async fn pty_spawn(
-    spec: PtySpawnSpec,
+    mut spec: PtySpawnSpec,
     app: AppHandle,
     mgr: State<'_, PtyManager>,
 ) -> AppResult<String> {
@@ -26,7 +27,30 @@ pub async fn pty_spawn(
             .into_iter()
             .find(|p| p.id == project_id)
             .ok_or_else(|| AppError::NotFound(format!("project {project_id}")))?;
-        paths::ensure_within_roots(&spec.cwd, &[project.path])?;
+        match project.origin {
+            ProjectOrigin::Local => {
+                paths::ensure_within_roots(&spec.cwd, &[project.path])?;
+            }
+            ProjectOrigin::Ssh {
+                access_id,
+                remote_path,
+            } => {
+                let safe_cwd =
+                    remote_access::ensure_project_path(&access_id, &remote_path, &spec.cwd)?;
+                spec.kind = match spec.kind {
+                    PtyKind::Plain => PtyKind::RemoteShell {
+                        access_id,
+                        remote_cwd: safe_cwd,
+                    },
+                    PtyKind::Cli { command } => PtyKind::RemoteCli {
+                        access_id,
+                        remote_cwd: safe_cwd,
+                        command,
+                    },
+                    other => other,
+                };
+            }
+        }
     }
     mgr.spawn(spec)
 }
@@ -267,11 +291,23 @@ pub async fn pty_update_cwd(
     // outside the sandbox into stored state. Plain shells (no project_id) are
     // unrestricted: `cd /tmp` is a normal operation.
     let project_id = mgr.project_id_of(&session_id);
-    if project_id.is_some() {
+    if let Some(project_id) = project_id {
         let cache = app.state::<Arc<ProjectsCache>>();
-        let roots = cache.project_roots();
-        if !roots.is_empty() {
-            paths::ensure_within_roots(&cwd, &roots)?;
+        let project = cache
+            .snapshot()
+            .into_iter()
+            .find(|p| p.id == project_id)
+            .ok_or_else(|| AppError::NotFound(format!("project {project_id}")))?;
+        match project.origin {
+            ProjectOrigin::Local => {
+                paths::ensure_within_roots(&cwd, &[project.path])?;
+            }
+            ProjectOrigin::Ssh {
+                access_id,
+                remote_path,
+            } => {
+                remote_access::ensure_project_path(&access_id, &remote_path, &cwd)?;
+            }
         }
     }
     mgr.set_cwd_override(&session_id, cwd)

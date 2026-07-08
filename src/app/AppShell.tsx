@@ -13,6 +13,7 @@ import {
 import { SendToProjectDialog } from "@/components/previews/SendToProjectDialog";
 import { DropOverlay } from "@/components/previews/DropOverlay";
 import { useProjectsStore } from "@/features/projects/project.store";
+import { isRemoteProject } from "@/features/projects/project.types";
 import { useSettingsDataStore } from "@/features/settings/settings.data.store";
 import { useSettingsStore } from "@/features/settings/settings.store";
 import type { PreviewGrant } from "@/lib/events";
@@ -23,6 +24,7 @@ import { SidePanel } from "@/components/side-panel/SidePanel";
 import { useSidePanelStore } from "@/features/side-panel/sidePanel.store";
 import { WorktreeCreateDialog } from "@/components/source-control/WorktreeCreateDialog";
 import { CloneFromGithubDialog } from "@/components/project-rail/CloneFromGithubDialog";
+import { RemoteAccessDialog } from "@/components/project-rail/RemoteAccessDialog";
 import { SettingsDialog } from "@/components/settings/SettingsDialog";
 import { Toaster } from "@/components/ui/Toaster";
 import { CloseTabsConfirm } from "@/app/CloseTabsConfirm";
@@ -73,6 +75,7 @@ export function AppShell() {
   const [pendingClose, setPendingClose] = useState<PendingClose | null>(null);
   const [worktreeDialogOpen, setWorktreeDialogOpen] = useState(false);
   const [cloneDialogOpen, setCloneDialogOpen] = useState(false);
+  const [remoteDialogOpen, setRemoteDialogOpen] = useState(false);
   // Preview mode: file being sent to a project (null = dialog closed) + the
   // drag-over feedback flag for the global file-drop target.
   const [sendToProjectFile, setSendToProjectFile] = useState<PreviewGrant | null>(null);
@@ -208,6 +211,7 @@ export function AppShell() {
         className="col-span-full"
         onOpenFolder={actions.openFolder}
         onCloneFromGithub={actions.cloneFromGithub}
+        onConnectSsh={() => setRemoteDialogOpen(true)}
       />
 
       {/* `contents` keeps these as direct grid items while letting this block
@@ -392,7 +396,7 @@ export function AppShell() {
         onConfirm={actions.confirmPendingClose}
       />
 
-      {project ? (
+      {project && !isRemoteProject(project) ? (
         <WorktreeCreateDialog
           open={worktreeDialogOpen}
           onOpenChange={setWorktreeDialogOpen}
@@ -407,6 +411,11 @@ export function AppShell() {
       <CloneFromGithubDialog
         open={cloneDialogOpen}
         onOpenChange={setCloneDialogOpen}
+      />
+
+      <RemoteAccessDialog
+        open={remoteDialogOpen}
+        onOpenChange={setRemoteDialogOpen}
       />
 
       <SendToProjectDialog

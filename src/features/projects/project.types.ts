@@ -2,11 +2,20 @@ export interface Project {
   id: string;
   name: string;
   path: string;
+  origin: ProjectOrigin;
   color: string;
   /** Lucide icon name, e.g. "Folder", "Code", "BookOpen" */
   icon: string;
   createdAt: string;
   lastOpenedAt: string;
+}
+
+export type ProjectOrigin =
+  | { kind: "local" }
+  | { kind: "ssh"; accessId: string; remotePath: string };
+
+export function isRemoteProject(project: Project | null | undefined): boolean {
+  return project?.origin.kind === "ssh";
 }
 
 /**

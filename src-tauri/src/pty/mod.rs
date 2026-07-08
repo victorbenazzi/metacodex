@@ -46,7 +46,18 @@ fn emit_pty_buffer(app: &AppHandle, session_id: &str, pending: &mut Vec<u8>) {
 #[serde(tag = "kind", rename_all = "lowercase")]
 pub enum PtyKind {
     Plain,
-    Cli { command: String },
+    Cli {
+        command: String,
+    },
+    RemoteShell {
+        access_id: String,
+        remote_cwd: String,
+    },
+    RemoteCli {
+        access_id: String,
+        remote_cwd: String,
+        command: String,
+    },
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -121,6 +132,27 @@ impl PtyManager {
                 let (p, a) = shell::cli_launch_args(command);
                 (p, a, "cli".to_string(), spec.cli_id.clone())
             }
+            PtyKind::RemoteShell {
+                access_id,
+                remote_cwd,
+            } => {
+                let (p, a) = crate::remote_access::ssh_command_args(access_id, remote_cwd, None)?;
+                (p, a, "shell".to_string(), None)
+            }
+            PtyKind::RemoteCli {
+                access_id,
+                remote_cwd,
+                command,
+            } => {
+                let (p, a) =
+                    crate::remote_access::ssh_command_args(access_id, remote_cwd, Some(command))?;
+                (p, a, "cli".to_string(), spec.cli_id.clone())
+            }
+        };
+        let process_cwd = match &spec.kind {
+            PtyKind::RemoteShell { .. } | PtyKind::RemoteCli { .. } => dirs::home_dir()
+                .unwrap_or_else(|| std::path::PathBuf::from(std::path::MAIN_SEPARATOR.to_string())),
+            _ => std::path::PathBuf::from(&spec.cwd),
         };
 
         let pty_system = native_pty_system();
@@ -137,9 +169,9 @@ impl PtyManager {
         for a in &args {
             cmd.arg(a);
         }
-        cmd.cwd(&spec.cwd);
+        cmd.cwd(&process_cwd);
         cmd.env_clear();
-        for (k, v) in shell::build_env(Path::new(&spec.cwd)) {
+        for (k, v) in shell::build_env(Path::new(&process_cwd)) {
             cmd.env(k, v);
         }
         // rxvt convention read by background-detecting TUIs: "fg;bg" in ANSI

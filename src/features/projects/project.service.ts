@@ -8,6 +8,13 @@ export const projectsApi = {
   create(directory: string, name: string): Promise<Project> {
     return invoke<Project>(CMD.createProject, { directory, name });
   },
+  addRemote(accessId: string, path: string, name?: string): Promise<Project> {
+    return invoke<Project>(CMD.addRemoteProject, {
+      accessId,
+      path,
+      name: name ?? null,
+    });
+  },
   remove(id: string): Promise<void> {
     return invoke<void>(CMD.removeProject, { id });
   },

@@ -9,18 +9,19 @@ pub mod open_files;
 pub mod preview_grants;
 pub mod projects;
 pub mod pty;
+pub mod remote_access;
 pub mod search;
 pub mod util;
 pub mod watcher;
 
 use std::sync::Arc;
 
+use commands::search::SearchRegistry;
 use directory_grants::DirectoryGrants;
 use open_files::PendingOpenFiles;
 use preview_grants::PreviewGrants;
 use projects::ProjectsCache;
 use pty::PtyManager;
-use commands::search::SearchRegistry;
 use tauri::{Emitter, Manager};
 use watcher::WatcherManager;
 
@@ -148,6 +149,12 @@ pub fn run() {
             commands::projects::set_active_project,
             commands::projects::get_active_project_id,
             commands::projects::reveal_in_finder,
+            commands::remote_access::remote_access_list,
+            commands::remote_access::remote_access_save,
+            commands::remote_access::remote_access_remove,
+            commands::remote_access::remote_access_test,
+            commands::remote_access::remote_discover_projects,
+            commands::remote_access::add_remote_project,
             commands::system::open_external_url,
             commands::system::take_pending_open_files,
             commands::filesystem::read_dir,
@@ -163,6 +170,13 @@ pub fn run() {
             commands::filesystem::write_file_text,
             commands::filesystem::create_file,
             commands::filesystem::create_dir,
+            commands::filesystem::workspace_read_dir,
+            commands::filesystem::workspace_stat,
+            commands::filesystem::workspace_read_file_text,
+            commands::filesystem::workspace_read_file_bytes,
+            commands::filesystem::workspace_write_file_text,
+            commands::filesystem::workspace_create_file,
+            commands::filesystem::workspace_create_dir,
             commands::workspace::save_workspace_state,
             commands::workspace::load_workspace_state,
             commands::settings::read_settings,

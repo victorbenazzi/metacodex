@@ -29,6 +29,14 @@ export const CMD = {
   getActiveProjectId: "get_active_project_id",
   revealInFinder: "reveal_in_finder",
 
+  // remote access
+  remoteAccessList: "remote_access_list",
+  remoteAccessSave: "remote_access_save",
+  remoteAccessRemove: "remote_access_remove",
+  remoteAccessTest: "remote_access_test",
+  remoteDiscoverProjects: "remote_discover_projects",
+  addRemoteProject: "add_remote_project",
+
   // system
   openExternalUrl: "open_external_url",
   takePendingOpenFiles: "take_pending_open_files",
@@ -43,6 +51,13 @@ export const CMD = {
   stat: "stat",
   createFile: "create_file",
   createDir: "create_dir",
+  workspaceReadDir: "workspace_read_dir",
+  workspaceReadFileText: "workspace_read_file_text",
+  workspaceWriteFileText: "workspace_write_file_text",
+  workspaceReadFileBytes: "workspace_read_file_bytes",
+  workspaceStat: "workspace_stat",
+  workspaceCreateFile: "workspace_create_file",
+  workspaceCreateDir: "workspace_create_dir",
 
   // filesystem preview mode (files outside any project root)
   readPreviewText: "read_preview_text",
