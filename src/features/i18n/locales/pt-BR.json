@@ -288,8 +288,10 @@
     "titleCommands": "Executar comando",
     "placeholderFiles": "Ir para arquivo…",
     "placeholderNoProject": "Abra um projeto primeiro",
+    "placeholderRemoteProject": "Busca de arquivos é local-only na v1 SSH",
     "placeholderCommand": "Executar comando…",
     "noProjectOpen": "Nenhum projeto aberto.",
+    "remoteUnsupported": "Busca de arquivos é local-only na v1 SSH.",
     "nothingFound": "Nada encontrado."
   },
   "search": {
@@ -301,6 +303,7 @@
     "regex": "Regex",
     "close": "Fechar busca",
     "openToSearch": "Abra um projeto para buscar dentro dele.",
+    "remoteUnsupported": "Busca é local-only na v1 SSH.",
     "typeToSearch": "Digite para buscar no conteúdo dos arquivos do projeto atual.",
     "noMatches": "Nenhum resultado.",
     "summary": "{{matches}} resultados · {{files}} arquivos",
@@ -578,17 +581,32 @@
   },
   "remoteAccess": {
     "title": "Conectar via SSH",
-    "description": "Salve um acesso SSH, confira a host key e adicione pastas remotas como projetos.",
+    "description": "Salve um acesso SSH, confira a fingerprint do servidor e adicione pastas remotas como projetos.",
     "saved": "Acessos",
-    "noSaved": "Nenhum acesso salvo.",
+    "noSaved": "Os acessos SSH salvos aparecem aqui.",
+    "newAccess": "Novo",
     "fields": {
       "label": "Nome",
       "host": "Host",
       "port": "Porta",
       "user": "Usuário",
-      "identityFile": "Chave",
+      "identityFile": "Arquivo da chave SSH",
       "roots": "Pastas raiz"
     },
+    "placeholders": {
+      "label": "VPS produção",
+      "host": "187.77.45.81",
+      "port": "22",
+      "user": "root ou ubuntu",
+      "identityFile": "~/.ssh/id_ed25519",
+      "roots": "/opt/multica\n/var/www\n/home/ubuntu/apps"
+    },
+    "hints": {
+      "identityFile": "Cole o caminho da chave privada ou escolha o arquivo. Se este servidor já funciona no Terminal, pode deixar vazio.",
+      "roots": "O Metacodex procura projetos dentro dessas pastas. Use uma pasta por linha."
+    },
+    "chooseFile": "Escolher",
+    "pickIdentityTitle": "Escolher arquivo da chave SSH",
     "test": "Testar",
     "trustHost": "Confiar na host key",
     "saveAndDiscover": "Salvar e buscar",

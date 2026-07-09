@@ -1,195 +1,45 @@
-import { useEffect, useMemo, useState } from "react";
-import { FolderPlus, Loader2, RefreshCw, Server, ShieldCheck, Trash2 } from "lucide-react";
+import { FolderOpen, FolderPlus, Loader2, Plus, RefreshCw, ShieldCheck, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { DialogContent, DialogRoot } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
-import { useProjectsStore } from "@/features/projects/project.store";
-import { remoteAccessApi } from "@/features/remote-access/remote-access.service";
-import type {
-  RemoteAccess,
-  RemoteAccessDraft,
-  RemoteAccessTestResult,
-  RemoteProjectCandidate,
-} from "@/features/remote-access/remote-access.types";
 import { cn } from "@/lib/cn";
+import { useRemoteAccessDialogState } from "./useRemoteAccessDialogState";
 
 interface RemoteAccessDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-interface DraftState {
-  id: string | null;
-  label: string;
-  host: string;
-  port: string;
-  user: string;
-  identityFile: string;
-  rootsText: string;
-}
-
-const emptyDraft = (): DraftState => ({
-  id: null,
-  label: "",
-  host: "",
-  port: "22",
-  user: "",
-  identityFile: "",
-  rootsText: "/opt",
-});
-
-function draftFromAccess(access: RemoteAccess): DraftState {
-  return {
-    id: access.id,
-    label: access.label,
-    host: access.host,
-    port: String(access.port || 22),
-    user: access.user,
-    identityFile: access.identityFile ?? "",
-    rootsText: access.rootPaths.join("\n"),
-  };
-}
-
 export function RemoteAccessDialog({ open, onOpenChange }: RemoteAccessDialogProps) {
   const { t } = useTranslation();
-  const addRemote = useProjectsStore((s) => s.addRemote);
-  const [accesses, setAccesses] = useState<RemoteAccess[]>([]);
-  const [draft, setDraft] = useState<DraftState>(emptyDraft);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [testResult, setTestResult] = useState<RemoteAccessTestResult | null>(null);
-  const [candidates, setCandidates] = useState<RemoteProjectCandidate[]>([]);
-  const [selectedPaths, setSelectedPaths] = useState<Record<string, boolean>>({});
-
-  const selectedCount = Object.values(selectedPaths).filter(Boolean).length;
-  const canSubmit = draft.host.trim() && draft.user.trim() && Number(draft.port) > 0;
-  const fingerprint = testResult?.fingerprintSha256 ?? null;
-  const needsTrust = testResult?.status === "untrusted";
-
-  const loadAccesses = async () => {
-    const list = await remoteAccessApi.list();
-    setAccesses(list);
-    if (!draft.id && list.length > 0) {
-      setDraft(draftFromAccess(list[0]));
-    }
-  };
-
-  useEffect(() => {
-    if (!open) return;
-    setError(null);
-    setTestResult(null);
-    setCandidates([]);
-    setSelectedPaths({});
-    void loadAccesses().catch((err) => setError(readError(err)));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
-
-  const currentAccess = useMemo(
-    () => accesses.find((access) => access.id === draft.id) ?? null,
-    [accesses, draft.id],
-  );
-
-  const toRemoteDraft = (): RemoteAccessDraft => ({
-    id: draft.id,
-    label: draft.label.trim() || draft.host.trim(),
-    host: draft.host.trim(),
-    port: Number(draft.port || 22),
-    user: draft.user.trim(),
-    identityFile: draft.identityFile.trim() || null,
-    rootPaths: draft.rootsText
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean),
+  const {
+    accesses,
+    draft,
+    busy,
+    error,
+    candidates,
+    selectedPaths,
+    setSelectedPaths,
+    selectedCount,
+    canConnect,
+    canDiscover,
+    fingerprint,
+    needsTrust,
+    updateDraft,
+    resetDraft,
+    selectAccess,
+    pickIdentityFile,
+    runTest,
+    discover,
+    addSelectedProjects,
+    removeCurrent,
+  } = useRemoteAccessDialogState({
+    open,
+    onOpenChange,
+    pickIdentityTitle: t("remoteAccess.pickIdentityTitle"),
   });
-
-  const updateDraft = (patch: Partial<DraftState>) => {
-    setDraft((prev) => ({ ...prev, ...patch }));
-    setTestResult(null);
-    setCandidates([]);
-    setSelectedPaths({});
-    setError(null);
-  };
-
-  const runTest = async (trustHost: boolean) => {
-    if (!canSubmit) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const result = await remoteAccessApi.test(toRemoteDraft(), trustHost);
-      setTestResult(result);
-      if (result.status === "trusted" && trustHost && currentAccess) {
-        await loadAccesses();
-      }
-    } catch (err) {
-      setError(readError(err));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const saveCurrent = async (): Promise<RemoteAccess | null> => {
-    if (!canSubmit) return null;
-    const saved = await remoteAccessApi.save(toRemoteDraft());
-    setDraft(draftFromAccess(saved));
-    const list = await remoteAccessApi.list();
-    setAccesses(list);
-    return saved;
-  };
-
-  const discover = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      const saved = await saveCurrent();
-      if (!saved) return;
-      const found = await remoteAccessApi.discoverProjects(saved.id);
-      setCandidates(found);
-      setSelectedPaths(Object.fromEntries(found.map((candidate) => [candidate.path, true])));
-    } catch (err) {
-      setError(readError(err));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const addSelectedProjects = async () => {
-    const accessId = draft.id;
-    if (!accessId || selectedCount === 0) return;
-    setBusy(true);
-    setError(null);
-    try {
-      for (const candidate of candidates) {
-        if (selectedPaths[candidate.path]) {
-          await addRemote(accessId, candidate.path, candidate.name);
-        }
-      }
-      onOpenChange(false);
-    } catch (err) {
-      setError(readError(err));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const removeCurrent = async () => {
-    if (!draft.id) return;
-    setBusy(true);
-    setError(null);
-    try {
-      await remoteAccessApi.remove(draft.id);
-      setDraft(emptyDraft());
-      setCandidates([]);
-      setSelectedPaths({});
-      const list = await remoteAccessApi.list();
-      setAccesses(list);
-    } catch (err) {
-      setError(readError(err));
-    } finally {
-      setBusy(false);
-    }
-  };
 
   return (
     <DialogRoot open={open} onOpenChange={onOpenChange}>
@@ -218,8 +68,15 @@ export function RemoteAccessDialog({ open, onOpenChange }: RemoteAccessDialogPro
           <aside className="min-h-0 rounded-sm border border-hairline-soft bg-canvas-soft/50 p-[8px]">
             <div className="mb-[8px] flex items-center justify-between gap-[8px]">
               <span className="editorial-caps text-muted">{t("remoteAccess.saved")}</span>
-              <Button variant="ghost" size="icon" onClick={() => updateDraft(emptyDraft())}>
-                <Icon icon={Server} size={13} />
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-[24px] px-[7px]"
+                aria-label={t("remoteAccess.newAccess")}
+                onClick={resetDraft}
+              >
+                <Icon icon={Plus} size={12} />
+                {t("remoteAccess.newAccess")}
               </Button>
             </div>
             <div className="space-y-[4px]">
@@ -229,7 +86,7 @@ export function RemoteAccessDialog({ open, onOpenChange }: RemoteAccessDialogPro
                   <button
                     type="button"
                     key={access.id}
-                    onClick={() => updateDraft(draftFromAccess(access))}
+                    onClick={() => selectAccess(access)}
                     className={cn(
                       "flex w-full flex-col rounded-sm px-[8px] py-[7px] text-left",
                       active ? "bg-surface-strong/70 text-ink" : "text-body hover:bg-surface-strong/45",
@@ -243,7 +100,7 @@ export function RemoteAccessDialog({ open, onOpenChange }: RemoteAccessDialogPro
                 );
               })}
               {accesses.length === 0 ? (
-                <p className="px-[4px] py-[8px] text-caption text-muted">
+                <p className="px-[4px] py-[8px] text-caption leading-[1.45] text-muted">
                   {t("remoteAccess.noSaved")}
                 </p>
               ) : null}
@@ -257,34 +114,41 @@ export function RemoteAccessDialog({ open, onOpenChange }: RemoteAccessDialogPro
                 label={t("remoteAccess.fields.label")}
                 value={draft.label}
                 onChange={(value) => updateDraft({ label: value })}
+                placeholder={t("remoteAccess.placeholders.label")}
               />
               <Field
                 id="remote-host"
                 label={t("remoteAccess.fields.host")}
                 value={draft.host}
                 onChange={(value) => updateDraft({ host: value })}
+                placeholder={t("remoteAccess.placeholders.host")}
               />
               <Field
                 id="remote-port"
                 label={t("remoteAccess.fields.port")}
                 value={draft.port}
                 onChange={(value) => updateDraft({ port: value.replace(/\D/g, "") })}
+                placeholder={t("remoteAccess.placeholders.port")}
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-[8px]">
+            <div className="grid grid-cols-[minmax(0,220px)_minmax(0,1fr)] gap-[8px]">
               <Field
                 id="remote-user"
                 label={t("remoteAccess.fields.user")}
                 value={draft.user}
                 onChange={(value) => updateDraft({ user: value })}
+                placeholder={t("remoteAccess.placeholders.user")}
               />
-              <Field
+              <KeyFileField
                 id="remote-identity"
                 label={t("remoteAccess.fields.identityFile")}
                 value={draft.identityFile}
                 onChange={(value) => updateDraft({ identityFile: value })}
-                placeholder="~/.ssh/id_ed25519"
+                onPick={pickIdentityFile}
+                disabled={busy}
+                placeholder={t("remoteAccess.placeholders.identityFile")}
+                hint={t("remoteAccess.hints.identityFile")}
               />
             </div>
 
@@ -296,13 +160,17 @@ export function RemoteAccessDialog({ open, onOpenChange }: RemoteAccessDialogPro
                 id="remote-roots"
                 value={draft.rootsText}
                 onChange={(event) => updateDraft({ rootsText: event.target.value })}
+                placeholder={t("remoteAccess.placeholders.roots")}
                 spellCheck={false}
                 className="block h-[78px] w-full resize-none rounded-sm border border-hairline-strong bg-canvas px-[10px] py-[7px] font-mono text-caption text-ink outline-none placeholder:text-muted-soft focus:border-ink"
               />
+              <p className="text-label leading-[1.45] text-muted-soft">
+                {t("remoteAccess.hints.roots")}
+              </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-[8px]">
-              <Button variant="outline" size="sm" disabled={busy || !canSubmit} onClick={() => runTest(false)}>
+              <Button variant="outline" size="sm" disabled={busy || !canConnect} onClick={() => runTest(false)}>
                 {busy ? <Icon icon={Loader2} size={12} className="animate-spin" /> : <Icon icon={ShieldCheck} size={12} />}
                 {t("remoteAccess.test")}
               </Button>
@@ -312,7 +180,7 @@ export function RemoteAccessDialog({ open, onOpenChange }: RemoteAccessDialogPro
                   {t("remoteAccess.trustHost")}
                 </Button>
               ) : null}
-              <Button variant="outline" size="sm" disabled={busy || !canSubmit} onClick={discover}>
+              <Button variant="outline" size="sm" disabled={busy || !canDiscover} onClick={discover}>
                 <Icon icon={RefreshCw} size={12} />
                 {t("remoteAccess.saveAndDiscover")}
               </Button>
@@ -402,12 +270,14 @@ function Field({
   value,
   onChange,
   placeholder,
+  hint,
 }: {
   id: string;
   label: string;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  hint?: string;
 }) {
   return (
     <div className="space-y-[6px]">
@@ -423,14 +293,58 @@ function Field({
         autoComplete="off"
         className="block w-full rounded-sm border border-hairline-strong bg-canvas px-[10px] py-[7px] font-mono text-caption text-ink outline-none placeholder:text-muted-soft focus:border-ink"
       />
+      {hint ? <p className="text-label leading-[1.45] text-muted-soft">{hint}</p> : null}
     </div>
   );
 }
 
-function readError(err: unknown): string {
-  return err instanceof Error
-    ? err.message
-    : typeof err === "object" && err && "message" in err
-      ? String((err as { message: unknown }).message)
-      : String(err);
+function KeyFileField({
+  id,
+  label,
+  value,
+  onChange,
+  onPick,
+  disabled,
+  placeholder,
+  hint,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  onPick: () => void;
+  disabled: boolean;
+  placeholder?: string;
+  hint: string;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="space-y-[6px]">
+      <label className="editorial-caps block" htmlFor={id}>
+        {label}
+      </label>
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-[6px]">
+        <input
+          id={id}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder={placeholder}
+          spellCheck={false}
+          autoComplete="off"
+          className="block w-full rounded-sm border border-hairline-strong bg-canvas px-[10px] py-[7px] font-mono text-caption text-ink outline-none placeholder:text-muted-soft focus:border-ink"
+        />
+        <Button
+          variant="outline"
+          size="md"
+          className="h-[32px] px-[10px] text-caption"
+          disabled={disabled}
+          onClick={onPick}
+        >
+          <Icon icon={FolderOpen} size={12} />
+          {t("remoteAccess.chooseFile")}
+        </Button>
+      </div>
+      <p className="text-label leading-[1.45] text-muted-soft">{hint}</p>
+    </div>
+  );
 }

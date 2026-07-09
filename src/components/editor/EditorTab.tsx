@@ -19,7 +19,7 @@ import {
 import { bracketMatching, foldGutter, indentOnInput } from "@codemirror/language";
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 
-import { fsApi } from "@/features/filesystem/filesystem.service";
+import { fsApi, workspaceFsApi } from "@/features/filesystem/filesystem.service";
 import { useEditorStore } from "@/features/editor/editor.store";
 import { registerEditorSaver } from "@/features/editor/editorSavers";
 import { useTabsStore } from "@/components/tabs/tabsStore";
@@ -101,7 +101,6 @@ export function EditorTab({
     projectId ? s.projects.find((p) => p.id === projectId) ?? null : null,
   );
   const remoteProject = isRemoteProject(project);
-  const workspaceProjectId = !preview && projectId ? projectId : undefined;
   // Re-fetch HEAD for the change gutter whenever this project's git state moves
   // (commit, checkout, stage). The object identity changes on every refresh.
   // Preview files live outside any repo , skip git entirely.
@@ -125,12 +124,9 @@ export function EditorTab({
 
     (async () => {
       try {
-        if (preview && !previewGrantId) {
-          throw new Error("preview grant missing");
-        }
         const text = preview
-          ? await fsApi.readPreviewText(previewGrantId!, 25 * 1024 * 1024)
-          : await fsApi.readFileText(path, 25 * 1024 * 1024, workspaceProjectId);
+          ? await readPreviewText(previewGrantId, 25 * 1024 * 1024)
+          : await readWorkspaceText(projectId, path, 25 * 1024 * 1024);
         if (cancelled) return;
         // Heuristic binary detection on the first 8 KiB
         const sample = text.content.slice(0, 8192);
@@ -352,10 +348,9 @@ export function EditorTab({
     setSaving(tabId, true);
     try {
       if (preview) {
-        if (!previewGrantId) throw new Error("preview grant missing");
-        await fsApi.writePreviewText(previewGrantId, content);
+        await writePreviewText(previewGrantId, content);
       } else {
-        await fsApi.writeFileText(path, content, workspaceProjectId);
+        await writeWorkspaceText(projectId, path, content);
       }
       // The baseline always advances to what we just wrote (that IS what's on
       // disk now). But only clear `dirty` if the live doc still equals `content`:
@@ -457,6 +452,34 @@ export function EditorTab({
       ) : null}
     </div>
   );
+}
+
+function readPreviewText(previewGrantId: string | undefined, maxBytes?: number) {
+  if (!previewGrantId) {
+    throw new Error("preview grant missing");
+  }
+  return fsApi.readPreviewText(previewGrantId, maxBytes);
+}
+
+function readWorkspaceText(projectId: string, path: string, maxBytes?: number) {
+  if (!projectId) {
+    throw new Error("workspace project missing");
+  }
+  return workspaceFsApi.readFileText(projectId, path, maxBytes);
+}
+
+function writePreviewText(previewGrantId: string | undefined, content: string) {
+  if (!previewGrantId) {
+    throw new Error("preview grant missing");
+  }
+  return fsApi.writePreviewText(previewGrantId, content);
+}
+
+function writeWorkspaceText(projectId: string, path: string, content: string) {
+  if (!projectId) {
+    throw new Error("workspace project missing");
+  }
+  return workspaceFsApi.writeFileText(projectId, path, content);
 }
 
 /**

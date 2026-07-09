@@ -5,7 +5,7 @@ import { Pencil, Eye, Copy, Check } from "lucide-react";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { useTranslation } from "react-i18next";
 
-import { fsApi } from "@/features/filesystem/filesystem.service";
+import { fsApi, workspaceFsApi } from "@/features/filesystem/filesystem.service";
 import { useTabsStore } from "@/components/tabs/tabsStore";
 import { EditorTab } from "@/components/editor/EditorTab";
 import { SendToProjectButton } from "@/components/previews/PreviewToolbar";
@@ -53,12 +53,9 @@ export function MarkdownPreview({
     setError(null);
     (async () => {
       try {
-        if (preview && !previewGrantId) {
-          throw new Error("preview grant missing");
-        }
         const text = preview
-          ? await fsApi.readPreviewText(previewGrantId!)
-          : await fsApi.readFileText(path, undefined, projectId || undefined);
+          ? await readPreviewText(previewGrantId)
+          : await workspaceFsApi.readFileText(projectId, path);
         if (!cancelled) setContent(text.content);
       } catch (err: any) {
         if (!cancelled) setError(err?.message ?? String(err));
@@ -67,7 +64,7 @@ export function MarkdownPreview({
     return () => {
       cancelled = true;
     };
-  }, [path, mode, preview, previewGrantId]);
+  }, [path, projectId, mode, preview, previewGrantId]);
 
   const toggleMode = () => {
     updateTab(projectKey, tabId, {
@@ -144,6 +141,13 @@ export function MarkdownPreview({
       </div>
     </div>
   );
+}
+
+function readPreviewText(previewGrantId: string | undefined) {
+  if (!previewGrantId) {
+    throw new Error("preview grant missing");
+  }
+  return fsApi.readPreviewText(previewGrantId);
 }
 
 function MarkdownBody({ source }: { source: string }) {

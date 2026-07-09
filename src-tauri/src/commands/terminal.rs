@@ -20,6 +20,15 @@ pub async fn pty_spawn(
     app: AppHandle,
     mgr: State<'_, PtyManager>,
 ) -> AppResult<String> {
+    if matches!(
+        spec.kind,
+        PtyKind::RemoteShell { .. } | PtyKind::RemoteCli { .. }
+    ) {
+        return Err(AppError::PermissionDenied(
+            "remote pty kind is backend-only".into(),
+        ));
+    }
+
     if let Some(project_id) = spec.project_id.as_deref() {
         let cache = app.state::<Arc<ProjectsCache>>();
         let project = cache

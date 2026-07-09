@@ -15,6 +15,18 @@ export const projectsApi = {
       name: name ?? null,
     });
   },
+  addRemoteMany(
+    accessId: string,
+    projects: Array<{ path: string; name?: string }>,
+  ): Promise<Project[]> {
+    return invoke<Project[]>(CMD.addRemoteProjects, {
+      accessId,
+      selections: projects.map((project) => ({
+        path: project.path,
+        name: project.name ?? null,
+      })),
+    });
+  },
   remove(id: string): Promise<void> {
     return invoke<void>(CMD.removeProject, { id });
   },

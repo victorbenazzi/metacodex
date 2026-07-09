@@ -81,6 +81,109 @@ fn project_by_id(app: &AppHandle, project_id: &str) -> AppResult<Project> {
         .ok_or_else(|| AppError::NotFound(format!("project {project_id}")))
 }
 
+enum WorkspaceFs {
+    Local,
+    Ssh {
+        access_id: String,
+        remote_path: String,
+    },
+}
+
+impl WorkspaceFs {
+    fn load(app: &AppHandle, project_id: &str) -> AppResult<Self> {
+        Ok(match project_by_id(app, project_id)?.origin {
+            ProjectOrigin::Local => Self::Local,
+            ProjectOrigin::Ssh {
+                access_id,
+                remote_path,
+            } => Self::Ssh {
+                access_id,
+                remote_path,
+            },
+        })
+    }
+
+    fn read_dir(&self, app: &AppHandle, path: &str) -> AppResult<Vec<DirEntry>> {
+        match self {
+            Self::Local => fs_ops::read_dir(app, path),
+            Self::Ssh {
+                access_id,
+                remote_path,
+            } => remote_access::read_dir(access_id, remote_path, path),
+        }
+    }
+
+    fn stat(&self, app: &AppHandle, path: &str) -> AppResult<FileMeta> {
+        match self {
+            Self::Local => fs_ops::stat(app, path),
+            Self::Ssh {
+                access_id,
+                remote_path,
+            } => remote_access::stat(access_id, remote_path, path),
+        }
+    }
+
+    fn read_file_text(
+        &self,
+        app: &AppHandle,
+        path: &str,
+        max_bytes: Option<u64>,
+    ) -> AppResult<TextFile> {
+        match self {
+            Self::Local => fs_ops::read_file_text(app, path, max_bytes),
+            Self::Ssh {
+                access_id,
+                remote_path,
+            } => remote_access::read_file_text(access_id, remote_path, path, max_bytes),
+        }
+    }
+
+    fn read_file_bytes(
+        &self,
+        app: &AppHandle,
+        path: &str,
+        max_bytes: Option<u64>,
+    ) -> AppResult<BytesFile> {
+        match self {
+            Self::Local => fs_ops::read_file_bytes(app, path, max_bytes),
+            Self::Ssh {
+                access_id,
+                remote_path,
+            } => remote_access::read_file_bytes(access_id, remote_path, path, max_bytes),
+        }
+    }
+
+    fn write_file_text(&self, app: &AppHandle, path: &str, content: &str) -> AppResult<()> {
+        match self {
+            Self::Local => fs_ops::write_file_text(app, path, content),
+            Self::Ssh {
+                access_id,
+                remote_path,
+            } => remote_access::write_file_text(access_id, remote_path, path, content),
+        }
+    }
+
+    fn create_file(&self, app: &AppHandle, parent: &str, name: &str) -> AppResult<String> {
+        match self {
+            Self::Local => fs_ops::create_file(app, parent, name),
+            Self::Ssh {
+                access_id,
+                remote_path,
+            } => remote_access::create_file(access_id, remote_path, parent, name),
+        }
+    }
+
+    fn create_dir(&self, app: &AppHandle, parent: &str, name: &str) -> AppResult<String> {
+        match self {
+            Self::Local => fs_ops::create_dir(app, parent, name),
+            Self::Ssh {
+                access_id,
+                remote_path,
+            } => remote_access::create_dir(access_id, remote_path, parent, name),
+        }
+    }
+}
+
 #[tauri::command]
 pub async fn pick_preview_file(
     title: String,
@@ -230,14 +333,8 @@ pub async fn workspace_read_dir(
     app: AppHandle,
 ) -> AppResult<Vec<DirEntry>> {
     blocking(move || {
-        let project = project_by_id(&app, &project_id)?;
-        match project.origin {
-            ProjectOrigin::Local => fs_ops::read_dir(&app, &path),
-            ProjectOrigin::Ssh {
-                access_id,
-                remote_path,
-            } => remote_access::read_dir(&access_id, &remote_path, &path),
-        }
+        let workspace = WorkspaceFs::load(&app, &project_id)?;
+        workspace.read_dir(&app, &path)
     })
     .await
 }
@@ -249,14 +346,8 @@ pub async fn workspace_stat(
     app: AppHandle,
 ) -> AppResult<FileMeta> {
     blocking(move || {
-        let project = project_by_id(&app, &project_id)?;
-        match project.origin {
-            ProjectOrigin::Local => fs_ops::stat(&app, &path),
-            ProjectOrigin::Ssh {
-                access_id,
-                remote_path,
-            } => remote_access::stat(&access_id, &remote_path, &path),
-        }
+        let workspace = WorkspaceFs::load(&app, &project_id)?;
+        workspace.stat(&app, &path)
     })
     .await
 }
@@ -269,14 +360,8 @@ pub async fn workspace_read_file_text(
     app: AppHandle,
 ) -> AppResult<TextFile> {
     blocking(move || {
-        let project = project_by_id(&app, &project_id)?;
-        match project.origin {
-            ProjectOrigin::Local => fs_ops::read_file_text(&app, &path, max_bytes),
-            ProjectOrigin::Ssh {
-                access_id,
-                remote_path,
-            } => remote_access::read_file_text(&access_id, &remote_path, &path, max_bytes),
-        }
+        let workspace = WorkspaceFs::load(&app, &project_id)?;
+        workspace.read_file_text(&app, &path, max_bytes)
     })
     .await
 }
@@ -289,14 +374,8 @@ pub async fn workspace_read_file_bytes(
     app: AppHandle,
 ) -> AppResult<BytesFile> {
     blocking(move || {
-        let project = project_by_id(&app, &project_id)?;
-        match project.origin {
-            ProjectOrigin::Local => fs_ops::read_file_bytes(&app, &path, max_bytes),
-            ProjectOrigin::Ssh {
-                access_id,
-                remote_path,
-            } => remote_access::read_file_bytes(&access_id, &remote_path, &path, max_bytes),
-        }
+        let workspace = WorkspaceFs::load(&app, &project_id)?;
+        workspace.read_file_bytes(&app, &path, max_bytes)
     })
     .await
 }
@@ -309,14 +388,8 @@ pub async fn workspace_write_file_text(
     app: AppHandle,
 ) -> AppResult<()> {
     blocking(move || {
-        let project = project_by_id(&app, &project_id)?;
-        match project.origin {
-            ProjectOrigin::Local => fs_ops::write_file_text(&app, &path, &content),
-            ProjectOrigin::Ssh {
-                access_id,
-                remote_path,
-            } => remote_access::write_file_text(&access_id, &remote_path, &path, &content),
-        }
+        let workspace = WorkspaceFs::load(&app, &project_id)?;
+        workspace.write_file_text(&app, &path, &content)
     })
     .await
 }
@@ -329,14 +402,8 @@ pub async fn workspace_create_file(
     app: AppHandle,
 ) -> AppResult<String> {
     blocking(move || {
-        let project = project_by_id(&app, &project_id)?;
-        match project.origin {
-            ProjectOrigin::Local => fs_ops::create_file(&app, &parent, &name),
-            ProjectOrigin::Ssh {
-                access_id,
-                remote_path,
-            } => remote_access::create_file(&access_id, &remote_path, &parent, &name),
-        }
+        let workspace = WorkspaceFs::load(&app, &project_id)?;
+        workspace.create_file(&app, &parent, &name)
     })
     .await
 }
@@ -349,14 +416,8 @@ pub async fn workspace_create_dir(
     app: AppHandle,
 ) -> AppResult<String> {
     blocking(move || {
-        let project = project_by_id(&app, &project_id)?;
-        match project.origin {
-            ProjectOrigin::Local => fs_ops::create_dir(&app, &parent, &name),
-            ProjectOrigin::Ssh {
-                access_id,
-                remote_path,
-            } => remote_access::create_dir(&access_id, &remote_path, &parent, &name),
-        }
+        let workspace = WorkspaceFs::load(&app, &project_id)?;
+        workspace.create_dir(&app, &parent, &name)
     })
     .await
 }

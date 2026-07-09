@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { fsApi } from "@/features/filesystem/filesystem.service";
+import { fsApi, workspaceFsApi } from "@/features/filesystem/filesystem.service";
 import { base64ToUint8Array } from "@/lib/base64";
 import { Icon } from "@/components/ui/Icon";
 import { Button } from "@/components/ui/Button";
@@ -41,12 +41,9 @@ export function PdfPreview({ path, projectId, preview = false, previewGrantId }:
 
     (async () => {
       try {
-        if (preview && !previewGrantId) {
-          throw new Error("preview grant missing");
-        }
         const file = preview
-          ? await fsApi.readPreviewBytes(previewGrantId!)
-          : await fsApi.readFileBytes(path, undefined, projectId);
+          ? await readPreviewBytes(previewGrantId)
+          : await readWorkspaceBytes(projectId, path);
         if (cancelled) return;
         const data = base64ToUint8Array(file.b64);
         const pdfjs = await loadPdfjs();
@@ -136,4 +133,18 @@ export function PdfPreview({ path, projectId, preview = false, previewGrantId }:
       </div>
     </div>
   );
+}
+
+function readPreviewBytes(previewGrantId?: string) {
+  if (!previewGrantId) {
+    throw new Error("preview grant missing");
+  }
+  return fsApi.readPreviewBytes(previewGrantId);
+}
+
+function readWorkspaceBytes(projectId: string | undefined, path: string) {
+  if (!projectId) {
+    throw new Error("workspace project missing");
+  }
+  return workspaceFsApi.readFileBytes(projectId, path);
 }
