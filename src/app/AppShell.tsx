@@ -44,11 +44,10 @@ import { cn } from "@/lib/cn";
 // Must equal `--dur-base` (tokens.css): the grid uses `duration-base` for its
 // column transition, and the side panel must stay mounted until it finishes.
 const DRAWER_ANIMATION_MS = 180;
-// Horizontal breathing room around the floating sidebar cards: window edge to
-// card and card to card. The VERTICAL gaps (title bar to card, card to window
-// bottom) are both 4px, hardcoded in the top-[4px]/bottom-[4px] classes below,
-// so the cards sit symmetrically between the chrome rows.
-const PANEL_GAP_PX = 8;
+// Horizontal gap between the floating sidebar cards, as a CSS value so it stays
+// in lockstep with the resize-handle offsets and the vertical insets. Source of
+// truth: `--panel-gap-x` in tokens.css. The vertical gaps use `--panel-gap-y`.
+const PANEL_GAP_X = "var(--panel-gap-x)";
 
 export function AppShell() {
   const { t } = useTranslation();
@@ -164,13 +163,13 @@ export function AppShell() {
   // flush with the window (no card).
   const projectsColWidth = codeSidebarCollapsed ? RAIL_WIDTH_PX : projectsWidth;
   const explorerColWidth = explorerCollapsed ? 0 : explorerWidth;
-  const explorerGap = explorerCollapsed ? 0 : PANEL_GAP_PX;
+  const explorerGap = explorerCollapsed ? "0px" : PANEL_GAP_X;
   const sidePanelColWidth = panelOpen ? sourceControlWidth : 0;
-  const sidePanelGap = panelOpen ? PANEL_GAP_PX : 0;
+  const sidePanelGap = panelOpen ? PANEL_GAP_X : "0px";
   const gridTemplateColumns =
-    `${PANEL_GAP_PX}px ${projectsColWidth}px ${PANEL_GAP_PX}px ` +
-    `${explorerColWidth}px ${explorerGap}px minmax(0,1fr) ` +
-    `${sidePanelGap}px ${sidePanelColWidth}px ${sidePanelGap}px`;
+    `${PANEL_GAP_X} ${projectsColWidth}px ${PANEL_GAP_X} ` +
+    `${explorerColWidth}px ${explorerGap} minmax(0,1fr) ` +
+    `${sidePanelGap} ${sidePanelColWidth}px ${sidePanelGap}`;
 
   return (
     <div
@@ -199,7 +198,7 @@ export function AppShell() {
           {/* The vertical gap lives on the clip container: absolute children
               resolve against the padding box, so padding on the wrapper would
               not inset them. */}
-          <div className="absolute inset-x-0 bottom-[4px] top-[4px] overflow-hidden">
+          <div className="absolute inset-x-0 bottom-[var(--panel-gap-y)] top-[var(--panel-gap-y)] overflow-hidden">
             <div
               aria-hidden={!codeSidebarCollapsed}
               className={cn(
@@ -235,7 +234,7 @@ export function AppShell() {
             ariaLabel={t("appShell.resizeProjectsPanel")}
             enabled={!codeSidebarCollapsed}
             onDraggingChange={setResizing}
-            className="bottom-[4px] top-[4px] h-auto"
+            className="bottom-[var(--panel-gap-y)] top-[var(--panel-gap-y)] h-auto"
           />
         </div>
 
@@ -246,7 +245,7 @@ export function AppShell() {
               the grid column can slide to zero without reflowing the tree. */}
           <div
             aria-hidden={explorerCollapsed}
-            className="absolute inset-x-0 bottom-[4px] top-[4px] overflow-hidden"
+            className="absolute inset-x-0 bottom-[var(--panel-gap-y)] top-[var(--panel-gap-y)] overflow-hidden"
           >
             <div
               className={cn(
@@ -280,17 +279,23 @@ export function AppShell() {
             ariaLabel={t("appShell.resizeExplorer")}
             enabled={!explorerCollapsed}
             onDraggingChange={setResizing}
-            className="bottom-[4px] top-[4px] h-auto"
+            className="bottom-[var(--panel-gap-y)] top-[var(--panel-gap-y)] h-auto"
           >
             <ExplorerTogglePill collapsed={false} onToggle={toggleExplorerCollapsed} />
           </ResizeHandle>
           {explorerCollapsed ? (
-            // The handle is gone while collapsed; park the pill straddling
-            // the projects card's trailing edge (this column is 0px wide and
-            // sits after the 8px gap, so `left:-16px` + 16px width centers
-            // the pill on that edge). The wrapper is inert, only the pill
-            // takes pointer events.
-            <div className="pointer-events-none absolute -left-[16px] top-0 z-30 h-full w-[16px]">
+            // The handle is gone while collapsed; park the pill straddling the
+            // projects card's trailing edge. This column is 0px wide and sits
+            // after one gap, so offsetting by TWO gaps (and spanning two) centers
+            // the pill on that edge. The wrapper is inert; only the pill takes
+            // pointer events.
+            <div
+              className="pointer-events-none absolute top-0 z-30 h-full"
+              style={{
+                left: "calc(var(--panel-gap-x) * -2)",
+                width: "calc(var(--panel-gap-x) * 2)",
+              }}
+            >
               <ExplorerTogglePill collapsed onToggle={toggleExplorerCollapsed} />
             </div>
           ) : null}
@@ -327,7 +332,7 @@ export function AppShell() {
             <>
               <div
                 aria-hidden={!panelOpen}
-                className="absolute inset-x-0 bottom-[4px] top-[4px] overflow-hidden"
+                className="absolute inset-x-0 bottom-[var(--panel-gap-y)] top-[var(--panel-gap-y)] overflow-hidden"
               >
                 <div
                   className={cn(
@@ -359,7 +364,7 @@ export function AppShell() {
                 ariaLabel={t("appShell.resizeSidePanel")}
                 enabled={panelOpen}
                 onDraggingChange={setResizing}
-                className="bottom-[4px] top-[4px] h-auto"
+                className="bottom-[var(--panel-gap-y)] top-[var(--panel-gap-y)] h-auto"
               />
             </>
           ) : null}

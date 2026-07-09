@@ -30,9 +30,7 @@ import { Kbd } from "@/components/ui/Kbd";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { CLI_BRAND_ICONS } from "@/components/icons/brand";
 import {
-  DEFAULT_CLI_REGISTRY,
-  cliCategory,
-  isAgentEnabled,
+  enabledAgentsByCategory,
   type CliTool,
 } from "@/features/terminal/cli-registry";
 import { useSettingsDataStore } from "@/features/settings/settings.data.store";
@@ -73,9 +71,8 @@ export function NewTabBody({ actions, C }: { actions: NewTabActions; C: MenuComp
   // shared menu default of /70, which reads as almost no hover at this density).
   const itemClass = "py-[9px] data-[highlighted]:bg-surface-strong";
 
-  const visible = DEFAULT_CLI_REGISTRY.filter((cli) => isAgentEnabled(cli.id, enabledAgents));
-  const codingAgents = visible.filter((cli) => cliCategory(cli) === "coding");
-  const autonomousAgents = visible.filter((cli) => cliCategory(cli) === "autonomous");
+  const { coding: codingAgents, autonomous: autonomousAgents } =
+    enabledAgentsByCategory(enabledAgents);
 
   // No install-state hint on launcher rows. The install guide surfaces inside
   // the tab via CliMissingPanel after the user clicks. Settings > CLI Registry

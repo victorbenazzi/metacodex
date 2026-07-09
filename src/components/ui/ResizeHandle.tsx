@@ -158,12 +158,17 @@ export function ResizeHandle({
 
   if (!enabled) return null;
 
-  // Default edge offsets (-8px) hang the 8px hit zone fully outside the panel,
-  // covering the gap column between two floating cards. Callers that supply
-  // their own `style` (e.g. free-floating diff seam) skip these by overriding
-  // the offset properties.
+  // Default edge offsets hang the hit zone fully outside the panel, covering the
+  // gap column between two floating cards. The offset and the zone width both
+  // track `--panel-gap-x` so the handle always fills exactly the shell's gap.
+  // Callers that supply their own `style` (e.g. free-floating diff seam) skip
+  // these by overriding the offset properties.
   const defaultEdgeClass =
-    side === "right" ? "-right-[8px]" : side === "left" ? "-left-[8px]" : "";
+    side === "right"
+      ? "-right-[var(--panel-gap-x)]"
+      : side === "left"
+        ? "-left-[var(--panel-gap-x)]"
+        : "";
 
   return (
     <div
@@ -175,7 +180,7 @@ export function ResizeHandle({
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => setHovering(false)}
       className={cn(
-        "group absolute top-0 z-30 h-full w-[8px] touch-none select-none cursor-col-resize",
+        "group absolute top-0 z-30 h-full w-[var(--panel-gap-x)] touch-none select-none cursor-col-resize",
         defaultEdgeClass,
         className,
       )}
@@ -187,14 +192,15 @@ export function ResizeHandle({
           // The hit zone spans the whole gap between two cards; the rail
           // paints ON the sized panel's edge (overlaying its 1px border) so
           // hover/drag reads as the card border lighting up, never a loose
-          // line floating in the gap. It is inset 12px (the card radius) from
-          // both ends so it hugs only the straight run of the edge. "center"
-          // (diff seam) has no card edge, so it stays at the zone's middle.
+          // line floating in the gap. It is inset by the card radius
+          // (--radius-lg) from both ends so it hugs only the straight run of
+          // the edge. "center" (diff seam) has no card edge, so it stays at
+          // the zone's middle.
           "pointer-events-none absolute w-px",
           side === "right"
-            ? "-left-px bottom-[12px] top-[12px]"
+            ? "-left-px bottom-[var(--radius-lg)] top-[var(--radius-lg)]"
             : side === "left"
-              ? "-right-px bottom-[12px] top-[12px]"
+              ? "-right-px bottom-[var(--radius-lg)] top-[var(--radius-lg)]"
               : "left-1/2 top-0 h-full -translate-x-1/2",
           "transition-colors duration-fast ease-out",
           dragging

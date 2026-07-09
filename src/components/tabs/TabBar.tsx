@@ -271,7 +271,7 @@ export function TabBar({
   return (
     <NewTabContextMenu onNewTerminal={onNewTerminal} onLaunchCli={onLaunchCli}>
     <div
-      className="relative z-20 h-[34px]"
+      className="relative z-20 h-[var(--panel-header-h)]"
       data-tauri-drag-region
     >
       {/* The scroll container fills the row exactly. The native scrollbar is

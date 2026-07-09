@@ -203,3 +203,19 @@ export function cliDetectCommandDisplay(cli: CliTool): string {
 export function isAgentEnabled(cliId: string, enabledAgents: Record<string, boolean>): boolean {
   return enabledAgents[cliId] ?? true;
 }
+
+/**
+ * The enabled agents split by category, in registry order. Both launcher
+ * surfaces (the "+" menu and the side panel) render the same two groups, so the
+ * filtering lives here instead of being copy-pasted into each.
+ */
+export function enabledAgentsByCategory(enabledAgents: Record<string, boolean>): {
+  coding: CliTool[];
+  autonomous: CliTool[];
+} {
+  const visible = DEFAULT_CLI_REGISTRY.filter((cli) => isAgentEnabled(cli.id, enabledAgents));
+  return {
+    coding: visible.filter((cli) => cliCategory(cli) === "coding"),
+    autonomous: visible.filter((cli) => cliCategory(cli) === "autonomous"),
+  };
+}

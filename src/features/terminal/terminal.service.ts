@@ -3,13 +3,15 @@ import { useThemeStore } from "@/features/theme/theme.store";
 import type { PtySpawnSpec } from "./terminal.types";
 
 export const ptyApi = {
-  spawn(spec: PtySpawnSpec): Promise<string> {
+  // `theme_kind` is injected here, not accepted from callers: the Omit makes
+  // that a compile error, and spreading it LAST means the injection always wins.
+  spawn(spec: Omit<PtySpawnSpec, "theme_kind">): Promise<string> {
     // Stamp the current theme kind so the backend can export COLORFGBG and
     // background-detecting TUIs start with matching colors. One injection
     // point here keeps every spawn path (new tab, resume, CLI) covered.
     const themed: PtySpawnSpec = {
-      theme_kind: useThemeStore.getState().effective,
       ...spec,
+      theme_kind: useThemeStore.getState().effective,
     };
     return invoke<string>(CMD.ptySpawn, { spec: themed });
   },

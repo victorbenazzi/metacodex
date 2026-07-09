@@ -9,11 +9,9 @@ import { Kbd } from "@/components/ui/Kbd";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { SourceControlPanel } from "@/components/source-control/SourceControlPanel";
 import { CLI_BRAND_ICONS } from "@/components/icons/brand";
-import type { CliTool } from "@/features/terminal/cli-registry";
 import {
-  DEFAULT_CLI_REGISTRY,
-  cliCategory,
-  isAgentEnabled,
+  enabledAgentsByCategory,
+  type CliTool,
 } from "@/features/terminal/cli-registry";
 import type { Project } from "@/features/projects/project.types";
 import { projectCapabilities } from "@/features/projects/project.types";
@@ -44,11 +42,8 @@ export function SidePanel({
   const canGit = projectCapabilities(project).git;
   const changeCount = git ? Object.keys(git.statuses).length : 0;
   const enabledAgents = useSettingsDataStore((s) => s.settings.interface.enabledAgents);
-  const visibleAgents = DEFAULT_CLI_REGISTRY.filter((cli) =>
-    isAgentEnabled(cli.id, enabledAgents),
-  );
-  const codingAgents = visibleAgents.filter((cli) => cliCategory(cli) === "coding");
-  const autonomousAgents = visibleAgents.filter((cli) => cliCategory(cli) === "autonomous");
+  const { coding: codingAgents, autonomous: autonomousAgents } =
+    enabledAgentsByCategory(enabledAgents);
 
   const openLauncherAction = (action: () => void) => {
     action();

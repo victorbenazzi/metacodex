@@ -200,8 +200,14 @@
   --title-bar-h: 44px;
   /* Single height for every panel header strip (explorer, projects sidebar,
      side panel, diagnostics) and the tab bar, so the top line of all columns
-     stays coplanar. The 36px title bar is a separate concern (drag region). */
+     stays coplanar. The title bar (--title-bar-h) is a separate concern. */
   --panel-header-h: 34px;
+  /* Breathing room around the floating sidebar cards: `x` is the gap between a
+     card and the window edge or another card (also the resize-handle hit-zone
+     width); `y` is the gap above and below each card. Single source of truth
+     for the grid template, the handle offsets and the vertical insets. */
+  --panel-gap-x: 8px;
+  --panel-gap-y: 4px;
 
   /* Terminal palette (warm, neutral ANSI) */
   --term-bg: var(--canvas);
