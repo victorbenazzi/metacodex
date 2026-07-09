@@ -37,9 +37,18 @@ pub struct RemoteAccessDraft {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RemoteAccessTestResult {
-    pub status: String,
+    pub status: HostTrustStatus,
     pub fingerprint_sha256: String,
-    pub message: Option<String>,
+}
+
+/// Result of the trust check during a connection test. Serializes to the
+/// `"trusted"` / `"untrusted"` strings the dialog already switches on, but as a
+/// closed enum so the boundary is not stringly-typed on either side.
+#[derive(Debug, Clone, Copy, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum HostTrustStatus {
+    Trusted,
+    Untrusted,
 }
 
 #[derive(Debug, Clone, Serialize)]

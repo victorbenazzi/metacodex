@@ -155,7 +155,6 @@ pub fn run() {
             commands::remote_access::remote_access_remove,
             commands::remote_access::remote_access_test,
             commands::remote_access::remote_discover_projects,
-            commands::remote_access::add_remote_project,
             commands::remote_access::add_remote_projects,
             commands::system::open_external_url,
             commands::system::take_pending_open_files,

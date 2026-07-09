@@ -8,7 +8,7 @@ use super::paths::normalize_remote_path;
 use super::ssh::{
     authenticate, check_or_trust_host, connect_transport, host_fingerprint, HostTrust,
 };
-use super::types::{RemoteAccess, RemoteAccessDraft, RemoteAccessTestResult};
+use super::types::{HostTrustStatus, RemoteAccess, RemoteAccessDraft, RemoteAccessTestResult};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -53,6 +53,7 @@ pub fn remove_access(id: &str) -> AppResult<()> {
     if file.accesses.len() == before {
         return Err(AppError::NotFound(format!("remote access {id}")));
     }
+    super::session::invalidate(id);
     save_file(&file)
 }
 
@@ -95,6 +96,9 @@ pub fn save_access(draft: RemoteAccessDraft) -> AppResult<RemoteAccess> {
     } else {
         file.accesses.push(access.clone());
     }
+    // The endpoint or identity may have changed; drop any pooled session so the
+    // next use reconnects with the new settings.
+    super::session::invalidate(&access.id);
     save_file(&file)?;
     Ok(access)
 }
@@ -108,9 +112,8 @@ pub fn test_access(
     let fingerprint = host_fingerprint(&session)?;
     match check_or_trust_host(&mut session, &normalized, trust_host)? {
         HostTrust::Untrusted => Ok(RemoteAccessTestResult {
-            status: "untrusted".into(),
+            status: HostTrustStatus::Untrusted,
             fingerprint_sha256: fingerprint,
-            message: None,
         }),
         HostTrust::Trusted => {
             authenticate(&session, &normalized)?;
@@ -118,9 +121,8 @@ pub fn test_access(
                 let _ = touch_access(id, Some(fingerprint.clone()));
             }
             Ok(RemoteAccessTestResult {
-                status: "trusted".into(),
+                status: HostTrustStatus::Trusted,
                 fingerprint_sha256: fingerprint,
-                message: None,
             })
         }
     }

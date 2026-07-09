@@ -1,12 +1,13 @@
 mod fs;
 mod paths;
+mod session;
 mod ssh;
 mod store;
 mod types;
 
 pub use fs::{
     create_dir, create_file, discover_projects, ensure_project_path, read_dir, read_file_bytes,
-    read_file_text, stat, validate_project_candidate, validate_project_candidates, write_file_text,
+    read_file_text, stat, validate_project_candidates, write_file_text,
 };
 pub use paths::{normalize_remote_path, remote_basename};
 pub use ssh::ssh_command_args;

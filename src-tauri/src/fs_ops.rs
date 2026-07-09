@@ -181,13 +181,18 @@ pub fn read_dir(app: &AppHandle, path: &str) -> AppResult<Vec<DirEntry>> {
         });
     }
 
-    // Folders first, then files; both case-insensitive alphabetical.
-    out.sort_by(|a, b| match (a.is_dir, b.is_dir) {
+    sort_dir_entries(&mut out);
+    Ok(out)
+}
+
+/// Folders first, then files; both case-insensitive alphabetical. Shared with
+/// the remote (SFTP) explorer so local and remote listings sort identically.
+pub(crate) fn sort_dir_entries(entries: &mut [DirEntry]) {
+    entries.sort_by(|a, b| match (a.is_dir, b.is_dir) {
         (true, false) => std::cmp::Ordering::Less,
         (false, true) => std::cmp::Ordering::Greater,
         _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
     });
-    Ok(out)
 }
 
 pub fn stat(app: &AppHandle, path: &str) -> AppResult<FileMeta> {
@@ -515,7 +520,7 @@ pub fn write_preview_text(path: &str, content: &str) -> AppResult<()> {
     atomic_write(Path::new(path), content.as_bytes())
 }
 
-fn guess_mime(path: &str) -> Option<String> {
+pub(crate) fn guess_mime(path: &str) -> Option<String> {
     let ext = Path::new(path)
         .extension()
         .and_then(|s| s.to_str())

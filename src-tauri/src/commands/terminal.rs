@@ -16,7 +16,7 @@ use crate::util::paths;
 
 #[tauri::command]
 pub async fn pty_spawn(
-    mut spec: PtySpawnSpec,
+    spec: PtySpawnSpec,
     app: AppHandle,
     mgr: State<'_, PtyManager>,
 ) -> AppResult<String> {
@@ -29,39 +29,51 @@ pub async fn pty_spawn(
         ));
     }
 
-    if let Some(project_id) = spec.project_id.as_deref() {
-        let cache = app.state::<Arc<ProjectsCache>>();
-        let project = cache
-            .snapshot()
-            .into_iter()
-            .find(|p| p.id == project_id)
-            .ok_or_else(|| AppError::NotFound(format!("project {project_id}")))?;
-        match project.origin {
-            ProjectOrigin::Local => {
-                paths::ensure_within_roots(&spec.cwd, &[project.path])?;
-            }
-            ProjectOrigin::Ssh {
-                access_id,
-                remote_path,
-            } => {
-                let safe_cwd =
-                    remote_access::ensure_project_path(&access_id, &remote_path, &spec.cwd)?;
-                spec.kind = match spec.kind {
-                    PtyKind::Plain => PtyKind::RemoteShell {
-                        access_id,
-                        remote_cwd: safe_cwd,
-                    },
-                    PtyKind::Cli { command } => PtyKind::RemoteCli {
-                        access_id,
-                        remote_cwd: safe_cwd,
-                        command,
-                    },
-                    other => other,
-                };
-            }
+    // Resolving an SSH project's cwd opens a connection; keep that off the async
+    // IPC worker (which also pumps pty://data) by validating on the blocking pool.
+    let spec = tokio::task::spawn_blocking(move || resolve_spawn_spec(&app, spec))
+        .await
+        .map_err(|e| AppError::Other(format!("join: {e}")))??;
+    mgr.spawn(spec)
+}
+
+/// Validate a spawn request against its project origin and, for SSH projects,
+/// rewrite the pty kind into its remote variant with the sandbox-checked cwd.
+/// Runs on the blocking pool because the SSH validation opens a connection.
+fn resolve_spawn_spec(app: &AppHandle, mut spec: PtySpawnSpec) -> AppResult<PtySpawnSpec> {
+    let Some(project_id) = spec.project_id.as_deref() else {
+        return Ok(spec);
+    };
+    let cache = app.state::<Arc<ProjectsCache>>();
+    let project = cache
+        .snapshot()
+        .into_iter()
+        .find(|p| p.id == project_id)
+        .ok_or_else(|| AppError::NotFound(format!("project {project_id}")))?;
+    match project.origin {
+        ProjectOrigin::Local => {
+            paths::ensure_within_roots(&spec.cwd, &[project.path])?;
+        }
+        ProjectOrigin::Ssh {
+            access_id,
+            remote_path,
+        } => {
+            let safe_cwd = remote_access::ensure_project_path(&access_id, &remote_path, &spec.cwd)?;
+            spec.kind = match spec.kind {
+                PtyKind::Plain => PtyKind::RemoteShell {
+                    access_id,
+                    remote_cwd: safe_cwd,
+                },
+                PtyKind::Cli { command } => PtyKind::RemoteCli {
+                    access_id,
+                    remote_cwd: safe_cwd,
+                    command,
+                },
+                other => other,
+            };
         }
     }
-    mgr.spawn(spec)
+    Ok(spec)
 }
 
 #[tauri::command]
@@ -299,25 +311,30 @@ pub async fn pty_update_cwd(
     // the registered roots , preventing an OSC 7 sequence from leaking a path
     // outside the sandbox into stored state. Plain shells (no project_id) are
     // unrestricted: `cd /tmp` is a normal operation.
-    let project_id = mgr.project_id_of(&session_id);
-    if let Some(project_id) = project_id {
-        let cache = app.state::<Arc<ProjectsCache>>();
-        let project = cache
-            .snapshot()
-            .into_iter()
-            .find(|p| p.id == project_id)
-            .ok_or_else(|| AppError::NotFound(format!("project {project_id}")))?;
-        match project.origin {
-            ProjectOrigin::Local => {
-                paths::ensure_within_roots(&cwd, &[project.path])?;
-            }
-            ProjectOrigin::Ssh {
-                access_id,
-                remote_path,
-            } => {
-                remote_access::ensure_project_path(&access_id, &remote_path, &cwd)?;
-            }
-        }
+    if let Some(project_id) = mgr.project_id_of(&session_id) {
+        let app = app.clone();
+        let cwd = cwd.clone();
+        tokio::task::spawn_blocking(move || validate_project_cwd(&app, &project_id, &cwd))
+            .await
+            .map_err(|e| AppError::Other(format!("join: {e}")))??;
     }
     mgr.set_cwd_override(&session_id, cwd)
+}
+
+/// Confirm `cwd` is inside the session's project sandbox. For SSH projects this
+/// opens a connection, so callers run it on the blocking pool.
+fn validate_project_cwd(app: &AppHandle, project_id: &str, cwd: &str) -> AppResult<()> {
+    let cache = app.state::<Arc<ProjectsCache>>();
+    let project = cache
+        .snapshot()
+        .into_iter()
+        .find(|p| p.id == project_id)
+        .ok_or_else(|| AppError::NotFound(format!("project {project_id}")))?;
+    match project.origin {
+        ProjectOrigin::Local => paths::ensure_within_roots(cwd, &[project.path]),
+        ProjectOrigin::Ssh {
+            access_id,
+            remote_path,
+        } => remote_access::ensure_project_path(&access_id, &remote_path, cwd).map(|_| ()),
+    }
 }

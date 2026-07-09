@@ -171,6 +171,26 @@ pub(crate) fn connect_access(access: &RemoteAccess) -> AppResult<Session> {
             )));
         }
     }
+    // Defense in depth. `check_or_trust_host` already validated the key against
+    // our known_hosts file; pinning the fingerprint we recorded on first trust
+    // additionally catches a known_hosts file edited out from under us. On the
+    // first successful connect we record it so later connects can pin.
+    match access.known_host_sha256.as_deref() {
+        Some(expected) => {
+            let actual = host_fingerprint(&session)?;
+            if actual != expected {
+                return Err(AppError::PermissionDenied(format!(
+                    "ssh host key fingerprint changed for {}:{}",
+                    normalized.host, normalized.port
+                )));
+            }
+        }
+        None => {
+            if let Ok(actual) = host_fingerprint(&session) {
+                let _ = super::store::touch_access(&access.id, Some(actual));
+            }
+        }
+    }
     authenticate(&session, &normalized)?;
     Ok(session)
 }
@@ -184,23 +204,20 @@ fn normalize_access_draft(mut draft: RemoteAccessDraft) -> AppResult<RemoteAcces
     Ok(draft)
 }
 
-pub(crate) fn sftp_for_access(access_id: &str) -> AppResult<(RemoteAccess, ssh2::Sftp)> {
-    let access = get_access(access_id)?;
-    let session = connect_access(&access)?;
-    let sftp = session.sftp().map_err(|e| ssh_error("sftp", e))?;
-    Ok((access, sftp))
-}
-
 pub fn ssh_command_args(
     access_id: &str,
     cwd: &str,
     command: Option<&str>,
 ) -> AppResult<(String, Vec<String>)> {
     let access = get_access(access_id)?;
+    // Normalize first so the containment check cannot be defeated by `..` or
+    // duplicate slashes: `path_within_root` is a pure prefix test. This is
+    // public and must fail closed regardless of what the caller passes.
+    let cwd = super::paths::normalize_remote_path(cwd)?;
     if !access
         .root_paths
         .iter()
-        .any(|root| path_within_root(root, cwd))
+        .any(|root| path_within_root(root, &cwd))
     {
         return Err(AppError::PathNotAllowed(format!(
             "remote cwd outside configured access roots: {cwd}"
@@ -209,9 +226,9 @@ pub fn ssh_command_args(
     let known_hosts = config_paths::ssh_known_hosts_file()?;
     let target = format!("{}@{}", access.user, access.host);
     let remote_command = if let Some(command) = command {
-        format!("cd -- {} && exec {command}", sh_quote(cwd))
+        format!("cd -- {} && exec {command}", sh_quote(&cwd))
     } else {
-        format!("cd -- {} && exec ${{SHELL:-/bin/sh}} -l", sh_quote(cwd))
+        format!("cd -- {} && exec ${{SHELL:-/bin/sh}} -l", sh_quote(&cwd))
     };
     let mut args = vec![
         "-tt".to_string(),

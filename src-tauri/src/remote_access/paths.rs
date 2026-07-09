@@ -63,30 +63,26 @@ pub fn normalize_remote_path(path: &str) -> AppResult<String> {
 pub(crate) fn remote_join(parent: &str, name: &str) -> AppResult<String> {
     validate_relative_name(name)?;
     let mut path = normalize_remote_path(parent)?;
-    for seg in name.replace('\\', "/").split('/') {
-        if seg.is_empty() {
-            continue;
-        }
-        if path != "/" {
-            path.push('/');
-        }
-        path.push_str(seg);
+    if path != "/" {
+        path.push('/');
     }
+    path.push_str(name.trim());
     normalize_remote_path(&path)
 }
 
+/// A leaf name for create-file / create-dir: exactly one path segment, no
+/// separators. Multi-segment names were accepted before but could never be
+/// created (the parent chain would not exist), so reject them at the door.
 fn validate_relative_name(name: &str) -> AppResult<()> {
-    if name.trim().is_empty()
+    let name = name.trim();
+    if name.is_empty()
+        || name == "."
+        || name == ".."
         || name.contains('\0')
-        || name.starts_with('/')
-        || name.starts_with('\\')
+        || name.contains('/')
+        || name.contains('\\')
     {
         return Err(AppError::Other(format!("invalid name: {name:?}")));
-    }
-    for seg in name.replace('\\', "/").split('/') {
-        if seg.is_empty() || seg == "." || seg == ".." {
-            return Err(AppError::Other(format!("invalid name: {name:?}")));
-        }
     }
     Ok(())
 }
@@ -129,14 +125,23 @@ pub(crate) fn ensure_allowed<S: RemotePathStat>(
             current.push('/');
         }
         current.push_str(seg);
+        let is_leaf = current == target;
         match stat.remote_lstat(&current) {
             Ok(RemoteNodeKind::Symlink) => {
                 return Err(AppError::PathNotAllowed(format!(
                     "remote symlink is not allowed: {current}"
                 )));
             }
+            // An intermediate component must be a real directory. Rejecting a
+            // file here (instead of letting a later mkdir/open fail with an
+            // opaque SFTP error) keeps the boundary honest and the errors clear.
+            Ok(kind) if !is_leaf && kind != RemoteNodeKind::Dir => {
+                return Err(AppError::PathNotAllowed(format!(
+                    "remote path component is not a directory: {current}"
+                )));
+            }
             Ok(_) => {}
-            Err(_) if leaf_may_be_missing && current == target => break,
+            Err(_) if leaf_may_be_missing && is_leaf => break,
             Err(err) => return Err(err),
         }
     }
@@ -238,5 +243,33 @@ mod tests {
         let err =
             ensure_allowed(&stat, "/srv/app", "/srv/application/file.txt", false).unwrap_err();
         assert!(matches!(err, AppError::PathNotAllowed(_)));
+    }
+
+    #[test]
+    fn ensure_allowed_rejects_file_as_intermediate_component() {
+        let stat = FakeStat::new(&[
+            ("/srv/app", RemoteNodeKind::Dir),
+            ("/srv/app/notes.txt", RemoteNodeKind::File),
+        ]);
+        let err =
+            ensure_allowed(&stat, "/srv/app", "/srv/app/notes.txt/child", true).unwrap_err();
+        assert!(matches!(err, AppError::PathNotAllowed(_)));
+    }
+
+    #[test]
+    fn ensure_allowed_accepts_file_as_leaf() {
+        let stat = FakeStat::new(&[
+            ("/srv/app", RemoteNodeKind::Dir),
+            ("/srv/app/notes.txt", RemoteNodeKind::File),
+        ]);
+        let path = ensure_allowed(&stat, "/srv/app", "/srv/app/notes.txt", false).unwrap();
+        assert_eq!(path, "/srv/app/notes.txt");
+    }
+
+    #[test]
+    fn remote_join_rejects_path_separators_in_name() {
+        assert!(remote_join("/srv/app", "a/b").is_err());
+        assert!(remote_join("/srv/app", "..").is_err());
+        assert!(remote_join("/srv/app", "child").is_ok());
     }
 }

@@ -41,16 +41,6 @@ impl Project {
     pub fn is_local(&self) -> bool {
         matches!(self.origin, ProjectOrigin::Local)
     }
-
-    pub fn ssh_origin(&self) -> Option<(&str, &str)> {
-        match &self.origin {
-            ProjectOrigin::Ssh {
-                access_id,
-                remote_path,
-            } => Some((access_id.as_str(), remote_path.as_str())),
-            ProjectOrigin::Local => None,
-        }
-    }
 }
 
 /// On-disk shape of `~/.metacodex/state/projects.json`: the registry plus the
@@ -253,18 +243,6 @@ pub fn add(app: &AppHandle, path: String) -> AppResult<Project> {
     Ok(project)
 }
 
-pub fn add_remote(
-    app: &AppHandle,
-    access_id: String,
-    remote_path: String,
-    name: Option<String>,
-) -> AppResult<Project> {
-    add_remote_many(app, access_id, vec![(remote_path, name)])?
-        .into_iter()
-        .next()
-        .ok_or_else(|| AppError::Other("remote project was not added".into()))
-}
-
 pub fn add_remote_many(
     app: &AppHandle,
     access_id: String,
@@ -299,7 +277,8 @@ pub fn add_remote_many(
         let trimmed_name = name.map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
         let project = Project {
             id: new_id(),
-            name: trimmed_name.unwrap_or_else(|| remote_basename(&remote_path)),
+            name: trimmed_name
+                .unwrap_or_else(|| crate::remote_access::remote_basename(&remote_path)),
             path: remote_path.clone(),
             origin: ProjectOrigin::Ssh {
                 access_id: access_id.clone(),
@@ -337,48 +316,6 @@ pub fn remote_dependency_count(access_id: &str) -> AppResult<usize> {
             )
         })
         .count())
-}
-
-pub fn remove_remote_access_projects(app: &AppHandle, access_id: &str) -> AppResult<Vec<String>> {
-    let mut file = load_file()?;
-    let mut removed_ids = Vec::new();
-    file.projects.retain(|p| {
-        let remove = matches!(
-            &p.origin,
-            ProjectOrigin::Ssh {
-                access_id: existing_access_id,
-                ..
-            } if existing_access_id == access_id
-        );
-        if remove {
-            removed_ids.push(p.id.clone());
-        }
-        !remove
-    });
-    if removed_ids.is_empty() {
-        return Ok(removed_ids);
-    }
-    if let Some(active_id) = file.last_active_project_id.as_deref() {
-        if removed_ids.iter().any(|id| id == active_id) {
-            file.last_active_project_id = None;
-        }
-    }
-    save_file(&file)?;
-    app.state::<Arc<ProjectsCache>>()
-        .replace(file.projects.clone());
-    for id in &removed_ids {
-        app.state::<Arc<crate::watcher::WatcherManager>>()
-            .unwatch(id);
-    }
-    Ok(removed_ids)
-}
-
-fn remote_basename(path: &str) -> String {
-    path.trim_end_matches('/')
-        .rsplit('/')
-        .find(|s| !s.is_empty())
-        .unwrap_or(path)
-        .to_string()
 }
 
 /// Create a brand-new project folder under `directory` and register it. `name`
