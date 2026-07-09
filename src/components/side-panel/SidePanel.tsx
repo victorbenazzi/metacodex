@@ -36,9 +36,10 @@ export function SidePanel({
   onOpenDiff,
 }: SidePanelProps) {
   const { t } = useTranslation();
-  const activeTool = useSidePanelStore((s) => s.activeTool);
-  const setActiveTool = useSidePanelStore((s) => s.setActiveTool);
-  const setOpen = useSidePanelStore((s) => s.setOpen);
+  const view = useSidePanelStore((s) => s.view);
+  const showReview = useSidePanelStore((s) => s.showReview);
+  const showLauncher = useSidePanelStore((s) => s.showLauncher);
+  const close = useSidePanelStore((s) => s.close);
   const git = useGitStore((s) => (project ? s.byProject[project.id] : null));
   const canGit = projectCapabilities(project).git;
   const changeCount = git ? Object.keys(git.statuses).length : 0;
@@ -51,7 +52,7 @@ export function SidePanel({
 
   const openLauncherAction = (action: () => void) => {
     action();
-    setOpen(false);
+    close();
   };
 
   // Height choreography: in launcher mode the card hugs its content; opening
@@ -98,12 +99,12 @@ export function SidePanel({
     const ro = new ResizeObserver(sync);
     ro.observe(block);
     return () => ro.disconnect();
-  }, [activeTool]);
+  }, [view]);
 
   const collapsedH =
     launcherH !== null && frameH !== null ? Math.min(launcherH, frameH) : null;
   const asideHeight =
-    activeTool === "review" ? frameH ?? undefined : collapsedH ?? undefined;
+    view === "review" ? frameH ?? undefined : collapsedH ?? undefined;
 
   return (
     <div ref={frameRef} className="h-full min-h-0">
@@ -117,14 +118,14 @@ export function SidePanel({
       style={{ height: asideHeight }}
       aria-label={t("sidePanel.title")}
     >
-      {activeTool === "review" ? (
+      {view === "review" ? (
         <>
           <header className="flex h-[var(--panel-header-h)] shrink-0 items-center gap-[6px] border-b border-hairline-soft px-[8px]">
             <Tooltip content={t("sidePanel.showTools")} side="bottom">
               <IconButton
                 aria-label={t("sidePanel.showTools")}
                 size="md"
-                onClick={() => setActiveTool(null)}
+                onClick={() => showLauncher()}
               >
                 <Icon icon={ChevronLeft} size={14} />
               </IconButton>
@@ -183,7 +184,7 @@ export function SidePanel({
                       </span>
                     ) : null
                   }
-                  onClick={() => setActiveTool("review")}
+                  onClick={() => showReview()}
                 />
               </LauncherSection>
             ) : null}

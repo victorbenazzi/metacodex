@@ -1,31 +1,26 @@
 import { create } from "zustand";
 
-export type SidePanelTool = "review";
+/**
+ * The side panel is a single three-state surface, not an (open, tool) pair:
+ * `closed` (hidden), `launcher` (the new-tab launcher), or `review` (the
+ * source-control view). One field rules out the meaningless "closed but a tool
+ * is selected" state the old shape allowed.
+ */
+export type SidePanelView = "closed" | "launcher" | "review";
 
 interface SidePanelState {
-  open: boolean;
-  activeTool: SidePanelTool | null;
-  toggle: (tool?: SidePanelTool) => void;
-  setOpen: (open: boolean) => void;
-  setActiveTool: (tool: SidePanelTool | null) => void;
+  view: SidePanelView;
+  /** Title-bar button: closed opens the launcher, anything open closes it. */
+  toggle: () => void;
+  close: () => void;
+  showLauncher: () => void;
+  showReview: () => void;
 }
 
 export const useSidePanelStore = create<SidePanelState>((set) => ({
-  open: false,
-  activeTool: null,
-  toggle: (tool) =>
-    set((s) => {
-      if (tool) {
-        return {
-          open: !(s.open && s.activeTool === tool),
-          activeTool: tool,
-        };
-      }
-      return {
-        open: !s.open,
-        activeTool: s.open ? s.activeTool : null,
-      };
-    }),
-  setOpen: (open) => set({ open }),
-  setActiveTool: (tool) => set({ activeTool: tool, open: true }),
+  view: "closed",
+  toggle: () => set((s) => ({ view: s.view === "closed" ? "launcher" : "closed" })),
+  close: () => set({ view: "closed" }),
+  showLauncher: () => set({ view: "launcher" }),
+  showReview: () => set({ view: "review" }),
 }));

@@ -10,7 +10,6 @@ import {
 import { useExplorerStore } from "@/features/explorer/explorer.store";
 import { useSettingsDataStore, flushSettings } from "@/features/settings/settings.data.store";
 import { flushAllEditors } from "@/features/editor/editorSavers";
-import { useSaveStatusStore } from "@/features/workspace/saveStatus.store";
 import { EV, listenTo } from "@/lib/events";
 import { CMD, invoke } from "@/lib/ipc";
 import { recordDiag, useDiagnosticsStore } from "@/features/diagnostics/diagnostics.store";
@@ -102,18 +101,15 @@ export function useWorkspacePersistence(
       cur?.activeTabId && persistTabs.some((t) => t.id === cur.activeTabId)
         ? cur.activeTabId
         : persistTabs[0]?.id ?? null;
-    useSaveStatusStore.getState().beginSave();
     try {
       await workspaceApi.save(projectId, {
         openTabs: persistTabs,
         activeTabId: persistedActiveId,
         expandedPaths,
       });
-      useSaveStatusStore.getState().markSaved();
       recordDiag("workspace.save.ok", { projectId, detail: { tabs: persistTabs.length } });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      useSaveStatusStore.getState().markFailed(message);
       recordDiag("workspace.save.fail", {
         projectId,
         detail: { error: message },

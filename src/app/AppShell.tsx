@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { MiniProjectSidebar } from "@/components/project-rail/MiniProjectSidebar";
 import { ExplorerPanel } from "@/components/file-explorer/ExplorerPanel";
 import { ExplorerTogglePill } from "@/components/file-explorer/ExplorerTogglePill";
@@ -38,8 +38,11 @@ import { useAppBootstrap } from "@/app/hooks/useAppBootstrap";
 import { useFilesystemSync } from "@/app/hooks/useFilesystemSync";
 import { useWorkspacePersistence } from "@/app/hooks/useWorkspacePersistence";
 import { useTabActions } from "@/app/hooks/useTabActions";
+import { useDelayedFlag } from "@/app/hooks/useDelayedFlag";
 import { cn } from "@/lib/cn";
 
+// Must equal `--dur-base` (tokens.css): the grid uses `duration-base` for its
+// column transition, and the side panel must stay mounted until it finishes.
 const DRAWER_ANIMATION_MS = 180;
 // Horizontal breathing room around the floating sidebar cards: window edge to
 // card and card to card. The VERTICAL gaps (title bar to card, card to window
@@ -86,21 +89,20 @@ export function AppShell() {
     [project, homeDirPath],
   );
 
-  const panelOpen = useSidePanelStore((s) => s.open);
+  const panelOpen = useSidePanelStore((s) => s.view !== "closed");
   // Code sidebar collapsed -> the Files/History panel folds away to just the rail.
   const codeSidebarCollapsed = useCodeSidebarStore((s) => s.collapsed);
   // Explorer collapsed -> the file-explorer column folds to zero width; the
   // toggle pill on the seam is the way back.
   const explorerCollapsed = useCodeSidebarStore((s) => s.explorerCollapsed);
   const toggleExplorerCollapsed = useCodeSidebarStore((s) => s.toggleExplorerCollapsed);
-  const [sidePanelMounted, setSidePanelMounted] = useState(panelOpen);
-  const [drawerAnimating, setDrawerAnimating] = useState(false);
-  const previousDrawerState = useRef({ codeSidebarCollapsed, explorerCollapsed, panelOpen });
-  const drawerStateChanged =
-    previousDrawerState.current.codeSidebarCollapsed !== codeSidebarCollapsed ||
-    previousDrawerState.current.explorerCollapsed !== explorerCollapsed ||
-    previousDrawerState.current.panelOpen !== panelOpen;
-  const drawerTransitionActive = drawerStateChanged || drawerAnimating;
+  // Keep the side panel mounted through its close animation.
+  const sidePanelMounted = useDelayedFlag(panelOpen, DRAWER_ANIMATION_MS);
+  // The grid-template-columns transition is always on EXCEPT while a resize
+  // handle is being dragged: during a drag we want 1px steps to track the
+  // pointer, not ease behind it. Drawer toggles (collapse/expand, panel
+  // open/close) are never drags, so they always animate.
+  const [resizing, setResizing] = useState(false);
 
   // Resizable panel widths, driven by settings, persisted to ~/.metacodex.
   const projectsWidth = useSettingsDataStore((s) => s.settings.panels.projectsWidth);
@@ -133,33 +135,6 @@ export function AppShell() {
     () => updateSettings("panels", { sourceControlWidth: PANEL_LIMITS.sourceControl.default }),
     [updateSettings],
   );
-
-  useEffect(() => {
-    if (panelOpen) {
-      setSidePanelMounted(true);
-      return undefined;
-    }
-
-    const timeout = window.setTimeout(
-      () => setSidePanelMounted(false),
-      DRAWER_ANIMATION_MS,
-    );
-    return () => window.clearTimeout(timeout);
-  }, [panelOpen]);
-
-  useEffect(() => {
-    previousDrawerState.current = { codeSidebarCollapsed, explorerCollapsed, panelOpen };
-    if (!drawerStateChanged) {
-      return undefined;
-    }
-
-    setDrawerAnimating(true);
-    const timeout = window.setTimeout(
-      () => setDrawerAnimating(false),
-      DRAWER_ANIMATION_MS,
-    );
-    return () => window.clearTimeout(timeout);
-  }, [codeSidebarCollapsed, explorerCollapsed, panelOpen]);
 
   useWorkspacePersistence(project, projects, bucket);
 
@@ -201,7 +176,7 @@ export function AppShell() {
     <div
       className={cn(
         "relative grid h-screen w-screen grid-rows-[var(--title-bar-h)_minmax(0,1fr)] bg-canvas text-ink",
-        drawerTransitionActive &&
+        !resizing &&
           "transition-[grid-template-columns] duration-base ease-out motion-reduce:transition-none",
       )}
       style={{ gridTemplateColumns }}
@@ -259,6 +234,7 @@ export function AppShell() {
             onReset={resetProjectsWidth}
             ariaLabel={t("appShell.resizeProjectsPanel")}
             enabled={!codeSidebarCollapsed}
+            onDraggingChange={setResizing}
             className="bottom-[4px] top-[4px] h-auto"
           />
         </div>
@@ -303,6 +279,7 @@ export function AppShell() {
             onReset={resetExplorerWidth}
             ariaLabel={t("appShell.resizeExplorer")}
             enabled={!explorerCollapsed}
+            onDraggingChange={setResizing}
             className="bottom-[4px] top-[4px] h-auto"
           >
             <ExplorerTogglePill collapsed={false} onToggle={toggleExplorerCollapsed} />
@@ -381,6 +358,7 @@ export function AppShell() {
                 onReset={resetSourceControlWidth}
                 ariaLabel={t("appShell.resizeSidePanel")}
                 enabled={panelOpen}
+                onDraggingChange={setResizing}
                 className="bottom-[4px] top-[4px] h-auto"
               />
             </>

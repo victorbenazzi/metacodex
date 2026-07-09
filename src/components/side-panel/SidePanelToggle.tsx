@@ -8,7 +8,7 @@ import { cn } from "@/lib/cn";
 
 export function SidePanelToggle() {
   const { t } = useTranslation();
-  const open = useSidePanelStore((s) => s.open);
+  const open = useSidePanelStore((s) => s.view !== "closed");
   const toggle = useSidePanelStore((s) => s.toggle);
 
   return (

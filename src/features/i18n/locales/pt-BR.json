@@ -470,8 +470,6 @@
     }
   },
   "sourceControl": {
-    "toggle": "Git e revisão",
-    "title": "Git e revisão",
     "changedFiles_one": "{{count}} arquivo",
     "changedFiles_other": "{{count}} arquivos",
     "additions_one": "{{count}} adição",
@@ -507,7 +505,6 @@
     "title": "Painel lateral",
     "toggle": "Alternar painel lateral",
     "review": "Git e revisão",
-    "toggleReview": "Git e revisão",
     "showTools": "Mostrar ferramentas do painel lateral",
     "sections": {
       "repository": "Repositório",

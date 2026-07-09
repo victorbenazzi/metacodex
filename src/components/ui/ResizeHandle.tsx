@@ -48,6 +48,12 @@ interface ResizeHandleProps {
   /** When false, hides the handle entirely (e.g. panel collapsed). */
   enabled?: boolean;
   /**
+   * Notified when a drag starts (`true`) and ends (`false`). The shell uses it
+   * to suspend its grid-template-columns transition during a drag, so 1px
+   * resize steps track the pointer instead of easing behind it.
+   */
+  onDraggingChange?: (dragging: boolean) => void;
+  /**
    * Optional affordances layered inside the hit zone (e.g. the explorer's
    * collapse pill). The root carries the `group` class so children can reveal
    * themselves via `group-hover:*`. Children are unmounted while dragging so
@@ -84,6 +90,7 @@ export function ResizeHandle({
   style,
   ariaLabel,
   enabled = true,
+  onDraggingChange,
   children,
 }: ResizeHandleProps) {
   const [dragging, setDragging] = useState(false);
@@ -138,6 +145,12 @@ export function ResizeHandle({
       document.body.style.userSelect = prevSelect;
     };
   }, [dragging, max, min, onChange, toDelta]);
+
+  // Report drag start/stop to the caller. In an effect (not inside the setters)
+  // so it fires once per real transition and never during render.
+  useEffect(() => {
+    onDraggingChange?.(dragging);
+  }, [dragging, onDraggingChange]);
 
   const onDoubleClick = useCallback(() => {
     if (onReset) onReset();

@@ -470,8 +470,6 @@
     }
   },
   "sourceControl": {
-    "toggle": "Git and Review",
-    "title": "Git and Review",
     "changedFiles_one": "{{count}} file",
     "changedFiles_other": "{{count}} files",
     "additions_one": "{{count}} addition",
@@ -507,7 +505,6 @@
     "title": "Side panel",
     "toggle": "Toggle side panel",
     "review": "Git and Review",
-    "toggleReview": "Git and Review",
     "showTools": "Show side panel tools",
     "sections": {
       "repository": "Repository",
