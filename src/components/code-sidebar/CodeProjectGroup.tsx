@@ -39,7 +39,11 @@ import { CLI_BRAND_ICONS } from "@/components/icons/brand";
 import { useTabsStore } from "@/components/tabs/tabsStore";
 import { useTerminalStore } from "@/features/terminal/terminal.store";
 import { useTabMetadataStore, type ListeningPort } from "@/features/terminal/tabMetadata.store";
-import { isRemoteProject, type Project } from "@/features/projects/project.types";
+import {
+  isRemoteProject,
+  projectCapabilities,
+  type Project,
+} from "@/features/projects/project.types";
 import type { ResumeEntry } from "@/features/resume/resume.service";
 import { resolveTabTitle, type Tab } from "@/components/tabs/types";
 
@@ -79,7 +83,10 @@ export function CodeProjectGroup({
   const expanded = explicit ?? active; // active project opens by default
   const collapsed = !expanded;
   const vertical = layoutMode === "vertical";
+  // `remoteProject` drives the SSH badge (that is literally what it means);
+  // `canReveal` gates the reveal-in-Finder row (a capability, not an identity).
   const remoteProject = isRemoteProject(project);
+  const canReveal = projectCapabilities(project).revealInFinder;
 
   // --- Section data (subscribed always; only rendered when expanded) ---------
   const resumeEntries = useResumeStore((s) => s.entries);
@@ -272,12 +279,12 @@ export function CodeProjectGroup({
                     <Icon icon={Pencil} size={12} className="text-muted" />
                     {t("projectRail.menu.rename")}
                   </DropdownItem>
-                  {remoteProject ? null : (
+                  {canReveal ? (
                     <DropdownItem onSelect={revealInFinder}>
                       <Icon icon={FolderOpen} size={12} className="text-muted" />
                       {t("projectRail.menu.revealInFinder")}
                     </DropdownItem>
-                  )}
+                  ) : null}
                   <DropdownSeparator />
                   <DropdownItem
                     className="text-danger data-[highlighted]:bg-danger/10 data-[highlighted]:text-danger"

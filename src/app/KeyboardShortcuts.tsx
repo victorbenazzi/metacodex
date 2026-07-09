@@ -7,7 +7,7 @@ import { useSearchUiStore } from "@/features/search/search.store";
 import { useCommandPaletteStore } from "@/features/command-palette/command-palette.store";
 import { useDiagnosticsStore } from "@/features/diagnostics/diagnostics.store";
 import { useProjectsStore } from "@/features/projects/project.store";
-import { isRemoteProject } from "@/features/projects/project.types";
+import { projectCapabilities } from "@/features/projects/project.types";
 import { getAppCommands } from "@/app/appCommands";
 
 /**
@@ -52,13 +52,13 @@ function dispatchCommand(cmd: ResolvedCommand) {
       useSettingsStore.getState().setOpen(true);
       break;
     case "search.inProject":
-      if (!activeProjectIsRemote()) useSearchUiStore.getState().setOpen(true);
+      if (activeProjectCan("search")) useSearchUiStore.getState().setOpen(true);
       break;
     case "palette.commands":
       useCommandPaletteStore.getState().openCommands();
       break;
     case "palette.files":
-      if (!activeProjectIsRemote()) useCommandPaletteStore.getState().openFiles();
+      if (activeProjectCan("search")) useCommandPaletteStore.getState().openFiles();
       break;
     case "file.save":
       // Passive commands return before dispatch; this case is for exhaustiveness.
@@ -72,10 +72,10 @@ function dispatchCommand(cmd: ResolvedCommand) {
   }
 }
 
-function activeProjectIsRemote(): boolean {
+function activeProjectCan(capability: "search"): boolean {
   const state = useProjectsStore.getState();
   const project = state.projects.find((p) => p.id === state.activeProjectId);
-  return isRemoteProject(project);
+  return projectCapabilities(project)[capability];
 }
 
 /**

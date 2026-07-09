@@ -32,7 +32,7 @@ import { useEditorStatusStore } from "@/features/editor/editor-status.store";
 import { gitApi } from "@/features/git/git.service";
 import { useGitStore } from "@/features/git/git.store";
 import { useProjectsStore } from "@/features/projects/project.store";
-import { isRemoteProject } from "@/features/projects/project.types";
+import { projectCapabilities } from "@/features/projects/project.types";
 import { buildEditorTheme } from "./editorTheme";
 import { EditorStatusBar } from "./EditorStatusBar";
 import { EditorBreadcrumbs } from "./EditorBreadcrumbs";
@@ -100,12 +100,12 @@ export function EditorTab({
   const project = useProjectsStore((s) =>
     projectId ? s.projects.find((p) => p.id === projectId) ?? null : null,
   );
-  const remoteProject = isRemoteProject(project);
+  const gitUnsupported = !projectCapabilities(project).git;
   // Re-fetch HEAD for the change gutter whenever this project's git state moves
   // (commit, checkout, stage). The object identity changes on every refresh.
   // Preview files live outside any repo , skip git entirely.
   const gitInfo = useGitStore((s) =>
-    !preview && projectId && !remoteProject ? s.byProject[projectId] : undefined,
+    !preview && projectId && !gitUnsupported ? s.byProject[projectId] : undefined,
   );
 
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -249,7 +249,7 @@ export function EditorTab({
 
         // Seed the change gutter with the file's committed (HEAD) text. Preview
         // files aren't in a repo , skip the HEAD lookup entirely.
-        if (!preview && !remoteProject) {
+        if (!preview && !gitUnsupported) {
           void gitApi
             .fileHeadContent(path)
             .then((head) => {
@@ -304,7 +304,7 @@ export function EditorTab({
   // Refresh the change gutter when this project's git state moves (commit,
   // checkout, …). The initial fetch is handled by the build effect above.
   useEffect(() => {
-    if (preview || remoteProject) return;
+    if (preview || gitUnsupported) return;
     const view = viewRef.current;
     if (!view) return;
     void gitApi

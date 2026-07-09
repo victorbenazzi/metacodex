@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 
 import { EV, listenTo, type FsChangedPayload } from "@/lib/events";
-import { fsApi } from "@/features/filesystem/filesystem.service";
+import { workspaceFsApi } from "@/features/filesystem/filesystem.service";
 import { useTabsStore } from "@/components/tabs/tabsStore";
 import { useEditorStore } from "./editor.store";
 
@@ -32,7 +32,7 @@ export function useEditorReconcile() {
     let disposed = false;
     void (async () => {
       const off = await listenTo<FsChangedPayload>(EV.fsChanged, (e) => {
-        void reconcile(e.payload.paths);
+        void reconcile(e.payload.projectId, e.payload.paths);
       });
       if (disposed) off();
       else unlisten = off;
@@ -44,21 +44,24 @@ export function useEditorReconcile() {
   }, []);
 }
 
-async function reconcile(changedPaths: string[]) {
+async function reconcile(projectId: string, changedPaths: string[]) {
   if (changedPaths.length === 0) return;
   const editor = useEditorStore.getState();
-  const { byProject } = useTabsStore.getState();
+  // The watcher emits per project, so only reconcile that project's tabs and
+  // read through its workspace. Scanning every bucket by path alone could reload
+  // a same-path tab from a different project (e.g. an SSH project mirroring a
+  // watched local path) with the wrong file's content.
+  const bucket = useTabsStore.getState().byProject[projectId];
+  if (!bucket) return;
 
   // Collect (tabId → path) for every open file-backed tab that has a live editor
   // buffer and whose path is touched by an event path. Dedupe by tabId.
   const targets = new Map<string, string>();
-  for (const bucket of Object.values(byProject)) {
-    for (const tab of bucket.tabs) {
-      if (!("path" in tab) || !tab.path) continue;
-      if (!matchesChangedPath(tab.path, changedPaths)) continue;
-      if (!editor.get(tab.id)) continue; // no live buffer (e.g. markdown in preview)
-      targets.set(tab.id, tab.path);
-    }
+  for (const tab of bucket.tabs) {
+    if (!("path" in tab) || !tab.path) continue;
+    if (!matchesChangedPath(tab.path, changedPaths)) continue;
+    if (!editor.get(tab.id)) continue; // no live buffer (e.g. markdown in preview)
+    targets.set(tab.id, tab.path);
   }
   if (targets.size === 0) return;
 
@@ -68,7 +71,7 @@ async function reconcile(changedPaths: string[]) {
     // Skip mid-save: the atomic write itself fires the watcher for this path.
     if (st.saving) continue;
     try {
-      const disk = await fsApi.readFileText(path, READ_LIMIT);
+      const disk = await workspaceFsApi.readFileText(projectId, path, READ_LIMIT);
       const cur = useEditorStore.getState().get(tabId);
       if (!cur || cur.saving) continue;
       if (disk.content === cur.loadedContent) continue; // no real divergence

@@ -36,7 +36,6 @@ export const CMD = {
   remoteAccessRemove: "remote_access_remove",
   remoteAccessTest: "remote_access_test",
   remoteDiscoverProjects: "remote_discover_projects",
-  addRemoteProject: "add_remote_project",
   addRemoteProjects: "add_remote_projects",
 
   // system

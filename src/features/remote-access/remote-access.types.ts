@@ -24,7 +24,6 @@ export interface RemoteAccessDraft {
 export interface RemoteAccessTestResult {
   status: "trusted" | "untrusted";
   fingerprintSha256: string;
-  message?: string | null;
 }
 
 export interface RemoteProjectCandidate {

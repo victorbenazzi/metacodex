@@ -16,7 +16,6 @@ interface ProjectsState {
 
   hydrate: () => Promise<void>;
   add: (path: string) => Promise<Project>;
-  addRemote: (accessId: string, path: string, name?: string) => Promise<Project>;
   addRemoteMany: (
     accessId: string,
     projects: Array<{ path: string; name?: string }>,
@@ -72,8 +71,6 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
   },
 
   add: (path) => projectsApi.add(path).then((p) => absorbProject(get, set, p)),
-  addRemote: (accessId, path, name) =>
-    projectsApi.addRemote(accessId, path, name).then((p) => absorbProject(get, set, p)),
   addRemoteMany: (accessId, projects) =>
     projectsApi.addRemoteMany(accessId, projects).then((added) => {
       for (const project of added) absorbProject(get, set, project);

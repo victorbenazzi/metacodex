@@ -19,6 +19,49 @@ export function isRemoteProject(project: Project | null | undefined): boolean {
 }
 
 /**
+ * What a project's origin supports. Every UI surface asks about the capability
+ * it needs (`caps.search`, `caps.git`) instead of re-deriving "is this remote?"
+ * on its own, so the rules live here. When an SSH capability lands (remote
+ * search, remote git), flip its flag in `REMOTE_CAPABILITIES` and every gate
+ * follows. The sidebar's SSH badge still asks `isRemoteProject` directly
+ * because that is literally what it means.
+ */
+export interface ProjectCapabilities {
+  /** Git status + gutter, the Source Control panel, and worktrees. */
+  git: boolean;
+  /** In-project content search (ripgrep) and the file palette. */
+  search: boolean;
+  /** Filesystem watcher and external-change reconcile. */
+  watcher: boolean;
+  /** Native "reveal in Finder / Explorer". */
+  revealInFinder: boolean;
+  /** Detecting whether a CLI is installed before launching it. */
+  localCli: boolean;
+}
+
+const LOCAL_CAPABILITIES: ProjectCapabilities = {
+  git: true,
+  search: true,
+  watcher: true,
+  revealInFinder: true,
+  localCli: true,
+};
+
+const REMOTE_CAPABILITIES: ProjectCapabilities = {
+  git: false,
+  search: false,
+  watcher: false,
+  revealInFinder: false,
+  localCli: false,
+};
+
+export function projectCapabilities(
+  project: Project | null | undefined,
+): ProjectCapabilities {
+  return isRemoteProject(project) ? REMOTE_CAPABILITIES : LOCAL_CAPABILITIES;
+}
+
+/**
  * Each accent ships a pair of hex variants tuned per theme:
  *   - `hex`  → canonical value (also the swatch the user picks); used on the
  *              warm-cream light canvas. Mid-saturated and mid-dark so the icon

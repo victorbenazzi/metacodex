@@ -17,7 +17,7 @@ import { useSearchUiStore } from "@/features/search/search.store";
 import { useSettingsStore } from "@/features/settings/settings.store";
 import { useThemeStore } from "@/features/theme/theme.store";
 import { searchApi } from "@/features/search/search.service";
-import { isRemoteProject } from "@/features/projects/project.types";
+import { projectCapabilities } from "@/features/projects/project.types";
 import { fuzzyScore } from "@/lib/fuzzy";
 import { basename } from "@/lib/path";
 import { getAppCommands } from "@/app/appCommands";
@@ -66,7 +66,7 @@ export function CommandPalette() {
     (s) => s.projects.find((p) => p.id === s.activeProjectId) ?? null,
   );
   const projectPath = activeProject?.path;
-  const remoteProject = isRemoteProject(activeProject);
+  const searchUnsupported = !projectCapabilities(activeProject).search;
 
   const [query, setQuery] = useState("");
   const [files, setFiles] = useState<string[]>([]);
@@ -84,7 +84,7 @@ export function CommandPalette() {
 
   // Load the project's file list when entering files mode.
   useEffect(() => {
-    if (!open || mode !== "files" || !projectPath || remoteProject) return;
+    if (!open || mode !== "files" || !projectPath || searchUnsupported) return;
     const cached = fileCache.get(projectPath);
     if (cached && Date.now() - cached.ts < CACHE_TTL) {
       setFiles(cached.files);
@@ -108,15 +108,15 @@ export function CommandPalette() {
     return () => {
       cancelled = true;
     };
-  }, [open, mode, projectPath, remoteProject]);
+  }, [open, mode, projectPath, searchUnsupported]);
 
   const root = projectPath?.replace(/\/+$/, "") ?? "";
 
   const commands = useMemo<PaletteCommand[]>(
     () =>
-      COMMAND_DEFS.filter((c) => !(remoteProject && (c.id === "go-to-file" || c.id === "search")))
+      COMMAND_DEFS.filter((c) => !(searchUnsupported && (c.id === "go-to-file" || c.id === "search")))
         .map((c) => ({ id: c.id, title: t(c.titleKey), hint: c.hint, run: c.run })),
-    [remoteProject, t],
+    [searchUnsupported, t],
   );
 
   const items = useMemo<PaletteItem[]>(() => {
@@ -183,7 +183,7 @@ export function CommandPalette() {
     }
   };
 
-  const filesDisabled = mode === "files" && (!projectPath || remoteProject);
+  const filesDisabled = mode === "files" && (!projectPath || searchUnsupported);
 
   return (
     <RD.Root open={open} onOpenChange={(o) => !o && close()}>
@@ -218,7 +218,7 @@ export function CommandPalette() {
               placeholder={
                 mode === "files"
                   ? projectPath
-                    ? remoteProject
+                    ? searchUnsupported
                       ? t("commandPalette.placeholderRemoteProject")
                       : t("commandPalette.placeholderFiles")
                     : t("commandPalette.placeholderNoProject")
@@ -236,7 +236,7 @@ export function CommandPalette() {
               </li>
             ) : items.length === 0 ? (
               <li className="px-[14px] py-[12px] text-caption text-muted">
-                {remoteProject
+                {searchUnsupported
                   ? t("commandPalette.remoteUnsupported")
                   : filesDisabled
                     ? t("commandPalette.noProjectOpen")

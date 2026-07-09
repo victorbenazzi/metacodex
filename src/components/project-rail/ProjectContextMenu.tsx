@@ -32,7 +32,7 @@ import {
 import {
   PROJECT_PALETTE,
   PROJECT_ICONS,
-  isRemoteProject,
+  projectCapabilities,
   type Project,
 } from "@/features/projects/project.types";
 import { isCustomIcon, pickProjectIcon } from "@/features/projects/customIcon.service";
@@ -56,7 +56,7 @@ export function ProjectContextMenu({
   const projects = useProjectsStore((s) => s.projects);
   const reorder = useProjectsStore((s) => s.reorder);
   const hasCustomIcon = isCustomIcon(project.icon);
-  const remoteProject = isRemoteProject(project);
+  const canReveal = projectCapabilities(project).revealInFinder;
 
   // Keyboard-friendly alternative to drag-reorder: swap with the neighbor.
   const index = projects.findIndex((p) => p.id === project.id);
@@ -94,12 +94,12 @@ export function ProjectContextMenu({
           <Icon icon={Pencil} size={12} className="text-muted" />
           {t("projectRail.menu.rename")}
         </ContextMenuItem>
-        {remoteProject ? null : (
+        {canReveal ? (
           <ContextMenuItem onSelect={revealInFinder}>
             <Icon icon={FolderOpen} size={12} className="text-muted" />
             {t("projectRail.menu.revealInFinder")}
           </ContextMenuItem>
-        )}
+        ) : null}
 
         <ContextMenuSeparator />
 

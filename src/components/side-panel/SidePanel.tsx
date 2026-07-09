@@ -16,7 +16,7 @@ import {
   isAgentEnabled,
 } from "@/features/terminal/cli-registry";
 import type { Project } from "@/features/projects/project.types";
-import { isRemoteProject } from "@/features/projects/project.types";
+import { projectCapabilities } from "@/features/projects/project.types";
 import { useGitStore } from "@/features/git/git.store";
 import { useSidePanelStore } from "@/features/side-panel/sidePanel.store";
 import { useSettingsDataStore } from "@/features/settings/settings.data.store";
@@ -40,7 +40,7 @@ export function SidePanel({
   const setActiveTool = useSidePanelStore((s) => s.setActiveTool);
   const setOpen = useSidePanelStore((s) => s.setOpen);
   const git = useGitStore((s) => (project ? s.byProject[project.id] : null));
-  const remoteProject = isRemoteProject(project);
+  const canGit = projectCapabilities(project).git;
   const changeCount = git ? Object.keys(git.statuses).length : 0;
   const enabledAgents = useSettingsDataStore((s) => s.settings.interface.enabledAgents);
   const visibleAgents = DEFAULT_CLI_REGISTRY.filter((cli) =>
@@ -140,7 +140,7 @@ export function SidePanel({
             </div>
           </header>
           <div className="min-h-0 flex-1">
-            {project && !remoteProject ? (
+            {project && canGit ? (
               <SourceControlPanel
                 projectId={project.id}
                 projectPath={project.path}
@@ -148,7 +148,13 @@ export function SidePanel({
               />
             ) : (
               <div className="h-full min-h-0">
-                <EmptyState body={remoteProject ? t("sourceControl.remoteUnsupported") : t("sourceControl.noProject")} />
+                <EmptyState
+                  body={
+                    project && !canGit
+                      ? t("sourceControl.remoteUnsupported")
+                      : t("sourceControl.noProject")
+                  }
+                />
               </div>
             )}
           </div>
@@ -165,7 +171,7 @@ export function SidePanel({
             ref={launcherBlockRef}
             className="mx-auto w-full max-w-[420px] self-start space-y-[18px]"
           >
-            {remoteProject ? null : (
+            {canGit ? (
               <LauncherSection label={t("sidePanel.sections.repository")}>
                 <LauncherRow
                   icon={<Icon icon={GitBranch} size={14} />}
@@ -180,7 +186,7 @@ export function SidePanel({
                   onClick={() => setActiveTool("review")}
                 />
               </LauncherSection>
-            )}
+            ) : null}
 
             <LauncherSection label={t("sidePanel.sections.workspace")}>
               <LauncherRow

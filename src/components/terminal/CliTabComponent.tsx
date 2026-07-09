@@ -8,7 +8,7 @@ import { cliApi } from "@/features/terminal/cli.service";
 import { cliById, type CliTool } from "@/features/terminal/cli-registry";
 import { useTabsStore, WORKSPACE_NULL } from "@/components/tabs/tabsStore";
 import { useProjectsStore } from "@/features/projects/project.store";
-import { isRemoteProject } from "@/features/projects/project.types";
+import { projectCapabilities } from "@/features/projects/project.types";
 import { newId } from "@/lib/idGen";
 
 interface CliTabComponentProps {
@@ -38,11 +38,13 @@ export function CliTabComponent({
   const project = useProjectsStore((s) =>
     projectId ? s.projects.find((p) => p.id === projectId) ?? null : null,
   );
-  const remoteProject = isRemoteProject(project);
+  const canDetectCli = projectCapabilities(project).localCli;
   const cli: CliTool | undefined = cliById(cliId);
 
   const detect = useCallback(async () => {
-    if (remoteProject) {
+    // Remote hosts run their own CLIs; we can't probe the local machine for them,
+    // so treat them as ready and let the launch surface any failure.
+    if (!canDetectCli) {
       setStatus("ready");
       return;
     }
@@ -58,7 +60,7 @@ export function CliTabComponent({
       console.warn("[cli] detect failed", err);
       setStatus("missing");
     }
-  }, [cli, remoteProject]);
+  }, [cli, canDetectCli]);
 
   useEffect(() => {
     void detect();

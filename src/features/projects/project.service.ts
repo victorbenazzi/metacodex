@@ -8,13 +8,6 @@ export const projectsApi = {
   create(directory: string, name: string): Promise<Project> {
     return invoke<Project>(CMD.createProject, { directory, name });
   },
-  addRemote(accessId: string, path: string, name?: string): Promise<Project> {
-    return invoke<Project>(CMD.addRemoteProject, {
-      accessId,
-      path,
-      name: name ?? null,
-    });
-  },
   addRemoteMany(
     accessId: string,
     projects: Array<{ path: string; name?: string }>,
