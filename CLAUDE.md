@@ -43,14 +43,20 @@ The boundary is strict: **Rust owns all OS/IO; React owns rendering and ephemera
 
 Paths OUTSIDE project roots are reachable only through unforgeable grants minted behind consent boundaries: `preview_grants.rs` (files opened via preview mode or macOS "Open With", see `open_files.rs`) and `directory_grants.rs` (clone parent dirs picked via native dialog). `config_paths.rs` carries the `~/.metacodex` carve-out. If you add a new FS-touching command it MUST validate through one of these paths before any `fs::*` call.
 
+### Remote (SSH) projects
+
+A project's `origin` is `Local` or `Ssh { access_id, remote_path }` (`projects.rs`). SSH access records (host, user, identity file, allowed root paths) live in `~/.metacodex/state/remote-accesses.json`, managed by `src-tauri/src/remote_access/*` and the `remote_access_*` / `add_remote_projects` commands. The filesystem/terminal commands dispatch on origin: `commands/filesystem.rs::WorkspaceFs` routes `workspace_*` FS ops to `fs_ops` (local) or `remote_access` (SFTP), and `pty_spawn` rewrites a remote project's pty kind into `RemoteShell` / `RemoteCli` (backend-only kinds; the frontend cannot request them).
+
+Remote path safety mirrors the local sandbox: `remote_access/paths.rs::ensure_allowed` rejects `..`, checks containment in a configured root, and walks each component over SFTP rejecting symlinks (and non-directory intermediates). Trust is TOFU against the app's own known-hosts file (`config_paths::ssh_known_hosts_file`) plus a pinned fingerprint on the access record. Connections are pooled one-per-access in `remote_access/session.rs` (serialized, auto-reconnecting); every remote command runs on the blocking pool. The frontend never asks "is this remote?" ad hoc, it asks `projectCapabilities(project)` (`project.types.ts`) for the capability it needs (git / search / watcher / revealInFinder / localCli).
+
 ### Shell layout (post v0.0.12 redesign)
 
-- `src/app/AppShell.tsx` owns only the CSS grid and top-level composition: a 36px title bar row over columns [projects sidebar | explorer | center | source control (optional right panel)]. Bootstrap, filesystem sync, workspace persistence and tab actions live in `src/app/hooks/`.
+- `src/app/AppShell.tsx` owns only the CSS grid and top-level composition: a title bar row (`--title-bar-h`, 44px) over columns [projects sidebar | explorer | center | side panel (optional right column: launcher or Git/Review)]. The sidebars are floating cards separated by gap columns; the gaps come from `--panel-gap-x` / `--panel-gap-y` (tokens.css) and collapse to 0 with their panel in the same `grid-template-columns` transition. That transition is always on except while a `ResizeHandle` is being dragged (`resizing` flag). Bootstrap, filesystem sync, workspace persistence and tab actions live in `src/app/hooks/`.
 - The projects sidebar has two forms, toggled from the title bar and persisted in `features/ui/codeSidebar.store.ts` (localStorage): the collapsed icon rail (`components/project-rail/MiniProjectSidebar.tsx`) and the expanded list (`components/code-sidebar/ExpandedProjectsSidebar.tsx` + `CodeProjectGroup.tsx`) with nested per-project sections: Histórico (resume registry), and in vertical layout also Agentes, Terminais and Arquivos (open file tabs).
 - **Projects reorder by drag in BOTH sidebar forms** through the shared `components/ui/useListReorder.tsx` hook (pointer events, 8px threshold, trailing-click suppression, `data-no-drag` opt-out for nested interactive regions). Do NOT add `setPointerCapture` there: capturing suppresses the nested button's click under composed Radix Slots in WKWebView (see the hook's note). The context menu also offers Move up / Move down as the keyboard-friendly path. Order persists via `reorder_projects`.
 - **Active project identity:** accent bar + medium label on the expanded row (`SidebarRow` `accent` prop), accent bar + tinted glyph on the rail tile, and glyph + name in the title bar center. **Per-project session status** (worst of the per-tab agent statuses, plus session count) renders as a dot on the row and as a tile corner badge: rollup in `features/terminal/projectStatus.ts`, dot in `components/project-rail/ProjectStatusDot.tsx`, tone mapping shared with the tab dot in `components/tabs/statusTone.ts`.
 - `interface.layoutMode` setting: `horizontal` (top tab bar, sidebar shows only Histórico) or `vertical` (no tab bar; the sidebar sections are the ONLY tab management surface, which is why the Arquivos section must list every non-process tab kind).
-- Title bar (`src/app/TitleBar.tsx`): sidebar toggle + add-project (open folder / clone from GitHub) on the left; active project glyph + name, branch (ahead/behind) and `UpdatePill` center; new-tab actions + workspace save-status dot right; custom min/max/close controls on Windows only.
+- Title bar (`src/app/TitleBar.tsx`): sidebar toggle + add-project (open folder / clone from GitHub / connect SSH) on the left; active project glyph + name, branch (ahead/behind) and `UpdatePill` center; the side panel toggle right; custom min/max/close controls on Windows only. (Workspace save failures surface in the Cmd+Shift+D diagnostics log, not a title-bar dot.)
 
 ### State (frontend)
 
@@ -58,12 +64,12 @@ Zustand stores per feature (`src/features/<feature>/*.store.ts`):
 
 - `projects/project.store.ts`: list + activeProjectId. Its `remove()` tears down every live resource (PTYs, tab bucket, explorer/git caches, watcher) BEFORE the Rust registry forgets the project.
 - `tabs` store (`src/components/tabs/tabsStore.ts`): `byProject: Record<projectKey, { tabs, activeTabId }>`; `WORKSPACE_NULL` is the bucket key when no project is active.
-- `explorer`, `git`, `editor` + `editor-status`, `search`, `theme`, `keybindings`, `worktrees`, `source-control`, `resume`, `terminal`, `command-palette`: feature-local slices.
+- `explorer`, `git`, `editor` + `editor-status`, `search`, `theme`, `keybindings`, `worktrees`, `resume`, `terminal`, `command-palette`: feature-local slices.
 - `settings` (dialog open/close) vs `settings.data` (user preferences, the single source of truth for tunables).
 - `terminal/agent-status.store.ts`: per-tab `idle | working | needs-attention | done` derived from OSC + heuristics; powers the tab dot, the per-project rollup and Cmd+Shift+U.
 - `terminal/tabMetadata.store.ts`: per-tab branch / cwd / listening ports (polled); powers `TabTooltip` and the sidebar port chips.
-- `workspace/saveStatus.store.ts`: workspace save lifecycle (title bar dot; red opens diagnostics filtered to save events).
-- `diagnostics/diagnostics.store.ts`: the Cmd+Shift+D diagnostic log panel.
+- `side-panel/sidePanel.store.ts`: the right column's single `view` (`closed | launcher | review`).
+- `diagnostics/diagnostics.store.ts`: the Cmd+Shift+D diagnostic log panel (also where workspace save failures are recorded).
 - `updates/updates.store.ts`: updater lifecycle (silent boot check, `UpdatePill`, About pane).
 - `ui/codeSidebar.store.ts` (collapsed + per-project expansion, localStorage) and `ui/toast.store.ts`.
 - Never reach across stores inside a component; derive in `AppShell`, app hooks or selectors. Cross-surface commands go through `src/app/appCommands.ts`, registered by `AppShell` and read by keyboard shortcuts, command palette, editor keymaps and preview controls. Tabs are keyed by project: switching projects swaps the visible bucket; terminals from other projects stay alive in memory.
@@ -118,7 +124,7 @@ One `notify_debouncer_mini::Debouncer` per project root, owned by `WatcherManage
 
 - **Tokens drive everything.** Never hardcode colors in components. Tailwind `colors: { canvas, ink, hairline, ... }` map to CSS variables in `src/styles/tokens.css`. Light/dark switches via `data-theme` on `<html>`.
 - **11 selectable themes** live in `src/features/theme/themes/*.ts`, all typed by `Theme` (`theme/types.ts`) so every theme is forced to define the full `chrome`/`syntax`/`terminal` key set. `applyTheme.ts` writes those vars; accents, atmosphere, shadows and `--update-blue*` stay per-kind (light|dark) in `tokens.css`.
-- **Type scale is enforced:** `text-label` (11) / `text-caption` (12) / `text-ui` (13) / `text-content` (14) / `text-title` (15) / `text-display-*`. Never `text-[Npx]`, with two sanctioned exceptions: the 10px mono micro-label pattern and one-off display sizes on hero surfaces. Section eyebrows/titles are sentence case (first letter capitalized only) via `editorial-caps`; never all-caps titles. `tracking-label` survives only on micro badges/chips (`Badge`). **If you add a fontSize tier to `tailwind.config.js`, register it in `src/lib/cn.ts`** (tailwind-merge classGroups) or twMerge will treat it as a text COLOR and drop it silently.
+- **Type scale is enforced:** `text-micro` (10, mono metadata) / `text-label` (11) / `text-caption` (12) / `text-ui` (13) / `text-content` (14) / `text-title` (15) / `text-display-*`. Never `text-[Npx]`; the only sanctioned exception is one-off display sizes on hero surfaces. Section eyebrows/titles are sentence case (first letter capitalized only) via `editorial-caps`; never all-caps titles. `tracking-label` survives only on micro badges/chips (`Badge`). **If you add a fontSize tier to `tailwind.config.js`, register it in `src/lib/cn.ts`** (tailwind-merge classGroups) or twMerge will treat it as a text COLOR and drop it silently.
 - **Radius:** token classes only (`rounded-xs|sm|md|lg|xl|pill`). Never `rounded-full` / `rounded-2xl` / `rounded-[var(...)]`.
 - **Motion:** bare `transition-*` defaults to `--dur-fast`; use `duration-fast|base|slow` when explicit. Never `duration-100/150/200/300`.
 - **Buttons:** use `Button` / `IconButton` from `components/ui/` instead of ad-hoc `<button>` styling; hand-styled primary CTAs must include `press-feedback` + a focus-visible treatment.
@@ -146,7 +152,7 @@ One `notify_debouncer_mini::Debouncer` per project root, owned by `WatcherManage
 | Add a new Tauri command | `src-tauri/src/commands/<area>.rs` + register in `lib.rs::invoke_handler!` + mirror in `src/lib/ipc.ts::CMD` |
 | Change app shell layout | `src/app/AppShell.tsx` (grid template lives there); use `src/app/hooks/*` for bootstrap, filesystem sync, persistence and tab actions |
 | Projects sidebar (rail / expanded, reorder, status dots) | `components/project-rail/*`, `components/code-sidebar/*`, `components/ui/useListReorder.tsx`, `features/terminal/projectStatus.ts`, `features/ui/codeSidebar.store.ts` |
-| Title bar (project identity, branch, updates, save dot) | `src/app/TitleBar.tsx` |
+| Title bar (project identity, branch, updates, side panel toggle) | `src/app/TitleBar.tsx` |
 | Add a new tab kind | `src/components/tabs/types.ts` (union) → `TabContent.tsx` (renderer) → `useTabActions.openFile` / `openPreviewFile` (routing) → Arquivos section in `CodeProjectGroup.tsx` (vertical layout) |
 | Add a new CLI to the launcher | `src/features/terminal/cli-registry.ts::DEFAULT_CLI_REGISTRY` |
 | Add/change a user setting | `src/features/settings/settings.types.ts` (`AppSettings` + `DEFAULT_SETTINGS` + `mergeSettings`) → consumer → pane in `components/settings/panes/` + i18n keys (both locales) |
@@ -154,6 +160,7 @@ One `notify_debouncer_mini::Debouncer` per project root, owned by `WatcherManage
 | Add an app-wide UI command | `src/app/appCommands.ts` + implementation in `src/app/hooks/useTabActions.ts` or the relevant store-backed dispatcher |
 | Source Control panel / worktrees | `src/components/source-control/*` + `features/git/*`; Rust in `commands/git.rs` |
 | Clone from GitHub | `components/project-rail/CloneFromGithubDialog.tsx` + `commands/git.rs::git_clone` (+ `git://clone-progress`) |
+| Connect a remote (SSH) project | `components/project-rail/RemoteAccessDialog.tsx` + `useRemoteAccessDialogState.ts`; Rust `remote_access/*` + `commands/remote_access.rs`; per-origin FS in `commands/filesystem.rs::WorkspaceFs` |
 | Resume registry (recent CLI sessions) | `features/resume/*` + `components/resume/ResumeCards.tsx` + Histórico rows in `CodeProjectGroup.tsx`; Rust `commands/resume.rs` |
 | Agent status (idle/working/needs-attention/done) | OSC parsing in `components/terminal/oscHandlers.ts` + `agentHeuristic.ts` → `features/terminal/agent-status.store.ts`; shared tone in `components/tabs/statusTone.ts` |
 | Tab tooltip / per-tab branch+ports | `features/terminal/tabMetadata.store.ts` + `useTabMetadataPolling` → `components/tabs/TabTooltip.tsx` |
