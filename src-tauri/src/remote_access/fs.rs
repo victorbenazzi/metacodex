@@ -266,7 +266,7 @@ pub fn discover_projects(access_id: &str) -> AppResult<Vec<RemoteProjectCandidat
                 });
             }
         }
-        out.sort_by(|a, b| a.path.to_lowercase().cmp(&b.path.to_lowercase()));
+        out.sort_by_key(|candidate| candidate.path.to_lowercase());
         out.dedup_by(|a, b| a.path == b.path);
         Ok(out)
     })

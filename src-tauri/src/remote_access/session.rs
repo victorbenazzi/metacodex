@@ -1,8 +1,8 @@
 //! Connection pool for remote SSH access.
 //!
 //! Without pooling, every remote filesystem call (`read_dir`, `stat`, a single
-//! keystroke's worth of editor read/write) paid a full DNS + TCP + SSH handshake
-//! + auth + SFTP-channel open. On a link with real latency that is seconds per
+//! keystroke's worth of editor read/write) paid a full DNS, TCP, SSH handshake,
+//! auth and SFTP-channel open. On a link with real latency that is seconds per
 //! click. This keeps ONE live session per `access_id`, guarded by a mutex so
 //! operations over a single connection serialize (libssh2 is not safe for
 //! concurrent use of one session), and transparently reconnects when the

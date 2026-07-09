@@ -21,20 +21,15 @@ pub struct Project {
     pub last_opened_at: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum ProjectOrigin {
+    #[default]
     Local,
     Ssh {
         access_id: String,
         remote_path: String,
     },
-}
-
-impl Default for ProjectOrigin {
-    fn default() -> Self {
-        Self::Local
-    }
 }
 
 impl Project {
