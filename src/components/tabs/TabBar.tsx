@@ -109,6 +109,7 @@ export function TabBar({
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const thumbRef = useRef<HTMLDivElement | null>(null);
   const trailingRef = useRef<HTMLDivElement | null>(null);
+  const dragGhostRef = useRef<HTMLDivElement | null>(null);
   // Real width of the trailing strip; observed so the scroll padding and fade
   // line up exactly even as the pill expands (e.g. when the SC change count
   // grows to "99+").
@@ -134,6 +135,11 @@ export function TabBar({
       edgePx: AUTO_SCROLL_EDGE_PX,
       maxPerFrame: AUTO_SCROLL_MAX_PER_FRAME,
       endInsetPx: trailingWidth,
+    },
+    onPointerMove: ({ x, y }) => {
+      const ghost = dragGhostRef.current;
+      if (!ghost) return;
+      ghost.style.transform = `translate3d(${x + 10}px, ${y - 10}px, 0)`;
     },
   });
 
@@ -238,11 +244,11 @@ export function TabBar({
     const viewLeft = el.scrollLeft;
     const viewRight = viewLeft + el.clientWidth - trailingWidth;
     if (nodeLeft < viewLeft) {
-      el.scrollTo({ left: nodeLeft - 24, behavior: "smooth" });
+      el.scrollTo({ left: nodeLeft - 24, behavior: "auto" });
     } else if (nodeRight > viewRight) {
       el.scrollTo({
         left: nodeRight - el.clientWidth + trailingWidth + 24,
-        behavior: "smooth",
+        behavior: "auto",
       });
     }
   }, [activeTabId, tabs.length, trailing, trailingWidth]);
@@ -362,7 +368,7 @@ export function TabBar({
                 }}
                 className={cn(
                   "group relative flex h-[26px] min-w-[120px] max-w-[220px] shrink-0 items-center gap-[7px] rounded-md px-[10px]",
-                  "touch-none border transition-colors duration-fast",
+                  "touch-none border",
                   active
                     ? "border-tab-active-border bg-tab-active text-tab-active-text"
                     : "border-transparent text-muted hover:bg-canvas-soft hover:text-body",
@@ -416,7 +422,7 @@ export function TabBar({
                     onClose(tab.id);
                   }}
                   className={cn(
-                    "inline-flex h-[18px] w-[18px] items-center justify-center rounded-xs opacity-0 transition-all duration-fast group-hover:opacity-100",
+                    "inline-flex h-[18px] w-[18px] items-center justify-center rounded-xs opacity-0 transition-[opacity,background-color,color] duration-fast group-hover:opacity-100",
                     active
                       ? "text-tab-active-text opacity-60 hover:opacity-100"
                       : "text-muted hover:bg-surface-strong hover:text-ink",
@@ -484,11 +490,11 @@ export function TabBar({
             if (!dragged) return null;
             return (
               <div
+                ref={dragGhostRef}
                 aria-hidden
-                className="pointer-events-none fixed z-[60] flex h-[26px] min-w-[120px] max-w-[220px] items-center gap-[7px] rounded-md border border-hairline bg-canvas px-[10px] text-caption text-ink shadow-drag"
+                className="pointer-events-none fixed left-0 top-0 z-[60] flex h-[26px] min-w-[120px] max-w-[220px] items-center gap-[7px] rounded-md border border-hairline bg-canvas px-[10px] text-caption text-ink shadow-drag will-change-transform"
                 style={{
-                  left: drag.pointerPos.x + 10,
-                  top: drag.pointerPos.y - 10,
+                  transform: `translate3d(${drag.pointerPos.x + 10}px, ${drag.pointerPos.y - 10}px, 0)`,
                 }}
               >
                 {renderTabIcon(dragged, false)}

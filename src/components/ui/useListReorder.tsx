@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState, type MouseEvent as RMouseEvent, type PointerEvent as RPointerEvent } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type MouseEvent as RMouseEvent,
+  type PointerEvent as RPointerEvent,
+} from "react";
 
 /**
  * Pointer-driven drag-to-reorder for a list along one axis. Canonical gesture
@@ -46,6 +53,18 @@ const EDGE_GAP_PX = 4;
 // delta applied per animation frame at the very edge.
 const DEFAULT_AUTO_SCROLL_EDGE_PX = 36;
 const DEFAULT_AUTO_SCROLL_MAX_PER_FRAME = 14;
+const FLIP_DURATION_MS = 180;
+const FLIP_EASING = "cubic-bezier(0.23, 1, 0.32, 1)";
+
+interface PointerPosition {
+  x: number;
+  y: number;
+}
+
+interface PendingFlip {
+  expectedIds: string[];
+  firstRects: Map<string, DOMRect>;
+}
 
 export interface ListReorderAutoScroll {
   containerRef: { readonly current: HTMLElement | null };
@@ -81,6 +100,9 @@ export interface ListReorderOptions {
   dragDisabled?: (id: string) => boolean;
   /** Enable edge auto-scroll of a scrolling container during the drag. */
   autoScroll?: ListReorderAutoScroll;
+  /** Receives pointer coordinates at most once per animation frame. Consumers
+   *  use this to write a full transform directly to their drag ghost. */
+  onPointerMove?: (position: PointerPosition) => void;
 }
 
 export interface ListReorderHandle {
@@ -89,8 +111,9 @@ export interface ListReorderHandle {
   /** Raw insertion slot 0..ids.length while dragging, else null. Includes the
    *  two source-adjacent no-op slots; consumers filter for their indicator. */
   dropIndex: number | null;
-  /** Viewport pointer position while dragging; anchors the surface's ghost. */
-  pointerPos: { x: number; y: number } | null;
+  /** Initial viewport pointer position. Later movement bypasses React state and
+   *  reaches the ghost through `onPointerMove`. */
+  pointerPos: PointerPosition | null;
   /** Center Y (px, container space) for the drop indicator. Only computed on
    *  the y axis (null on x); already hides the source-adjacent no-op slots. */
   indicatorTop: number | null;
@@ -105,7 +128,7 @@ export interface ListReorderHandle {
 export function useListReorder(options: ListReorderOptions): ListReorderHandle {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
-  const [pointerPos, setPointerPos] = useState<{ x: number; y: number } | null>(null);
+  const [pointerPos, setPointerPos] = useState<PointerPosition | null>(null);
 
   // One DOM ref per item wrapper: drop-slot math + indicator geometry.
   const itemEls = useRef<Map<string, HTMLElement>>(new Map());
@@ -116,6 +139,8 @@ export function useListReorder(options: ListReorderOptions): ListReorderHandle {
   const getItemEl = (id: string) => itemEls.current.get(id) ?? null;
 
   const suppressClicksUntil = useRef(0);
+  const pendingFlip = useRef<PendingFlip | null>(null);
+  const flipAnimations = useRef<Map<string, Animation>>(new Map());
 
   // Handlers are registered at pointerdown time; every mid-gesture read (ids,
   // callbacks, axis, auto-scroll insets) goes through this ref so a re-render
@@ -125,6 +150,56 @@ export function useListReorder(options: ListReorderOptions): ListReorderHandle {
 
   const axis = options.axis ?? "y";
   const bodyClass = options.bodyClass ?? "is-reordering-projects";
+
+  useLayoutEffect(() => {
+    const pending = pendingFlip.current;
+    if (!pending) return;
+
+    const idsMatch =
+      pending.expectedIds.length === options.ids.length &&
+      pending.expectedIds.every((id, index) => options.ids[index] === id);
+    if (!idsMatch) return;
+    pendingFlip.current = null;
+
+    for (const animation of flipAnimations.current.values()) animation.cancel();
+    flipAnimations.current.clear();
+
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    for (const id of options.ids) {
+      const element = itemEls.current.get(id);
+      const first = pending.firstRects.get(id);
+      if (!element || !first) continue;
+      const last = element.getBoundingClientRect();
+      const dx = first.left - last.left;
+      const dy = first.top - last.top;
+      if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) continue;
+
+      const animation = element.animate(
+        [
+          { transform: `translate3d(${dx}px, ${dy}px, 0)` },
+          { transform: "translate3d(0, 0, 0)" },
+        ],
+        { duration: FLIP_DURATION_MS, easing: FLIP_EASING },
+      );
+      flipAnimations.current.set(id, animation);
+      const clear = () => {
+        if (flipAnimations.current.get(id) === animation) {
+          flipAnimations.current.delete(id);
+        }
+      };
+      animation.onfinish = clear;
+      animation.oncancel = clear;
+    }
+  }, [options.ids]);
+
+  useEffect(
+    () => () => {
+      for (const animation of flipAnimations.current.values()) animation.cancel();
+      flipAnimations.current.clear();
+    },
+    [],
+  );
 
   // Global cursor while dragging: a body class so EVERY element (including
   // buttons that opt into cursor:pointer) shows the grabbing cursor.
@@ -168,6 +243,23 @@ export function useListReorder(options: ListReorderOptions): ListReorderHandle {
     let localDropIndex: number | null = null;
     let lastCoord = isX ? startX : startY;
     let autoScrollRaf = 0;
+    let pointerRaf = 0;
+    let latestPointer: PointerPosition | null = null;
+
+    const updateDropIndex = (next: number) => {
+      if (next === localDropIndex) return;
+      localDropIndex = next;
+      setDropIndex(next);
+    };
+
+    const schedulePointerWrite = (position: PointerPosition) => {
+      latestPointer = position;
+      if (pointerRaf) return;
+      pointerRaf = requestAnimationFrame(() => {
+        pointerRaf = 0;
+        if (latestPointer) optsRef.current.onPointerMove?.(latestPointer);
+      });
+    };
 
     // Edge auto-scroll of the consumer's scrolling container; recomputes the
     // drop slot after each scroll tick since the items shifted under the
@@ -198,27 +290,25 @@ export function useListReorder(options: ListReorderOptions): ListReorderHandle {
       if (delta !== 0) {
         if (isX) el.scrollLeft += delta;
         else el.scrollTop += delta;
-        const idx = computeDropIndex(lastCoord);
-        localDropIndex = idx;
-        setDropIndex(idx);
+        updateDropIndex(computeDropIndex(lastCoord));
       }
       autoScrollRaf = requestAnimationFrame(tickAutoScroll);
     };
 
     const onMove = (ev: PointerEvent) => {
+      const position = { x: ev.clientX, y: ev.clientY };
       if (!dragging) {
         if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < threshold) return;
         dragging = true;
         setDraggingId(id);
+        setPointerPos(position);
         if (optsRef.current.autoScroll) {
           autoScrollRaf = requestAnimationFrame(tickAutoScroll);
         }
       }
       lastCoord = isX ? ev.clientX : ev.clientY;
-      const idx = computeDropIndex(lastCoord);
-      localDropIndex = idx;
-      setDropIndex(idx);
-      setPointerPos({ x: ev.clientX, y: ev.clientY });
+      updateDropIndex(computeDropIndex(lastCoord));
+      schedulePointerWrite(position);
     };
 
     const cleanup = () => {
@@ -227,6 +317,7 @@ export function useListReorder(options: ListReorderOptions): ListReorderHandle {
       window.removeEventListener("pointercancel", onCancel);
       window.removeEventListener("keydown", onKey, true);
       if (autoScrollRaf) cancelAnimationFrame(autoScrollRaf);
+      if (pointerRaf) cancelAnimationFrame(pointerRaf);
       setDraggingId(null);
       setDropIndex(null);
       setPointerPos(null);
@@ -242,6 +333,16 @@ export function useListReorder(options: ListReorderOptions): ListReorderHandle {
           next.splice(sourceIdx, 1);
           const insertAt = localDropIndex > sourceIdx ? localDropIndex - 1 : localDropIndex;
           next.splice(insertAt, 0, id);
+          const firstRects = new Map<string, DOMRect>();
+          for (const itemId of order) {
+            const element = itemEls.current.get(itemId);
+            if (element) firstRects.set(itemId, element.getBoundingClientRect());
+          }
+          const pending = { expectedIds: next, firstRects };
+          pendingFlip.current = pending;
+          window.setTimeout(() => {
+            if (pendingFlip.current === pending) pendingFlip.current = null;
+          }, 1000);
           optsRef.current.onReorder(next, id, insertAt);
         }
         suppressClicksUntil.current = performance.now() + CLICK_SUPPRESS_MS;

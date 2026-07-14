@@ -189,10 +189,7 @@ export function CommandPalette() {
     <RD.Root open={open} onOpenChange={(o) => !o && close()}>
       <RD.Portal>
         <RD.Overlay
-          className={cn(
-            "fixed inset-0 z-[100] bg-scrim",
-            "data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out",
-          )}
+          className="fixed inset-0 z-[100] bg-scrim"
         />
         <RD.Content
           aria-describedby={undefined}
@@ -200,7 +197,6 @@ export function CommandPalette() {
           className={cn(
             "fixed left-1/2 top-[12vh] z-[101] -translate-x-1/2",
             "max-h-[72vh] w-[min(640px,92vw)] overflow-hidden rounded-lg border border-hairline bg-surface-card",
-            "data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out",
           )}
         >
           <RD.Title className="sr-only">

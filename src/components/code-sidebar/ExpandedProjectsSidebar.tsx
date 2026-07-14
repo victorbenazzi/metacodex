@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { FolderOpen, Settings } from "lucide-react";
 
@@ -37,10 +37,17 @@ export function ExpandedProjectsSidebar({ onOpenFolder }: ExpandedProjectsSideba
 
   const [renameTarget, setRenameTarget] = useState<Project | null>(null);
   const [removeTarget, setRemoveTarget] = useState<Project | null>(null);
+  const ghostRef = useRef<HTMLDivElement | null>(null);
 
   const drag = useListReorder({
     ids: projects.map((p) => p.id),
     onReorder: (ids) => void reorder(ids),
+    onPointerMove: ({ x, y }) => {
+      const ghost = ghostRef.current;
+      if (!ghost) return;
+      ghost.style.transform =
+        `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%) rotate(-2deg)`;
+    },
   });
   const draggingProject = drag.draggingId
     ? projects.find((p) => p.id === drag.draggingId) ?? null
@@ -118,12 +125,13 @@ export function ExpandedProjectsSidebar({ onOpenFolder }: ExpandedProjectsSideba
           glides under the cursor without intercepting events from the list. */}
       {draggingProject && drag.pointerPos ? (
         <div
+          ref={ghostRef}
           aria-hidden
-          className="pointer-events-none fixed z-[1000]"
+          className="pointer-events-none fixed left-0 top-0 z-[1000] will-change-transform"
           style={{
-            top: drag.pointerPos.y,
-            left: drag.pointerPos.x,
-            transform: "translate(-50%, -50%) rotate(-2deg)",
+            transform:
+              `translate3d(${drag.pointerPos.x}px, ${drag.pointerPos.y}px, 0) ` +
+              "translate(-50%, -50%) rotate(-2deg)",
           }}
         >
           <div className="flex h-[28px] max-w-[220px] items-center gap-[8px] rounded-md border border-hairline bg-surface-card px-[10px] shadow-drag">

@@ -101,17 +101,13 @@ export function SearchDialog() {
     <RD.Root open={open} onOpenChange={setOpen}>
       <RD.Portal>
         <RD.Overlay
-          className={cn(
-            "fixed inset-0 z-[100] bg-scrim",
-            "data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out",
-          )}
+          className="fixed inset-0 z-[100] bg-scrim"
         />
         <RD.Content
           aria-describedby={undefined}
           className={cn(
             "fixed left-1/2 top-[12vh] z-[101] -translate-x-1/2",
             "max-h-[72vh] w-[min(720px,92vw)] overflow-hidden rounded-md border border-hairline bg-surface-card",
-            "data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out",
           )}
         >
           <RD.Title className="sr-only">{t("search.title")}</RD.Title>

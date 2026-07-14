@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Settings } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -30,11 +30,18 @@ export function MiniProjectSidebar() {
   const [renameTarget, setRenameTarget] = useState<Project | null>(null);
   const [removeTarget, setRemoveTarget] = useState<Project | null>(null);
   const setSettingsOpen = useSettingsStore((s) => s.setOpen);
+  const ghostRef = useRef<HTMLDivElement | null>(null);
 
   const drag = useListReorder({
     ids: projects.map((p) => p.id),
     onReorder: (ids) => void reorder(ids),
     onPressActivate: (id) => void setActive(id),
+    onPointerMove: ({ x, y }) => {
+      const ghost = ghostRef.current;
+      if (!ghost) return;
+      ghost.style.transform =
+        `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%) rotate(-3deg)`;
+    },
   });
 
   const draggingProject = drag.draggingId
@@ -104,12 +111,13 @@ export function MiniProjectSidebar() {
           glides under the cursor without intercepting events from the rail. */}
       {draggingProject && drag.pointerPos ? (
         <div
+          ref={ghostRef}
           aria-hidden
-          className="pointer-events-none fixed z-[1000]"
+          className="pointer-events-none fixed left-0 top-0 z-[1000] will-change-transform"
           style={{
-            top: drag.pointerPos.y,
-            left: drag.pointerPos.x,
-            transform: "translate(-50%, -50%) rotate(-3deg)",
+            transform:
+              `translate3d(${drag.pointerPos.x}px, ${drag.pointerPos.y}px, 0) ` +
+              "translate(-50%, -50%) rotate(-3deg)",
           }}
         >
           <div className="rounded-md shadow-drag">
