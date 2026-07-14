@@ -198,7 +198,7 @@ export function AppShell() {
             <div
               aria-hidden={!codeSidebarCollapsed}
               className={cn(
-                "absolute inset-0 transition-opacity duration-fast ease-out",
+                "absolute inset-y-0 left-0 w-[var(--rail-w)] transition-opacity duration-drawer ease-drawer",
                 codeSidebarCollapsed
                   ? "opacity-100"
                   : "pointer-events-none opacity-0",
@@ -209,7 +209,7 @@ export function AppShell() {
             <div
               aria-hidden={codeSidebarCollapsed}
               className={cn(
-                "absolute inset-y-0 left-0 h-full transition-opacity duration-fast ease-out",
+                "absolute inset-y-0 left-0 h-full transition-opacity duration-drawer ease-drawer",
                 codeSidebarCollapsed
                   ? "pointer-events-none opacity-0"
                   : "opacity-100",
@@ -245,7 +245,7 @@ export function AppShell() {
           >
             <div
               className={cn(
-                "absolute inset-y-0 left-0 h-full transition-opacity duration-fast ease-out",
+                "absolute inset-y-0 left-0 h-full transition-opacity duration-drawer ease-drawer",
                 explorerCollapsed
                   ? "pointer-events-none opacity-0"
                   : "opacity-100",
@@ -332,7 +332,7 @@ export function AppShell() {
               >
                 <div
                   className={cn(
-                    "absolute inset-y-0 right-0 h-full transition-opacity duration-fast ease-out",
+                    "absolute inset-y-0 right-0 h-full transition-opacity duration-drawer ease-drawer",
                     panelOpen
                       ? "opacity-100"
                       : "pointer-events-none opacity-0",
