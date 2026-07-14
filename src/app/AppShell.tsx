@@ -239,7 +239,7 @@ export function AppShell() {
         </div>
 
         <div aria-hidden />
-        <div className="relative min-w-0">
+        <div className="group/explorer relative min-w-0">
           {/* Same drawer recipe as the projects sidebar / side panel: the
               content keeps its full width inside an overflow-hidden clip so
               the grid column can slide to zero without reflowing the tree. */}

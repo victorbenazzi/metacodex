@@ -15,8 +15,8 @@ interface ExplorerTogglePillProps {
  *
  * Two reveal modes, one component:
  *   - Expanded (rendered inside the ResizeHandle hit zone): invisible at rest,
- *     fades in when the seam is hovered (`group-hover` on the handle root).
- *     Pointer events stay off until the seam is hovered so the invisible
+ *     fades in when the explorer column is hovered (`group-hover/explorer`).
+ *     Pointer events stay off until the explorer is hovered so the invisible
  *     button never swallows clicks meant for content next to the border.
  *   - Collapsed (rendered standalone, the handle is gone): faintly visible as
  *     the only way back, full strength on hover.
@@ -56,7 +56,7 @@ export function ExplorerTogglePill({ collapsed, onToggle }: ExplorerTogglePillPr
                 // there, matching where the resize rail paints.
                 "left-0 -translate-x-1/2",
                 "pointer-events-none opacity-0",
-                "group-hover:pointer-events-auto group-hover:opacity-100",
+                "group-hover/explorer:pointer-events-auto group-hover/explorer:opacity-100",
                 "focus-visible:pointer-events-auto focus-visible:opacity-100",
               ),
         )}
