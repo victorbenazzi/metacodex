@@ -14,6 +14,7 @@ Baseline commit: `3cda0a8`.
 | 008 | Preserve information under reduced motion | MEDIUM | DONE | 003, 006, 007 |
 | 009 | Add interruptible toast motion | MEDIUM | DONE | 006, 008 |
 | 010 | Run the final motion review | HIGH | DONE | 001 through 009 |
+| 011 | Refine the workspace drawers | HIGH | DONE | 006, 008 |
 
 ## Recommended execution order
 
@@ -24,6 +25,7 @@ Baseline commit: `3cda0a8`.
 5. Plan 008 completes accessibility and recent-state behavior.
 6. Plan 009 adds the missing toast motion.
 7. Plan 010 reviews and validates the complete diff.
+8. Plan 011 replaces the coarse drawer snap with one coordinated transition.
 
 ## Scope rule
 
