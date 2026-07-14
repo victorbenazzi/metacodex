@@ -79,7 +79,11 @@ function CliStatusBadge({ status }: { status: CliDetectionStatus }) {
   if (status === "checking") {
     return (
       <Badge tone="muted">
-        <Icon icon={Loader2} size={10} className="animate-spin" />
+        <Icon
+          icon={Loader2}
+          size={10}
+          className="animate-spin motion-reduce:animate-none"
+        />
         {t("settings.cli.statusChecking")}
       </Badge>
     );

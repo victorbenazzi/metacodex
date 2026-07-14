@@ -172,7 +172,9 @@
   --font-display: -apple-system, BlinkMacSystemFont, "Inter", "Menlo", system-ui, sans-serif;
 
   /* Motion */
-  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
   --ease-in: cubic-bezier(0.6, 0, 0.7, 0.3);
   --dur-fast: 120ms;
   --dur-base: 180ms;
@@ -180,8 +182,9 @@
 
   /* Press feedback for primary CTAs — tiny scale-down on :active to give
      tactile confirmation. Restricted to actions (not navigation/tabs). */
-  --press-scale: 0.98;
-  --press-dur: 80ms;
+  --press-scale: 0.97;
+  --press-dur: 160ms;
+  --press-release-dur: 100ms;
   /* Unified popup motion (dialogs, menus, palette, tooltips). Exit is ~70% of
      enter — "exit faster than enter" — so dismissals feel instant. Pure-opacity
      fade only; never animate transform here or it fights the modal centering. */
@@ -410,10 +413,104 @@
 @media (prefers-reduced-motion: no-preference) {
   .press-feedback {
     will-change: transform;
-    transition: transform var(--press-dur) var(--ease-in);
+    transition: transform var(--press-release-dur) var(--ease-out);
   }
 
   .press-feedback:active {
     transform: scale(var(--press-scale));
+    transition-duration: var(--press-dur);
+  }
+}
+
+/* Explorer toggle feedback stays small and only stretches on devices with a
+   precise hover pointer. The component owns color feedback independently. */
+.explorer-toggle-indicator {
+  transition:
+    transform var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .explorer-toggle-pill:hover .explorer-toggle-indicator {
+    transform: scaleY(1.04);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .explorer-toggle-pill:active .explorer-toggle-indicator {
+    transform: scaleY(0.97);
+  }
+}
+
+/* A generated layer carries the recent-file tint so only opacity animates. */
+@keyframes explorer-recent-tint {
+  0%,
+  96% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.explorer-recent {
+  position: relative;
+  isolation: isolate;
+}
+
+.explorer-recent::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  content: "";
+  background-color: var(--explorer-recent);
+  opacity: 1;
+  pointer-events: none;
+  animation: explorer-recent-tint 15s linear forwards;
+}
+
+.explorer-recent[data-selected="true"]::before {
+  visibility: hidden;
+}
+
+/* Toast rows use transitions so entry and exit can retarget from their current
+   state. Stack movement is handled separately through FLIP and WAAPI. */
+.toast-row,
+.toast-row[data-state="visible"] {
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity var(--dur-enter) var(--ease-out),
+    transform var(--dur-enter) var(--ease-out);
+}
+
+.toast-row[data-state="entering"] {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.toast-row[data-state="exiting"] {
+  opacity: 0;
+  transform: translateY(4px);
+  transition-duration: var(--dur-exit);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .explorer-toggle-indicator {
+    transform: none;
+    transition-property: background-color;
+  }
+
+  .explorer-recent::before {
+    opacity: 1;
+    animation: none;
+  }
+
+  .toast-row,
+  .toast-row[data-state="entering"],
+  .toast-row[data-state="visible"],
+  .toast-row[data-state="exiting"] {
+    transform: none;
+    transition-property: opacity;
   }
 }

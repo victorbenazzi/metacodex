@@ -189,7 +189,13 @@ function MarkdownBody({ source }: { source: string }) {
                   const el =
                     document.getElementById(id) ??
                     document.querySelector(`[name="${CSS.escape(id)}"]`);
-                  el?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  const reduceMotion = window.matchMedia(
+                    "(prefers-reduced-motion: reduce)",
+                  ).matches;
+                  el?.scrollIntoView({
+                    behavior: reduceMotion ? "auto" : "smooth",
+                    block: "start",
+                  });
                 } else if (/^https?:\/\//i.test(href)) {
                   // External link , hand off to the OS browser via the opener.
                   void invoke(CMD.openExternalUrl, { url: href });

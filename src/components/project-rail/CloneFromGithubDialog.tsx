@@ -308,7 +308,11 @@ export function CloneFromGithubDialog({ open, onOpenChange }: CloneFromGithubDia
             <div className="space-y-[6px]" aria-live="polite">
               <div className="flex items-center justify-between gap-[8px] text-caption text-muted">
                 <span className="flex items-center gap-[6px]">
-                  <Icon icon={Loader2} size={12} className="animate-spin" />
+                  <Icon
+                    icon={Loader2}
+                    size={12}
+                    className="animate-spin motion-reduce:animate-none"
+                  />
                   <span>{progress ? progress.phase : t("cloneFromGithub.connecting")}</span>
                 </span>
                 {progress && progress.percent > 0 ? (
@@ -345,13 +349,13 @@ function ProgressBar({ percent }: { percent: number | null }) {
       {indeterminate ? (
         <span
           aria-hidden
-          className="absolute inset-y-0 left-0 w-1/3 bg-ink animate-progress-indeterminate"
+          className="absolute inset-y-0 left-0 w-1/3 bg-ink animate-progress-indeterminate motion-reduce:animate-pulse motion-reduce:transform-none"
         />
       ) : (
         <span
           aria-hidden
-          className="absolute inset-y-0 left-0 bg-ink transition-[width] duration-base ease-out"
-          style={{ width: `${Math.max(0, Math.min(100, percent ?? 0))}%` }}
+          className="absolute inset-y-0 left-0 h-full w-full origin-left bg-ink transition-transform duration-base ease-out motion-reduce:transition-none"
+          style={{ transform: `scaleX(${Math.max(0, Math.min(100, percent ?? 0)) / 100})` }}
         />
       )}
     </div>

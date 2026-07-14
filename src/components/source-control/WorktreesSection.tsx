@@ -283,7 +283,11 @@ function IconButton({
         "hover:bg-surface-strong/55 hover:text-ink",
       )}
     >
-      <Icon icon={icon} size={12} className={spinning ? "animate-spin" : ""} />
+      <Icon
+        icon={icon}
+        size={12}
+        className={spinning ? "animate-spin motion-reduce:animate-none" : ""}
+      />
     </button>
   );
 }

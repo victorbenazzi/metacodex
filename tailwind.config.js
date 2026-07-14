@@ -104,6 +104,9 @@ export default {
       },
       transitionTimingFunction: {
         DEFAULT: "var(--ease-out)",
+        out: "var(--ease-out)",
+        "in-out": "var(--ease-in-out)",
+        drawer: "var(--ease-drawer)",
       },
       borderRadius: {
         xs: "var(--radius-xs)",
@@ -149,15 +152,6 @@ export default {
           "0%": { backgroundPosition: "-200% 0" },
           "100%": { backgroundPosition: "200% 0" },
         },
-        // Explorer "just appeared" tint: holds the recent color for ~96% of
-        // the run, then fades the last 600ms (96% of 15s). `forwards` keeps
-        // the row transparent after the animation ends so the row stays
-        // selectable without any leftover tint.
-        "explorer-recent-tint": {
-          "0%": { backgroundColor: "var(--explorer-recent)" },
-          "96%": { backgroundColor: "var(--explorer-recent)" },
-          "100%": { backgroundColor: "transparent" },
-        },
         // Tab-status "working" indicator — pure opacity, slow enough not to
         // distract but visible enough to read at a glance. Triangulated by
         // Radix scale tests: 1.6s feels alive, 0.8s feels anxious.
@@ -195,9 +189,8 @@ export default {
         // Durations/easings are tokens — see --dur-enter/--dur-exit in tokens.css.
         "fade-in": "fade-in var(--dur-enter) var(--ease-out)",
         "fade-out": "fade-out var(--dur-exit) var(--ease-in) forwards",
-        "explorer-recent-tint": "explorer-recent-tint 15s linear forwards",
         "tab-status-pulse": "tab-status-pulse 1.6s ease-in-out infinite",
-        "progress-indeterminate": "progress-indeterminate 1.4s ease-in-out infinite",
+        "progress-indeterminate": "progress-indeterminate 1.4s linear infinite",
         "slide-in-left": "slide-in-left 180ms var(--ease-out) both",
         rise: "rise 240ms var(--ease-out) both",
       },

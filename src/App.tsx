@@ -6,6 +6,7 @@ import { SearchDialog } from "@/components/search/SearchDialog";
 import { CommandPalette } from "@/components/command-palette/CommandPalette";
 import { DiagnosticLogPanel } from "@/components/diagnostics/DiagnosticLogPanel";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
+import { TooltipProvider } from "@/components/ui/Tooltip";
 import { initThemeListener } from "@/features/theme/theme.store";
 
 export default function App() {
@@ -38,11 +39,13 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <KeyboardShortcuts />
-      <AppShell />
-      <SearchDialog />
-      <CommandPalette />
-      <DiagnosticLogPanel />
+      <TooltipProvider>
+        <KeyboardShortcuts />
+        <AppShell />
+        <SearchDialog />
+        <CommandPalette />
+        <DiagnosticLogPanel />
+      </TooltipProvider>
     </ErrorBoundary>
   );
 }

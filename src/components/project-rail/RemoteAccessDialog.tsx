@@ -171,7 +171,15 @@ export function RemoteAccessDialog({ open, onOpenChange }: RemoteAccessDialogPro
 
             <div className="flex flex-wrap items-center gap-[8px]">
               <Button variant="outline" size="sm" disabled={busy || !canConnect} onClick={() => runTest(false)}>
-                {busy ? <Icon icon={Loader2} size={12} className="animate-spin" /> : <Icon icon={ShieldCheck} size={12} />}
+                {busy ? (
+                  <Icon
+                    icon={Loader2}
+                    size={12}
+                    className="animate-spin motion-reduce:animate-none"
+                  />
+                ) : (
+                  <Icon icon={ShieldCheck} size={12} />
+                )}
                 {t("remoteAccess.test")}
               </Button>
               {needsTrust ? (

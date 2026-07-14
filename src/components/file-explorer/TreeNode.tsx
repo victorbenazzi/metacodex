@@ -123,10 +123,11 @@ export const TreeNode = memo(function TreeNode({
               ? "bg-accent/15 hover:bg-accent/20"
               : "hover:bg-surface-strong/45 focus-visible:bg-surface-strong/55",
             "data-[state=open]:bg-surface-strong/55",
-            // Recent-file tint runs underneath the selection/hover layers
-            // and overrides them visually for ~14.4s before fading out.
-            isRecent && !isSelected && "animate-explorer-recent-tint",
+            // Recent-file tint runs on a generated layer for the full 15s TTL.
+            // Selection hides the layer without restarting its opacity timeline.
+            isRecent && "explorer-recent",
           )}
+          data-selected={isSelected ? "true" : undefined}
           style={{ paddingLeft: indentPx }}
           title={entry.path}
         >
@@ -376,7 +377,7 @@ function TreeChildren({
           className="flex items-center gap-[6px] py-[3px] font-mono text-label text-muted-soft"
           style={{ paddingLeft: indentPx }}
         >
-          <span className="h-[8px] w-[8px] animate-pulse rounded-pill bg-hairline-strong" />
+          <span className="h-[8px] w-[8px] animate-pulse rounded-pill bg-hairline-strong motion-reduce:animate-none" />
           {t("common.loading")}
         </div>
       </>
