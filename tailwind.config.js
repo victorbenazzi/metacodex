@@ -100,6 +100,7 @@ export default {
         DEFAULT: "var(--dur-fast)",
         fast: "var(--dur-fast)",
         base: "var(--dur-base)",
+        drawer: "var(--dur-drawer)",
         slow: "var(--dur-slow)",
       },
       transitionTimingFunction: {

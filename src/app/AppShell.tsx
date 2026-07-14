@@ -41,9 +41,9 @@ import { useTabActions } from "@/app/hooks/useTabActions";
 import { useDelayedFlag } from "@/app/hooks/useDelayedFlag";
 import { cn } from "@/lib/cn";
 
-// Must equal `--dur-base` (tokens.css): the side panel must stay mounted until
-// its inner opacity and transform transition finishes.
-const DRAWER_ANIMATION_MS = 180;
+// Must equal `--dur-drawer` (tokens.css): the side panel must stay mounted until
+// its grid track finishes closing.
+const DRAWER_ANIMATION_MS = 240;
 // Horizontal gap between the floating sidebar cards, as a CSS value so it stays
 // in lockstep with the resize-handle offsets and the vertical insets. Source of
 // truth: `--panel-gap-x` in tokens.css. The vertical gaps use `--panel-gap-y`.
@@ -97,6 +97,9 @@ export function AppShell() {
   const toggleExplorerCollapsed = useCodeSidebarStore((s) => s.toggleExplorerCollapsed);
   // Keep the side panel mounted through its close animation.
   const sidePanelMounted = useDelayedFlag(panelOpen, DRAWER_ANIMATION_MS);
+  // Suspend grid easing while a resize handle is active so width changes track
+  // the pointer directly instead of trailing behind it.
+  const [resizing, setResizing] = useState(false);
 
   // Resizable panel widths, driven by settings, persisted to ~/.metacodex.
   const projectsWidth = useSettingsDataStore((s) => s.settings.panels.projectsWidth);
@@ -148,14 +151,12 @@ export function AppShell() {
 
   useEffect(() => registerAppCommands(actions), [actions]);
 
-  // CSS-grid template: the variable-width columns use the current settings so
-  // resizing rerenders only this style and the dragged column.
+  // CSS-grid template: drawer toggles interpolate the panel and adjacent gap
+  // tracks together. Pointer resizing bypasses the transition.
   // Floating-panel layout: the sidebars (projects, explorer, side panel) are
   // rounded cards separated from the window edges and from each other by
   // fixed gap COLUMNS baked into the template. Gaps adjacent to a collapsed
-  // panel collapse to 0 with it. Column changes snap so editor and terminal
-  // layout is not recalculated across an animation. The work area stays flush
-  // with the window (no card).
+  // panel collapse to 0 with it. The work area stays flush with the window.
   const projectsColWidth = codeSidebarCollapsed ? RAIL_WIDTH_PX : projectsWidth;
   const explorerColWidth = explorerCollapsed ? 0 : explorerWidth;
   const explorerGap = explorerCollapsed ? "0px" : PANEL_GAP_X;
@@ -168,7 +169,11 @@ export function AppShell() {
 
   return (
     <div
-      className="relative grid h-screen w-screen grid-rows-[var(--title-bar-h)_minmax(0,1fr)] bg-canvas text-ink"
+      className={cn(
+        "relative grid h-screen w-screen grid-rows-[var(--title-bar-h)_minmax(0,1fr)] bg-canvas text-ink",
+        !resizing &&
+          "transition-[grid-template-columns] duration-drawer ease-drawer motion-reduce:transition-none",
+      )}
       style={{ gridTemplateColumns }}
     >
       <DropOverlay active={dropActive} />
@@ -193,10 +198,10 @@ export function AppShell() {
             <div
               aria-hidden={!codeSidebarCollapsed}
               className={cn(
-                "absolute inset-0 transition-[opacity,transform] duration-base ease-out motion-reduce:transform-none motion-reduce:transition-opacity",
+                "absolute inset-0 transition-opacity duration-fast ease-out",
                 codeSidebarCollapsed
-                  ? "translate-x-0 opacity-100"
-                  : "pointer-events-none -translate-x-[10px] opacity-0",
+                  ? "opacity-100"
+                  : "pointer-events-none opacity-0",
               )}
             >
               <MiniProjectSidebar />
@@ -204,10 +209,10 @@ export function AppShell() {
             <div
               aria-hidden={codeSidebarCollapsed}
               className={cn(
-                "absolute inset-y-0 left-0 h-full transition-[opacity,transform] duration-base ease-out motion-reduce:transform-none motion-reduce:transition-opacity",
+                "absolute inset-y-0 left-0 h-full transition-opacity duration-fast ease-out",
                 codeSidebarCollapsed
-                  ? "pointer-events-none -translate-x-[14px] opacity-0"
-                  : "translate-x-0 opacity-100",
+                  ? "pointer-events-none opacity-0"
+                  : "opacity-100",
               )}
               style={{ width: projectsWidth }}
             >
@@ -224,6 +229,7 @@ export function AppShell() {
             onReset={resetProjectsWidth}
             ariaLabel={t("appShell.resizeProjectsPanel")}
             enabled={!codeSidebarCollapsed}
+            onDraggingChange={setResizing}
             className="bottom-[var(--panel-gap-y)] top-[var(--panel-gap-y)] h-auto"
           />
         </div>
@@ -239,10 +245,10 @@ export function AppShell() {
           >
             <div
               className={cn(
-                "absolute inset-y-0 left-0 h-full transition-[opacity,transform] duration-base ease-out motion-reduce:transform-none motion-reduce:transition-opacity",
+                "absolute inset-y-0 left-0 h-full transition-opacity duration-fast ease-out",
                 explorerCollapsed
-                  ? "pointer-events-none -translate-x-[14px] opacity-0"
-                  : "translate-x-0 opacity-100",
+                  ? "pointer-events-none opacity-0"
+                  : "opacity-100",
               )}
               style={{ width: explorerWidth }}
             >
@@ -268,6 +274,7 @@ export function AppShell() {
             onReset={resetExplorerWidth}
             ariaLabel={t("appShell.resizeExplorer")}
             enabled={!explorerCollapsed}
+            onDraggingChange={setResizing}
             className="bottom-[var(--panel-gap-y)] top-[var(--panel-gap-y)] h-auto"
           >
             <ExplorerTogglePill collapsed={false} onToggle={toggleExplorerCollapsed} />
@@ -321,17 +328,14 @@ export function AppShell() {
             <>
               <div
                 aria-hidden={!panelOpen}
-                className={cn(
-                  "absolute inset-x-0 bottom-[var(--panel-gap-y)] top-[var(--panel-gap-y)]",
-                  panelOpen ? "overflow-hidden" : "overflow-visible",
-                )}
+                className="absolute inset-x-0 bottom-[var(--panel-gap-y)] top-[var(--panel-gap-y)] overflow-hidden"
               >
                 <div
                   className={cn(
-                    "absolute inset-y-0 right-0 h-full transition-[opacity,transform] duration-base ease-out motion-reduce:transform-none motion-reduce:transition-opacity",
+                    "absolute inset-y-0 right-0 h-full transition-opacity duration-fast ease-out",
                     panelOpen
-                      ? "translate-x-0 opacity-100"
-                      : "pointer-events-none translate-x-[16px] opacity-0",
+                      ? "opacity-100"
+                      : "pointer-events-none opacity-0",
                   )}
                   style={{ width: sourceControlWidth }}
                 >
@@ -355,6 +359,7 @@ export function AppShell() {
                 onReset={resetSourceControlWidth}
                 ariaLabel={t("appShell.resizeSidePanel")}
                 enabled={panelOpen}
+                onDraggingChange={setResizing}
                 className="bottom-[var(--panel-gap-y)] top-[var(--panel-gap-y)] h-auto"
               />
             </>

@@ -178,6 +178,7 @@
   --ease-in: cubic-bezier(0.6, 0, 0.7, 0.3);
   --dur-fast: 120ms;
   --dur-base: 180ms;
+  --dur-drawer: 240ms;
   --dur-slow: 280ms;
 
   /* Press feedback for primary CTAs — tiny scale-down on :active to give
