@@ -3,8 +3,7 @@ import type { ComponentType } from "react";
 import { AntigravityIcon } from "./AntigravityIcon";
 import { ClaudeCodeIcon } from "./ClaudeCodeIcon";
 import { CodexIcon } from "./CodexIcon";
-import { HermesIcon } from "./HermesIcon";
-import { OpenClawIcon } from "./OpenClawIcon";
+import { GrokIcon } from "./GrokIcon";
 import { OpenCodeIcon } from "./OpenCodeIcon";
 import { PiIcon } from "./PiIcon";
 import type { BrandIconProps } from "./types";
@@ -14,8 +13,7 @@ export {
   AntigravityIcon,
   ClaudeCodeIcon,
   CodexIcon,
-  HermesIcon,
-  OpenClawIcon,
+  GrokIcon,
   OpenCodeIcon,
   PiIcon,
   XiaomiMiMoIcon,
@@ -29,9 +27,8 @@ export const CLI_BRAND_ICONS: Record<string, ComponentType<BrandIconProps>> = {
   "claude-code": ClaudeCodeIcon,
   "codex-cli": CodexIcon,
   opencode: OpenCodeIcon,
+  grok: GrokIcon,
   "antigravity-cli": AntigravityIcon,
   "pi-cli": PiIcon,
-  hermes: HermesIcon,
-  openclaw: OpenClawIcon,
   "mimo-code": XiaomiMiMoIcon,
 };

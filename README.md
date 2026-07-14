@@ -63,7 +63,7 @@ From **v0.0.3** onwards, metacodex updates itself. Shortly after launch the app 
 
 | Pain | metacodex's take |
 |---|---|
-| AI coding CLIs feel great in isolation but lousy as a workspace | First-class **PTY tabs** for Claude Code, Codex CLI, OpenCode, Antigravity, Hermes, OpenClaw — launched through `$SHELL -l -i -c` so your `mise` / `nvm` / `.zshrc` PATH is intact. |
+| AI coding CLIs feel great in isolation but lousy as a workspace | First-class **PTY tabs** for Claude Code, Codex CLI, OpenCode, Grok Build, MiMo Code, Antigravity, and Pi. They launch through `$SHELL -l -i -c` so your `mise` / `nvm` / `.zshrc` PATH is intact. |
 | Electron IDEs are heavy, slow to launch, fragile on resize | Tauri 2 native shell, ~tens of MB binary, instant cold start. |
 | "Open with terminal" is a context-switch | Terminal and editor live in the **same tab bar**, keyed per project. |
 | Cloud-bound settings get out of sync | Plain JSON in `~/.metacodex/`. Edit it in vim if you want. |
@@ -91,7 +91,7 @@ From **v0.0.3** onwards, metacodex updates itself. Shortly after launch the app 
 ### Terminal & AI CLIs
 - xterm.js v5.5 with the Canvas renderer (carefully deferred load order — see `useXterm.ts`), DOM fallback on failure.
 - Bundled **JetBrains Mono Nerd Font** for TUI glyphs (Claude Code box-drawing, Codex spinners) — `lineHeight` is pinned to 1.0 by design.
-- One-click launcher for any CLI in the registry (`cli-registry.ts`): Claude Code, Codex CLI, OpenCode, Antigravity, Hermes, OpenClaw, Pi.
+- One-click launcher for any CLI in the registry (`cli-registry.ts`): Claude Code, Codex CLI, OpenCode, Grok Build, MiMo Code, Antigravity, Pi.
 - **Agent status** per tab (`idle | working | needs-attention | done`) driven by OSC parsing + heuristics; jump to the next attention with `Cmd+Shift+U`.
 - **Tab tooltip** with per-tab branch, cwd, and listening ports (polled from Rust).
 - OS notifications + sound when an agent finishes or needs you.

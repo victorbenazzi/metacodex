@@ -63,7 +63,7 @@ A partir da **v0.0.3**, o metacodex se atualiza sozinho. Logo após abrir, o app
 
 | Dor | Resposta do metacodex |
 |---|---|
-| CLIs de IA são ótimas isoladamente mas péssimas como workspace | **Abas de PTY** de primeira classe pra Claude Code, Codex CLI, OpenCode, Antigravity, Hermes, OpenClaw — lançadas via `$SHELL -l -i -c` pra preservar PATH do `mise` / `nvm` / `.zshrc`. |
+| CLIs de IA são ótimas isoladamente mas péssimas como workspace | **Abas de PTY** de primeira classe pra Claude Code, Codex CLI, OpenCode, Grok Build, MiMo Code, Antigravity e Pi. Elas são lançadas via `$SHELL -l -i -c` pra preservar o PATH do `mise`, `nvm` e `.zshrc`. |
 | IDE Electron é pesada, lenta pra abrir, frágil em resize | Shell nativa Tauri 2, binário de ~dezenas de MB, cold start instantâneo. |
 | "Abrir no terminal" é troca de contexto | Terminal e editor vivem na **mesma barra de abas**, agrupados por projeto. |
 | Configurações na nuvem dessincronizam | JSON puro em `~/.metacodex/`. Edite no vim se quiser. |
@@ -91,7 +91,7 @@ A partir da **v0.0.3**, o metacodex se atualiza sozinho. Logo após abrir, o app
 ### Terminal & CLIs de IA
 - xterm.js v5.5 com renderer Canvas (ordem de carregamento cuidadosamente adiada — veja `useXterm.ts`), fallback DOM em caso de falha.
 - **JetBrains Mono Nerd Font** embutida pra glifos de TUI (box-drawing do Claude Code, spinners do Codex) — `lineHeight` travado em 1.0 por design.
-- Launcher de um clique pra qualquer CLI do registry (`cli-registry.ts`): Claude Code, Codex CLI, OpenCode, Antigravity, Hermes, OpenClaw, Pi.
+- Launcher de um clique pra qualquer CLI do registry (`cli-registry.ts`): Claude Code, Codex CLI, OpenCode, Grok Build, MiMo Code, Antigravity e Pi.
 - **Status de agente** por aba (`idle | working | needs-attention | done`) via parsing de OSC + heurística; pule pro próximo "needs-attention" com `Cmd+Shift+U`.
 - **Tooltip de aba** com branch, cwd e portas em escuta (pollado do Rust).
 - Notificação do sistema operacional + som quando o agente termina ou precisa de você.

@@ -2,13 +2,7 @@ import { isWindows } from "@/lib/platform";
 
 export type CliDangerLevel = "normal" | "dangerous";
 
-/**
- * Grouping in the launcher menu:
- * - "coding"     → flat list under the "Coding Agents" header (Claude Code, Codex, …)
- * - "autonomous" → nested under a collapsible "Autonomous Agents" header (Hermes, OpenClaw)
- *
- * Missing/undefined defaults to "coding" so older entries stay where they are.
- */
+/** Launcher grouping. Missing values default to the coding-agent section. */
 export type CliCategory = "coding" | "autonomous";
 
 export interface CliTool {
@@ -40,6 +34,8 @@ export interface CliTool {
   /** Marks CLIs whose install/launch command is not officially confirmed yet. */
   needsConfig?: boolean;
   category?: CliCategory;
+  /** Whether PowerShell needs its stop-parsing token before launch arguments. */
+  powerShellStopParsing?: boolean;
 }
 
 /**
@@ -64,6 +60,7 @@ export const DEFAULT_CLI_REGISTRY: CliTool[] = [
     docsUrl: "https://docs.claude.com/en/docs/claude-code",
     description: "Anthropic's terminal-native coding agent.",
     dangerLevel: "dangerous",
+    powerShellStopParsing: true,
   },
   {
     id: "codex-cli",
@@ -88,6 +85,18 @@ export const DEFAULT_CLI_REGISTRY: CliTool[] = [
     installCommandWindows: "npm install -g opencode-ai",
     docsUrl: "https://opencode.ai",
     description: "Open-source AI coding agent.",
+  },
+  {
+    id: "grok",
+    label: "Grok Build",
+    command: "grok",
+    args: ["--always-approve"],
+    detectCommand: "command -v grok",
+    detectCommandWindows: "Get-Command grok",
+    installCommand: "curl -fsSL https://x.ai/cli/install.sh | bash",
+    docsUrl: "https://docs.x.ai/build",
+    description: "xAI's terminal-native coding agent.",
+    dangerLevel: "dangerous",
   },
   {
     id: "mimo-code",
@@ -123,33 +132,6 @@ export const DEFAULT_CLI_REGISTRY: CliTool[] = [
       "Inflection Pi terminal client. Official install command not yet confirmed, configure in CLI registry.",
     needsConfig: true,
   },
-  {
-    id: "hermes",
-    label: "Hermes",
-    command: "hermes",
-    args: [],
-    detectCommand: "command -v hermes",
-    detectCommandWindows: "Get-Command hermes",
-    installCommand:
-      "curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash",
-    docsUrl: "https://github.com/NousResearch/hermes-agent",
-    description: "NousResearch's autonomous research agent.",
-    category: "autonomous",
-  },
-  {
-    id: "openclaw",
-    label: "OpenClaw",
-    command: "openclaw",
-    args: [],
-    detectCommand: "command -v openclaw",
-    detectCommandWindows: "Get-Command openclaw",
-    installCommand: "npm i -g openclaw",
-    installCommandWindows: "npm i -g openclaw",
-    altInstallCommand: "curl -fsSL https://openclaw.ai/install.sh | bash",
-    docsUrl: "https://openclaw.ai",
-    description: "Open-source autonomous agent reachable via chat apps.",
-    category: "autonomous",
-  },
 ];
 
 export function cliById(id: string, registry: CliTool[] = DEFAULT_CLI_REGISTRY): CliTool | undefined {
@@ -159,7 +141,7 @@ export function cliById(id: string, registry: CliTool[] = DEFAULT_CLI_REGISTRY):
 /** Combine `command` + args into a single shell command string. */
 export function cliLaunchString(cli: CliTool): string {
   if (!cli.args.length) return cli.command;
-  if (isWindows) {
+  if (isWindows && cli.powerShellStopParsing) {
     // PowerShell parses `--flag` as a parameter unless we lead with the
     // stop-parsing token. Prepending `--%` makes pwsh forward every
     // subsequent token verbatim — required for `claude
@@ -170,7 +152,7 @@ export function cliLaunchString(cli: CliTool): string {
   return [cli.command, ...cli.args].join(" ");
 }
 
-/** Default category for a CLI ("coding" when omitted). */
+/** Default category for a CLI. */
 export function cliCategory(cli: CliTool): CliCategory {
   return cli.category ?? "coding";
 }
@@ -204,11 +186,7 @@ export function isAgentEnabled(cliId: string, enabledAgents: Record<string, bool
   return enabledAgents[cliId] ?? true;
 }
 
-/**
- * The enabled agents split by category, in registry order. Both launcher
- * surfaces (the "+" menu and the side panel) render the same two groups, so the
- * filtering lives here instead of being copy-pasted into each.
- */
+/** Enabled agents split by category in registry order. */
 export function enabledAgentsByCategory(enabledAgents: Record<string, boolean>): {
   coding: CliTool[];
   autonomous: CliTool[];
