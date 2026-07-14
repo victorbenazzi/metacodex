@@ -52,6 +52,12 @@
   --primary-active: #0a0b0f;
   --on-primary: #ffffff;
 
+  /* Active tab: a white foreground surface in light themes. Kept separate
+     from primary actions because tabs preserve the normal ink direction. */
+  --tab-active-bg: #ffffff;
+  --tab-active-border: #ffffff;
+  --tab-active-text: var(--ink);
+
   /* Accent — restrained indigo/lavender. Powers selected/active/focus tints
      (bg-accent/NN, ring-accent, text-accent) and the corner atmosphere glow.
      Kept consistent across every light syntax theme (defined here, not in the
@@ -303,6 +309,12 @@
   --primary: #f3f4f7;
   --primary-active: #ffffff;
   --on-primary: #0f1015;
+
+  /* Active tab: deeper than the surrounding dark canvas, with a visible
+     hairline so the selected surface does not disappear into the chrome. */
+  --tab-active-bg: #08090d;
+  --tab-active-border: var(--hairline-strong);
+  --tab-active-text: var(--ink);
 
   /* Accent — lavender lifted brighter so it reads on the dim canvas. */
   --accent: #8a8af3;

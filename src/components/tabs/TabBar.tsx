@@ -49,8 +49,7 @@ interface TabBarProps {
 //     so the tab bar visually matches the sidebar entry.
 //   - Terminal tabs → generic terminal mark.
 function renderTabIcon(tab: Tab, active: boolean): ReactNode {
-  // The active pill is ink-inverted, so its glyphs swap to the on-primary tone.
-  const tone = active ? "text-on-primary" : "text-muted-soft";
+  const tone = active ? "text-tab-active-text" : "text-muted-soft";
 
   if (tab.kind === "terminal") {
     return <Icon icon={TerminalSquare} size={12} className={tone} />;
@@ -363,10 +362,10 @@ export function TabBar({
                 }}
                 className={cn(
                   "group relative flex h-[26px] min-w-[120px] max-w-[220px] shrink-0 items-center gap-[7px] rounded-md px-[10px]",
-                  "touch-none transition-colors duration-fast",
+                  "touch-none border transition-colors duration-fast",
                   active
-                    ? "bg-ink text-on-primary"
-                    : "text-muted hover:bg-canvas-soft hover:text-body",
+                    ? "border-tab-active-border bg-tab-active text-tab-active-text"
+                    : "border-transparent text-muted hover:bg-canvas-soft hover:text-body",
                   beingDragged && "opacity-40",
                 )}
                 aria-current={active ? "page" : undefined}
@@ -378,7 +377,7 @@ export function TabBar({
                   <span
                     className={cn(
                       "h-[6px] w-[6px] shrink-0 rounded-pill",
-                      active ? "bg-on-primary" : "bg-ink",
+                      active ? "bg-tab-active-text" : "bg-ink",
                     )}
                     aria-label={t("tabs.unsavedChanges")}
                   />
@@ -419,7 +418,7 @@ export function TabBar({
                   className={cn(
                     "inline-flex h-[18px] w-[18px] items-center justify-center rounded-xs opacity-0 transition-all duration-fast group-hover:opacity-100",
                     active
-                      ? "text-on-primary opacity-60 hover:opacity-100"
+                      ? "text-tab-active-text opacity-60 hover:opacity-100"
                       : "text-muted hover:bg-surface-strong hover:text-ink",
                   )}
                   aria-label={t("tabs.closeTab")}
@@ -492,7 +491,7 @@ export function TabBar({
                   top: drag.pointerPos.y - 10,
                 }}
               >
-                {renderTabIcon(dragged, true)}
+                {renderTabIcon(dragged, false)}
                 <span className="truncate">{resolveTabTitle(dragged)}</span>
               </div>
             );
@@ -568,8 +567,7 @@ function TabRenameInput({ initial, onCommit, onCancel }: TabRenameInputProps) {
       }}
       onBlur={commit}
       className={cn(
-        // Solid canvas: the input must stay readable over the ink-inverted
-        // active pill, so it cannot be translucent.
+        // Solid canvas keeps the input distinct from the active tab surface.
         "flex-1 min-w-0 truncate rounded-xs border border-accent/60 bg-canvas px-[4px]",
         "text-left text-caption text-ink",
         "outline-none focus:border-accent focus:outline-none",

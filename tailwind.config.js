@@ -30,6 +30,10 @@ export default {
         "primary-active": "var(--primary-active)",
         "on-primary": "var(--on-primary)",
 
+        "tab-active": "var(--tab-active-bg)",
+        "tab-active-border": "var(--tab-active-border)",
+        "tab-active-text": "var(--tab-active-text)",
+
         // Restrained indigo/lavender accent (active/selected/focus + glow).
         // Token-driven so it stays consistent across every syntax theme.
         accent: "var(--accent)",
