@@ -4,16 +4,16 @@ Baseline commit: `3cda0a8`.
 
 | Plan | Title | Severity | Status | Depends on |
 |---|---|---|---|---|
-| 001 | Make keyboard surfaces instant | HIGH | TODO | None |
-| 002 | Move drag tracking to the compositor | HIGH | TODO | 006 |
-| 003 | Stop animating workspace layout | HIGH | TODO | 006 |
-| 004 | Remove operational row entrances | HIGH | TODO | None |
-| 005 | Share tooltip timing | MEDIUM | TODO | None |
-| 006 | Unify motion tokens and progress | MEDIUM | TODO | None |
-| 007 | Make control feedback minimal and bounded | MEDIUM | TODO | 006 |
-| 008 | Preserve information under reduced motion | MEDIUM | TODO | 003, 006, 007 |
-| 009 | Add interruptible toast motion | MEDIUM | TODO | 006, 008 |
-| 010 | Run the final motion review | HIGH | TODO | 001 through 009 |
+| 001 | Make keyboard surfaces instant | HIGH | DONE | None |
+| 002 | Move drag tracking to the compositor | HIGH | DONE | 006 |
+| 003 | Stop animating workspace layout | HIGH | DONE | 006 |
+| 004 | Remove operational row entrances | HIGH | DONE | None |
+| 005 | Share tooltip timing | MEDIUM | DONE | None |
+| 006 | Unify motion tokens and progress | MEDIUM | DONE | None |
+| 007 | Make control feedback minimal and bounded | MEDIUM | DONE | 006 |
+| 008 | Preserve information under reduced motion | MEDIUM | DONE | 003, 006, 007 |
+| 009 | Add interruptible toast motion | MEDIUM | DONE | 006, 008 |
+| 010 | Run the final motion review | HIGH | DONE | 001 through 009 |
 
 ## Recommended execution order
 

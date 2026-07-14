@@ -1,6 +1,6 @@
 # 007: Make control feedback minimal and bounded
 
-- **Status**: TODO
+- **Status**: DONE
 - **Commit**: 3cda0a8
 - **Severity**: MEDIUM
 - **Category**: Physicality, timing, and performance

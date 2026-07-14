@@ -1,6 +1,6 @@
 # 006: Unify motion tokens and progress
 
-- **Status**: TODO
+- **Status**: DONE
 - **Commit**: 3cda0a8
 - **Severity**: MEDIUM
 - **Category**: Cohesion, easing, and performance

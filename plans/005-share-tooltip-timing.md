@@ -1,6 +1,6 @@
 # 005: Share tooltip timing
 
-- **Status**: TODO
+- **Status**: DONE
 - **Commit**: 3cda0a8
 - **Severity**: MEDIUM
 - **Category**: Easing and duration

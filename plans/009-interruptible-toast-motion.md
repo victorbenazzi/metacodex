@@ -1,6 +1,6 @@
 # 009: Add interruptible toast motion
 
-- **Status**: TODO
+- **Status**: DONE
 - **Commit**: 3cda0a8
 - **Severity**: MEDIUM
 - **Category**: Missed opportunity and interruptibility

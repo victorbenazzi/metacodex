@@ -1,6 +1,6 @@
 # 002: Move drag tracking to the compositor
 
-- **Status**: TODO
+- **Status**: DONE
 - **Commit**: 3cda0a8
 - **Severity**: HIGH
 - **Category**: Performance and physicality

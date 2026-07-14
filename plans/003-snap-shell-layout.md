@@ -1,6 +1,6 @@
 # 003: Stop animating workspace layout
 
-- **Status**: TODO
+- **Status**: DONE
 - **Commit**: 3cda0a8
 - **Severity**: HIGH
 - **Category**: Performance

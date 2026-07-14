@@ -1,6 +1,6 @@
 # 001: Make keyboard surfaces instant
 
-- **Status**: TODO
+- **Status**: DONE
 - **Commit**: 3cda0a8
 - **Severity**: HIGH
 - **Category**: Purpose and frequency
