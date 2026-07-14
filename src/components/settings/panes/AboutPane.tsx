@@ -113,7 +113,7 @@ export function AboutPane() {
             <Icon
               icon={isChecking ? Loader2 : RefreshCw}
               size={10}
-              className={isChecking ? "animate-spin" : undefined}
+              className={isChecking ? "animate-spin motion-reduce:animate-none" : undefined}
             />
             <span>
               {isChecking
@@ -159,7 +159,7 @@ export function AboutPane() {
           <Icon
             icon={ArrowUpRight}
             size={10}
-            className="opacity-60 transition-transform duration-fast group-hover:-translate-y-px group-hover:translate-x-px"
+            className="opacity-60"
           />
         </button>
       </p>

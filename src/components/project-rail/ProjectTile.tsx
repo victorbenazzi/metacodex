@@ -86,9 +86,7 @@ export const ProjectTile = forwardRef<HTMLButtonElement, ProjectTileProps>(funct
         aria-current={active ? "true" : undefined}
         className={cn(
           "relative inline-flex h-[32px] w-[32px] items-center justify-center rounded-md border bg-surface-card",
-          "transition-[border-color,background-color,color,box-shadow,transform] duration-fast ease-out",
-          // Micro-interaction: lift + soft shadow on hover, press-in on active.
-          "hover:-translate-y-px hover:shadow-elevated active:scale-[0.96] active:translate-y-0",
+          "hover:shadow-elevated",
           "focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[3px]",
           active
             ? "border-hairline-strong"

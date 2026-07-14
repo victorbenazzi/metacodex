@@ -50,17 +50,14 @@ export function SidePanel({
     close();
   };
 
-  // Height choreography: in launcher mode the card hugs its content; opening
-  // Git and Review expands it to the full column. A flex-grow transition can't
-  // animate this (the review content is taller than the column, so the
-  // resolved height snaps to full on the first frame), so both endpoints are
-  // measured in px and the transition runs on `height`:
+  // Height sizing: in launcher mode the card hugs its content; opening Git and
+  // Review expands it to the full column. Both endpoints are measured in px:
   //   - frameH: the available column height (ResizeObserver on the frame).
   //   - launcherH: the launcher's natural content height, measured from the
   //     scroll container while observing the inner block (the scroll box
   //     itself doesn't resize when its CONTENT changes, the block does).
-  // launcherH intentionally survives while review is open: it's the target
-  // the collapse animates back to.
+  // launcherH intentionally survives while review is open so the launcher can
+  // return to its measured height.
   const frameRef = useRef<HTMLDivElement | null>(null);
   const launcherScrollRef = useRef<HTMLDivElement | null>(null);
   const launcherBlockRef = useRef<HTMLDivElement | null>(null);
@@ -104,10 +101,7 @@ export function SidePanel({
   return (
     <div ref={frameRef} className="h-full min-h-0">
     <aside
-      className={cn(
-        "flex min-h-0 flex-col overflow-hidden rounded-lg border border-hairline bg-surface-card",
-        "transition-[height] duration-base ease-out motion-reduce:transition-none",
-      )}
+      className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-hairline bg-surface-card"
       // Undefined until the first measurement: the card renders height:auto,
       // which visually equals the measured collapsed height, so nothing jumps.
       style={{ height: asideHeight }}

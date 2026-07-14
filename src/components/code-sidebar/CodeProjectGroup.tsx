@@ -48,8 +48,6 @@ import type { ResumeEntry } from "@/features/resume/resume.service";
 import { resolveTabTitle, type Tab } from "@/components/tabs/types";
 
 const HISTORY_CAP = 6;
-const STAGGER_CAP = 10;
-const STAGGER_STEP_MS = 24;
 
 /**
  * One project parent row over its nested Code sections (built on the shared
@@ -195,8 +193,6 @@ export function CodeProjectGroup({
   const hasContent =
     historico.length > 0 ||
     (showOpen && (terminais.length > 0 || agentes.length > 0 || arquivos.length > 0));
-  let staggerIndex = 0;
-  const nextDelay = () => `${Math.min(staggerIndex++, STAGGER_CAP) * STAGGER_STEP_MS}ms`;
 
   // Hover-revealed trailing controls (new-tab "+", project options "⋯").
   const trailingBtn = cn(
@@ -317,7 +313,7 @@ export function CodeProjectGroup({
             {historico.length > 0 ? (
               <Section label={t("codeSidebar.historico")} count={historico.length}>
                 {historico.map((entry) => (
-                  <HistoricoRow key={entry.id} entry={entry} delay={nextDelay()} onResume={resume} />
+                  <HistoricoRow key={entry.id} entry={entry} onResume={resume} />
                 ))}
               </Section>
             ) : null}
@@ -329,7 +325,6 @@ export function CodeProjectGroup({
                     key={tab.id}
                     tab={tab}
                     ports={portsByTabId[tab.id] ?? []}
-                    delay={nextDelay()}
                     onFocus={focusTab}
                     onClose={closeTabHere}
                   />
@@ -344,7 +339,6 @@ export function CodeProjectGroup({
                     key={tab.id}
                     tab={tab}
                     ports={portsByTabId[tab.id] ?? []}
-                    delay={nextDelay()}
                     onFocus={focusTab}
                     onClose={closeTabHere}
                   />
@@ -358,7 +352,6 @@ export function CodeProjectGroup({
                   <FileRow
                     key={tab.id}
                     tab={tab}
-                    delay={nextDelay()}
                     onFocus={focusTab}
                     onClose={closeTabHere}
                   />
@@ -390,7 +383,6 @@ interface RowShellProps {
   leading: ReactNode;
   label: string;
   trailing?: ReactNode;
-  delay: string;
   title?: string;
   ariaLabel?: string;
   onClick: () => void;
@@ -400,12 +392,11 @@ interface RowShellProps {
   closeLabel?: string;
 }
 
-function RowShell({ leading, label, trailing, delay, title, ariaLabel, onClick, onClose, closeLabel }: RowShellProps) {
+function RowShell({ leading, label, trailing, title, ariaLabel, onClick, onClose, closeLabel }: RowShellProps) {
   return (
     <div
-      style={{ animationDelay: delay }}
       className={cn(
-        "group/row flex w-full animate-rise items-center gap-[8px] rounded-sm px-[8px] py-[4px] text-ui text-body transition-colors duration-fast motion-reduce:animate-none",
+        "group/row flex w-full items-center gap-[8px] rounded-sm px-[8px] py-[4px] text-ui text-body transition-colors duration-fast",
         "hover:bg-surface-strong/40 hover:text-ink",
       )}
     >
@@ -439,11 +430,9 @@ function RowShell({ leading, label, trailing, delay, title, ariaLabel, onClick, 
 
 function HistoricoRow({
   entry,
-  delay,
   onResume,
 }: {
   entry: ResumeEntry;
-  delay: string;
   onResume: (entry: ResumeEntry) => void;
 }) {
   const { t } = useTranslation();
@@ -460,7 +449,6 @@ function HistoricoRow({
           {agoShort(entry.lastSeenAt)}
         </span>
       }
-      delay={delay}
       title={`${label} · ${entry.cwd}`}
       ariaLabel={t("codeSidebar.resumeAria", { cli: label })}
       onClick={() => onResume(entry)}
@@ -473,13 +461,11 @@ function HistoricoRow({
 function TabRow({
   tab,
   ports,
-  delay,
   onFocus,
   onClose,
 }: {
   tab: Tab;
   ports: ListeningPort[];
-  delay: string;
   onFocus: (tabId: string) => void;
   onClose: (tabId: string) => void;
 }) {
@@ -508,7 +494,6 @@ function TabRow({
           <TabStatusDot tabId={tab.id} />
         </span>
       }
-      delay={delay}
       onClick={() => onFocus(tab.id)}
       onClose={() => onClose(tab.id)}
       closeLabel={t(tab.kind === "cli" ? "codeSidebar.endAgent" : "codeSidebar.endTerminal")}
@@ -521,12 +506,10 @@ function TabRow({
  *  since the top tab bar is hidden there. Shows the unsaved-changes dot. */
 function FileRow({
   tab,
-  delay,
   onFocus,
   onClose,
 }: {
   tab: Tab;
-  delay: string;
   onFocus: (tabId: string) => void;
   onClose: (tabId: string) => void;
 }) {
@@ -543,7 +526,6 @@ function FileRow({
           />
         ) : undefined
       }
-      delay={delay}
       onClick={() => onFocus(tab.id)}
       onClose={() => onClose(tab.id)}
       closeLabel={t("codeSidebar.closeFile")}

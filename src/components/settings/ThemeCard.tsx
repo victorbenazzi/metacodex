@@ -29,7 +29,7 @@ export function ThemeCard({ theme, selected, onSelect }: ThemeCardProps) {
       aria-pressed={selected}
       aria-label={t("settings.appearance.applyTheme", { name: theme.name })}
       className={cn(
-        "group relative flex flex-col overflow-hidden rounded-md border text-left transition-all",
+        "group relative flex flex-col overflow-hidden rounded-md border text-left transition-[border-color,box-shadow]",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/30",
         selected
           ? "border-ink shadow-[0_0_0_1px_var(--ink)]"

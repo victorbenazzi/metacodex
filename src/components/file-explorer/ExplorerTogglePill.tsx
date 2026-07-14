@@ -40,9 +40,9 @@ export function ExplorerTogglePill({ collapsed, onToggle }: ExplorerTogglePillPr
         onPointerDown={(e) => e.stopPropagation()}
         onDoubleClick={(e) => e.stopPropagation()}
         className={cn(
-          "group/pill absolute top-1/2 z-10 -translate-y-1/2",
+          "explorer-toggle-pill group/pill absolute top-1/2 z-10 -translate-y-1/2",
           "flex h-[56px] w-[16px] cursor-pointer items-center justify-center",
-          "transition-opacity duration-fast ease-out motion-reduce:transition-none",
+          "transition-opacity duration-fast ease-out motion-reduce:transition-opacity",
           "focus-visible:outline-none",
           collapsed
             ? cn(
@@ -64,11 +64,11 @@ export function ExplorerTogglePill({ collapsed, onToggle }: ExplorerTogglePillPr
         <span
           aria-hidden
           className={cn(
-            "h-[40px] w-[3px] rounded-pill bg-muted",
+            "explorer-toggle-indicator h-[40px] w-[3px] rounded-pill bg-muted",
             "transition-[transform,background-color] duration-fast ease-out",
-            "motion-reduce:transition-none motion-reduce:transform-none",
-            "group-hover/pill:scale-y-110 group-hover/pill:bg-ink",
-            "group-active/pill:scale-y-90 group-active/pill:bg-ink",
+            "motion-reduce:transform-none motion-reduce:transition-colors",
+            "group-hover/pill:bg-ink",
+            "group-active/pill:bg-ink",
             "group-focus-visible/pill:bg-ink group-focus-visible/pill:ring-1 group-focus-visible/pill:ring-hairline-strong",
           )}
         />

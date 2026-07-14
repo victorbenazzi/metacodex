@@ -222,7 +222,7 @@ function SwatchButton({
       onClick={onClick}
       aria-label={t("projectRail.menu.useColor", { color })}
       aria-pressed={selected}
-      className="relative inline-flex h-[28px] w-[28px] items-center justify-center rounded-md transition-transform hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[3px]"
+      className="relative inline-flex h-[28px] w-[28px] items-center justify-center rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[3px]"
       style={{
         backgroundColor: tileBackground(color, {
           theme,

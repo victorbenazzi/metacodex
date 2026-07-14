@@ -41,8 +41,8 @@ import { useTabActions } from "@/app/hooks/useTabActions";
 import { useDelayedFlag } from "@/app/hooks/useDelayedFlag";
 import { cn } from "@/lib/cn";
 
-// Must equal `--dur-base` (tokens.css): the grid uses `duration-base` for its
-// column transition, and the side panel must stay mounted until it finishes.
+// Must equal `--dur-base` (tokens.css): the side panel must stay mounted until
+// its inner opacity and transform transition finishes.
 const DRAWER_ANIMATION_MS = 180;
 // Horizontal gap between the floating sidebar cards, as a CSS value so it stays
 // in lockstep with the resize-handle offsets and the vertical insets. Source of
@@ -97,11 +97,6 @@ export function AppShell() {
   const toggleExplorerCollapsed = useCodeSidebarStore((s) => s.toggleExplorerCollapsed);
   // Keep the side panel mounted through its close animation.
   const sidePanelMounted = useDelayedFlag(panelOpen, DRAWER_ANIMATION_MS);
-  // The grid-template-columns transition is always on EXCEPT while a resize
-  // handle is being dragged: during a drag we want 1px steps to track the
-  // pointer, not ease behind it. Drawer toggles (collapse/expand, panel
-  // open/close) are never drags, so they always animate.
-  const [resizing, setResizing] = useState(false);
 
   // Resizable panel widths, driven by settings, persisted to ~/.metacodex.
   const projectsWidth = useSettingsDataStore((s) => s.settings.panels.projectsWidth);
@@ -153,14 +148,14 @@ export function AppShell() {
 
   useEffect(() => registerAppCommands(actions), [actions]);
 
-  // CSS-grid template: the variable-width columns interpolate the current
-  // settings so resizing rerenders only this style + the dragged column.
+  // CSS-grid template: the variable-width columns use the current settings so
+  // resizing rerenders only this style and the dragged column.
   // Floating-panel layout: the sidebars (projects, explorer, side panel) are
   // rounded cards separated from the window edges and from each other by
   // fixed gap COLUMNS baked into the template. Gaps adjacent to a collapsed
-  // panel collapse to 0 with it, so they slide in the same
-  // grid-template-columns transition as the panel widths. The work area stays
-  // flush with the window (no card).
+  // panel collapse to 0 with it. Column changes snap so editor and terminal
+  // layout is not recalculated across an animation. The work area stays flush
+  // with the window (no card).
   const projectsColWidth = codeSidebarCollapsed ? RAIL_WIDTH_PX : projectsWidth;
   const explorerColWidth = explorerCollapsed ? 0 : explorerWidth;
   const explorerGap = explorerCollapsed ? "0px" : PANEL_GAP_X;
@@ -173,11 +168,7 @@ export function AppShell() {
 
   return (
     <div
-      className={cn(
-        "relative grid h-screen w-screen grid-rows-[var(--title-bar-h)_minmax(0,1fr)] bg-canvas text-ink",
-        !resizing &&
-          "transition-[grid-template-columns] duration-base ease-out motion-reduce:transition-none",
-      )}
+      className="relative grid h-screen w-screen grid-rows-[var(--title-bar-h)_minmax(0,1fr)] bg-canvas text-ink"
       style={{ gridTemplateColumns }}
     >
       <DropOverlay active={dropActive} />
@@ -202,7 +193,7 @@ export function AppShell() {
             <div
               aria-hidden={!codeSidebarCollapsed}
               className={cn(
-                "absolute inset-0 transition-[opacity,transform] duration-base ease-out motion-reduce:transition-none",
+                "absolute inset-0 transition-[opacity,transform] duration-base ease-out motion-reduce:transform-none motion-reduce:transition-opacity",
                 codeSidebarCollapsed
                   ? "translate-x-0 opacity-100"
                   : "pointer-events-none -translate-x-[10px] opacity-0",
@@ -213,7 +204,7 @@ export function AppShell() {
             <div
               aria-hidden={codeSidebarCollapsed}
               className={cn(
-                "absolute inset-y-0 left-0 h-full transition-[opacity,transform] duration-base ease-out motion-reduce:transition-none",
+                "absolute inset-y-0 left-0 h-full transition-[opacity,transform] duration-base ease-out motion-reduce:transform-none motion-reduce:transition-opacity",
                 codeSidebarCollapsed
                   ? "pointer-events-none -translate-x-[14px] opacity-0"
                   : "translate-x-0 opacity-100",
@@ -233,7 +224,6 @@ export function AppShell() {
             onReset={resetProjectsWidth}
             ariaLabel={t("appShell.resizeProjectsPanel")}
             enabled={!codeSidebarCollapsed}
-            onDraggingChange={setResizing}
             className="bottom-[var(--panel-gap-y)] top-[var(--panel-gap-y)] h-auto"
           />
         </div>
@@ -249,7 +239,7 @@ export function AppShell() {
           >
             <div
               className={cn(
-                "absolute inset-y-0 left-0 h-full transition-[opacity,transform] duration-base ease-out motion-reduce:transition-none",
+                "absolute inset-y-0 left-0 h-full transition-[opacity,transform] duration-base ease-out motion-reduce:transform-none motion-reduce:transition-opacity",
                 explorerCollapsed
                   ? "pointer-events-none -translate-x-[14px] opacity-0"
                   : "translate-x-0 opacity-100",
@@ -278,7 +268,6 @@ export function AppShell() {
             onReset={resetExplorerWidth}
             ariaLabel={t("appShell.resizeExplorer")}
             enabled={!explorerCollapsed}
-            onDraggingChange={setResizing}
             className="bottom-[var(--panel-gap-y)] top-[var(--panel-gap-y)] h-auto"
           >
             <ExplorerTogglePill collapsed={false} onToggle={toggleExplorerCollapsed} />
@@ -336,7 +325,7 @@ export function AppShell() {
               >
                 <div
                   className={cn(
-                    "absolute inset-y-0 right-0 h-full transition-[opacity,transform] duration-base ease-out motion-reduce:transition-none",
+                    "absolute inset-y-0 right-0 h-full transition-[opacity,transform] duration-base ease-out motion-reduce:transform-none motion-reduce:transition-opacity",
                     panelOpen
                       ? "translate-x-0 opacity-100"
                       : "pointer-events-none translate-x-[16px] opacity-0",
@@ -363,7 +352,6 @@ export function AppShell() {
                 onReset={resetSourceControlWidth}
                 ariaLabel={t("appShell.resizeSidePanel")}
                 enabled={panelOpen}
-                onDraggingChange={setResizing}
                 className="bottom-[var(--panel-gap-y)] top-[var(--panel-gap-y)] h-auto"
               />
             </>
