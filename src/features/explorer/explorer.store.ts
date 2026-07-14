@@ -37,7 +37,7 @@ interface ExplorerBucket {
 }
 
 /** How long a newly-appeared entry keeps its tint. Matches the
- *  `explorer-recent-tint` keyframe duration (15s) in `tailwind.config.js`. */
+ *  `explorer-recent-tint` keyframe duration (15s) in `src/styles/tokens.css`. */
 export const RECENT_TTL_MS = 15_000;
 
 interface ExplorerState {

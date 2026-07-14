@@ -89,7 +89,10 @@ export function SidebarChevron({
       <Icon
         icon={ChevronDown}
         size={12}
-        className={cn("transition-transform duration-fast", collapsed && "-rotate-90")}
+        className={cn(
+          "transition-transform duration-fast motion-reduce:transition-none",
+          collapsed && "-rotate-90",
+        )}
       />
     </button>
   );

@@ -28,7 +28,6 @@ const toneAccent: Record<ToastTone, string> = {
 
 type ToastVisualState = "entering" | "visible" | "exiting";
 
-const TOAST_EXIT_MS = 105;
 const STACK_FLIP_MS = 180;
 const STACK_FLIP_EASING = "cubic-bezier(0.77, 0, 0.175, 1)";
 
@@ -45,9 +44,9 @@ function ToastRow({ toast, registerRow, onSettledPosition }: ToastRowProps) {
   const visualStateRef = useRef<ToastVisualState>("entering");
   const enterFrameRef = useRef(0);
   const autoDismissTimerRef = useRef(0);
-  const removeTimerRef = useRef(0);
   const removedRef = useRef(false);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const transitionRef = useRef<HTMLDivElement | null>(null);
 
   const setElementRef = useCallback(
     (element: HTMLDivElement | null) => {
@@ -60,7 +59,6 @@ function ToastRow({ toast, registerRow, onSettledPosition }: ToastRowProps) {
   const finishDismiss = useCallback(() => {
     if (removedRef.current) return;
     removedRef.current = true;
-    window.clearTimeout(removeTimerRef.current);
     dismiss(toast.id);
   }, [dismiss, toast.id]);
 
@@ -69,8 +67,7 @@ function ToastRow({ toast, registerRow, onSettledPosition }: ToastRowProps) {
     visualStateRef.current = "exiting";
     setVisualState("exiting");
     window.clearTimeout(autoDismissTimerRef.current);
-    removeTimerRef.current = window.setTimeout(finishDismiss, TOAST_EXIT_MS);
-  }, [finishDismiss]);
+  }, []);
 
   useEffect(() => {
     enterFrameRef.current = requestAnimationFrame(() => {
@@ -87,11 +84,35 @@ function ToastRow({ toast, registerRow, onSettledPosition }: ToastRowProps) {
     return () => window.clearTimeout(autoDismissTimerRef.current);
   }, [beginDismiss, toast.durationMs]);
 
+  useEffect(() => {
+    if (visualState !== "exiting") return;
+    const element = transitionRef.current;
+    if (!element) {
+      finishDismiss();
+      return;
+    }
+
+    const animations = element
+      .getAnimations()
+      .filter((animation) => animation.playState !== "finished");
+    if (animations.length === 0) {
+      finishDismiss();
+      return;
+    }
+
+    let active = true;
+    void Promise.allSettled(animations.map((animation) => animation.finished)).then(() => {
+      if (active) finishDismiss();
+    });
+    return () => {
+      active = false;
+    };
+  }, [finishDismiss, visualState]);
+
   useEffect(
     () => () => {
       cancelAnimationFrame(enterFrameRef.current);
       window.clearTimeout(autoDismissTimerRef.current);
-      window.clearTimeout(removeTimerRef.current);
     },
     [],
   );
@@ -111,6 +132,7 @@ function ToastRow({ toast, registerRow, onSettledPosition }: ToastRowProps) {
   return (
     <div ref={setElementRef} className="pointer-events-auto">
       <div
+        ref={transitionRef}
         role="status"
         data-state={visualState}
         onTransitionEnd={handleTransitionEnd}

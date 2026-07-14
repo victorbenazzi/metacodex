@@ -117,7 +117,7 @@ export const ProjectTile = forwardRef<HTMLButtonElement, ProjectTileProps>(funct
         ) : (
           <span
             className={cn(
-              "font-display leading-none transition-colors duration-fast",
+              "font-display leading-none",
               active ? "font-medium" : "text-muted",
             )}
             style={{ fontSize: mark.length > 1 ? "12px" : "15px" }}

@@ -321,7 +321,10 @@ export function AppShell() {
             <>
               <div
                 aria-hidden={!panelOpen}
-                className="absolute inset-x-0 bottom-[var(--panel-gap-y)] top-[var(--panel-gap-y)] overflow-hidden"
+                className={cn(
+                  "absolute inset-x-0 bottom-[var(--panel-gap-y)] top-[var(--panel-gap-y)]",
+                  panelOpen ? "overflow-hidden" : "overflow-visible",
+                )}
               >
                 <div
                   className={cn(

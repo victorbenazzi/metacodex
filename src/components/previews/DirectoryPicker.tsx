@@ -106,7 +106,10 @@ export function DirectoryPicker({
             <Icon
               icon={ChevronRight}
               size={12}
-              className={cn("transition-transform duration-fast", isOpen && "rotate-90")}
+              className={cn(
+                "transition-transform duration-fast motion-reduce:transition-none",
+                isOpen && "rotate-90",
+              )}
             />
           </button>
           <Icon icon={Folder} size={12} className="shrink-0 text-muted" />
