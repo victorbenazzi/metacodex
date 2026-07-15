@@ -20,12 +20,11 @@ async function loadPdfjs() {
 
 interface PdfPreviewProps {
   path: string;
-  projectId?: string;
   preview?: boolean;
   previewGrantId?: string;
 }
 
-export function PdfPreview({ path, projectId, preview = false, previewGrantId }: PdfPreviewProps) {
+export function PdfPreview({ path, preview = false, previewGrantId }: PdfPreviewProps) {
   const { t } = useTranslation();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [page, setPage] = useState(1);
@@ -46,7 +45,7 @@ export function PdfPreview({ path, projectId, preview = false, previewGrantId }:
         }
         const file = preview
           ? await fsApi.readPreviewBytes(previewGrantId!)
-          : await fsApi.readFileBytes(path, undefined, projectId);
+          : await fsApi.readFileBytes(path);
         if (cancelled) return;
         const data = base64ToUint8Array(file.b64);
         const pdfjs = await loadPdfjs();
@@ -72,7 +71,7 @@ export function PdfPreview({ path, projectId, preview = false, previewGrantId }:
         d.destroy?.();
       }
     };
-  }, [path, projectId, preview, previewGrantId]);
+  }, [path, preview, previewGrantId]);
 
   const renderPage = async (n: number) => {
     const doc = docRef.current;

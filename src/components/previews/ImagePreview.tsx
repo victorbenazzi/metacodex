@@ -6,12 +6,11 @@ import { basename } from "@/lib/path";
 
 interface ImagePreviewProps {
   path: string;
-  projectId?: string;
   preview?: boolean;
   previewGrantId?: string;
 }
 
-export function ImagePreview({ path, projectId, preview = false, previewGrantId }: ImagePreviewProps) {
+export function ImagePreview({ path, preview = false, previewGrantId }: ImagePreviewProps) {
   const { t } = useTranslation();
   const [dataUrl, setDataUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -28,7 +27,7 @@ export function ImagePreview({ path, projectId, preview = false, previewGrantId 
         }
         const f = preview
           ? await fsApi.readPreviewBytes(previewGrantId!)
-          : await fsApi.readFileBytes(path, undefined, projectId);
+          : await fsApi.readFileBytes(path);
         if (cancelled) return;
         const mime = f.mime ?? "application/octet-stream";
         setDataUrl(`data:${mime};base64,${f.b64}`);
@@ -40,7 +39,7 @@ export function ImagePreview({ path, projectId, preview = false, previewGrantId 
     return () => {
       cancelled = true;
     };
-  }, [path, projectId, preview, previewGrantId]);
+  }, [path, preview, previewGrantId]);
 
   return (
     <div className="relative flex h-full flex-col bg-canvas">

@@ -40,8 +40,7 @@
     "openProject": "Open project",
     "openProjectMenu": {
       "local": "Open folder…",
-      "github": "Clone from GitHub…",
-      "ssh": "Connect over SSH…"
+      "github": "Clone from GitHub…"
     },
     "openTerminal": "Open terminal",
     "openFile": "Open a file",
@@ -476,7 +475,6 @@
     "openDiff": "Open diff",
     "empty": "No changes",
     "noProject": "Open a project to see its changes.",
-    "remoteUnsupported": "Remote Git is outside SSH v1.",
     "worktrees": {
       "title": "Worktrees",
       "empty": "No worktrees yet. Use the + to spin one up for an agent.",
@@ -572,28 +570,6 @@
       "successTitle": "Project cloned",
       "successBody": "{{name}} is ready."
     }
-  },
-  "remoteAccess": {
-    "title": "Connect over SSH",
-    "description": "Save an SSH access, verify the host key, and add remote folders as projects.",
-    "saved": "Accesses",
-    "noSaved": "No saved accesses.",
-    "fields": {
-      "label": "Name",
-      "host": "Host",
-      "port": "Port",
-      "user": "User",
-      "identityFile": "Key",
-      "roots": "Root folders"
-    },
-    "test": "Test",
-    "trustHost": "Trust host key",
-    "saveAndDiscover": "Save and discover",
-    "trustedHost": "Trusted host:",
-    "untrustedHost": "New host:",
-    "foundProjects": "Found folders",
-    "noCandidates": "No folders loaded yet.",
-    "addSelected": "Add {{count}}"
   },
   "diff": {
     "comparedWithHead": "compared with HEAD",

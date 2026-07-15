@@ -40,8 +40,7 @@
     "openProject": "Abrir projeto",
     "openProjectMenu": {
       "local": "Abrir pasta…",
-      "github": "Clonar do GitHub…",
-      "ssh": "Conectar via SSH…"
+      "github": "Clonar do GitHub…"
     },
     "openTerminal": "Abrir terminal",
     "openFile": "Abrir um arquivo",
@@ -476,7 +475,6 @@
     "openDiff": "Abrir diff",
     "empty": "Nenhuma alteração",
     "noProject": "Abra um projeto para ver as alterações.",
-    "remoteUnsupported": "Git remoto fica fora da v1 SSH.",
     "worktrees": {
       "title": "Worktrees",
       "empty": "Nenhuma worktree ainda. Use o + para criar uma para um agente.",
@@ -572,28 +570,6 @@
       "successTitle": "Projeto clonado",
       "successBody": "{{name}} está pronto."
     }
-  },
-  "remoteAccess": {
-    "title": "Conectar via SSH",
-    "description": "Salve um acesso SSH, confira a host key e adicione pastas remotas como projetos.",
-    "saved": "Acessos",
-    "noSaved": "Nenhum acesso salvo.",
-    "fields": {
-      "label": "Nome",
-      "host": "Host",
-      "port": "Porta",
-      "user": "Usuário",
-      "identityFile": "Chave",
-      "roots": "Pastas raiz"
-    },
-    "test": "Testar",
-    "trustHost": "Confiar na host key",
-    "saveAndDiscover": "Salvar e buscar",
-    "trustedHost": "Host confiável:",
-    "untrustedHost": "Host novo:",
-    "foundProjects": "Pastas encontradas",
-    "noCandidates": "Nenhuma pasta carregada ainda.",
-    "addSelected": "Adicionar {{count}}"
   },
   "diff": {
     "comparedWithHead": "comparado com HEAD",

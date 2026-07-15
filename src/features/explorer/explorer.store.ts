@@ -115,7 +115,7 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
       },
     }));
     try {
-      const entries = await fsApi.readDir(path, projectId);
+      const entries = await fsApi.readDir(path);
       set((state) => {
         const b = state.byProject[projectId] ?? emptyBucket();
         return {
@@ -161,7 +161,7 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
     // on screen and swap it atomically once the new read resolves.
     let entries: DirEntry[];
     try {
-      entries = await fsApi.readDir(path, projectId);
+      entries = await fsApi.readDir(path);
     } catch (err: any) {
       const message = err?.message ?? String(err);
       set((state) => {
@@ -280,8 +280,8 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
   createNode: async (projectId, parentPath, name, kind) => {
     const newPath =
       kind === "dir"
-        ? await fsApi.createDir(parentPath, name, projectId)
-        : await fsApi.createFile(parentPath, name, projectId);
+        ? await fsApi.createDir(parentPath, name)
+        : await fsApi.createFile(parentPath, name);
     set((state) => {
       const cur = state.byProject[projectId] ?? emptyBucket();
       return {

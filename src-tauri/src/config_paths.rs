@@ -60,24 +60,9 @@ pub fn projects_file() -> AppResult<PathBuf> {
     Ok(state_dir()?.join("projects.json"))
 }
 
-/// `~/.metacodex/state/remote-accesses.json`, SSH access metadata.
-pub fn remote_accesses_file() -> AppResult<PathBuf> {
-    Ok(state_dir()?.join("remote-accesses.json"))
-}
-
 /// `~/.metacodex/state/workspace`, one file per project.
 pub fn workspace_dir() -> AppResult<PathBuf> {
     Ok(state_dir()?.join("workspace"))
-}
-
-/// `~/.metacodex/ssh`, app-owned SSH trust material.
-pub fn ssh_dir() -> AppResult<PathBuf> {
-    Ok(config_root()?.join("ssh"))
-}
-
-/// `~/.metacodex/ssh/known_hosts`, trusted host keys for remote projects.
-pub fn ssh_known_hosts_file() -> AppResult<PathBuf> {
-    Ok(ssh_dir()?.join("known_hosts"))
 }
 
 /// `~/.metacodex/state/legacy-agent`, archived state from the removed Agent View.
@@ -123,7 +108,6 @@ pub fn workspace_file(project_id: &str) -> AppResult<PathBuf> {
 /// Creating the deepest dir (`workspace`) implies its ancestors.
 pub fn ensure_dirs() -> AppResult<()> {
     fs::create_dir_all(workspace_dir()?)?;
-    fs::create_dir_all(ssh_dir()?)?;
     archive_legacy_agent_state()?;
     Ok(())
 }
@@ -268,10 +252,7 @@ fn tmp_path(path: &Path) -> PathBuf {
     use std::sync::atomic::{AtomicU64, Ordering};
     static COUNTER: AtomicU64 = AtomicU64::new(0);
     let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-    let file_name = path
-        .file_name()
-        .and_then(|s| s.to_str())
-        .unwrap_or("config");
+    let file_name = path.file_name().and_then(|s| s.to_str()).unwrap_or("config");
     path.with_file_name(format!(
         "{file_name}.metacodex.tmp.{}.{n}",
         std::process::id()

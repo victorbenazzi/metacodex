@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 
 import type { Project } from "@/features/projects/project.types";
-import { isRemoteProject } from "@/features/projects/project.types";
 import { watcherApi } from "@/features/filesystem/watcher.service";
 import { useExplorerStore } from "@/features/explorer/explorer.store";
 import { useGitStore } from "@/features/git/git.store";
@@ -18,7 +17,6 @@ export function useFilesystemSync(project: Project | null): void {
 
   useEffect(() => {
     if (!project) return;
-    if (isRemoteProject(project)) return;
     void watcherApi.watch(project.id, project.path).catch((err) => {
       console.warn("[watcher] watch failed", err);
     });
@@ -71,7 +69,7 @@ export function useFilesystemSync(project: Project | null): void {
         const proj = useProjectsStore
           .getState()
           .projects.find((p) => p.id === projectId);
-        if (proj && !isRemoteProject(proj)) {
+        if (proj) {
           scheduleGitRefresh(projectId, proj.path);
         }
         const bucket2 = useTabsStore.getState().byProject[projectId];
@@ -89,7 +87,7 @@ export function useFilesystemSync(project: Project | null): void {
           );
           for (const p of candidates) {
             try {
-              await invoke(CMD.workspaceStat, { projectId, path: p });
+              await invoke(CMD.stat, { path: p });
             } catch {
               useTabsStore.getState().closeForRemovedPath(projectId, p);
               recordDiag("tab.close_external", { projectId, detail: { path: p } });
@@ -114,7 +112,6 @@ export function useFilesystemSync(project: Project | null): void {
 
   useEffect(() => {
     if (!project) return;
-    if (isRemoteProject(project)) return;
     void refreshGit(project.id, project.path);
     void useWorktreesStore.getState().refresh(project.id, project.path);
   }, [project, refreshGit]);

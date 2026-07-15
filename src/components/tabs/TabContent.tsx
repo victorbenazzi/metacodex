@@ -85,23 +85,9 @@ function renderTab(tab: Tab, isVisible: boolean, projectKey: string) {
         />
       );
     case "image":
-      return (
-        <ImagePreview
-          path={tab.path}
-          projectId={tab.projectId ?? undefined}
-          preview={preview}
-          previewGrantId={tab.previewGrantId}
-        />
-      );
+      return <ImagePreview path={tab.path} preview={preview} previewGrantId={tab.previewGrantId} />;
     case "pdf":
-      return (
-        <PdfPreview
-          path={tab.path}
-          projectId={tab.projectId ?? undefined}
-          preview={preview}
-          previewGrantId={tab.previewGrantId}
-        />
-      );
+      return <PdfPreview path={tab.path} preview={preview} previewGrantId={tab.previewGrantId} />;
     default:
       return null;
   }

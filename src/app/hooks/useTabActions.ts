@@ -13,7 +13,6 @@ import type { Tab } from "@/components/tabs/types";
 import { fileKindFor } from "@/components/tabs/fileKind";
 import { WORKSPACE_NULL, useTabsStore, type TabsBucket } from "@/components/tabs/tabsStore";
 import type { Project } from "@/features/projects/project.types";
-import { isRemoteProject } from "@/features/projects/project.types";
 import { useProjectsStore } from "@/features/projects/project.store";
 import { useExplorerStore } from "@/features/explorer/explorer.store";
 import { flushEditor } from "@/features/editor/editorSavers";
@@ -174,7 +173,6 @@ export function useTabActions({
 
   const openWorktreeDialog = useCallback(() => {
     if (!project) return;
-    if (isRemoteProject(project)) return;
     setWorktreeDialogOpen(true);
   }, [project, setWorktreeDialogOpen]);
 
@@ -252,15 +250,11 @@ export function useTabActions({
     (tabId: string) => {
       const tab = bucket.tabs.find((t) => t.id === tabId);
       if (!tab || !("path" in tab) || !tab.path) return;
-      const tabProject = "projectId" in tab && tab.projectId
-        ? projects.find((p) => p.id === tab.projectId)
-        : null;
-      if (isRemoteProject(tabProject)) return;
       invoke(CMD.revealInFinder, { path: tab.path }).catch((err) => {
         console.warn("[reveal_in_finder] failed", err);
       });
     },
-    [bucket.tabs, projects],
+    [bucket.tabs],
   );
 
   const copyTabCwd = useCallback(

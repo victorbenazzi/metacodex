@@ -39,7 +39,7 @@ import { CLI_BRAND_ICONS } from "@/components/icons/brand";
 import { useTabsStore } from "@/components/tabs/tabsStore";
 import { useTerminalStore } from "@/features/terminal/terminal.store";
 import { useTabMetadataStore, type ListeningPort } from "@/features/terminal/tabMetadata.store";
-import { isRemoteProject, type Project } from "@/features/projects/project.types";
+import type { Project } from "@/features/projects/project.types";
 import type { ResumeEntry } from "@/features/resume/resume.service";
 import { resolveTabTitle, type Tab } from "@/components/tabs/types";
 
@@ -77,7 +77,6 @@ export function CodeProjectGroup({
   const expanded = explicit ?? active; // active project opens by default
   const collapsed = !expanded;
   const vertical = layoutMode === "vertical";
-  const remoteProject = isRemoteProject(project);
 
   // --- Section data (subscribed always; only rendered when expanded) ---------
   const resumeEntries = useResumeStore((s) => s.entries);
@@ -234,11 +233,6 @@ export function CodeProjectGroup({
                   </span>
                 </Tooltip>
               ) : null}
-              {remoteProject ? (
-                <span className="mr-[5px] rounded-xs bg-surface-strong/55 px-[5px] py-[1px] font-mono text-micro text-muted">
-                  SSH
-                </span>
-              ) : null}
               <DropdownRoot>
                 <Tooltip content={t("codeSidebar.newInProject")} side="bottom">
                   <DropdownTrigger asChild>
@@ -268,12 +262,10 @@ export function CodeProjectGroup({
                     <Icon icon={Pencil} size={12} className="text-muted" />
                     {t("projectRail.menu.rename")}
                   </DropdownItem>
-                  {remoteProject ? null : (
-                    <DropdownItem onSelect={revealInFinder}>
-                      <Icon icon={FolderOpen} size={12} className="text-muted" />
-                      {t("projectRail.menu.revealInFinder")}
-                    </DropdownItem>
-                  )}
+                  <DropdownItem onSelect={revealInFinder}>
+                    <Icon icon={FolderOpen} size={12} className="text-muted" />
+                    {t("projectRail.menu.revealInFinder")}
+                  </DropdownItem>
                   <DropdownSeparator />
                   <DropdownItem
                     className="text-danger data-[highlighted]:bg-danger/10 data-[highlighted]:text-danger"

@@ -7,8 +7,6 @@ import { IconButton } from "@/components/ui/IconButton";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { Kbd } from "@/components/ui/Kbd";
 import { useExplorerStore, type CreateKind } from "@/features/explorer/explorer.store";
-import { useProjectsStore } from "@/features/projects/project.store";
-import { isRemoteProject } from "@/features/projects/project.types";
 import { useSearchUiStore } from "@/features/search/search.store";
 import { TreeNode, CreateRow, type TreeNodeActions } from "./TreeNode";
 import { basename, dirname } from "@/lib/path";
@@ -32,8 +30,6 @@ export function FileExplorer({
   const refresh = useExplorerStore((s) => s.refresh);
   const beginCreate = useExplorerStore((s) => s.beginCreate);
   const setSelected = useExplorerStore((s) => s.setSelected);
-  const project = useProjectsStore((s) => s.projects.find((p) => p.id === projectId) ?? null);
-  const remoteProject = isRemoteProject(project);
   // Fine-grained: re-render the root list only when the root's children or the
   // inline-create state change, not on every mutation deeper in the tree.
   const rootChildren = useExplorerStore(
@@ -79,14 +75,12 @@ export function FileExplorer({
         <div className="flex items-center gap-[2px]">
           {headerButton(t("explorer.newFile"), () => handleNewNode("file"), FilePlus)}
           {headerButton(t("explorer.newFolder"), () => handleNewNode("dir"), FolderPlus)}
-          {remoteProject
-            ? null
-            : headerButton(
-                t("explorer.searchInProject"),
-                () => useSearchUiStore.getState().setOpen(true),
-                Search,
-                <Kbd keys={["Mod", "Shift", "F"]} />,
-              )}
+          {headerButton(
+            t("explorer.searchInProject"),
+            () => useSearchUiStore.getState().setOpen(true),
+            Search,
+            <Kbd keys={["Mod", "Shift", "F"]} />,
+          )}
         </div>
       </header>
 
