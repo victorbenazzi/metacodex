@@ -19,7 +19,7 @@ import {
 import { bracketMatching, foldGutter, indentOnInput } from "@codemirror/language";
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 
-import { fsApi, workspaceFsApi } from "@/features/filesystem/filesystem.service";
+import { fsApi } from "@/features/filesystem/filesystem.service";
 import { useEditorStore } from "@/features/editor/editor.store";
 import { registerEditorSaver } from "@/features/editor/editorSavers";
 import { useTabsStore } from "@/components/tabs/tabsStore";
@@ -32,7 +32,7 @@ import { useEditorStatusStore } from "@/features/editor/editor-status.store";
 import { gitApi } from "@/features/git/git.service";
 import { useGitStore } from "@/features/git/git.store";
 import { useProjectsStore } from "@/features/projects/project.store";
-import { projectCapabilities } from "@/features/projects/project.types";
+import { isRemoteProject } from "@/features/projects/project.types";
 import { buildEditorTheme } from "./editorTheme";
 import { EditorStatusBar } from "./EditorStatusBar";
 import { EditorBreadcrumbs } from "./EditorBreadcrumbs";
@@ -100,12 +100,13 @@ export function EditorTab({
   const project = useProjectsStore((s) =>
     projectId ? s.projects.find((p) => p.id === projectId) ?? null : null,
   );
-  const gitUnsupported = !projectCapabilities(project).git;
+  const remoteProject = isRemoteProject(project);
+  const workspaceProjectId = !preview && projectId ? projectId : undefined;
   // Re-fetch HEAD for the change gutter whenever this project's git state moves
   // (commit, checkout, stage). The object identity changes on every refresh.
   // Preview files live outside any repo , skip git entirely.
   const gitInfo = useGitStore((s) =>
-    !preview && projectId && !gitUnsupported ? s.byProject[projectId] : undefined,
+    !preview && projectId && !remoteProject ? s.byProject[projectId] : undefined,
   );
 
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -124,9 +125,12 @@ export function EditorTab({
 
     (async () => {
       try {
+        if (preview && !previewGrantId) {
+          throw new Error("preview grant missing");
+        }
         const text = preview
-          ? await readPreviewText(previewGrantId, 25 * 1024 * 1024)
-          : await readWorkspaceText(projectId, path, 25 * 1024 * 1024);
+          ? await fsApi.readPreviewText(previewGrantId!, 25 * 1024 * 1024)
+          : await fsApi.readFileText(path, 25 * 1024 * 1024, workspaceProjectId);
         if (cancelled) return;
         // Heuristic binary detection on the first 8 KiB
         const sample = text.content.slice(0, 8192);
@@ -249,7 +253,7 @@ export function EditorTab({
 
         // Seed the change gutter with the file's committed (HEAD) text. Preview
         // files aren't in a repo , skip the HEAD lookup entirely.
-        if (!preview && !gitUnsupported) {
+        if (!preview && !remoteProject) {
           void gitApi
             .fileHeadContent(path)
             .then((head) => {
@@ -304,7 +308,7 @@ export function EditorTab({
   // Refresh the change gutter when this project's git state moves (commit,
   // checkout, …). The initial fetch is handled by the build effect above.
   useEffect(() => {
-    if (preview || gitUnsupported) return;
+    if (preview || remoteProject) return;
     const view = viewRef.current;
     if (!view) return;
     void gitApi
@@ -348,9 +352,10 @@ export function EditorTab({
     setSaving(tabId, true);
     try {
       if (preview) {
-        await writePreviewText(previewGrantId, content);
+        if (!previewGrantId) throw new Error("preview grant missing");
+        await fsApi.writePreviewText(previewGrantId, content);
       } else {
-        await writeWorkspaceText(projectId, path, content);
+        await fsApi.writeFileText(path, content, workspaceProjectId);
       }
       // The baseline always advances to what we just wrote (that IS what's on
       // disk now). But only clear `dirty` if the live doc still equals `content`:
@@ -452,34 +457,6 @@ export function EditorTab({
       ) : null}
     </div>
   );
-}
-
-function readPreviewText(previewGrantId: string | undefined, maxBytes?: number) {
-  if (!previewGrantId) {
-    throw new Error("preview grant missing");
-  }
-  return fsApi.readPreviewText(previewGrantId, maxBytes);
-}
-
-function readWorkspaceText(projectId: string, path: string, maxBytes?: number) {
-  if (!projectId) {
-    throw new Error("workspace project missing");
-  }
-  return workspaceFsApi.readFileText(projectId, path, maxBytes);
-}
-
-function writePreviewText(previewGrantId: string | undefined, content: string) {
-  if (!previewGrantId) {
-    throw new Error("preview grant missing");
-  }
-  return fsApi.writePreviewText(previewGrantId, content);
-}
-
-function writeWorkspaceText(projectId: string, path: string, content: string) {
-  if (!projectId) {
-    throw new Error("workspace project missing");
-  }
-  return workspaceFsApi.writeFileText(projectId, path, content);
 }
 
 /**

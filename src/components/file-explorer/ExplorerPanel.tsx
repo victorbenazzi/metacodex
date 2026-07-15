@@ -41,7 +41,7 @@ export function ExplorerPanel({
         />
       ) : (
         <>
-          <header className="flex h-[var(--panel-header-h)] shrink-0 items-center justify-between px-[12px]">
+          <header className="flex h-[var(--panel-header-h)] shrink-0 items-center justify-between border-b border-hairline-soft px-[12px]">
             <span className="editorial-caps">{t("explorer.title")}</span>
           </header>
           <ExplorerEmpty onOpenFolder={onOpenFolder} />

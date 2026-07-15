@@ -64,7 +64,7 @@ export function ExpandedProjectsSidebar({ onOpenFolder }: ExpandedProjectsSideba
         className="atmosphere-soft flex h-full w-full flex-col overflow-hidden rounded-lg border border-hairline"
         aria-label={t("codeSidebar.projects")}
       >
-        <header className="flex h-[var(--panel-header-h)] shrink-0 items-center px-[12px]">
+        <header className="flex h-[var(--panel-header-h)] shrink-0 items-center border-b border-hairline-soft px-[12px]">
           <span className="editorial-caps truncate">{t("codeSidebar.projects")}</span>
         </header>
 
@@ -121,7 +121,7 @@ export function ExpandedProjectsSidebar({ onOpenFolder }: ExpandedProjectsSideba
         </footer>
       </aside>
 
-      {/* Floating drag ghost, viewport-fixed and pointer-events:none so it
+      {/* Floating drag ghost — viewport-fixed and pointer-events:none so it
           glides under the cursor without intercepting events from the list. */}
       {draggingProject && drag.pointerPos ? (
         <div

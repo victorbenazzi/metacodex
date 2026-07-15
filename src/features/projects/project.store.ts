@@ -16,10 +16,7 @@ interface ProjectsState {
 
   hydrate: () => Promise<void>;
   add: (path: string) => Promise<Project>;
-  addRemoteMany: (
-    accessId: string,
-    projects: Array<{ path: string; name?: string }>,
-  ) => Promise<Project[]>;
+  addRemote: (accessId: string, path: string, name?: string) => Promise<Project>;
   create: (directory: string, name: string) => Promise<Project>;
   remove: (id: string) => Promise<void>;
   rename: (id: string, name: string) => Promise<Project>;
@@ -71,17 +68,14 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
   },
 
   add: (path) => projectsApi.add(path).then((p) => absorbProject(get, set, p)),
-  addRemoteMany: (accessId, projects) =>
-    projectsApi.addRemoteMany(accessId, projects).then((added) => {
-      for (const project of added) absorbProject(get, set, project);
-      return added;
-    }),
+  addRemote: (accessId, path, name) =>
+    projectsApi.addRemote(accessId, path, name).then((p) => absorbProject(get, set, p)),
   create: (directory, name) =>
     projectsApi.create(directory, name).then((p) => absorbProject(get, set, p)),
 
   remove: async (id) => {
     // Tear down every live resource attached to this project BEFORE the Rust
-    // registry forgets it. Otherwise leaked PTYs keep emitting pty://data.
+    // registry forgets it — otherwise leaked PTYs keep emitting pty://data
     // for a project the UI no longer knows about, and the next click on a
     // sibling project lands on stale tab/terminal state (the "stuck after
     // remove" bug).
@@ -134,7 +128,7 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
       if (p) next.push(p);
     }
     if (next.length !== cur.length) {
-      // Mismatch. Abort the local reorder, backend would reject anyway.
+      // Mismatch — abort the local reorder; backend would reject anyway.
       return;
     }
     set({ projects: next });

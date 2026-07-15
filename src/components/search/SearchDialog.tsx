@@ -9,7 +9,6 @@ import { useSearchUiStore, usePendingGotoStore } from "@/features/search/search.
 import { searchApi } from "@/features/search/search.service";
 import type { SearchResults } from "@/features/search/search.types";
 import { useProjectsStore } from "@/features/projects/project.store";
-import { projectCapabilities } from "@/features/projects/project.types";
 import { useSettingsDataStore } from "@/features/settings/settings.data.store";
 import { useTabsStore } from "@/components/tabs/tabsStore";
 import { basename } from "@/lib/path";
@@ -21,7 +20,6 @@ export function SearchDialog() {
   const open = useSearchUiStore((s) => s.open);
   const setOpen = useSearchUiStore((s) => s.setOpen);
   const project = useProjectsStore((s) => s.projects.find((p) => p.id === s.activeProjectId));
-  const searchUnsupported = !projectCapabilities(project).search;
 
   const [query, setQuery] = useState("");
   const [caseSensitive, setCaseSensitive] = useState(false);
@@ -33,7 +31,7 @@ export function SearchDialog() {
 
   // Debounced search on input change.
   useEffect(() => {
-    if (!open || !project || searchUnsupported) return;
+    if (!open || !project) return;
     if (!query.trim()) {
       setResults(null);
       setErr(null);
@@ -64,7 +62,7 @@ export function SearchDialog() {
       cancelled = true;
       clearTimeout(handle);
     };
-  }, [open, query, caseSensitive, wholeWord, regex, project, searchUnsupported]);
+  }, [open, query, caseSensitive, wholeWord, regex, project]);
 
   const openTab = useTabsStore((s) => s.openTab);
   const setPendingGoto = usePendingGotoStore((s) => s.set);
@@ -117,14 +115,8 @@ export function SearchDialog() {
             <SearchInput
               query={query}
               setQuery={setQuery}
-              placeholder={
-                searchUnsupported
-                  ? t("search.remoteUnsupported")
-                  : project
-                    ? t("search.placeholder", { name: project.name })
-                    : t("search.noProjectOpen")
-              }
-              disabled={!project || searchUnsupported}
+              placeholder={project ? t("search.placeholder", { name: project.name }) : t("search.noProjectOpen")}
+              disabled={!project}
             />
             <ToggleButton
               icon={CaseSensitive}
@@ -159,10 +151,6 @@ export function SearchDialog() {
             {!project ? (
               <p className="px-[14px] py-[14px] text-caption text-muted">
                 {t("search.openToSearch")}
-              </p>
-            ) : searchUnsupported ? (
-              <p className="px-[14px] py-[14px] text-caption text-muted">
-                {t("search.remoteUnsupported")}
               </p>
             ) : err ? (
               <p className="px-[14px] py-[14px] text-caption text-danger">{err}</p>

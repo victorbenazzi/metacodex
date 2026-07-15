@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { fsApi, workspaceFsApi } from "@/features/filesystem/filesystem.service";
+import { fsApi } from "@/features/filesystem/filesystem.service";
 import { SendToProjectButton } from "@/components/previews/PreviewToolbar";
 import { basename } from "@/lib/path";
 
@@ -23,9 +23,12 @@ export function ImagePreview({ path, projectId, preview = false, previewGrantId 
     setError(null);
     (async () => {
       try {
+        if (preview && !previewGrantId) {
+          throw new Error("preview grant missing");
+        }
         const f = preview
-          ? await readPreviewBytes(previewGrantId)
-          : await readWorkspaceBytes(projectId, path);
+          ? await fsApi.readPreviewBytes(previewGrantId!)
+          : await fsApi.readFileBytes(path, undefined, projectId);
         if (cancelled) return;
         const mime = f.mime ?? "application/octet-stream";
         setDataUrl(`data:${mime};base64,${f.b64}`);
@@ -69,20 +72,6 @@ export function ImagePreview({ path, projectId, preview = false, previewGrantId 
       </div>
     </div>
   );
-}
-
-function readPreviewBytes(previewGrantId?: string) {
-  if (!previewGrantId) {
-    throw new Error("preview grant missing");
-  }
-  return fsApi.readPreviewBytes(previewGrantId);
-}
-
-function readWorkspaceBytes(projectId: string | undefined, path: string) {
-  if (!projectId) {
-    throw new Error("workspace project missing");
-  }
-  return workspaceFsApi.readFileBytes(projectId, path);
 }
 
 function formatBytes(n: number): string {

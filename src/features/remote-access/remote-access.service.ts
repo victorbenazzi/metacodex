@@ -10,9 +10,6 @@ export const remoteAccessApi = {
   list(): Promise<RemoteAccess[]> {
     return invoke<RemoteAccess[]>(CMD.remoteAccessList);
   },
-  pickIdentityFile(title: string): Promise<string | null> {
-    return invoke<string | null>(CMD.remoteAccessPickIdentityFile, { title });
-  },
   save(draft: RemoteAccessDraft): Promise<RemoteAccess> {
     return invoke<RemoteAccess>(CMD.remoteAccessSave, { draft });
   },

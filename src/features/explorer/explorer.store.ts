@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-import { workspaceFsApi } from "@/features/filesystem/filesystem.service";
+import { fsApi } from "@/features/filesystem/filesystem.service";
 import type { DirEntry } from "@/features/filesystem/filesystem.types";
 
 export type ChildrenState = DirEntry[] | "loading" | { error: string };
@@ -115,7 +115,7 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
       },
     }));
     try {
-      const entries = await workspaceFsApi.readDir(projectId, path);
+      const entries = await fsApi.readDir(path, projectId);
       set((state) => {
         const b = state.byProject[projectId] ?? emptyBucket();
         return {
@@ -161,7 +161,7 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
     // on screen and swap it atomically once the new read resolves.
     let entries: DirEntry[];
     try {
-      entries = await workspaceFsApi.readDir(projectId, path);
+      entries = await fsApi.readDir(path, projectId);
     } catch (err: any) {
       const message = err?.message ?? String(err);
       set((state) => {
@@ -280,8 +280,8 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
   createNode: async (projectId, parentPath, name, kind) => {
     const newPath =
       kind === "dir"
-        ? await workspaceFsApi.createDir(projectId, parentPath, name)
-        : await workspaceFsApi.createFile(projectId, parentPath, name);
+        ? await fsApi.createDir(parentPath, name, projectId)
+        : await fsApi.createFile(parentPath, name, projectId);
     set((state) => {
       const cur = state.byProject[projectId] ?? emptyBucket();
       return {

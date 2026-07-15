@@ -288,10 +288,8 @@
     "titleCommands": "Run command",
     "placeholderFiles": "Go to file…",
     "placeholderNoProject": "Open a project first",
-    "placeholderRemoteProject": "File search is local-only in SSH v1",
     "placeholderCommand": "Run command…",
     "noProjectOpen": "No project open.",
-    "remoteUnsupported": "File search is local-only in SSH v1.",
     "nothingFound": "Nothing found."
   },
   "search": {
@@ -303,7 +301,6 @@
     "regex": "Regex",
     "close": "Close search",
     "openToSearch": "Open a project to search inside it.",
-    "remoteUnsupported": "Search is local-only in SSH v1.",
     "typeToSearch": "Type to search file contents in the current project.",
     "noMatches": "No matches.",
     "summary": "{{matches}} matches · {{files}} files",
@@ -578,32 +575,17 @@
   },
   "remoteAccess": {
     "title": "Connect over SSH",
-    "description": "Save an SSH access, verify the server fingerprint, and add remote folders as projects.",
+    "description": "Save an SSH access, verify the host key, and add remote folders as projects.",
     "saved": "Accesses",
-    "noSaved": "Saved SSH accesses will appear here.",
-    "newAccess": "New",
+    "noSaved": "No saved accesses.",
     "fields": {
       "label": "Name",
       "host": "Host",
       "port": "Port",
       "user": "User",
-      "identityFile": "SSH key file",
+      "identityFile": "Key",
       "roots": "Root folders"
     },
-    "placeholders": {
-      "label": "Production VPS",
-      "host": "187.77.45.81",
-      "port": "22",
-      "user": "root or ubuntu",
-      "identityFile": "~/.ssh/id_ed25519",
-      "roots": "/opt/multica\n/var/www\n/home/ubuntu/apps"
-    },
-    "hints": {
-      "identityFile": "Paste a private key file path or choose the file. If this server already works in Terminal, you can leave it empty.",
-      "roots": "Metacodex scans these folders for projects. Add one path per line."
-    },
-    "chooseFile": "Choose file",
-    "pickIdentityTitle": "Choose SSH key file",
     "test": "Test",
     "trustHost": "Trust host key",
     "saveAndDiscover": "Save and discover",

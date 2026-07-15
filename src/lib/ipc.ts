@@ -31,12 +31,11 @@ export const CMD = {
 
   // remote access
   remoteAccessList: "remote_access_list",
-  remoteAccessPickIdentityFile: "remote_access_pick_identity_file",
   remoteAccessSave: "remote_access_save",
   remoteAccessRemove: "remote_access_remove",
   remoteAccessTest: "remote_access_test",
   remoteDiscoverProjects: "remote_discover_projects",
-  addRemoteProjects: "add_remote_projects",
+  addRemoteProject: "add_remote_project",
 
   // system
   openExternalUrl: "open_external_url",

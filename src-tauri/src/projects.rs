@@ -21,10 +21,9 @@ pub struct Project {
     pub last_opened_at: String,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum ProjectOrigin {
-    #[default]
     Local,
     Ssh {
         access_id: String,
@@ -32,9 +31,25 @@ pub enum ProjectOrigin {
     },
 }
 
+impl Default for ProjectOrigin {
+    fn default() -> Self {
+        Self::Local
+    }
+}
+
 impl Project {
     pub fn is_local(&self) -> bool {
         matches!(self.origin, ProjectOrigin::Local)
+    }
+
+    pub fn ssh_origin(&self) -> Option<(&str, &str)> {
+        match &self.origin {
+            ProjectOrigin::Ssh {
+                access_id,
+                remote_path,
+            } => Some((access_id.as_str(), remote_path.as_str())),
+            ProjectOrigin::Local => None,
+        }
     }
 }
 
@@ -206,7 +221,7 @@ pub fn add(app: &AppHandle, path: String) -> AppResult<Project> {
 
     let mut file = load_file()?;
     if let Some(existing) = file.projects.iter().find(|p| p.path == path) {
-        // Refresh last_opened_at and return the existing entry. Opening the same
+        // Refresh last_opened_at and return the existing entry — opening the same
         // folder twice should not create duplicates.
         let id = existing.id.clone();
         let now = Utc::now().to_rfc3339();
@@ -238,86 +253,70 @@ pub fn add(app: &AppHandle, path: String) -> AppResult<Project> {
     Ok(project)
 }
 
-pub fn add_remote_many(
+pub fn add_remote(
     app: &AppHandle,
     access_id: String,
-    entries: Vec<(String, Option<String>)>,
-) -> AppResult<Vec<Project>> {
+    remote_path: String,
+    name: Option<String>,
+) -> AppResult<Project> {
+    let remote_path = crate::remote_access::normalize_remote_path(&remote_path)?;
     let mut file = load_file()?;
-    let mut result = Vec::new();
-    let mut seen = Vec::<String>::new();
+    if let Some(existing) = file.projects.iter().find(|p| {
+        matches!(
+            &p.origin,
+            ProjectOrigin::Ssh {
+                access_id: existing_access_id,
+                remote_path: existing_remote_path,
+            } if existing_access_id == &access_id && existing_remote_path == &remote_path
+        )
+    }) {
+        let id = existing.id.clone();
+        let now = Utc::now().to_rfc3339();
+        for p in file.projects.iter_mut() {
+            if p.id == id {
+                p.last_opened_at = now.clone();
+            }
+        }
+        save_file(&file)?;
+        app.state::<Arc<ProjectsCache>>()
+            .replace(file.projects.clone());
+        return Ok(file.projects.into_iter().find(|p| p.id == id).unwrap());
+    }
+
+    let trimmed_name = name.map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
     let now = Utc::now().to_rfc3339();
-
-    for (remote_path, name) in entries {
-        let remote_path = crate::remote_access::normalize_remote_path(&remote_path)?;
-        if seen.contains(&remote_path) {
-            continue;
-        }
-        seen.push(remote_path.clone());
-
-        if let Some(idx) = file.projects.iter().position(|p| {
-            matches!(
-                &p.origin,
-                ProjectOrigin::Ssh {
-                    access_id: existing_access_id,
-                    remote_path: existing_remote_path,
-                } if existing_access_id == &access_id && existing_remote_path == &remote_path
-            )
-        }) {
-            file.projects[idx].last_opened_at = now.clone();
-            result.push(file.projects[idx].clone());
-            continue;
-        }
-
-        let trimmed_name = name.map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
-        let project = Project {
-            id: new_id(),
-            name: trimmed_name
-                .unwrap_or_else(|| crate::remote_access::remote_basename(&remote_path)),
-            path: remote_path.clone(),
-            origin: ProjectOrigin::Ssh {
-                access_id: access_id.clone(),
-                remote_path,
-            },
-            color: assign_color(&file.projects),
-            icon: "Server".into(),
-            created_at: now.clone(),
-            last_opened_at: now.clone(),
-        };
-        file.projects.push(project.clone());
-        result.push(project);
-    }
-
-    if result.is_empty() {
-        return Err(AppError::Other("no remote projects to add".into()));
-    }
+    let project = Project {
+        id: new_id(),
+        name: trimmed_name.unwrap_or_else(|| remote_basename(&remote_path)),
+        path: remote_path.clone(),
+        origin: ProjectOrigin::Ssh {
+            access_id,
+            remote_path,
+        },
+        color: assign_color(&file.projects),
+        icon: "Server".into(),
+        created_at: now.clone(),
+        last_opened_at: now,
+    };
+    file.projects.push(project.clone());
     save_file(&file)?;
-    app.state::<Arc<ProjectsCache>>()
-        .replace(file.projects.clone());
-    Ok(result)
+    app.state::<Arc<ProjectsCache>>().replace(file.projects);
+    Ok(project)
 }
 
-pub fn remote_dependency_count(access_id: &str) -> AppResult<usize> {
-    Ok(load_file()?
-        .projects
-        .iter()
-        .filter(|p| {
-            matches!(
-                &p.origin,
-                ProjectOrigin::Ssh {
-                    access_id: existing_access_id,
-                    ..
-                } if existing_access_id == access_id
-            )
-        })
-        .count())
+fn remote_basename(path: &str) -> String {
+    path.trim_end_matches('/')
+        .rsplit('/')
+        .find(|s| !s.is_empty())
+        .unwrap_or(path)
+        .to_string()
 }
 
 /// Create a brand-new project folder under `directory` and register it. `name`
 /// becomes a single new sub-folder; the resulting path is then handed to `add`
 /// (so naming / color / dedup all stay in one place). Refuses to clobber.
 ///
-// SECURITY: this creates a directory outside the registered roots. A project
+// SECURITY: this creates a directory *outside* the registered roots — a project
 // doesn't exist yet, so it can't go through `ensure_within_roots`. Mitigated by:
 // `directory` comes from the native folder dialog (an explicit OS-level user
 // grant, same trust model as `add`), and `name` must be a single safe path
@@ -410,7 +409,7 @@ pub fn list() -> AppResult<Vec<Project>> {
 }
 
 /// Persist a new order for the project rail. `ordered_ids` must contain every
-/// existing project id exactly once. Any mismatch is rejected so the cache
+/// existing project id exactly once — any mismatch is rejected so the cache
 /// can't get out of sync with the persisted set.
 pub fn reorder(app: &AppHandle, ordered_ids: Vec<String>) -> AppResult<Vec<Project>> {
     let mut file = load_file()?;

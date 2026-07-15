@@ -25,7 +25,7 @@ import {
 } from "@/features/explorer/explorer.store";
 import { useGitStore } from "@/features/git/git.store";
 import { useProjectsStore } from "@/features/projects/project.store";
-import { projectCapabilities } from "@/features/projects/project.types";
+import { isRemoteProject } from "@/features/projects/project.types";
 import {
   gitColorForBadge,
   gitColorForName,
@@ -82,7 +82,7 @@ export const TreeNode = memo(function TreeNode({
   const setSelected = useExplorerStore((s) => s.setSelected);
   const gitStatus = useGitStore((s) => s.byProject[projectId]?.statuses?.[entry.path]);
   const project = useProjectsStore((s) => s.projects.find((p) => p.id === projectId) ?? null);
-  const canReveal = projectCapabilities(project).revealInFinder;
+  const remoteProject = isRemoteProject(project);
 
   const indentPx = depth * 12 + 8;
 
@@ -183,7 +183,7 @@ export const TreeNode = memo(function TreeNode({
                 </ContextMenuItem>
               ))}
             </ContextMenuSub>
-            {canReveal ? (
+            {remoteProject ? null : (
               <>
                 <ContextMenuSeparator />
                 <ContextMenuItem onSelect={revealInFinder}>
@@ -191,7 +191,7 @@ export const TreeNode = memo(function TreeNode({
                   {t("tree.revealInFinder")}
                 </ContextMenuItem>
               </>
-            ) : null}
+            )}
             <ContextMenuItem onSelect={copyPath}>
               <Icon icon={Copy} size={12} className="text-muted" />
               {t("tree.copyPath")}
@@ -203,7 +203,7 @@ export const TreeNode = memo(function TreeNode({
               <Icon icon={FolderOpen} size={12} className="text-muted" />
               {t("tree.open")}
             </ContextMenuItem>
-            {canReveal ? (
+            {remoteProject ? null : (
               <>
                 <ContextMenuSeparator />
                 <ContextMenuItem onSelect={revealInFinder}>
@@ -211,7 +211,7 @@ export const TreeNode = memo(function TreeNode({
                   {t("tree.revealInFinder")}
                 </ContextMenuItem>
               </>
-            ) : null}
+            )}
             <ContextMenuItem onSelect={copyPath}>
               <Icon icon={Copy} size={12} className="text-muted" />
               {t("tree.copyPath")}

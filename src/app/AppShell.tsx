@@ -13,7 +13,7 @@ import {
 import { SendToProjectDialog } from "@/components/previews/SendToProjectDialog";
 import { DropOverlay } from "@/components/previews/DropOverlay";
 import { useProjectsStore } from "@/features/projects/project.store";
-import { projectCapabilities } from "@/features/projects/project.types";
+import { isRemoteProject } from "@/features/projects/project.types";
 import { useSettingsDataStore } from "@/features/settings/settings.data.store";
 import { useSettingsStore } from "@/features/settings/settings.store";
 import type { PreviewGrant } from "@/lib/events";
@@ -375,7 +375,7 @@ export function AppShell() {
         onConfirm={actions.confirmPendingClose}
       />
 
-      {project && projectCapabilities(project).git ? (
+      {project && !isRemoteProject(project) ? (
         <WorktreeCreateDialog
           open={worktreeDialogOpen}
           onOpenChange={setWorktreeDialogOpen}
