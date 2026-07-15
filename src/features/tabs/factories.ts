@@ -38,46 +38,32 @@ export function makeCliTab(args: {
   };
 }
 
-export function makeFileTab(args: {
-  projectId: string;
+/** Single path-backed tab builder for project files and Preview grants. */
+export function makePathTab(args: {
   path: string;
   name: string;
+  projectId: string | null;
+  previewGrantId?: string;
+  /** Markdown source mode when opening an in-project file for edit. */
   openInEditMode?: boolean;
 }): Tab {
-  const id = `f-${args.path}`;
+  const isPreview = args.projectId == null;
+  const id = isPreview ? `pf-${args.path}` : `f-${args.path}`;
   const kind = fileKindFor(args.name);
-  if (kind === "markdown") {
-    return {
-      id,
-      kind: "markdown",
-      title: args.name,
-      projectId: args.projectId,
-      path: args.path,
-      mode: args.openInEditMode ? "source" : "preview",
-    };
-  }
-  if (kind === "image") {
-    return { id, kind: "image", title: args.name, projectId: args.projectId, path: args.path };
-  }
-  if (kind === "pdf") {
-    return { id, kind: "pdf", title: args.name, projectId: args.projectId, path: args.path };
-  }
-  return { id, kind: "editor", title: args.name, projectId: args.projectId, path: args.path };
-}
-
-export function makePreviewTab(args: { path: string; grantId: string }): Tab {
-  const name = basename(args.path);
-  const id = `pf-${args.path}`;
-  const kind = fileKindFor(name);
   const base = {
     id,
-    title: name,
-    projectId: null as string | null,
+    title: args.name,
+    projectId: args.projectId,
     path: args.path,
-    previewGrantId: args.grantId,
+    ...(args.previewGrantId ? { previewGrantId: args.previewGrantId } : {}),
   };
+
   if (kind === "markdown") {
-    return { ...base, kind: "markdown", mode: "preview" as const };
+    return {
+      ...base,
+      kind: "markdown",
+      mode: args.openInEditMode && !isPreview ? "source" : "preview",
+    };
   }
   if (kind === "image") {
     return { ...base, kind: "image" };
@@ -86,6 +72,29 @@ export function makePreviewTab(args: { path: string; grantId: string }): Tab {
     return { ...base, kind: "pdf" };
   }
   return { ...base, kind: "editor" };
+}
+
+export function makeFileTab(args: {
+  projectId: string;
+  path: string;
+  name: string;
+  openInEditMode?: boolean;
+}): Tab {
+  return makePathTab({
+    path: args.path,
+    name: args.name,
+    projectId: args.projectId,
+    openInEditMode: args.openInEditMode,
+  });
+}
+
+export function makePreviewTab(args: { path: string; grantId: string }): Tab {
+  return makePathTab({
+    path: args.path,
+    name: basename(args.path),
+    projectId: null,
+    previewGrantId: args.grantId,
+  });
 }
 
 export function makeDiffTab(args: {

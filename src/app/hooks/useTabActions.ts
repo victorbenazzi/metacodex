@@ -187,9 +187,9 @@ export function useTabActions({
 
   const closeTab = useCallback(
     (tabId: string) => {
-      requestCloseTab(projectKey, bucket.tabs, tabId);
+      requestCloseTab(projectKey, tabId);
     },
-    [bucket.tabs, projectKey],
+    [projectKey],
   );
 
   const closeOthers = useCallback(

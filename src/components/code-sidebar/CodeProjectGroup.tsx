@@ -149,7 +149,7 @@ export function CodeProjectGroup({
   };
   // Same Tab lifecycle path as the tab bar (confirm Process tabs, then stop + close).
   const closeTabHere = (tabId: string) => {
-    requestCloseTab(project.id, bucket?.tabs ?? [], tabId);
+    requestCloseTab(project.id, tabId);
   };
   // The "+" menu creates the tab in THIS project (and makes it active) rather
   // than the globally-active one, so it works from any project row.

@@ -73,14 +73,9 @@ pub async fn get_active_project_id() -> AppResult<Option<String>> {
 pub async fn reveal_in_finder(path: String, app: AppHandle) -> AppResult<()> {
     use crate::util::process::silent_command;
 
-    let roots_ok = app
-        .state::<Arc<ProjectsCache>>()
-        .require_within_project_roots(&path)
-        .is_ok();
+    let roots = app.state::<Arc<ProjectsCache>>().project_roots();
     let preview_ok = app.state::<Arc<PreviewGrants>>().contains_path(&path);
-    if !paths::may_reveal_path(roots_ok, preview_ok) {
-        return Err(AppError::PathNotAllowed(path));
-    }
+    paths::authorize_reveal(&roots, preview_ok, &path)?;
 
     #[cfg(target_os = "macos")]
     {

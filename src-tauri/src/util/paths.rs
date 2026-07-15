@@ -116,9 +116,23 @@ pub fn require_within_project(project_root: &str, path: &str) -> Result<(), AppE
 }
 
 /// Whether Finder/Explorer reveal is allowed: inside Project roots, or an
-/// active Preview grant path. Pure decision for tests and the reveal command.
+/// active Preview grant path. Pure decision for tests.
 pub fn may_reveal_path(roots_ok: bool, preview_grant_ok: bool) -> bool {
     roots_ok || preview_grant_ok
+}
+
+/// Path authorization for Finder reveal: Project roots, else Preview grant path.
+/// Propagates non-PathNotAllowed errors from the roots check (e.g. IO on symlink walk).
+pub fn authorize_reveal(
+    roots: &[String],
+    preview_grant_ok: bool,
+    path: &str,
+) -> Result<(), AppError> {
+    match require_within_project_roots(roots, path) {
+        Ok(()) => Ok(()),
+        Err(AppError::PathNotAllowed(_)) if preview_grant_ok => Ok(()),
+        Err(e) => Err(e),
+    }
 }
 
 #[cfg(test)]
@@ -209,5 +223,12 @@ mod tests {
         assert!(may_reveal_path(true, false));
         assert!(may_reveal_path(false, true));
         assert!(may_reveal_path(true, true));
+    }
+
+    #[test]
+    fn authorize_reveal_allows_preview_when_outside_roots() {
+        authorize_reveal(&[], true, "/tmp/outside.txt").unwrap();
+        let err = authorize_reveal(&[], false, "/tmp/outside.txt").unwrap_err();
+        assert!(matches!(err, AppError::PathNotAllowed(_)));
     }
 }

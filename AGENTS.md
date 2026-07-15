@@ -161,7 +161,7 @@ One `notify_debouncer_mini::Debouncer` per project root, owned by `WatcherManage
 | Source Control panel / worktrees | `src/components/source-control/*` + `features/git/*`; Rust in `commands/git.rs` |
 | Clone from GitHub | `components/project-rail/CloneFromGithubDialog.tsx` + `commands/git.rs::git_clone` (+ `git://clone-progress`) |
 | Resume registry (recent CLI sessions) | `features/resume/*` + `components/resume/ResumeCards.tsx` + Histórico rows in `CodeProjectGroup.tsx`; Rust `commands/resume.rs` |
-| Agent status (idle/working/needs-attention/done) | OSC parsing in `components/terminal/oscHandlers.ts` + `agentHeuristic.ts` → `features/terminal/agent-status.store.ts`; shared tone in `components/tabs/statusTone.ts` |
+| Agent status (idle/working/needs-attention/done) | OSC parsing in `features/terminal/oscHandlers.ts` + `agentHeuristic.ts` → `agent-status.store.ts`; shared tone in `components/tabs/statusTone.ts` |
 | Tab tooltip / per-tab branch+ports | `features/terminal/tabMetadata.store.ts` + `useTabMetadataPolling` → `components/tabs/TabTooltip.tsx` |
 | OS notifications / sound | `commands/notifications.rs` ← `features/terminal/notificationDispatch.ts` |
 | Diagnostics log panel (Cmd+Shift+D) | `features/diagnostics/*` + `components/diagnostics/*`; Rust `commands/diagnostics.rs` |

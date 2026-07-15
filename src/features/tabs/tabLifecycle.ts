@@ -15,16 +15,15 @@ import {
   makeTerminalTab,
   isProcessTab,
 } from "./factories";
-import {
-  planClose,
-  planCloseTab,
-  type ClosePlan,
-  type PendingClose,
-} from "./closePolicy";
+import { planClose, planCloseTab, type ClosePlan, type PendingClose } from "./closePolicy";
 import { usePendingCloseStore } from "./pendingClose.store";
 
 function openTabInProject(projectKey: string, tab: Tab, setActive = true): void {
   useTabsStore.getState().openTab(projectKey, tab, setActive);
+}
+
+function tabsFor(projectKey: string): Tab[] {
+  return useTabsStore.getState().byProject[projectKey]?.tabs ?? [];
 }
 
 /** Apply a Close plan: either execute immediately or raise the shared confirm. */
@@ -37,16 +36,19 @@ export function applyClosePlan(plan: ClosePlan | null): void {
   usePendingCloseStore.getState().setPending(plan.pending);
 }
 
+/**
+ * Kill Process tabs (parallel, via Session controller), then drop store rows.
+ * Unmount stop is idempotent; explicit stop here is the close-path owner so
+ * confirm does not rely on React unmount ordering alone.
+ */
 export async function executeClose(projectKey: string, ids: string[]): Promise<void> {
   if (ids.length === 0) return;
-  const bucket = useTabsStore.getState().byProject[projectKey];
-  const tabs = bucket?.tabs ?? [];
-  for (const id of ids) {
+  const tabs = tabsFor(projectKey);
+  const processIds = ids.filter((id) => {
     const tab = tabs.find((t) => t.id === id);
-    if (tab && isProcessTab(tab)) {
-      await sessionController.stop(id);
-    }
-  }
+    return tab != null && isProcessTab(tab);
+  });
+  await Promise.all(processIds.map((id) => sessionController.stop(id)));
   useTabsStore.getState().closeMany(projectKey, ids);
 }
 
@@ -59,8 +61,9 @@ export function requestCloseTabs(
   applyClosePlan(planClose(projectKey, mode, targets, singleTab));
 }
 
-export function requestCloseTab(projectKey: string, tabs: Tab[], tabId: string): void {
-  applyClosePlan(planCloseTab(projectKey, tabs, tabId));
+/** Looks up the live bucket; callers only pass projectKey + tabId. */
+export function requestCloseTab(projectKey: string, tabId: string): void {
+  applyClosePlan(planCloseTab(projectKey, tabsFor(projectKey), tabId));
 }
 
 export async function confirmPendingClose(): Promise<void> {
@@ -74,7 +77,7 @@ export function cancelPendingClose(): void {
   usePendingCloseStore.getState().clear();
 }
 
-// --- Open helpers ------------------------------------------------------------
+// --- Open helpers (factory + store; call sites stay one-liners) --------------
 
 export function openTerminal(args: {
   projectKey: string;
@@ -83,15 +86,7 @@ export function openTerminal(args: {
   title: string;
   prefillCommand?: string;
 }): void {
-  openTabInProject(
-    args.projectKey,
-    makeTerminalTab({
-      projectId: args.projectId,
-      cwd: args.cwd,
-      title: args.title,
-      prefillCommand: args.prefillCommand,
-    }),
-  );
+  openTabInProject(args.projectKey, makeTerminalTab(args));
 }
 
 export function openCli(args: {
@@ -101,15 +96,7 @@ export function openCli(args: {
   cli: CliTool;
   title?: string;
 }): void {
-  openTabInProject(
-    args.projectKey,
-    makeCliTab({
-      projectId: args.projectId,
-      cwd: args.cwd,
-      cli: args.cli,
-      title: args.title,
-    }),
-  );
+  openTabInProject(args.projectKey, makeCliTab(args));
 }
 
 export function openFileInProject(
@@ -120,12 +107,7 @@ export function openFileInProject(
 ): void {
   openTabInProject(
     project.id,
-    makeFileTab({
-      projectId: project.id,
-      path,
-      name,
-      openInEditMode,
-    }),
+    makeFileTab({ projectId: project.id, path, name, openInEditMode }),
   );
 }
 
@@ -164,13 +146,12 @@ export function openAfterSentToProject(args: {
       useTabsStore.getState().closeTab(key, previewId);
     }
   }
-  const name = basename(args.newPath);
   openTabInProject(
     args.dest.id,
     makeFileTab({
       projectId: args.dest.id,
       path: args.newPath,
-      name,
+      name: basename(args.newPath),
     }),
   );
   void useProjectsStore.getState().setActive(args.dest.id);

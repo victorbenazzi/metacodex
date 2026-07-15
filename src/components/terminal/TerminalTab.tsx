@@ -7,10 +7,8 @@ import {
 import { useXterm } from "./useXterm";
 import { ptyApi } from "@/features/terminal/terminal.service";
 import { useTerminalStore } from "@/features/terminal/terminal.store";
-import {
-  sessionController,
-} from "@/features/terminal/sessionController";
-import { applyTerminalFit } from "@/features/terminal/fitOnVisible";
+import { sessionController } from "@/features/terminal/sessionController";
+import { applyTerminalFit, runFitOnVisible } from "@/features/terminal/fitOnVisible";
 import type { PtyExitReason } from "@/lib/events";
 import { utf8ToBase64 } from "@/lib/base64";
 import { WORKSPACE_NULL } from "@/components/tabs/tabsStore";
@@ -31,18 +29,16 @@ interface TerminalTabProps {
    * trailing Enter). Used to pre-fill install commands. */
   prefillCommand?: string;
   /**
-   * Whether this tab is currently the displayed one. Drives Session controller
-   * fit-on-visible (WKWebView often misses ResizeObserver after display:none).
+   * Whether this tab is currently the displayed one. Drives fit-on-visible
+   * (WKWebView often misses ResizeObserver after display:none).
    */
   isVisible?: boolean;
 }
 
 /**
- * Process tab chrome: xterm mount, keyboard/clipboard, link provider, and
- * ResizeObserver. PTY Session lifecycle lives in the Session controller.
- *
- * The parent (TabContent) keeps this mounted with display:none while inactive
- * so PTY state and xterm scrollback survive tab switches.
+ * Process tab chrome: xterm mount, keyboard/clipboard, link provider,
+ * ResizeObserver, and fit-on-visible. PTY Session lifecycle lives in the
+ * Session controller.
  */
 export function TerminalTab({
   tabId,
@@ -55,8 +51,6 @@ export function TerminalTab({
   isVisible = true,
 }: TerminalTabProps) {
   const { containerRef, termRef, fitRef, disposedRef } = useXterm();
-  // Mirrored from Session controller so useSessionCapture and the exit banner
-  // re-render when the PTY Session id lands.
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [exitInfo, setExitInfo] = useState<{ code: number; reason: PtyExitReason } | null>(null);
   useSessionCapture({
@@ -69,8 +63,6 @@ export function TerminalTab({
   });
   const setLastFocused = useTerminalStore((s) => s.setLastFocused);
 
-  // Track focus so the editor's "send selection to terminal" knows which
-  // terminal to target (the last one the user interacted with in this project).
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -82,13 +74,15 @@ export function TerminalTab({
     return () => el.removeEventListener("focusin", onFocusIn);
   }, [projectId, setLastFocused, containerRef, tabId]);
 
-  // Session controller: spawn, pump, OSC/heuristic, kill on unmount.
+  // Session lifecycle. Cleanup awaits stop so StrictMode cannot spawn over a live kill.
   useEffect(() => {
     const term = termRef.current;
     const fit = fitRef.current;
     if (!term || !fit) return;
 
+    let cancelled = false;
     setExitInfo(null);
+
     void sessionController.start({
       tabId,
       projectId,
@@ -100,23 +94,40 @@ export function TerminalTab({
       term,
       fit,
       getContainer: () => containerRef.current,
-      disposed: () => disposedRef.current,
-      onSession: setActiveSessionId,
-      onExit: setExitInfo,
+      disposed: () => disposedRef.current || cancelled,
+      onSession: (id) => {
+        if (!cancelled) setActiveSessionId(id);
+      },
+      onExit: (info) => {
+        if (!cancelled) setExitInfo(info);
+      },
     });
 
     return () => {
-      void sessionController.stop(tabId).then(() => setActiveSessionId(null));
+      cancelled = true;
+      // Chain stop on the controller; do not fire-and-forget a parallel kill.
+      void sessionController.stop(tabId).then(() => {
+        setActiveSessionId(null);
+      });
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabId]);
 
+  // Fit-on-visible is pure DOM policy: uses term/fit refs, not the session map.
   useEffect(() => {
-    sessionController.onVisible(tabId, isVisible);
-  }, [tabId, isVisible]);
+    if (!isVisible) return;
+    const term = termRef.current;
+    const fit = fitRef.current;
+    if (!term || !fit) return;
+    return runFitOnVisible({
+      term,
+      fit,
+      getContainer: () => containerRef.current,
+      scrollToBottom: true,
+    });
+  }, [isVisible, termRef, fitRef, containerRef]);
 
   // Chrome: file links, Shift+Enter, paste/copy, context menu, ResizeObserver.
-  // Kept here because they are DOM/input policy, not PTY Session lifecycle.
   useEffect(() => {
     const term = termRef.current;
     const fit = fitRef.current;
@@ -124,11 +135,6 @@ export function TerminalTab({
 
     const linkProvider = term.registerLinkProvider(createFileLinkProvider(term, cwd));
 
-    // Shift+Enter → ESC+CR (newline without submit for ink/readline/bubbletea).
-    // Returning false from attachCustomKeyEventHandler skips xterm's keydown path
-    // including its preventDefault; we must preventDefault ourselves or WKWebView
-    // inserts a stray `\n` after our `\x1b\r`. Match `ev.code === "Enter"` too
-    // (ABNT2 / AZERTY localize `ev.key`).
     const pasteFromClipboard = () => {
       void readClipboardText()
         .then((text) => {
@@ -189,8 +195,6 @@ export function TerminalTab({
     const containerEl = containerRef.current;
     containerEl?.addEventListener("contextmenu", onTerminalContextMenu);
 
-    // Re-fit on container resize. Coalesce bursts into one fit per frame.
-    // Do not fit while hidden (display:none → 0×0 clamps cols ~2).
     const container = containerRef.current;
     let ro: ResizeObserver | undefined;
     let fitRaf = 0;

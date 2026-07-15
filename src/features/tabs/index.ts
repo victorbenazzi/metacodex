@@ -3,6 +3,7 @@ export {
   makeCliTab,
   makeFileTab,
   makePreviewTab,
+  makePathTab,
   makeDiffTab,
   isProcessTab,
 } from "./factories";
