@@ -26,17 +26,18 @@ import { CloneFromGithubDialog } from "@/components/project-rail/CloneFromGithub
 import { SettingsDialog } from "@/components/settings/SettingsDialog";
 import { Toaster } from "@/components/ui/Toaster";
 import { CloseTabsConfirm } from "@/app/CloseTabsConfirm";
-import {
-  EMPTY_BUCKET,
-  RAIL_WIDTH_PX,
-  type PendingClose,
-} from "@/app/appShell.helpers";
+import { EMPTY_BUCKET, RAIL_WIDTH_PX } from "@/app/appShell.helpers";
 import { registerAppCommands } from "@/app/appCommands";
 import { useAppBootstrap } from "@/app/hooks/useAppBootstrap";
 import { useFilesystemSync } from "@/app/hooks/useFilesystemSync";
 import { useWorkspacePersistence } from "@/app/hooks/useWorkspacePersistence";
 import { useTabActions } from "@/app/hooks/useTabActions";
 import { useDelayedFlag } from "@/app/hooks/useDelayedFlag";
+import {
+  cancelPendingClose,
+  confirmPendingClose,
+  usePendingCloseStore,
+} from "@/features/tabs";
 import { cn } from "@/lib/cn";
 
 // Must equal `--dur-drawer` (tokens.css): the side panel must stay mounted until
@@ -72,7 +73,7 @@ export function AppShell() {
   // anything other than the active project's active tab).
   const allBuckets = useTabsStore((s) => s.byProject);
   const bucket = allBuckets[projectKey] ?? EMPTY_BUCKET;
-  const [pendingClose, setPendingClose] = useState<PendingClose | null>(null);
+  const pendingClose = usePendingCloseStore((s) => s.pending);
   const [worktreeDialogOpen, setWorktreeDialogOpen] = useState(false);
   const [cloneDialogOpen, setCloneDialogOpen] = useState(false);
   // Preview mode: file being sent to a project (null = dialog closed) + the
@@ -138,8 +139,6 @@ export function AppShell() {
     projectKey,
     bucket,
     activeCwd,
-    pendingClose,
-    setPendingClose,
     setWorktreeDialogOpen,
     setCloneDialogOpen,
     setSendToProjectFile,
@@ -367,8 +366,10 @@ export function AppShell() {
 
       <CloseTabsConfirm
         state={pendingClose}
-        onCancel={() => setPendingClose(null)}
-        onConfirm={actions.confirmPendingClose}
+        onCancel={cancelPendingClose}
+        onConfirm={() => {
+          void confirmPendingClose();
+        }}
       />
 
       {project ? (

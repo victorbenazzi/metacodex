@@ -14,7 +14,6 @@ import {
   DropdownTrigger,
 } from "@/components/ui/DropdownMenu";
 import { cn } from "@/lib/cn";
-import { newId } from "@/lib/idGen";
 import { basename } from "@/lib/path";
 import { agoShort } from "@/lib/time";
 import { CMD, invoke } from "@/lib/ipc";
@@ -34,7 +33,7 @@ import { useCodeSidebarStore } from "@/features/ui/codeSidebar.store";
 import { useResumeStore } from "@/features/resume/resume.store";
 import { buildResumeTab } from "@/features/resume/resumeLaunch";
 import { resumeFlagFor } from "@/features/resume/sessionDetectors";
-import { cliById, cliLaunchString, type CliTool } from "@/features/terminal/cli-registry";
+import { cliById, type CliTool } from "@/features/terminal/cli-registry";
 import { CLI_BRAND_ICONS } from "@/components/icons/brand";
 import { useTabsStore } from "@/components/tabs/tabsStore";
 import { useTerminalStore } from "@/features/terminal/terminal.store";
@@ -42,6 +41,7 @@ import { useTabMetadataStore, type ListeningPort } from "@/features/terminal/tab
 import type { Project } from "@/features/projects/project.types";
 import type { ResumeEntry } from "@/features/resume/resume.service";
 import { resolveTabTitle, type Tab } from "@/components/tabs/types";
+import { openCli, openTerminal, requestCloseTab } from "@/features/tabs";
 
 const HISTORY_CAP = 6;
 
@@ -137,7 +137,6 @@ export function CodeProjectGroup({
   // --- Actions ---------------------------------------------------------------
   const openTab = useTabsStore((s) => s.openTab);
   const setActiveTab = useTabsStore((s) => s.setActiveTab);
-  const closeTab = useTabsStore((s) => s.closeTab);
 
   const resume = (entry: ResumeEntry) => {
     void setActive(project.id);
@@ -148,32 +147,28 @@ export function CodeProjectGroup({
     void setActive(project.id);
     setActiveTab(project.id, tabId);
   };
-  // Closing a Process tab unmounts TerminalTab; Session controller stop kills
-  // the PTY and clears session + agent-status. (Phase 3 will route close
-  // through Tab lifecycle so confirm matches the tab bar.)
-  const closeTabHere = (tabId: string) => closeTab(project.id, tabId);
+  // Same Tab lifecycle path as the tab bar (confirm Process tabs, then stop + close).
+  const closeTabHere = (tabId: string) => {
+    requestCloseTab(project.id, bucket?.tabs ?? [], tabId);
+  };
   // The "+" menu creates the tab in THIS project (and makes it active) rather
   // than the globally-active one, so it works from any project row.
   const newTerminalHere = () => {
     void setActive(project.id);
-    openTab(project.id, {
-      id: `t-${newId(10)}`,
-      kind: "terminal",
-      title: project.name,
+    openTerminal({
+      projectKey: project.id,
       projectId: project.id,
       cwd: project.path,
+      title: project.name,
     });
   };
   const launchCliHere = (cli: CliTool) => {
     void setActive(project.id);
-    openTab(project.id, {
-      id: `c-${newId(10)}`,
-      kind: "cli",
-      title: cli.label,
+    openCli({
+      projectKey: project.id,
       projectId: project.id,
       cwd: project.path,
-      cliId: cli.id,
-      launchCommand: cliLaunchString(cli),
+      cli,
     });
   };
   const revealInFinder = () => {

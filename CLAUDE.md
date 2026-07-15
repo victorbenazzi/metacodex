@@ -150,7 +150,10 @@ One `notify_debouncer_mini::Debouncer` per project root, owned by `WatcherManage
 | Change app shell layout | `src/app/AppShell.tsx` (grid template lives there); use `src/app/hooks/*` for bootstrap, filesystem sync, persistence and tab actions |
 | Projects sidebar (rail / expanded, reorder, status dots) | `components/project-rail/*`, `components/code-sidebar/*`, `components/ui/useListReorder.tsx`, `features/terminal/projectStatus.ts`, `features/ui/codeSidebar.store.ts` |
 | Title bar (project identity, branch, updates, side panel toggle) | `src/app/TitleBar.tsx` |
-| Add a new tab kind | `src/components/tabs/types.ts` (union) → `TabContent.tsx` (renderer) → `useTabActions.openFile` / `openPreviewFile` (routing) → Arquivos section in `CodeProjectGroup.tsx` (vertical layout) |
+| Add a new tab kind | `src/components/tabs/types.ts` (union) → `TabContent.tsx` (renderer) → factories/open helpers in `features/tabs/` → Arquivos section in `CodeProjectGroup.tsx` (vertical layout) |
+| Tab open/close policy (factories, confirm, Process kill) | `src/features/tabs/` (`tabLifecycle`, `factories`, `closePolicy`, `pendingClose.store`); React adapter `useTabActions` only |
+| PTY Session lifecycle (spawn/stop/fit-on-visible) | `src/features/terminal/sessionController.ts` + `fitOnVisible.ts`; TerminalTab is chrome only |
+| Path authorization (Project roots + Finder reveal) | `src-tauri/src/util/paths.rs` + `ProjectsCache::require_within_*`; grants in `preview_grants.rs` / `directory_grants.rs` |
 | Add a new CLI to the launcher | `src/features/terminal/cli-registry.ts::DEFAULT_CLI_REGISTRY` |
 | Add/change a user setting | `src/features/settings/settings.types.ts` (`AppSettings` + `DEFAULT_SETTINGS` + `mergeSettings`) → consumer → pane in `components/settings/panes/` + i18n keys (both locales) |
 | Add/rebind a keyboard shortcut | `src/features/keybindings/commands.ts` → dispatch in `KeyboardShortcuts.tsx` |

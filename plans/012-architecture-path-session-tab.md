@@ -404,11 +404,13 @@ Deletes/moves: inline tab object literals for open/close policy.
 
 ## Acceptance
 
-- [ ] No Process tab close via raw `tabsStore.closeTab` from UI components
-- [ ] `confirmPendingClose` always goes through `executeClose` (stop + close)
-- [ ] Factories are single construction site for Tab objects used by open paths
-- [ ] `pnpm exec tsc --noEmit` green
-- [ ] useTabActions substantially thinner (target: policy out, dialogs in)
+- [x] No Process tab close via raw `tabsStore.closeTab` from UI components
+- [x] `confirmPendingClose` always goes through `executeClose` (stop + close)
+- [x] Factories are single construction site for Tab objects used by open paths
+- [x] `pnpm exec tsc --noEmit` green
+- [x] useTabActions substantially thinner (target: policy out, dialogs in)
+
+**Done:** 2026-07-15 (phase 3 implementation).
 
 ---
 

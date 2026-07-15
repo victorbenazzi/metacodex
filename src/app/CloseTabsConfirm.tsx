@@ -3,7 +3,7 @@ import type { TFunction } from "i18next";
 import type { ReactNode } from "react";
 
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import type { PendingClose } from "@/app/appShell.helpers";
+import type { PendingClose } from "@/features/tabs";
 
 interface CloseTabsConfirmProps {
   state: PendingClose | null;

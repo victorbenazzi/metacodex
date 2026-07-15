@@ -9,19 +9,14 @@ import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { useTranslation } from "react-i18next";
 
-import type { Tab } from "@/components/tabs/types";
-import { fileKindFor } from "@/components/tabs/fileKind";
 import { WORKSPACE_NULL, useTabsStore, type TabsBucket } from "@/components/tabs/tabsStore";
 import type { Project } from "@/features/projects/project.types";
 import { useProjectsStore } from "@/features/projects/project.store";
-import { useExplorerStore } from "@/features/explorer/explorer.store";
 import { flushEditor } from "@/features/editor/editorSavers";
 import { fsApi } from "@/features/filesystem/filesystem.service";
 import { CMD, invoke } from "@/lib/ipc";
 import { EV, listenTo, type OpenFilePayload, type PreviewGrant } from "@/lib/events";
-import { basename } from "@/lib/path";
-import { newId } from "@/lib/idGen";
-import { cliLaunchString, type CliTool } from "@/features/terminal/cli-registry";
+import type { CliTool } from "@/features/terminal/cli-registry";
 import { useTerminalStore } from "@/features/terminal/terminal.store";
 import { ptyApi } from "@/features/terminal/terminal.service";
 import { utf8ToBase64 } from "@/lib/base64";
@@ -31,11 +26,20 @@ import {
 } from "@/features/terminal/agent-status.store";
 import type { SentToProject } from "@/components/previews/SendToProjectDialog";
 import type { AppCommands } from "@/app/appCommands";
+import { looksLikeFile } from "@/app/appShell.helpers";
+import { basename } from "@/lib/path";
 import {
-  looksLikeFile,
-  processSummary,
-  type PendingClose,
-} from "@/app/appShell.helpers";
+  cancelPendingClose,
+  confirmPendingClose as lifecycleConfirmPendingClose,
+  openAfterSentToProject,
+  openCli,
+  openDiffInProject,
+  openFileInProject,
+  openPreview,
+  openTerminal,
+  requestCloseTab,
+  requestCloseTabs,
+} from "@/features/tabs";
 
 interface UseTabActionsParams {
   project: Project | null;
@@ -43,8 +47,6 @@ interface UseTabActionsParams {
   projectKey: string;
   bucket: TabsBucket;
   activeCwd: string;
-  pendingClose: PendingClose | null;
-  setPendingClose: Dispatch<SetStateAction<PendingClose | null>>;
   setWorktreeDialogOpen: Dispatch<SetStateAction<boolean>>;
   setCloneDialogOpen: Dispatch<SetStateAction<boolean>>;
   setSendToProjectFile: Dispatch<SetStateAction<PreviewGrant | null>>;
@@ -71,14 +73,16 @@ export interface TabActions extends AppCommands {
   confirmPendingClose: () => void;
 }
 
+/**
+ * React adapter: dialogs, AppCommands shape, and gesture wiring.
+ * Tab open/close policy lives in Tab lifecycle (`@/features/tabs`).
+ */
 export function useTabActions({
   project,
   projects,
   projectKey,
   bucket,
   activeCwd,
-  pendingClose,
-  setPendingClose,
   setWorktreeDialogOpen,
   setCloneDialogOpen,
   setSendToProjectFile,
@@ -87,9 +91,6 @@ export function useTabActions({
   const { t } = useTranslation();
   const addProject = useProjectsStore((s) => s.add);
   const setActive = useProjectsStore((s) => s.setActive);
-  const openTab = useTabsStore((s) => s.openTab);
-  const closeTabStore = useTabsStore((s) => s.closeTab);
-  const closeMany = useTabsStore((s) => s.closeMany);
   const setActiveTab = useTabsStore((s) => s.setActiveTab);
   const moveTabStore = useTabsStore((s) => s.moveTab);
   const setTabTitles = useTabsStore((s) => s.setTabTitles);
@@ -115,14 +116,13 @@ export function useTabActions({
   }, [setCloneDialogOpen]);
 
   const newTerminal = useCallback(() => {
-    openTab(projectKey, {
-      id: `t-${newId(10)}`,
-      kind: "terminal",
-      title: project ? project.name : "terminal",
+    openTerminal({
+      projectKey,
       projectId: project?.id ?? null,
       cwd: activeCwd,
+      title: project ? project.name : "terminal",
     });
-  }, [openTab, projectKey, project, activeCwd]);
+  }, [projectKey, project, activeCwd]);
 
   const sendToTerminal = useCallback(
     (text: string) => {
@@ -142,33 +142,28 @@ export function useTabActions({
         void ptyApi.write(sid, utf8ToBase64(payload)).catch(() => undefined);
         if (session.tabId) setActiveTab(projectKey, session.tabId);
       } else {
-        openTab(projectKey, {
-          id: `t-${newId(10)}`,
-          kind: "terminal",
-          title: project ? project.name : "terminal",
+        openTerminal({
+          projectKey,
           projectId: project?.id ?? null,
           cwd: activeCwd,
+          title: project ? project.name : "terminal",
           prefillCommand: payload,
         });
       }
     },
-    [openTab, setActiveTab, projectKey, project, activeCwd],
+    [setActiveTab, projectKey, project, activeCwd],
   );
 
   const launchCli = useCallback(
     (cli: CliTool) => {
-      const launchCommand = cliLaunchString(cli);
-      openTab(projectKey, {
-        id: `c-${newId(10)}`,
-        kind: "cli",
-        title: cli.label,
+      openCli({
+        projectKey,
         projectId: project?.id ?? null,
         cwd: activeCwd,
-        cliId: cli.id,
-        launchCommand,
+        cli,
       });
     },
-    [openTab, projectKey, project, activeCwd],
+    [projectKey, project, activeCwd],
   );
 
   const openWorktreeDialog = useCallback(() => {
@@ -180,55 +175,34 @@ export function useTabActions({
     ({ branch, path }: { branch: string; path: string }) => {
       setWorktreeDialogOpen(false);
       if (!project) return;
-      openTab(projectKey, {
-        id: `t-${newId(10)}`,
-        kind: "terminal",
-        title: branch,
+      openTerminal({
+        projectKey,
         projectId: project.id,
         cwd: path,
+        title: branch,
       });
     },
-    [openTab, projectKey, project, setWorktreeDialogOpen],
-  );
-
-  const requestClose = useCallback(
-    (mode: PendingClose["mode"], targets: Tab[], singleTab?: Tab) => {
-      const ids = targets.map((tab) => tab.id);
-      if (ids.length === 0) return;
-      const { terminals, agents } = processSummary(targets);
-      if (terminals === 0 && agents === 0) {
-        closeMany(projectKey, ids);
-        return;
-      }
-      setPendingClose({ ids, mode, terminals, agents, singleTab });
-    },
-    [closeMany, projectKey, setPendingClose],
+    [projectKey, project, setWorktreeDialogOpen],
   );
 
   const closeTab = useCallback(
     (tabId: string) => {
-      const target = bucket.tabs.find((tab) => tab.id === tabId);
-      if (!target) return;
-      if (target.kind === "terminal" || target.kind === "cli") {
-        requestClose("single", [target], target);
-      } else {
-        closeTabStore(projectKey, tabId);
-      }
+      requestCloseTab(projectKey, bucket.tabs, tabId);
     },
-    [bucket.tabs, closeTabStore, projectKey, requestClose],
+    [bucket.tabs, projectKey],
   );
 
   const closeOthers = useCallback(
     (keepId: string) => {
       const targets = bucket.tabs.filter((tab) => tab.id !== keepId);
-      requestClose("others", targets);
+      requestCloseTabs(projectKey, "others", targets);
     },
-    [bucket.tabs, requestClose],
+    [bucket.tabs, projectKey],
   );
 
   const closeAll = useCallback(() => {
-    requestClose("all", bucket.tabs);
-  }, [bucket.tabs, requestClose]);
+    requestCloseTabs(projectKey, "all", bucket.tabs);
+  }, [bucket.tabs, projectKey]);
 
   const selectTab = useCallback(
     (tabId: string) => setActiveTab(projectKey, tabId),
@@ -322,90 +296,45 @@ export function useTabActions({
 
   const openInTerminal = useCallback(
     (path: string, name: string) => {
-      openTab(projectKey, {
-        id: `t-${newId(10)}`,
-        kind: "terminal",
-        title: name || basename(path),
+      openTerminal({
+        projectKey,
         projectId: project?.id ?? null,
         cwd: path,
+        title: name || basename(path),
       });
     },
-    [openTab, projectKey, project],
+    [projectKey, project],
   );
 
   const launchCliInPath = useCallback(
     (cli: CliTool, path: string, name: string) => {
-      const launchCommand = cliLaunchString(cli);
-      openTab(projectKey, {
-        id: `c-${newId(10)}`,
-        kind: "cli",
-        title: `${cli.label} · ${name || basename(path)}`,
+      openCli({
+        projectKey,
         projectId: project?.id ?? null,
         cwd: path,
-        cliId: cli.id,
-        launchCommand,
+        cli,
+        title: `${cli.label} · ${name || basename(path)}`,
       });
     },
-    [openTab, projectKey, project],
+    [projectKey, project],
   );
 
   const openFile = useCallback(
     (path: string, name: string, openInEditMode?: boolean) => {
       if (!project) return;
-      const id = `f-${path}`;
-      const kind = fileKindFor(name);
-      let tab: Tab;
-      if (kind === "markdown") {
-        tab = {
-          id,
-          kind: "markdown",
-          title: name,
-          projectId: project.id,
-          path,
-          mode: openInEditMode ? "source" : "preview",
-        };
-      } else if (kind === "image") {
-        tab = { id, kind: "image", title: name, projectId: project.id, path };
-      } else if (kind === "pdf") {
-        tab = { id, kind: "pdf", title: name, projectId: project.id, path };
-      } else {
-        tab = { id, kind: "editor", title: name, projectId: project.id, path };
-      }
-      openTab(projectKey, tab);
+      openFileInProject(project, path, name, openInEditMode);
     },
-    [openTab, projectKey, project],
-  );
-
-  const openPreviewFile = useCallback(
-    (file: PreviewGrant) => {
-      const { path, grantId } = file;
-      const name = basename(path);
-      const id = `pf-${path}`;
-      const kind = fileKindFor(name);
-      const base = { id, title: name, projectId: null, path, previewGrantId: grantId } as const;
-      let tab: Tab;
-      if (kind === "markdown") {
-        tab = { ...base, kind: "markdown", mode: "preview" };
-      } else if (kind === "image") {
-        tab = { ...base, kind: "image" };
-      } else if (kind === "pdf") {
-        tab = { ...base, kind: "pdf" };
-      } else {
-        tab = { ...base, kind: "editor" };
-      }
-      openTab(projectKey, tab);
-    },
-    [openTab, projectKey],
+    [project],
   );
 
   const pickPreviewFile = useCallback(async () => {
     try {
       const selected = await fsApi.pickPreviewFile(t("preview.openTitle"));
-      if (selected) openPreviewFile(selected);
+      if (selected) openPreview(projectKey, selected);
     } catch (err) {
       console.error("preview openDialog failed", err);
     }
-  }, [openPreviewFile, t]);
+  }, [projectKey, t]);
 
   const sendToProject = useCallback(
     async (file: PreviewGrant) => {
@@ -415,41 +344,16 @@ export function useTabActions({
     [setSendToProjectFile],
   );
 
-  const sentToProject = useCallback(
-    ({ project: dest, oldPath, newPath, toDir }: SentToProject) => {
-      const previewId = `pf-${oldPath}`;
-      const buckets = useTabsStore.getState().byProject;
-      for (const [key, b] of Object.entries(buckets)) {
-        if (b.tabs.some((tb) => tb.id === previewId)) {
-          closeTabStore(key, previewId);
-        }
-      }
-      const name = basename(newPath);
-      const fid = `f-${newPath}`;
-      const kind = fileKindFor(name);
-      let tab: Tab;
-      if (kind === "markdown") {
-        tab = { id: fid, kind: "markdown", title: name, projectId: dest.id, path: newPath, mode: "preview" };
-      } else if (kind === "image") {
-        tab = { id: fid, kind: "image", title: name, projectId: dest.id, path: newPath };
-      } else if (kind === "pdf") {
-        tab = { id: fid, kind: "pdf", title: name, projectId: dest.id, path: newPath };
-      } else {
-        tab = { id: fid, kind: "editor", title: name, projectId: dest.id, path: newPath };
-      }
-      openTab(dest.id, tab);
-      void setActive(dest.id);
-      void useExplorerStore.getState().refresh(dest.id, toDir);
-    },
-    [closeTabStore, openTab, setActive],
-  );
+  const sentToProject = useCallback(({ project: dest, oldPath, newPath, toDir }: SentToProject) => {
+    openAfterSentToProject({ dest, oldPath, newPath, toDir });
+  }, []);
 
   useEffect(() => {
     let off: (() => void) | undefined;
     let cancelled = false;
     (async () => {
       off = await listenTo<OpenFilePayload>(EV.openFile, (e) => {
-        for (const file of e.payload.files) openPreviewFile(file);
+        for (const file of e.payload.files) openPreview(projectKey, file);
       });
       if (cancelled) {
         off?.();
@@ -457,7 +361,7 @@ export function useTabActions({
       }
       try {
         const pending = await invoke<PreviewGrant[]>(CMD.takePendingOpenFiles);
-        for (const file of pending) openPreviewFile(file);
+        for (const file of pending) openPreview(projectKey, file);
       } catch {
         // nothing queued
       }
@@ -466,7 +370,7 @@ export function useTabActions({
       cancelled = true;
       off?.();
     };
-  }, [openPreviewFile]);
+  }, [projectKey]);
 
   useEffect(() => {
     let un: (() => void) | undefined;
@@ -500,16 +404,9 @@ export function useTabActions({
   const openDiff = useCallback(
     (path: string, status: string) => {
       if (!project) return;
-      openTab(projectKey, {
-        id: `diff-${path}`,
-        kind: "diff",
-        title: basename(path),
-        projectId: project.id,
-        path,
-        status,
-      });
+      openDiffInProject({ project, path, status });
     },
-    [openTab, projectKey, project],
+    [project],
   );
 
   const closeActiveTab = useCallback(() => {
@@ -538,10 +435,8 @@ export function useTabActions({
   }, [bucket.tabs, bucket.activeTabId, projectKey, setActiveTab]);
 
   const confirmPendingClose = useCallback(() => {
-    if (!pendingClose) return;
-    closeMany(projectKey, pendingClose.ids);
-    setPendingClose(null);
-  }, [closeMany, pendingClose, projectKey, setPendingClose]);
+    void lifecycleConfirmPendingClose();
+  }, []);
 
   return useMemo(
     () => ({
@@ -610,3 +505,6 @@ export function useTabActions({
     ],
   );
 }
+
+// Keep cancel available for AppShell without going through actions.
+export { cancelPendingClose };
