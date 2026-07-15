@@ -9,7 +9,6 @@ use tauri::{AppHandle, Manager};
 
 use crate::error::{AppError, AppResult};
 use crate::projects::ProjectsCache;
-use crate::util::paths;
 
 const DEFAULT_TEXT_LIMIT: u64 = 25 * 1024 * 1024; // 25 MiB
 const DEFAULT_BYTES_LIMIT: u64 = 50 * 1024 * 1024; // 50 MiB
@@ -101,14 +100,8 @@ pub struct BytesFile {
 }
 
 fn require_within_roots(app: &AppHandle, path: &str) -> AppResult<()> {
-    let cache = app.state::<Arc<ProjectsCache>>();
-    let roots = cache.project_roots();
-    if roots.is_empty() {
-        return Err(AppError::PathNotAllowed(
-            "no project roots registered yet".into(),
-        ));
-    }
-    paths::ensure_within_roots(path, &roots)
+    app.state::<Arc<ProjectsCache>>()
+        .require_within_project_roots(path)
 }
 
 fn mtime_ms(meta: &fs::Metadata) -> i64 {

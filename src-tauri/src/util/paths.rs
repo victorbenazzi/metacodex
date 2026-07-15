@@ -98,6 +98,29 @@ pub fn ensure_within_roots(target: &str, roots: &[String]) -> Result<(), AppErro
     }
 }
 
+/// Path authorization for Project roots: empty registry denies, then
+/// [`ensure_within_roots`]. Prefer this over calling `ensure_within_roots`
+/// with a hand-rolled empty check at every command.
+pub fn require_within_project_roots(roots: &[String], path: &str) -> Result<(), AppError> {
+    if roots.is_empty() {
+        return Err(AppError::PathNotAllowed(
+            "no project roots registered yet".into(),
+        ));
+    }
+    ensure_within_roots(path, roots)
+}
+
+/// Path authorization against a single Project root (e.g. PTY cwd for one Project).
+pub fn require_within_project(project_root: &str, path: &str) -> Result<(), AppError> {
+    ensure_within_roots(path, &[project_root.to_string()])
+}
+
+/// Whether Finder/Explorer reveal is allowed: inside Project roots, or an
+/// active Preview grant path. Pure decision for tests and the reveal command.
+pub fn may_reveal_path(roots_ok: bool, preview_grant_ok: bool) -> bool {
+    roots_ok || preview_grant_ok
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -156,5 +179,35 @@ mod tests {
             Path::new(r"C:\code\app"),
             Path::new(r"C:\code\application\secret.txt")
         ));
+    }
+
+    #[test]
+    fn require_within_project_roots_denies_empty_registry() {
+        let err = require_within_project_roots(&[], "/any/path").unwrap_err();
+        assert!(matches!(err, AppError::PathNotAllowed(_)));
+        assert!(err.to_string().contains("no project roots"));
+    }
+
+    #[test]
+    fn require_within_project_roots_allows_under_root() {
+        let base = std::env::temp_dir().join(format!(
+            "metacodex-paths-auth-{}",
+            uuid::Uuid::new_v4().simple()
+        ));
+        let root = base.join("root");
+        std::fs::create_dir_all(root.join("src")).unwrap();
+        let roots = vec![root.to_string_lossy().to_string()];
+        let target = root.join("src").join("main.rs");
+        // File need not exist for lexical + symlink walk (NotFound breaks walk early).
+        require_within_project_roots(&roots, &target.to_string_lossy()).unwrap();
+        let _ = std::fs::remove_dir_all(base);
+    }
+
+    #[test]
+    fn may_reveal_path_roots_or_preview() {
+        assert!(!may_reveal_path(false, false));
+        assert!(may_reveal_path(true, false));
+        assert!(may_reveal_path(false, true));
+        assert!(may_reveal_path(true, true));
     }
 }

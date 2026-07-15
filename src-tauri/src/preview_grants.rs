@@ -61,4 +61,10 @@ impl PreviewGrants {
         // Leaves the id in `order`; the eviction loop treats it as a no-op.
         self.inner.lock().by_id.remove(grant_id);
     }
+
+    /// True if any live grant points at `path` (exact string match as stored).
+    /// Used by Finder reveal when the path is outside Project roots.
+    pub fn contains_path(&self, path: &str) -> bool {
+        self.inner.lock().by_id.values().any(|p| p == path)
+    }
 }

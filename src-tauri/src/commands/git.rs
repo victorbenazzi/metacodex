@@ -46,7 +46,6 @@ use crate::directory_grants::{DirectoryGrant, DirectoryGrants};
 use crate::events::{GitCloneProgressPayload, EV_GIT_CLONE_PROGRESS};
 use crate::git::{file_head_content, git_info, GitInfo};
 use crate::projects::ProjectsCache;
-use crate::util::paths;
 use crate::util::process::silent_command;
 
 fn dialog_path_to_string(path: FilePath) -> AppResult<String> {
@@ -89,16 +88,8 @@ pub async fn git_status(
     root: String,
     include_stats: Option<bool>,
 ) -> AppResult<Option<GitInfo>> {
-    {
-        let cache = app.state::<Arc<ProjectsCache>>();
-        let roots = cache.project_roots();
-        if roots.is_empty() {
-            return Err(AppError::PathNotAllowed(
-                "no project roots registered yet".into(),
-            ));
-        }
-        paths::ensure_within_roots(&root, &roots)?;
-    }
+    app.state::<Arc<ProjectsCache>>()
+        .require_within_project_roots(&root)?;
     let include_stats = include_stats.unwrap_or(false);
     tokio::task::spawn_blocking(move || git_info(&root, include_stats))
         .await
@@ -108,16 +99,8 @@ pub async fn git_status(
 /// Committed (HEAD) text of a file, for the editor's change gutter. Read-only.
 #[tauri::command]
 pub async fn git_file_head_content(app: AppHandle, path: String) -> AppResult<Option<String>> {
-    {
-        let cache = app.state::<Arc<ProjectsCache>>();
-        let roots = cache.project_roots();
-        if roots.is_empty() {
-            return Err(AppError::PathNotAllowed(
-                "no project roots registered yet".into(),
-            ));
-        }
-        paths::ensure_within_roots(&path, &roots)?;
-    }
+    app.state::<Arc<ProjectsCache>>()
+        .require_within_project_roots(&path)?;
     tokio::task::spawn_blocking(move || file_head_content(&path))
         .await
         .map_err(|e| AppError::Other(format!("join: {e}")))?
@@ -134,17 +117,6 @@ pub struct WorktreeInfo {
     pub is_main: bool,
     pub locked: bool,
     pub prunable: bool,
-}
-
-fn ensure_root_allowed(app: &AppHandle, root: &str) -> AppResult<()> {
-    let cache = app.state::<Arc<ProjectsCache>>();
-    let roots = cache.project_roots();
-    if roots.is_empty() {
-        return Err(AppError::PathNotAllowed(
-            "no project roots registered yet".into(),
-        ));
-    }
-    paths::ensure_within_roots(root, &roots)
 }
 
 fn run_git(root: &str, args: &[&str]) -> Result<std::process::Output, AppError> {
@@ -266,7 +238,8 @@ fn default_worktree_path(root: &str, branch_name: &str) -> PathBuf {
 
 #[tauri::command]
 pub async fn git_worktree_list(app: AppHandle, root: String) -> AppResult<Vec<WorktreeInfo>> {
-    ensure_root_allowed(&app, &root)?;
+    app.state::<Arc<ProjectsCache>>()
+        .require_within_project_roots(&root)?;
     let root_clone = root.clone();
     tokio::task::spawn_blocking(move || {
         let out = run_git(&root_clone, &["worktree", "list", "--porcelain"])?;
@@ -291,7 +264,8 @@ pub async fn git_worktree_add(
     target_path: Option<String>,
     base_ref: Option<String>,
 ) -> AppResult<WorktreeInfo> {
-    ensure_root_allowed(&app, &root)?;
+    app.state::<Arc<ProjectsCache>>()
+        .require_within_project_roots(&root)?;
     if !valid_branch_name(&branch_name) {
         return Err(AppError::Other(format!(
             "invalid branch name: {branch_name}"
@@ -300,7 +274,8 @@ pub async fn git_worktree_add(
     let target = match target_path {
         Some(p) => {
             // If explicit, validate it lives inside a registered root too.
-            ensure_root_allowed(&app, &p)?;
+            app.state::<Arc<ProjectsCache>>()
+                .require_within_project_roots(&p)?;
             PathBuf::from(p)
         }
         None => default_worktree_path(&root, &branch_name),
@@ -371,8 +346,10 @@ pub async fn git_worktree_remove(
     worktree_path: String,
     force: bool,
 ) -> AppResult<()> {
-    ensure_root_allowed(&app, &root)?;
-    ensure_root_allowed(&app, &worktree_path)?;
+    app.state::<Arc<ProjectsCache>>()
+        .require_within_project_roots(&root)?;
+    app.state::<Arc<ProjectsCache>>()
+        .require_within_project_roots(&worktree_path)?;
     let root_clone = root.clone();
     let wt = worktree_path.clone();
     tokio::task::spawn_blocking(move || -> AppResult<()> {
@@ -664,7 +641,8 @@ pub async fn git_merge_into(
     branch: String,
     strategy: String,
 ) -> AppResult<()> {
-    ensure_root_allowed(&app, &root)?;
+    app.state::<Arc<ProjectsCache>>()
+        .require_within_project_roots(&root)?;
     if !valid_branch_name(&branch) {
         return Err(AppError::Other(format!("invalid branch name: {branch}")));
     }

@@ -1,7 +1,11 @@
-use tauri::AppHandle;
+use std::sync::Arc;
 
-use crate::error::AppResult;
-use crate::projects::{self, Project};
+use tauri::{AppHandle, Manager};
+
+use crate::error::{AppError, AppResult};
+use crate::preview_grants::PreviewGrants;
+use crate::projects::{self, Project, ProjectsCache};
+use crate::util::paths;
 
 #[tauri::command]
 pub async fn add_project(path: String, app: AppHandle) -> AppResult<Project> {
@@ -62,11 +66,21 @@ pub async fn get_active_project_id() -> AppResult<Option<String>> {
 }
 
 /// Reveal a path in the OS file manager (Finder / Explorer / nautilus).
+/// Allowed only when the path is under a Project root or matches an active
+/// Preview grant (user explicitly opened that file).
 /// Implemented here rather than via tauri-plugin-opener so we don't add another dep.
 #[tauri::command]
-pub async fn reveal_in_finder(path: String) -> AppResult<()> {
-    use crate::error::AppError;
+pub async fn reveal_in_finder(path: String, app: AppHandle) -> AppResult<()> {
     use crate::util::process::silent_command;
+
+    let roots_ok = app
+        .state::<Arc<ProjectsCache>>()
+        .require_within_project_roots(&path)
+        .is_ok();
+    let preview_ok = app.state::<Arc<PreviewGrants>>().contains_path(&path);
+    if !paths::may_reveal_path(roots_ok, preview_ok) {
+        return Err(AppError::PathNotAllowed(path));
+    }
 
     #[cfg(target_os = "macos")]
     {

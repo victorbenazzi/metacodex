@@ -11,7 +11,6 @@ use tauri::{AppHandle, Manager, State};
 use crate::error::{AppError, AppResult};
 use crate::projects::ProjectsCache;
 use crate::pty::{PtyManager, PtySessionInfo, PtySpawnSpec};
-use crate::util::paths;
 
 #[tauri::command]
 pub async fn pty_spawn(
@@ -20,13 +19,8 @@ pub async fn pty_spawn(
     mgr: State<'_, PtyManager>,
 ) -> AppResult<String> {
     if let Some(project_id) = spec.project_id.as_deref() {
-        let cache = app.state::<Arc<ProjectsCache>>();
-        let project = cache
-            .snapshot()
-            .into_iter()
-            .find(|p| p.id == project_id)
-            .ok_or_else(|| AppError::NotFound(format!("project {project_id}")))?;
-        paths::ensure_within_roots(&spec.cwd, &[project.path])?;
+        app.state::<Arc<ProjectsCache>>()
+            .require_within_project(project_id, &spec.cwd)?;
     }
     mgr.spawn(spec)
 }
@@ -262,17 +256,13 @@ pub async fn pty_update_cwd(
     cwd: String,
     mgr: State<'_, PtyManager>,
 ) -> AppResult<()> {
-    // If the session belongs to a project, validate the cwd is inside one of
-    // the registered roots , preventing an OSC 7 sequence from leaking a path
-    // outside the sandbox into stored state. Plain shells (no project_id) are
-    // unrestricted: `cd /tmp` is a normal operation.
-    let project_id = mgr.project_id_of(&session_id);
-    if project_id.is_some() {
-        let cache = app.state::<Arc<ProjectsCache>>();
-        let roots = cache.project_roots();
-        if !roots.is_empty() {
-            paths::ensure_within_roots(&cwd, &roots)?;
-        }
+    // If the session belongs to a Project, validate the cwd is inside a
+    // registered Project root so OSC 7 cannot leak an outside path into
+    // stored state. Plain shells (no project_id) are unrestricted: `cd /tmp`
+    // is a normal operation.
+    if mgr.project_id_of(&session_id).is_some() {
+        app.state::<Arc<ProjectsCache>>()
+            .require_within_project_roots(&cwd)?;
     }
     mgr.set_cwd_override(&session_id, cwd)
 }

@@ -129,11 +129,13 @@ or integration-style with `PreviewGrants::grant_path` + `contains_path`.
 
 ## Acceptance
 
-- [ ] No remaining private `ensure_root_allowed` / `require_within_roots` duplicates
-- [ ] `reveal_in_finder` rejects arbitrary paths outside roots without a grant
-- [ ] Preview file reveal still works for granted paths
-- [ ] `cargo test` in `src-tauri/` green
-- [ ] `cargo check` green
+- [x] No remaining private `ensure_root_allowed` / `require_within_roots` duplicates
+- [x] `reveal_in_finder` rejects arbitrary paths outside roots without a grant
+- [x] Preview file reveal still works for granted paths
+- [x] `cargo test` in `src-tauri/` green
+- [x] `cargo check` green
+
+**Done:** 2026-07-15 (phase 1 implementation).
 
 ## Out of phase 1
 

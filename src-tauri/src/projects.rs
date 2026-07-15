@@ -53,6 +53,25 @@ impl ProjectsCache {
         self.inner.read().iter().map(|p| p.path.clone()).collect()
     }
 
+    /// Path authorization: target must sit inside a registered Project root.
+    /// Empty registry denies. See `util::paths::require_within_project_roots`.
+    pub fn require_within_project_roots(&self, path: &str) -> AppResult<()> {
+        crate::util::paths::require_within_project_roots(&self.project_roots(), path)
+    }
+
+    /// Path authorization against one Project by id (NotFound if unknown id).
+    pub fn require_within_project(&self, project_id: &str, path: &str) -> AppResult<()> {
+        let root = {
+            let guard = self.inner.read();
+            guard
+                .iter()
+                .find(|p| p.id == project_id)
+                .map(|p| p.path.clone())
+        };
+        let root = root.ok_or_else(|| AppError::NotFound(format!("project {project_id}")))?;
+        crate::util::paths::require_within_project(&root, path)
+    }
+
     /// Find the project (id, path) whose root is a prefix of `path`. Picks the
     /// longest matching root in case the user has registered nested folders.
     /// Returns `None` when no project owns the path.
