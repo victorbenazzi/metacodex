@@ -8,6 +8,8 @@ metacodex is a premium **local-first developer workspace** built as a Tauri 2 de
 
 **Removed feature, do not resurrect:** the second top-level view ("Agent view": opencode sidecar, agent chat, cron, MCP registry, agent entities) was removed in v0.0.12. The root docs `AGENT_VIEW_HANDOFF.md`, `AGENTS_DESIGN.md`, `AGENT_HARNESS_FEATURES.md`, `AGENT_P1_TEST_CHECKLIST.md` and `REVIEW_CRON_SCHEDULED_TASKS.md` describe that removed feature and are historical only. The single surviving code reference is the startup migration `config_paths.rs::archive_legacy_agent_state()`, which moves old agent state into `state/legacy-agent/`. Note the word "agent" elsewhere in the codebase refers to the LIVE terminal-CLI feature (per-tab status of coding agents like Claude Code running in a PTY), not the removed view.
 
+**Removed feature, do not resurrect:** remote SSH projects were removed after the initial implementation proved to be the wrong product direction. The only surviving code is startup compatibility that archives old access and trust state under `state/legacy-ssh/`, removes legacy SSH projects from the active registry, and archives their workspace state.
+
 ## Commands
 
 Package manager is **pnpm**. There is no frontend test suite and no separate lint command: `tsc --noEmit` (run via `pnpm build`) is the only TS static check. The Rust side has unit tests (notably the path sandbox in `util/paths.rs`), run with `cargo test` inside `src-tauri/`.
@@ -82,6 +84,7 @@ Plain, pretty-printed, hand-editable JSON written atomically (tmp then rename) v
     ├── last-session.log  # diagnostics ring-buffer dump on quit
     ├── last-crash.json   # last ErrorBoundary catch
     ├── legacy-agent/     # archived state from the removed Agent view (startup migration)
+    ├── legacy-ssh/       # archived state from the removed SSH feature (startup migration)
     └── workspace/{id}.json  # per-project: open tabs, active tab, expanded paths
 ```
 

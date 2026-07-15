@@ -121,7 +121,7 @@ export function ExpandedProjectsSidebar({ onOpenFolder }: ExpandedProjectsSideba
         </footer>
       </aside>
 
-      {/* Floating drag ghost — viewport-fixed and pointer-events:none so it
+      {/* Floating drag ghost. It is viewport-fixed and pointer-events:none so it
           glides under the cursor without intercepting events from the list. */}
       {draggingProject && drag.pointerPos ? (
         <div

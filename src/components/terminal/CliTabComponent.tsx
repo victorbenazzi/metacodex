@@ -104,7 +104,7 @@ export function CliTabComponent({
     );
   }
 
-  // ready — mount the real terminal
+  // ready. Mount the real terminal.
   return (
     <TerminalTab
       tabId={tabId}

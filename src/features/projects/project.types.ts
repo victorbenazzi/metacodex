@@ -50,7 +50,7 @@ export function getPaletteEntry(hex: string): PaletteEntry | undefined {
 /**
  * Curated Feather-style icons (sourced from lucide-react, which is the actively
  * maintained Feather fork). Kept to ~30 of the most useful project archetypes.
- * Names must match `lucide-react` exports — `getLucideIcon` looks them up by
+ * Names must match `lucide-react` exports. `getLucideIcon` looks them up by
  * key and falls back to `Folder` if missing.
  */
 export const PROJECT_ICONS = [

@@ -8,6 +8,8 @@ metacodex is a premium **local-first developer workspace** built as a Tauri 2 de
 
 **Removed feature, do not resurrect:** the second top-level view ("Agent view": opencode sidecar, agent chat, cron, MCP registry, agent entities) was removed in v0.0.12. The root docs `AGENT_VIEW_HANDOFF.md`, `AGENTS_DESIGN.md`, `AGENT_HARNESS_FEATURES.md`, `AGENT_P1_TEST_CHECKLIST.md` and `REVIEW_CRON_SCHEDULED_TASKS.md` describe that removed feature and are historical only. The single surviving code reference is the startup migration `config_paths.rs::archive_legacy_agent_state()`, which moves old agent state into `state/legacy-agent/`. Note the word "agent" elsewhere in the codebase refers to the LIVE terminal-CLI feature (per-tab status of coding agents like Claude Code running in a PTY), not the removed view.
 
+**Removed feature, do not resurrect:** remote SSH projects were removed after the initial implementation proved to be the wrong product direction. The only surviving code is startup compatibility that archives old access and trust state under `state/legacy-ssh/`, removes legacy SSH projects from the active registry, and archives their workspace state.
+
 ## Commands
 
 Package manager is **pnpm**. There is no frontend test suite and no separate lint command: `tsc --noEmit` (run via `pnpm build`) is the only TS static check. The Rust side has unit tests (notably the path sandbox in `util/paths.rs`), run with `cargo test` inside `src-tauri/`.
@@ -43,12 +45,6 @@ The boundary is strict: **Rust owns all OS/IO; React owns rendering and ephemera
 
 Paths OUTSIDE project roots are reachable only through unforgeable grants minted behind consent boundaries: `preview_grants.rs` (files opened via preview mode or macOS "Open With", see `open_files.rs`) and `directory_grants.rs` (clone parent dirs picked via native dialog). `config_paths.rs` carries the `~/.metacodex` carve-out. If you add a new FS-touching command it MUST validate through one of these paths before any `fs::*` call.
 
-### Remote (SSH) projects
-
-A project's `origin` is `Local` or `Ssh { access_id, remote_path }` (`projects.rs`). SSH access records (host, user, identity file, allowed root paths) live in `~/.metacodex/state/remote-accesses.json`, managed by `src-tauri/src/remote_access/*` and the `remote_access_*` / `add_remote_projects` commands. The filesystem/terminal commands dispatch on origin: `commands/filesystem.rs::WorkspaceFs` routes `workspace_*` FS ops to `fs_ops` (local) or `remote_access` (SFTP), and `pty_spawn` rewrites a remote project's pty kind into `RemoteShell` / `RemoteCli` (backend-only kinds; the frontend cannot request them).
-
-Remote path safety mirrors the local sandbox: `remote_access/paths.rs::ensure_allowed` rejects `..`, checks containment in a configured root, and walks each component over SFTP rejecting symlinks (and non-directory intermediates). Trust is TOFU against the app's own known-hosts file (`config_paths::ssh_known_hosts_file`) plus a pinned fingerprint on the access record. Connections are pooled one-per-access in `remote_access/session.rs` (serialized, auto-reconnecting); every remote command runs on the blocking pool. The frontend never asks "is this remote?" ad hoc, it asks `projectCapabilities(project)` (`project.types.ts`) for the capability it needs (git / search / watcher / revealInFinder / localCli).
-
 ### Shell layout (post v0.0.12 redesign)
 
 - `src/app/AppShell.tsx` owns only the CSS grid and top-level composition: a title bar row (`--title-bar-h`, 44px) over columns [projects sidebar | explorer | center | side panel (optional right column: launcher or Git/Review)]. The sidebars are floating cards separated by gap columns; the gaps come from `--panel-gap-x` / `--panel-gap-y` (tokens.css) and collapse to 0 with their panel in the same `grid-template-columns` transition. That transition is always on except while a `ResizeHandle` is being dragged (`resizing` flag). Bootstrap, filesystem sync, workspace persistence and tab actions live in `src/app/hooks/`.
@@ -56,7 +52,7 @@ Remote path safety mirrors the local sandbox: `remote_access/paths.rs::ensure_al
 - **Projects reorder by drag in BOTH sidebar forms** through the shared `components/ui/useListReorder.tsx` hook (pointer events, 8px threshold, trailing-click suppression, `data-no-drag` opt-out for nested interactive regions). Do NOT add `setPointerCapture` there: capturing suppresses the nested button's click under composed Radix Slots in WKWebView (see the hook's note). The context menu also offers Move up / Move down as the keyboard-friendly path. Order persists via `reorder_projects`.
 - **Active project identity:** accent bar + medium label on the expanded row (`SidebarRow` `accent` prop), accent bar + tinted glyph on the rail tile, and glyph + name in the title bar center. **Per-project session status** (worst of the per-tab agent statuses, plus session count) renders as a dot on the row and as a tile corner badge: rollup in `features/terminal/projectStatus.ts`, dot in `components/project-rail/ProjectStatusDot.tsx`, tone mapping shared with the tab dot in `components/tabs/statusTone.ts`.
 - `interface.layoutMode` setting: `horizontal` (top tab bar, sidebar shows only Histórico) or `vertical` (no tab bar; the sidebar sections are the ONLY tab management surface, which is why the Arquivos section must list every non-process tab kind).
-- Title bar (`src/app/TitleBar.tsx`): sidebar toggle + add-project (open folder / clone from GitHub / connect SSH) on the left; active project glyph + name, branch (ahead/behind) and `UpdatePill` center; the side panel toggle right; custom min/max/close controls on Windows only. (Workspace save failures surface in the Cmd+Shift+D diagnostics log, not a title-bar dot.)
+- Title bar (`src/app/TitleBar.tsx`): sidebar toggle + add-project (open folder / clone from GitHub) on the left; active project glyph + name, branch (ahead/behind) and `UpdatePill` center; the side panel toggle right; custom min/max/close controls on Windows only. (Workspace save failures surface in the Cmd+Shift+D diagnostics log, not a title-bar dot.)
 
 ### State (frontend)
 
@@ -88,6 +84,7 @@ Plain, pretty-printed, hand-editable JSON written atomically (tmp then rename) v
     ├── last-session.log  # diagnostics ring-buffer dump on quit
     ├── last-crash.json   # last ErrorBoundary catch
     ├── legacy-agent/     # archived state from the removed Agent view (startup migration)
+    ├── legacy-ssh/       # archived state from the removed SSH feature (startup migration)
     └── workspace/{id}.json  # per-project: open tabs, active tab, expanded paths
 ```
 
@@ -160,7 +157,6 @@ One `notify_debouncer_mini::Debouncer` per project root, owned by `WatcherManage
 | Add an app-wide UI command | `src/app/appCommands.ts` + implementation in `src/app/hooks/useTabActions.ts` or the relevant store-backed dispatcher |
 | Source Control panel / worktrees | `src/components/source-control/*` + `features/git/*`; Rust in `commands/git.rs` |
 | Clone from GitHub | `components/project-rail/CloneFromGithubDialog.tsx` + `commands/git.rs::git_clone` (+ `git://clone-progress`) |
-| Connect a remote (SSH) project | `components/project-rail/RemoteAccessDialog.tsx` + `useRemoteAccessDialogState.ts`; Rust `remote_access/*` + `commands/remote_access.rs`; per-origin FS in `commands/filesystem.rs::WorkspaceFs` |
 | Resume registry (recent CLI sessions) | `features/resume/*` + `components/resume/ResumeCards.tsx` + Histórico rows in `CodeProjectGroup.tsx`; Rust `commands/resume.rs` |
 | Agent status (idle/working/needs-attention/done) | OSC parsing in `components/terminal/oscHandlers.ts` + `agentHeuristic.ts` → `features/terminal/agent-status.store.ts`; shared tone in `components/tabs/statusTone.ts` |
 | Tab tooltip / per-tab branch+ports | `features/terminal/tabMetadata.store.ts` + `useTabMetadataPolling` → `components/tabs/TabTooltip.tsx` |

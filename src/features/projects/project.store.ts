@@ -72,7 +72,7 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
 
   remove: async (id) => {
     // Tear down every live resource attached to this project BEFORE the Rust
-    // registry forgets it — otherwise leaked PTYs keep emitting pty://data
+    // registry forgets it. Otherwise leaked PTYs keep emitting pty://data
     // for a project the UI no longer knows about, and the next click on a
     // sibling project lands on stale tab/terminal state (the "stuck after
     // remove" bug).
@@ -125,7 +125,7 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
       if (p) next.push(p);
     }
     if (next.length !== cur.length) {
-      // Mismatch — abort the local reorder; backend would reject anyway.
+      // Mismatch. Abort the local reorder because the backend would reject anyway.
       return;
     }
     set({ projects: next });

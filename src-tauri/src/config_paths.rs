@@ -7,6 +7,7 @@
 //! ├── keybindings.json       # shortcut overrides
 //! └── state/
 //!     ├── projects.json       # { projects, lastActiveProjectId }
+//!     ├── legacy-ssh/         # archived state from the removed SSH feature
 //!     └── workspace/
 //!         └── {projectId}.json
 //! ```
@@ -70,6 +71,11 @@ pub fn legacy_agent_dir() -> AppResult<PathBuf> {
     Ok(state_dir()?.join("legacy-agent"))
 }
 
+/// `~/.metacodex/state/legacy-ssh`, archived state from the removed SSH feature.
+pub fn legacy_ssh_dir() -> AppResult<PathBuf> {
+    Ok(state_dir()?.join("legacy-ssh"))
+}
+
 /// `~/.metacodex/state/resume.json`, terminal CLI session resume registry.
 pub fn resume_file() -> AppResult<PathBuf> {
     Ok(state_dir()?.join("resume.json"))
@@ -109,6 +115,7 @@ pub fn workspace_file(project_id: &str) -> AppResult<PathBuf> {
 pub fn ensure_dirs() -> AppResult<()> {
     fs::create_dir_all(workspace_dir()?)?;
     archive_legacy_agent_state()?;
+    archive_legacy_ssh_state()?;
     Ok(())
 }
 
@@ -140,6 +147,32 @@ fn archive_legacy_agent_state() -> AppResult<()> {
         if let Err(e) = fs::rename(&path, &dest) {
             eprintln!(
                 "[metacodex] failed to archive legacy agent state {}: {e}",
+                path.display()
+            );
+        }
+    }
+    Ok(())
+}
+
+fn archive_legacy_ssh_state() -> AppResult<()> {
+    let state = state_dir()?;
+    let root = config_root()?;
+    let legacy = legacy_ssh_dir()?;
+    for (path, archived_name) in [
+        (state.join("remote-accesses.json"), "remote-accesses.json"),
+        (root.join("ssh"), "ssh"),
+    ] {
+        if !path.exists() {
+            continue;
+        }
+        fs::create_dir_all(&legacy)?;
+        let dest = legacy.join(archived_name);
+        if dest.exists() {
+            continue;
+        }
+        if let Err(e) = fs::rename(&path, &dest) {
+            eprintln!(
+                "[metacodex] failed to archive removed SSH state {}: {e}",
                 path.display()
             );
         }
@@ -252,7 +285,10 @@ fn tmp_path(path: &Path) -> PathBuf {
     use std::sync::atomic::{AtomicU64, Ordering};
     static COUNTER: AtomicU64 = AtomicU64::new(0);
     let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-    let file_name = path.file_name().and_then(|s| s.to_str()).unwrap_or("config");
+    let file_name = path
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("config");
     path.with_file_name(format!(
         "{file_name}.metacodex.tmp.{}.{n}",
         std::process::id()

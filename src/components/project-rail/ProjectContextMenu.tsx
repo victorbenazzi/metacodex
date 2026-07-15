@@ -323,7 +323,7 @@ function LazyIcon({
 /**
  * The 1:1 "choose an image" button. Empty state: a dashed tile with an
  * ImagePlus glyph. Active state: the chosen image thumbnail (object-cover) with
- * an accent ring matching the project color — same selection language as the
+ * an accent ring matching the project color. This uses the same selection language as the
  * preset icon tiles.
  */
 function CustomImageButton({

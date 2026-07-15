@@ -1,6 +1,10 @@
 use chrono::Utc;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use std::collections::HashSet;
+use std::fs;
+use std::path::Path;
 use std::sync::Arc;
 use tauri::{AppHandle, Manager};
 
@@ -70,7 +74,98 @@ impl ProjectsCache {
 
 fn load_file() -> AppResult<ProjectsFile> {
     let path = config_paths::projects_file()?;
-    config_paths::read_json::<ProjectsFile>(&path)
+    let Some(mut raw) = config_paths::read_json_opt::<Value>(&path)? else {
+        return Ok(ProjectsFile::default());
+    };
+
+    let removed_ids = raw
+        .get("projects")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter(|project| project.pointer("/origin/kind").and_then(Value::as_str) == Some("ssh"))
+        .filter_map(|project| project.get("id").and_then(Value::as_str))
+        .map(str::to_string)
+        .collect::<HashSet<_>>();
+
+    if !removed_ids.is_empty() {
+        archive_removed_ssh_projects(&path, &removed_ids)?;
+    }
+
+    let mut migrated = false;
+    let mut retained_ids = HashSet::new();
+    if let Some(projects) = raw.get_mut("projects").and_then(Value::as_array_mut) {
+        let original_len = projects.len();
+        projects.retain(|project| {
+            project.pointer("/origin/kind").and_then(Value::as_str) != Some("ssh")
+        });
+        migrated |= projects.len() != original_len;
+
+        for project in projects {
+            if let Some(id) = project.get("id").and_then(Value::as_str) {
+                retained_ids.insert(id.to_string());
+            }
+            if project
+                .as_object_mut()
+                .is_some_and(|object| object.remove("origin").is_some())
+            {
+                migrated = true;
+            }
+        }
+    }
+
+    if let Some(active) = raw.get("lastActiveProjectId").and_then(Value::as_str) {
+        if !retained_ids.contains(active) {
+            if let Some(object) = raw.as_object_mut() {
+                object.insert("lastActiveProjectId".into(), Value::Null);
+                migrated = true;
+            }
+        }
+    }
+
+    let file = match serde_json::from_value::<ProjectsFile>(raw) {
+        Ok(file) => file,
+        Err(e) => {
+            eprintln!(
+                "[metacodex] config parse failed for {}: {e}; using defaults",
+                path.display()
+            );
+            return Ok(ProjectsFile::default());
+        }
+    };
+    if migrated {
+        save_file(&file)?;
+    }
+    Ok(file)
+}
+
+fn archive_removed_ssh_projects(path: &Path, project_ids: &HashSet<String>) -> AppResult<()> {
+    let legacy = config_paths::legacy_ssh_dir()?;
+    fs::create_dir_all(&legacy)?;
+    let projects_backup = legacy.join("projects.json");
+    if !projects_backup.exists() {
+        fs::copy(path, projects_backup)?;
+    }
+
+    let workspace_archive = legacy.join("workspace");
+    for project_id in project_ids {
+        let source = config_paths::workspace_file(project_id)?;
+        if !source.exists() {
+            continue;
+        }
+        fs::create_dir_all(&workspace_archive)?;
+        let dest = workspace_archive.join(format!("{project_id}.json"));
+        if dest.exists() {
+            continue;
+        }
+        if let Err(e) = fs::rename(&source, &dest) {
+            eprintln!(
+                "[metacodex] failed to archive removed SSH workspace {}: {e}",
+                source.display()
+            );
+        }
+    }
+    Ok(())
 }
 
 fn save_file(file: &ProjectsFile) -> AppResult<()> {
@@ -101,7 +196,12 @@ pub fn hydrate(app: &AppHandle) -> AppResult<()> {
 /// Generate a 12-char id similar to nanoid.
 fn new_id() -> String {
     use uuid::Uuid;
-    Uuid::new_v4().to_string().replace('-', "").chars().take(12).collect()
+    Uuid::new_v4()
+        .to_string()
+        .replace('-', "")
+        .chars()
+        .take(12)
+        .collect()
 }
 
 /// Canonical (light-theme) hex for each accent. Must match the `hex` column
@@ -182,7 +282,7 @@ pub fn add(app: &AppHandle, path: String) -> AppResult<Project> {
 
     let mut file = load_file()?;
     if let Some(existing) = file.projects.iter().find(|p| p.path == path) {
-        // Refresh last_opened_at and return the existing entry — opening the same
+        // Refresh last_opened_at and return the existing entry. Opening the same
         // folder twice should not create duplicates.
         let id = existing.id.clone();
         let now = Utc::now().to_rfc3339();
@@ -217,7 +317,7 @@ pub fn add(app: &AppHandle, path: String) -> AppResult<Project> {
 /// becomes a single new sub-folder; the resulting path is then handed to `add`
 /// (so naming / color / dedup all stay in one place). Refuses to clobber.
 ///
-// SECURITY: this creates a directory *outside* the registered roots — a project
+// SECURITY: this creates a directory outside the registered roots. A project
 // doesn't exist yet, so it can't go through `ensure_within_roots`. Mitigated by:
 // `directory` comes from the native folder dialog (an explicit OS-level user
 // grant, same trust model as `add`), and `name` must be a single safe path
@@ -236,7 +336,10 @@ pub fn create(app: &AppHandle, directory: String, name: String) -> AppResult<Pro
     }
     let full = std::path::Path::new(&directory).join(&name);
     if full.exists() {
-        return Err(AppError::Other(format!("already exists: {}", full.display())));
+        return Err(AppError::Other(format!(
+            "already exists: {}",
+            full.display()
+        )));
     }
     std::fs::create_dir(&full).map_err(|e| AppError::Other(format!("create project dir: {e}")))?;
     add(app, full.to_string_lossy().into_owned())
@@ -259,7 +362,8 @@ pub fn remove(app: &AppHandle, id: &str) -> AppResult<()> {
     // `unwatch_project`, but that call is best-effort (errors swallowed); if
     // it never lands, the debouncer would keep emitting fs://changed for a
     // project the app no longer knows about.
-    app.state::<Arc<crate::watcher::WatcherManager>>().unwatch(id);
+    app.state::<Arc<crate::watcher::WatcherManager>>()
+        .unwatch(id);
     Ok(())
 }
 
@@ -310,7 +414,7 @@ pub fn list() -> AppResult<Vec<Project>> {
 }
 
 /// Persist a new order for the project rail. `ordered_ids` must contain every
-/// existing project id exactly once — any mismatch is rejected so the cache
+/// existing project id exactly once. Any mismatch is rejected so the cache
 /// can't get out of sync with the persisted set.
 pub fn reorder(app: &AppHandle, ordered_ids: Vec<String>) -> AppResult<Vec<Project>> {
     let mut file = load_file()?;
