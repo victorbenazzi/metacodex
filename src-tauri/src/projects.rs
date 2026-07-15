@@ -144,7 +144,8 @@ fn archive_removed_ssh_projects(path: &Path, project_ids: &HashSet<String>) -> A
     fs::create_dir_all(&legacy)?;
     let projects_backup = legacy.join("projects.json");
     if !projects_backup.exists() {
-        fs::copy(path, projects_backup)?;
+        let original = fs::read_to_string(path)?;
+        config_paths::write_string_atomic(&projects_backup, &original)?;
     }
 
     let workspace_archive = legacy.join("workspace");
