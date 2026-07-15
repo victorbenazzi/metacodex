@@ -1,50 +1,23 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   readText as readClipboardText,
   writeText as writeClipboardText,
 } from "@tauri-apps/plugin-clipboard-manager";
 
 import { useXterm } from "./useXterm";
-import i18n from "@/features/i18n/config";
 import { ptyApi } from "@/features/terminal/terminal.service";
 import { useTerminalStore } from "@/features/terminal/terminal.store";
-import type { PtySpawnSpec } from "@/features/terminal/terminal.types";
+import {
+  sessionController,
+} from "@/features/terminal/sessionController";
+import { applyTerminalFit } from "@/features/terminal/fitOnVisible";
 import type { PtyExitReason } from "@/lib/events";
-import { subscribePtyData, subscribePtyExit } from "@/features/terminal/ptyEvents";
-import { base64ToUint8Array, utf8ToBase64 } from "@/lib/base64";
-import { useTabsStore, WORKSPACE_NULL } from "@/components/tabs/tabsStore";
+import { utf8ToBase64 } from "@/lib/base64";
+import { WORKSPACE_NULL } from "@/components/tabs/tabsStore";
 import { createFileLinkProvider } from "./terminalLinks";
-import { installOscHandlers } from "./oscHandlers";
-import { createAgentHeuristic } from "./agentHeuristic";
-import { useAgentStatusStore } from "@/features/terminal/agent-status.store";
-import { dispatchAgentNotification } from "@/features/terminal/notificationDispatch";
-import { CMD, invoke } from "@/lib/ipc";
 import { useSessionCapture } from "@/features/resume/useSessionCapture";
 import { TerminalExitBanner } from "./TerminalExitBanner";
 import { isMac } from "@/lib/platform";
-
-const AGENT_TITLE_MAX = 40;
-
-/**
- * Clean up a raw OSC 0/1/2 payload before storing it as the tab's agentTitle.
- * Strips C0/C1 control bytes, removes invisible/bidi formatting characters
- * (some agents emit BOMs/zero-width chars that would render as gaps), collapses
- * whitespace, trims, and caps the length so a verbose agent doesn't blow up
- * the tab width. Returns null if the result is empty or coincides with the
- * default label (no point overriding with the same string).
- */
-function sanitizeAgentTitle(raw: string, defaultTitle: string): string | null {
-  // eslint-disable-next-line no-control-regex
-  let s = raw.replace(/[\x00-\x1f\x7f-\x9f]/g, " ");
-  // Strip invisible/bidi: ZWSP, ZWNJ, ZWJ, LRM/RLM, BOM, LRE/RLE/PDF/LRO/RLO,
-  // word-joiner, narrow no-break space.
-  s = s.replace(/[​-‏‪-‮⁠﻿­ ]/g, "");
-  s = s.replace(/\s+/g, " ").trim();
-  if (!s) return null;
-  if (s.length > AGENT_TITLE_MAX) s = s.slice(0, AGENT_TITLE_MAX - 1) + "…";
-  if (s === defaultTitle) return null;
-  return s;
-}
 
 interface TerminalTabProps {
   tabId: string;
@@ -58,18 +31,15 @@ interface TerminalTabProps {
    * trailing Enter). Used to pre-fill install commands. */
   prefillCommand?: string;
   /**
-   * Whether this tab is currently the displayed one. Drives an explicit
-   * fit()/scroll-to-bottom whenever the tab transitions from hidden to shown,
-   * because in WKWebView a `display:none → block` swap doesn't always fire the
-   * ResizeObserver , leaving xterm with stale cols/rows (rendered content
-   * looks "cut off" along the bottom).
+   * Whether this tab is currently the displayed one. Drives Session controller
+   * fit-on-visible (WKWebView often misses ResizeObserver after display:none).
    */
   isVisible?: boolean;
 }
 
 /**
- * A single terminal tab: owns its xterm instance, spawns a PTY on mount,
- * pipes data both ways, kills the PTY on unmount.
+ * Process tab chrome: xterm mount, keyboard/clipboard, link provider, and
+ * ResizeObserver. PTY Session lifecycle lives in the Session controller.
  *
  * The parent (TabContent) keeps this mounted with display:none while inactive
  * so PTY state and xterm scrollback survive tab switches.
@@ -85,13 +55,9 @@ export function TerminalTab({
   isVisible = true,
 }: TerminalTabProps) {
   const { containerRef, termRef, fitRef, disposedRef } = useXterm();
-  const sessionIdRef = useRef<string | null>(null);
-  // sessionIdRef holds the latest PTY session id but its mutations don't
-  // trigger React renders. Mirror it into a state so `useSessionCapture` can
-  // recompute when the value lands.
+  // Mirrored from Session controller so useSessionCapture and the exit banner
+  // re-render when the PTY Session id lands.
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
-  // Sticky banner shown after an anomalous PTY exit (non-zero code OR
-  // reason !== "normal"). Cleared on dismiss or on a fresh spawn.
   const [exitInfo, setExitInfo] = useState<{ code: number; reason: PtyExitReason } | null>(null);
   useSessionCapture({
     enabled: !!cliToolId,
@@ -101,9 +67,6 @@ export function TerminalTab({
     cwd,
     sessionId: activeSessionId,
   });
-  const registerSession = useTerminalStore((s) => s.register);
-  const setStatus = useTerminalStore((s) => s.setStatus);
-  const removeSession = useTerminalStore((s) => s.remove);
   const setLastFocused = useTerminalStore((s) => s.setLastFocused);
 
   // Track focus so the editor's "send selection to terminal" knows which
@@ -112,194 +75,60 @@ export function TerminalTab({
     const el = containerRef.current;
     if (!el) return;
     const onFocusIn = () => {
-      const sid = sessionIdRef.current;
+      const sid = sessionController.getSessionId(tabId);
       if (sid) setLastFocused(projectId ?? WORKSPACE_NULL, sid);
     };
     el.addEventListener("focusin", onFocusIn);
     return () => el.removeEventListener("focusin", onFocusIn);
-  }, [projectId, setLastFocused, containerRef]);
+  }, [projectId, setLastFocused, containerRef, tabId]);
 
-  // When the tab transitions from hidden (`display:none`) to visible, the
-  // container resumes having a real size , but WKWebView's ResizeObserver
-  // sometimes misses that transition, so the xterm renderer keeps the cols/rows
-  // it had pre-hide (possibly 0 if it was first hidden). The result is content
-  // clipped at the bottom and a PTY out of sync with the visible viewport.
-  //
-  // Three regressions worth guarding here (all observed in WKWebView):
-  //   1. Layout can report a transient size for 1-2 frames after `display:block`
-  //      lands; if we fit on the first frame, we may lock in the wrong rows.
-  //      We poll across frames until the size stabilizes (same value twice).
-  //   2. If the container size happens to match what xterm already stored,
-  //      `fit.fit()` short-circuits without resizing, AND the CanvasAddon's
-  //      pixel cache stays stale from the pre-hide layout , bottom rows look
-  //      empty until the user nudges the window. We force a `refresh()` after
-  //      fit so the canvas redraws even when fit is a no-op.
-  //   3. Same no-op fit case also skips `term.resize()` → skips xterm's
-  //      `_afterResize` → skips `viewport.syncScrollArea(true)`. The viewport's
-  //      `_scrollArea.style.height` then stays cached at whatever the buffer
-  //      length was when sync last ran, so mouse-wheel-up has nothing to scroll
-  //      into , even though the scrollback IS populated. Typing the next chunk
-  //      of output (or anything that grows the buffer) re-syncs and unblocks
-  //      scrolling, which makes the bug look like it "fixes itself". We poke
-  //      the private viewport sync directly after every fit to keep the scroll
-  //      area honest regardless of whether fit actually resized.
+  // Session controller: spawn, pump, OSC/heuristic, kill on unmount.
   useEffect(() => {
-    if (!isVisible) return;
-    let cancelled = false;
-    let attempts = 0;
-    let lastW = 0;
-    let lastH = 0;
-    let stableFrames = 0;
-    const tick = () => {
-      if (cancelled) return;
-      const term = termRef.current;
-      const fit = fitRef.current;
-      const container = containerRef.current;
-      if (!term || !fit || !container) return;
-      const w = container.clientWidth;
-      const h = container.clientHeight;
-      if (!w || !h) {
-        if (attempts++ < 30) requestAnimationFrame(tick);
-        return;
-      }
-      if (w === lastW && h === lastH) {
-        stableFrames++;
-      } else {
-        stableFrames = 0;
-        lastW = w;
-        lastH = h;
-      }
-      // Two stable frames OR ~16 attempts (~250ms) , whichever first.
-      if (stableFrames < 2 && attempts++ < 16) {
-        requestAnimationFrame(tick);
-        return;
-      }
-      try {
-        fit.fit();
-        // Force a full redraw , `fit.fit()` only calls `term.resize()` when
-        // dimensions change; if rows/cols match the pre-hide values, the
-        // CanvasAddon never repaints and stale rows remain on screen.
-        term.refresh(0, Math.max(0, term.rows - 1));
-        // Force the viewport scroll area to sync. See item (3) above.
-        (term as any)._core?.viewport?.syncScrollArea?.(true);
-        term.scrollToBottom();
-      } catch {
-        // ignore , observer below will retry
-      }
-    };
-    requestAnimationFrame(tick);
-    return () => {
-      cancelled = true;
-    };
-  }, [isVisible, termRef, fitRef, containerRef]);
-
-  useEffect(() => {
-    let cancelled = false;
-    let unlistenData: (() => void) | undefined;
-    let unlistenExit: (() => void) | undefined;
-
     const term = termRef.current;
     const fit = fitRef.current;
     if (!term || !fit) return;
 
-    // Make `file:line` references in output clickable → open in the editor.
+    setExitInfo(null);
+    void sessionController.start({
+      tabId,
+      projectId,
+      cwd,
+      label,
+      cliLaunchCommand,
+      cliToolId,
+      prefillCommand,
+      term,
+      fit,
+      getContainer: () => containerRef.current,
+      disposed: () => disposedRef.current,
+      onSession: setActiveSessionId,
+      onExit: setExitInfo,
+    });
+
+    return () => {
+      void sessionController.stop(tabId).then(() => setActiveSessionId(null));
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabId]);
+
+  useEffect(() => {
+    sessionController.onVisible(tabId, isVisible);
+  }, [tabId, isVisible]);
+
+  // Chrome: file links, Shift+Enter, paste/copy, context menu, ResizeObserver.
+  // Kept here because they are DOM/input policy, not PTY Session lifecycle.
+  useEffect(() => {
+    const term = termRef.current;
+    const fit = fitRef.current;
+    if (!term || !fit) return;
+
     const linkProvider = term.registerLinkProvider(createFileLinkProvider(term, cwd));
 
-    // Agent observability , OSC handlers + heuristic. Both write into the
-    // shared `useAgentStatusStore` keyed by tabId so the TabBar dot reacts in
-    // real time. The OSC handler also funnels into `dispatchAgentNotification`
-    // which gates the OS banner + chime behind user settings.
-    const agentStore = useAgentStatusStore.getState();
-    let lastCwdPushed: string | null = null;
-    // Resolve project key once per session , used by OSC title updates which
-    // hit `useTabsStore.getState().setTabTitles(projectKey, tabId, ...)`.
-    const projectKey = projectId ?? WORKSPACE_NULL;
-    let lastAgentTitlePushed: string | null = null;
-    const oscDisposables = installOscHandlers(term, {
-      onCwd: (path) => {
-        // OSC 7 fires on every `cd` (oh-my-zsh `chpwd_functions`). Skip the
-        // round-trip when the value hasn't actually changed , saves IPC churn
-        // on prompts that re-emit cwd unconditionally.
-        if (path === lastCwdPushed) return;
-        lastCwdPushed = path;
-        const sid = sessionIdRef.current;
-        if (!sid) return;
-        invoke(CMD.ptyUpdateCwd, { sessionId: sid, cwd: path }).catch((err) => {
-          console.warn("[pty_update_cwd] failed", err);
-        });
-      },
-      onTitle: (raw) => {
-        // Agents often re-emit OSC titles many times per second (Codex paints
-        // a spinner into the title bar). Sanitize, dedupe, and only commit
-        // when the visible title would actually change.
-        const cleaned = sanitizeAgentTitle(raw, label);
-        if (cleaned === lastAgentTitlePushed) return;
-        lastAgentTitlePushed = cleaned;
-        useTabsStore.getState().setTabTitles(projectKey, tabId, {
-          agentTitle: cleaned ?? null,
-        });
-      },
-      onNotify: (payload) => {
-        agentStore.setStatus(
-          tabId,
-          payload.isDone ? "done" : "needs-attention",
-          payload.body ?? payload.title,
-          payload.urgency,
-        );
-        dispatchAgentNotification({
-          tabId,
-          title: payload.title,
-          body: payload.body,
-          sound: payload.sound,
-        });
-      },
-    });
-    const heuristic = createAgentHeuristic(term, {
-      cliId: cliToolId,
-      getStatus: () => useAgentStatusStore.getState().byTab[tabId]?.status,
-      setStatus: (status, hint) => {
-        // Don't downgrade an OSC-driven `needs-attention` back to `working`
-        // just because the user pressed Enter to send a follow-up , once an
-        // agent is waiting, only an explicit user reply (handled implicitly
-        // by the next round of output) should clear it.
-        const current = useAgentStatusStore.getState().byTab[tabId]?.status;
-        if (current === "needs-attention" && status === "working") return;
-        useAgentStatusStore.getState().setStatus(tabId, status, hint);
-      },
-    });
-
-    // Auto-clear `done` after a few seconds , the user got the signal, the
-    // green dot has done its job, the tab returns to neutral.
-    const doneSweeper = window.setInterval(() => {
-      const entry = useAgentStatusStore.getState().byTab[tabId];
-      if (entry && entry.status === "done" && Date.now() - entry.changedAt > 4000) {
-        useAgentStatusStore.getState().clear(tabId);
-      }
-    }, 1000);
-
-    // Shift+Enter → send ESC+CR (the Alt/Option+Enter byte sequence), which
-    // ink / readline / prompt-kit / bubbletea interpret as "insert newline
-    // without submit". Plain Enter on a PTY is just `\r` with no modifier
-    // bits, so without this CLIs like Claude Code, Codex, opencode and Aider
-    // can't tell Shift+Enter apart from Enter.
-    //
-    // Two subtleties (both regressions waiting to happen):
-    //   1. `attachCustomKeyEventHandler` returning false makes xterm SKIP its
-    //      normal keydown path , including the `preventDefault()` it would
-    //      otherwise call. Without our own preventDefault here, WKWebView's
-    //      default action inserts a `\n` into xterm's helper <textarea>,
-    //      which then leaks through the `input` listener as a stray `\n`
-    //      sent to the PTY immediately AFTER our `\x1b\r`. Most CLIs
-    //      interpret that trailing `\n` as "submit", so the user sees their
-    //      message dispatched without the newline they wanted.
-    //   2. Match on `ev.code === "Enter"` too , WKWebView in some keyboard
-    //      layouts (ABNT2, AZERTY) reports `ev.key` as a localized label
-    //      while `ev.code` stays canonical.
-    // Paste from the system clipboard into the active PTY. Uses `term.paste`
-    // so the data flows through xterm's bracketed-paste machinery (the shell
-    // sees `\x1b[200~...\x1b[201~` whenever it has DECSET 2004 enabled , Bash,
-    // Zsh, Fish, vim, and most TUIs request this), then through `onData` to
-    // the PTY just like keyboard input.
+    // Shift+Enter → ESC+CR (newline without submit for ink/readline/bubbletea).
+    // Returning false from attachCustomKeyEventHandler skips xterm's keydown path
+    // including its preventDefault; we must preventDefault ourselves or WKWebView
+    // inserts a stray `\n` after our `\x1b\r`. Match `ev.code === "Enter"` too
+    // (ABNT2 / AZERTY localize `ev.key`).
     const pasteFromClipboard = () => {
       void readClipboardText()
         .then((text) => {
@@ -313,18 +142,12 @@ export function TerminalTab({
       if (ev.type === "keydown" && isEnter && ev.shiftKey) {
         ev.preventDefault();
         ev.stopPropagation();
-        const sid = sessionIdRef.current;
+        const sid = sessionController.getSessionId(tabId);
         if (sid) {
           ptyApi.write(sid, utf8ToBase64("\x1b\r")).catch(() => undefined);
         }
         return false;
       }
-      // Paste: Cmd+V on macOS, Ctrl+V (or Ctrl+Shift+V) on Windows/Linux.
-      // Default xterm behaviour for Ctrl+V is to forward `\x16` (SYN) to the
-      // PTY, which is never what the user wants when typing a familiar paste
-      // shortcut. We intercept and inject the real clipboard contents instead.
-      // Matching `ev.code === "KeyV"` keeps this working under ABNT2 / AZERTY
-      // where `ev.key` is localized.
       const primaryMod = isMac
         ? ev.metaKey && !ev.ctrlKey
         : ev.ctrlKey && !ev.metaKey;
@@ -335,9 +158,6 @@ export function TerminalTab({
         pasteFromClipboard();
         return false;
       }
-      // Copy: when the user has a selection, Cmd/Ctrl+C copies it instead of
-      // sending SIGINT , same convention as VS Code's integrated terminal.
-      // Without a selection we fall through so the PTY still gets `\x03`.
       const isC = ev.key === "c" || ev.key === "C" || ev.code === "KeyC";
       if (
         ev.type === "keydown" &&
@@ -361,11 +181,6 @@ export function TerminalTab({
       return true;
     });
 
-    // Right-click → paste. The document-level contextmenu handler in App.tsx
-    // suppresses the WebView's native menu globally, which left the terminal
-    // with no paste affordance for users who prefer the mouse. Since event
-    // listeners on the inner element run before the document-level one, we
-    // stop propagation so only our paste behaviour fires.
     const onTerminalContextMenu = (e: MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
@@ -374,138 +189,8 @@ export function TerminalTab({
     const containerEl = containerRef.current;
     containerEl?.addEventListener("contextmenu", onTerminalContextMenu);
 
-    // Pre-register a placeholder session so UI can show "starting"
-    const localKind = cliLaunchCommand ? "cli" : "shell";
-
-    (async () => {
-      // Wait two animation frames so xterm has time to initialize its renderer
-      // before we begin writing PTY data. Without this we can race xterm's
-      // internal `_renderer.value.dimensions` getter and crash on first write.
-      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-      try {
-        // Skip if hidden (e.g. user switched tabs during those frames) , fitting
-        // a 0×0 container clamps cols to ~2; the ResizeObserver re-fits on show.
-        if (containerRef.current?.clientWidth) fit.fit();
-      } catch {
-        // ignore , observer below will retry
-      }
-
-      try {
-        const rows = term.rows || 24;
-        const cols = term.cols || 80;
-        const spec: PtySpawnSpec = {
-          project_id: projectId,
-          cwd,
-          rows,
-          cols,
-          kind: cliLaunchCommand
-            ? { kind: "cli", command: cliLaunchCommand }
-            : { kind: "plain" },
-          label,
-          cli_id: cliToolId,
-        };
-        const sessionId = await ptyApi.spawn(spec);
-        if (cancelled) {
-          await ptyApi.kill(sessionId).catch(() => undefined);
-          return;
-        }
-        sessionIdRef.current = sessionId;
-        setActiveSessionId(sessionId);
-        registerSession({
-          id: sessionId,
-          tabId,
-          projectId,
-          cwd,
-          kind: localKind,
-          cliToolId,
-          title: label,
-          status: "running",
-          createdAt: new Date().toISOString(),
-        });
-
-        let prefillWritten = false;
-        unlistenData = subscribePtyData(sessionId, (payload) => {
-          // Late-arriving chunk after unmount → term is gone. Skip silently.
-          if (disposedRef.current) return;
-          const bytes = base64ToUint8Array(payload.data_b64);
-          try {
-            term.write(bytes);
-          } catch (writeErr) {
-            console.warn("[pty] term.write failed", writeErr);
-          }
-          // Pre-fill the install command once after the shell prints its prompt.
-          // Small delay lets the prompt finish redrawing before our typed chars land.
-          if (!prefillWritten && prefillCommand) {
-            prefillWritten = true;
-            setTimeout(() => {
-              ptyApi
-                .write(sessionId, utf8ToBase64(prefillCommand))
-                .catch(() => undefined);
-            }, 200);
-          }
-        });
-        unlistenExit = subscribePtyExit(sessionId, (payload) => {
-          const reason = (payload.reason ?? "normal") as PtyExitReason;
-          if (!disposedRef.current) {
-            term.writeln(`\r\n\x1b[2m${i18n.t("terminal.processExited")}\x1b[0m`);
-          }
-          setStatus(sessionId, "exited", payload.exit_code);
-          // Surface a sticky banner whenever the exit was anomalous.
-          if (reason !== "normal" || payload.exit_code !== 0) {
-            setExitInfo({ code: payload.exit_code, reason });
-          }
-          // Only agent CLIs get the "done" dot + completion chime. A plain
-          // shell exiting (the user typed `exit` in a Cmd+T terminal) must not
-          // pop an "Agent done" banner for a tab that never ran an agent.
-          if (cliToolId != null) {
-            // Promote the tab dot to `done` so the user sees the agent finished
-            // even after switching away. Heuristic + OSC keep it bounded.
-            useAgentStatusStore.getState().setStatus(tabId, "done");
-            dispatchAgentNotification({
-              tabId,
-              title: i18n.t("notifications.agentDone"),
-              body: label,
-              sound: true,
-            });
-          }
-          // Clear the agent's "I am doing X" title , it's stale the moment the
-          // process exits. User overrides (userTitle) stay untouched.
-          useTabsStore.getState().setTabTitles(projectKey, tabId, {
-            agentTitle: null,
-          });
-        });
-
-        const dataDisposable = term.onData((d) => {
-          const sid = sessionIdRef.current;
-          if (!sid) return;
-          ptyApi.write(sid, utf8ToBase64(d)).catch(() => undefined);
-        });
-        const resizeDisposable = term.onResize(({ rows, cols }) => {
-          const sid = sessionIdRef.current;
-          if (!sid) return;
-          ptyApi.resize(sid, rows, cols).catch(() => undefined);
-        });
-
-        // Attach disposables so they get cleaned up on dispose. Term will dispose
-        // them automatically when dispose() is called, but we capture in case.
-        (term as any).__metacodexDisposables = [dataDisposable, resizeDisposable];
-
-        // Send an initial resize after listeners are attached so backend knows
-        // the real dimensions (xterm may have already fired onResize before we listened).
-        try {
-          await ptyApi.resize(sessionId, term.rows, term.cols);
-        } catch {
-          // ignore
-        }
-      } catch (err) {
-        console.error("pty spawn failed", err);
-      }
-    })();
-
-    // Re-fit on container resize. Coalesce bursts of size changes (panel drag,
-    // window resize) into one fit per frame so the CanvasAddon doesn't thrash
-    // its texture atlas mid-stream.
+    // Re-fit on container resize. Coalesce bursts into one fit per frame.
+    // Do not fit while hidden (display:none → 0×0 clamps cols ~2).
     const container = containerRef.current;
     let ro: ResizeObserver | undefined;
     let fitRaf = 0;
@@ -516,23 +201,9 @@ export function TerminalTab({
           fitRaf = 0;
           const f = fitRef.current;
           const t = termRef.current;
-          // Don't fit while the tab is hidden (display:none → 0×0). FitAddon
-          // would clamp to its minimum cols (~2) and resize the PTY to that,
-          // mangling TUIs like Claude Code into one-char-per-line. The observer
-          // fires again with real dimensions when the tab is shown, which
-          // re-fits correctly.
           if (!f || !t || !container.clientWidth || !container.clientHeight) return;
           try {
-            f.fit();
-            // Force a redraw , see the comment on the isVisible effect for the
-            // pixel-cache staleness this guards against.
-            t.refresh(0, Math.max(0, t.rows - 1));
-            // And force a viewport sync so mouse-wheel scroll stays alive even
-            // when fit() short-circuited , same root cause, see item (3) on
-            // the isVisible effect. This is the path hit when the Source
-            // Control panel opens / closes and width changes by a small amount
-            // that doesn't bump cols.
-            (t as any)._core?.viewport?.syncScrollArea?.(true);
+            applyTerminalFit(t, f);
           } catch {
             // ignore
           }
@@ -543,25 +214,13 @@ export function TerminalTab({
     }
 
     return () => {
-      cancelled = true;
       ro?.disconnect();
       if (fitRaf) cancelAnimationFrame(fitRaf);
       linkProvider.dispose();
-      for (const d of oscDisposables) d.dispose();
-      heuristic.dispose();
-      window.clearInterval(doneSweeper);
-      useAgentStatusStore.getState().clear(tabId);
-      unlistenData?.();
-      unlistenExit?.();
       containerEl?.removeEventListener("contextmenu", onTerminalContextMenu);
-      const sid = sessionIdRef.current;
-      if (sid) {
-        ptyApi.kill(sid).catch(() => undefined);
-        removeSession(sid);
-      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tabId]);
+  }, [tabId, cwd]);
 
   return (
     <div className="flex h-full w-full flex-col bg-canvas">

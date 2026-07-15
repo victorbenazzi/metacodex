@@ -148,8 +148,9 @@ export function CodeProjectGroup({
     void setActive(project.id);
     setActiveTab(project.id, tabId);
   };
-  // Closing a terminal/agent row unmounts its TerminalTab, whose cleanup kills
-  // the PTY (ptyApi.kill) and clears the session + agent-status registries.
+  // Closing a Process tab unmounts TerminalTab; Session controller stop kills
+  // the PTY and clears session + agent-status. (Phase 3 will route close
+  // through Tab lifecycle so confirm matches the tab bar.)
   const closeTabHere = (tabId: string) => closeTab(project.id, tabId);
   // The "+" menu creates the tab in THIS project (and makes it active) rather
   // than the globally-active one, so it works from any project row.

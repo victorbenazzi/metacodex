@@ -3,8 +3,7 @@ import { create } from "zustand";
 import { projectsApi } from "./project.service";
 import type { Project } from "./project.types";
 import { useTabsStore } from "@/components/tabs/tabsStore";
-import { useTerminalStore } from "@/features/terminal/terminal.store";
-import { ptyApi } from "@/features/terminal/terminal.service";
+import { sessionController } from "@/features/terminal/sessionController";
 import { useExplorerStore } from "@/features/explorer/explorer.store";
 import { useGitStore } from "@/features/git/git.store";
 import { watcherApi } from "@/features/filesystem/watcher.service";
@@ -71,24 +70,17 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
     projectsApi.create(directory, name).then((p) => absorbProject(get, set, p)),
 
   remove: async (id) => {
-    // Tear down every live resource attached to this project BEFORE the Rust
+    // Tear down every live resource attached to this Project BEFORE the Rust
     // registry forgets it. Otherwise leaked PTYs keep emitting pty://data
-    // for a project the UI no longer knows about, and the next click on a
-    // sibling project lands on stale tab/terminal state (the "stuck after
-    // remove" bug).
+    // for a Project the UI no longer knows about, and the next click on a
+    // sibling Project lands on stale tab/terminal state (the "stuck after
+    // remove" bug). Kill goes through Session controller (idempotent stop).
     const tabs = useTabsStore.getState();
     const bucket = tabs.byProject[id];
     if (bucket) {
-      const sessions = useTerminalStore.getState().sessions;
       for (const tab of bucket.tabs) {
         if (tab.kind !== "terminal" && tab.kind !== "cli") continue;
-        // Find any PTY session bound to this tab and kill it in Rust.
-        for (const s of Object.values(sessions)) {
-          if (s.tabId === tab.id) {
-            void ptyApi.kill(s.id).catch(() => undefined);
-            useTerminalStore.getState().remove(s.id);
-          }
-        }
+        await sessionController.stop(tab.id);
       }
       tabs.dropBucket(id);
     }

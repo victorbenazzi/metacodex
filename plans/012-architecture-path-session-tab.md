@@ -273,10 +273,12 @@ Optional: minimal node test file only if project adds vitest later.
 
 ## Acceptance
 
-- [ ] No `ptyApi.kill` outside controller (except controller’s deps)
-- [ ] `stop` idempotent (double unmount / remove + unmount)
-- [ ] TerminalTab under ~250 lines preferred (chrome + wiring)
-- [ ] `pnpm exec tsc --noEmit` green
+- [x] No `ptyApi.kill` outside controller (except controller’s deps)
+- [x] `stop` idempotent (double unmount / remove + unmount)
+- [x] TerminalTab under ~250 lines preferred (chrome + wiring)
+- [x] `pnpm exec tsc --noEmit` green
+
+**Done:** 2026-07-15 (phase 2 implementation).
 
 ---
 
