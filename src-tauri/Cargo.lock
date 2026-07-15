@@ -2510,7 +2510,7 @@ dependencies = [
 
 [[package]]
 name = "metacodex"
-version = "0.0.16"
+version = "0.0.17"
 dependencies = [
  "base64 0.22.1",
  "chrono",
