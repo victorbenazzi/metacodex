@@ -419,7 +419,10 @@
     "copyInstall": "Copiar comando de instalação",
     "lookup": "O metacodex pergunta ao seu shell de login por <0>{{command}}</0> via <1>{{detect}}</1>.",
     "unknownCli": "CLI desconhecida: <0>{{id}}</0>",
-    "detecting": "detectando {{label}}…",
+    "detecting": "Detectando {{label}}…",
+    "starting": "Abrindo o terminal…",
+    "startingNamed": "Abrindo {{label}}…",
+    "sessionFallback": "sessão",
     "processExited": "[processo encerrado]",
     "exitBanner": {
       "nonzero": "O processo saiu com código {{code}}.",

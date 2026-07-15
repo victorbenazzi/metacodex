@@ -15,7 +15,9 @@ import { WORKSPACE_NULL } from "@/components/tabs/tabsStore";
 import { createFileLinkProvider } from "./terminalLinks";
 import { useSessionCapture } from "@/features/resume/useSessionCapture";
 import { TerminalExitBanner } from "./TerminalExitBanner";
+import { TerminalSessionLoading } from "./TerminalSessionLoading";
 import { isMac } from "@/lib/platform";
+import { cn } from "@/lib/cn";
 
 interface TerminalTabProps {
   tabId: string;
@@ -53,6 +55,8 @@ export function TerminalTab({
   const { containerRef, termRef, fitRef, disposedRef } = useXterm();
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [exitInfo, setExitInfo] = useState<{ code: number; reason: PtyExitReason } | null>(null);
+  /** True until spawn settles (session id or failed start). Avoids blank first paint. */
+  const [booting, setBooting] = useState(true);
   useSessionCapture({
     enabled: !!cliToolId,
     term: termRef.current,
@@ -82,26 +86,36 @@ export function TerminalTab({
 
     let cancelled = false;
     setExitInfo(null);
+    setBooting(true);
+    setActiveSessionId(null);
 
-    void sessionController.start({
-      tabId,
-      projectId,
-      cwd,
-      label,
-      cliLaunchCommand,
-      cliToolId,
-      prefillCommand,
-      term,
-      fit,
-      getContainer: () => containerRef.current,
-      disposed: () => disposedRef.current || cancelled,
-      onSession: (id) => {
-        if (!cancelled) setActiveSessionId(id);
-      },
-      onExit: (info) => {
-        if (!cancelled) setExitInfo(info);
-      },
-    });
+    void sessionController
+      .start({
+        tabId,
+        projectId,
+        cwd,
+        label,
+        cliLaunchCommand,
+        cliToolId,
+        prefillCommand,
+        term,
+        fit,
+        getContainer: () => containerRef.current,
+        disposed: () => disposedRef.current || cancelled,
+        onSession: (id) => {
+          if (cancelled) return;
+          setActiveSessionId(id);
+          if (id) setBooting(false);
+        },
+        onExit: (info) => {
+          if (cancelled) return;
+          setExitInfo(info);
+          setBooting(false);
+        },
+      })
+      .finally(() => {
+        if (!cancelled) setBooting(false);
+      });
 
     return () => {
       cancelled = true;
@@ -226,8 +240,10 @@ export function TerminalTab({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabId, cwd]);
 
+  const showLoader = booting && !activeSessionId && !exitInfo;
+
   return (
-    <div className="flex h-full w-full flex-col bg-canvas">
+    <div className="relative flex h-full w-full flex-col bg-canvas">
       {exitInfo ? (
         <TerminalExitBanner
           exitCode={exitInfo.code}
@@ -236,7 +252,18 @@ export function TerminalTab({
           onDismiss={() => setExitInfo(null)}
         />
       ) : null}
-      <div ref={containerRef} className="min-h-0 flex-1" data-tab-id={tabId} />
+      <div className="relative min-h-0 flex-1">
+        {showLoader ? (
+          <TerminalSessionLoading label={label} phase="starting" />
+        ) : null}
+        {/* xterm must stay mounted under the loader so spawn can fit and attach. */}
+        <div
+          ref={containerRef}
+          className={cn("h-full w-full", showLoader && "opacity-0")}
+          data-tab-id={tabId}
+          aria-hidden={showLoader || undefined}
+        />
+      </div>
     </div>
   );
 }

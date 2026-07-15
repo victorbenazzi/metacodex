@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { useTranslation, Trans } from "react-i18next";
+import { Trans } from "react-i18next";
 
 import { TerminalTab } from "./TerminalTab";
 import { CliMissingPanel } from "./CliMissingPanel";
+import { TerminalSessionLoading } from "./TerminalSessionLoading";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { cliApi } from "@/features/terminal/cli.service";
 import { cliById, type CliTool } from "@/features/terminal/cli-registry";
@@ -30,7 +31,6 @@ export function CliTabComponent({
   label,
   isVisible,
 }: CliTabComponentProps) {
-  const { t } = useTranslation();
   const [status, setStatus] = useState<Status>("detecting");
   const openTab = useTabsStore((s) => s.openTab);
   const cli: CliTool | undefined = cliById(cliId);
@@ -98,8 +98,8 @@ export function CliTabComponent({
 
   if (status === "detecting") {
     return (
-      <div className="h-full bg-canvas">
-        <EmptyState body={t("terminal.detecting", { label: cli.label })} />
+      <div className="relative h-full bg-canvas">
+        <TerminalSessionLoading label={cli.label} phase="detecting" />
       </div>
     );
   }
