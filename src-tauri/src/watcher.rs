@@ -21,15 +21,23 @@ pub struct FsChangedPayload {
     pub paths: Vec<String>,
 }
 
-/// One file watcher per project root, owned in a hashmap. Dropping a debouncer
-/// releases its OS-level watcher.
+struct WatchEntry {
+    /// Path we asked notify to watch. Makes `watch()` idempotent , a no-op
+    /// when called twice with the same (id, path) , so the rapid
+    /// project-switch path doesn't drop in-flight events from the existing
+    /// debouncer's 80ms window.
+    path: PathBuf,
+    /// Never read, held for ownership: dropping it releases the OS watcher.
+    #[allow(dead_code)]
+    debouncer: Debouncer<notify::RecommendedWatcher>,
+}
+
+/// One file watcher per project root. A single map holds path + debouncer so
+/// watch/unwatch swap both atomically (two maps could desync under the
+/// concurrent watch/unwatch Tauri allows). Dropping a debouncer releases its
+/// OS-level watcher.
 pub struct WatcherManager {
-    by_project: Mutex<HashMap<String, Debouncer<notify::RecommendedWatcher>>>,
-    /// Path we asked notify to watch for each project. Used to make `watch()`
-    /// idempotent , a no-op when called twice with the same (id, path) , so
-    /// the rapid project-switch path doesn't drop in-flight events from the
-    /// existing debouncer's 80ms window.
-    paths_by_project: Mutex<HashMap<String, PathBuf>>,
+    by_project: Mutex<HashMap<String, WatchEntry>>,
     app_handle: AppHandle,
 }
 
@@ -37,29 +45,18 @@ impl WatcherManager {
     pub fn new(app_handle: AppHandle) -> Self {
         Self {
             by_project: Mutex::new(HashMap::new()),
-            paths_by_project: Mutex::new(HashMap::new()),
             app_handle,
         }
     }
 
     pub fn watch(&self, project_id: String, path: PathBuf) -> AppResult<()> {
         // Idempotent: if the same (project, path) pair is already wired, keep
-        // the existing debouncer alive , its in-flight events would otherwise
-        // be lost in the 80ms gap between remove() and the new insert.
-        if let Some(existing) = self.paths_by_project.lock().get(&project_id) {
-            if existing == &path {
+        // the existing debouncer alive.
+        if let Some(existing) = self.by_project.lock().get(&project_id) {
+            if existing.path == path {
                 return Ok(());
             }
         }
-        // Different path (or no entry): drop the old debouncer OUTSIDE the
-        // lock so its callback thread can't try to re-acquire the lock during
-        // shutdown (which would deadlock with parking_lot::Mutex). Take the
-        // value out, release the guard, then drop the value.
-        let old_debouncer = {
-            let mut guard = self.by_project.lock();
-            guard.remove(&project_id)
-        };
-        drop(old_debouncer);
 
         let app = self.app_handle.clone();
         let pid = project_id.clone();
@@ -69,12 +66,19 @@ impl WatcherManager {
         // explorer, however, caches directories under the path we were *asked*
         // to watch (the raw project root from `projects.json`). If the two
         // forms differ, an emitted event path can never string-match a cached
-        // dir key, so `AppShell`'s listener skips every refresh and the
+        // dir key, so the fs://changed listener skips every refresh and the
         // explorer silently never updates. Capture both forms and rewrite each
         // emitted path's canonical prefix back to the requested root so the
         // frontend's exact-prefix matching works regardless of symlinks.
         let requested_root = path.clone();
         let canonical_root = path.canonicalize().unwrap_or_else(|_| path.clone());
+        // Agents constantly run git; `.git/{index,objects,refs,logs}` churn
+        // would otherwise dominate a batch (and can push it past the 512
+        // collapse-to-root limit, degrading per-file granularity exactly when
+        // the user is waiting for new files to pop in). Collapse everything
+        // under `.git/` to the `.git` dir itself: still one event to drive
+        // the git-status refresh and the visible `.git` row, near-zero budget.
+        let git_dir = requested_root.join(".git").display().to_string();
         // 80ms keeps fs events feeling near-instant in the explorer (the IA
         // creates files via the terminal and the user expects them to pop in
         // immediately). Below ~50ms we'd start seeing redundant churn for
@@ -99,6 +103,17 @@ impl WatcherManager {
                         // root so they line up with the explorer's cache keys.
                         Ok(rel) => requested_root.join(rel).display().to_string(),
                         Err(_) => e.path.display().to_string(),
+                    })
+                    .map(|p| {
+                        // Collapse `.git` internals to the `.git` dir (see above).
+                        let is_git_internal = p.len() > git_dir.len()
+                            && p.starts_with(git_dir.as_str())
+                            && matches!(p.as_bytes()[git_dir.len()], b'/' | b'\\');
+                        if is_git_internal {
+                            git_dir.clone()
+                        } else {
+                            p
+                        }
                     })
                     // Drop `.metacodex/worktrees/*` , those are parallel
                     // checkouts of THIS repo; the main project's git status
@@ -137,15 +152,18 @@ impl WatcherManager {
             .watch(&path, RecursiveMode::Recursive)
             .map_err(|e| AppError::Other(format!("watch {}: {e}", path.display())))?;
 
-        self.paths_by_project
-            .lock()
-            .insert(project_id.clone(), path);
-        self.by_project.lock().insert(project_id, debouncer);
+        // Swap in the new entry, then drop any replaced one OUTSIDE the lock
+        // so its callback thread can't try to re-acquire the lock during
+        // shutdown (which would deadlock with parking_lot::Mutex).
+        let old = {
+            let mut guard = self.by_project.lock();
+            guard.insert(project_id, WatchEntry { path, debouncer })
+        };
+        drop(old);
         Ok(())
     }
 
     pub fn unwatch(&self, project_id: &str) {
-        self.paths_by_project.lock().remove(project_id);
         // Same drop-outside-the-lock rule as watch(): keep the callback
         // thread from racing the lock during Drop.
         let old = {

@@ -25,7 +25,7 @@ export function Kbd({ keys, className }: KbdProps) {
       {keys.map((k, i) => (
         <kbd
           key={i}
-          className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-xs border border-hairline bg-canvas-soft px-[5px] font-mono text-label leading-none text-muted"
+          className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-xs border border-hairline bg-canvas-soft px-5px font-mono text-label leading-none text-muted"
         >
           {symbolMap[k] ?? k}
         </kbd>

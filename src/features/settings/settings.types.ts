@@ -10,9 +10,10 @@ export type TerminalCursorStyle = "bar" | "block" | "underline";
  *  files stay monochrome, a focused color pop, not a rainbow. */
 export type ExplorerIconStyle = "mono" | "color";
 
-/** Global density tier. Multiplies the `--space-*` token scale by 0.85 / 1 /
- *  1.15. It touches every spacing-based surface uniformly without touching
- *  per-component values. */
+/** Global density tier. Multiplies the density spacing scale (`p-10px` /
+ *  `gap-6px` classes in tailwind.config.js), the `--space-*` tokens and the
+ *  structural `--panel-header-h` / `--panel-gap-*` tokens by 0.85 / 1 / 1.15,
+ *  flexing the whole chrome rhythm from a single setting. */
 export type UiDensity = "compact" | "comfortable" | "spacious";
 
 /** Numeric multiplier each density tier maps to. Kept here next to the type

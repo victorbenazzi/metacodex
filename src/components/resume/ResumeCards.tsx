@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { GitBranch, Trash2 } from "lucide-react";
+import { GitBranch, Trash2 } from "@/components/ui/icons";
 
 import { Icon } from "@/components/ui/Icon";
 import { useResumeStore } from "@/features/resume/resume.store";
@@ -58,9 +58,9 @@ export function ResumeCards({ projectId, title, limit = 5 }: ResumeCardsProps) {
   };
 
   return (
-    <section className="flex flex-col gap-[10px]">
+    <section className="flex flex-col gap-10px">
       {title ? <h3 className="editorial-caps text-muted">{title}</h3> : null}
-      <ul className="grid grid-cols-1 gap-[8px]">
+      <ul className="grid grid-cols-1 gap-8px">
         {entries.map((entry) => {
           const cli = cliById(entry.cliId);
           const detection = cli ? cliDetectionFor(cli, detections) : null;
@@ -70,14 +70,14 @@ export function ResumeCards({ projectId, title, limit = 5 }: ResumeCardsProps) {
             <li
               key={entry.id}
               className={cn(
-                "flex items-center gap-[12px] rounded-sm border border-hairline-soft bg-canvas-soft px-[12px] py-[10px]",
+                "flex items-center gap-12px rounded-sm border border-hairline-soft bg-canvas-soft px-12px py-10px",
               )}
             >
               <span className="flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-xs border border-hairline">
                 {BrandIcon ? <BrandIcon size={18} /> : null}
               </span>
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-[8px]">
+                <div className="flex items-center gap-8px">
                   <span className="truncate text-ui font-medium text-ink">
                     {cli?.label ?? entry.cliId}
                   </span>
@@ -95,7 +95,7 @@ export function ResumeCards({ projectId, title, limit = 5 }: ResumeCardsProps) {
                   {t("resume.lastSeen", { ago: agoShort(entry.lastSeenAt) })}
                 </div>
               </div>
-              <div className="flex shrink-0 items-center gap-[6px]">
+              <div className="flex shrink-0 items-center gap-6px">
                 {installed ? (
                   <Button variant="primary" size="sm" onClick={() => resume(entry)}>
                     {t("resume.resumeButton")}

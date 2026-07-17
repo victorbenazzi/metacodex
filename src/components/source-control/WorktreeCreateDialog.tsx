@@ -109,7 +109,7 @@ export function WorktreeCreateDialog({
         }
       >
         <form
-          className="flex flex-col gap-[14px]"
+          className="flex flex-col gap-14px"
           onSubmit={(e) => {
             e.preventDefault();
             void submit();
@@ -124,7 +124,7 @@ export function WorktreeCreateDialog({
               value={branchName}
               onChange={(e) => setBranchName(e.target.value)}
               autoFocus
-              className="w-full rounded-sm border border-hairline-strong bg-canvas px-[10px] py-[7px] font-mono text-caption text-ink outline-none focus-visible:border-ink"
+              className="w-full rounded-sm border border-hairline-strong bg-canvas px-10px py-7px font-mono text-caption text-ink outline-none focus-visible:border-ink"
             />
           </Field>
           <Field
@@ -135,7 +135,7 @@ export function WorktreeCreateDialog({
               type="text"
               value={baseRef}
               onChange={(e) => setBaseRef(e.target.value)}
-              className="w-full rounded-sm border border-hairline-strong bg-canvas px-[10px] py-[7px] font-mono text-caption text-ink outline-none focus-visible:border-ink"
+              className="w-full rounded-sm border border-hairline-strong bg-canvas px-10px py-7px font-mono text-caption text-ink outline-none focus-visible:border-ink"
             />
           </Field>
           {error ? (
@@ -153,7 +153,7 @@ export function WorktreeCreateDialog({
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
-    <label className="flex flex-col gap-[5px]">
+    <label className="flex flex-col gap-5px">
       <span className="text-caption font-medium text-ink">{label}</span>
       {children}
       {hint ? <span className="text-label text-muted">{hint}</span> : null}

@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { Download, Loader2, RotateCcw } from "lucide-react";
+import { Download, Loader2, RotateCcw } from "@/components/ui/icons";
 
 import { cn } from "@/lib/cn";
 import { Icon } from "@/components/ui/Icon";
@@ -67,7 +67,7 @@ export function UpdatePill() {
       disabled={isBusy}
       title={label}
       className={cn(
-        "inline-flex items-center gap-[6px] rounded-pill border px-[10px] py-[2px]",
+        "inline-flex items-center gap-6px rounded-pill border px-10px py-[2px]",
         "font-mono text-label leading-none transition-colors duration-fast",
         isBusy ? "cursor-default" : "cursor-pointer",
         colorClass,

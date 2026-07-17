@@ -6,7 +6,7 @@ import {
   Settings2,
   GitBranch,
   SquareTerminal,
-} from "lucide-react";
+} from "@/components/ui/icons";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -69,7 +69,7 @@ export function NewTabBody({ actions, C }: { actions: NewTabActions; C: MenuComp
   const updateSettings = useSettingsDataStore((s) => s.update);
   // Roomier rows + a more legible highlight (full-opacity surface, not the
   // shared menu default of /70, which reads as almost no hover at this density).
-  const itemClass = "py-[9px] data-[highlighted]:bg-surface-strong";
+  const itemClass = "py-9px data-[highlighted]:bg-surface-strong";
 
   const { coding: codingAgents, autonomous: autonomousAgents } =
     enabledAgentsByCategory(enabledAgents);

@@ -8,6 +8,19 @@ use crate::projects::ProjectsCache;
 use crate::util::paths;
 use crate::watcher::WatcherManager;
 
+/// Watcher setup/teardown joins the FSEvents run-loop thread on macOS, which
+/// can briefly block. Run it on the blocking pool so a watch/unwatch during a
+/// project switch can't stall an async IPC worker that also pumps PTY data.
+async fn blocking<T, F>(f: F) -> AppResult<T>
+where
+    T: Send + 'static,
+    F: FnOnce() -> AppResult<T> + Send + 'static,
+{
+    tokio::task::spawn_blocking(f)
+        .await
+        .map_err(|e| AppError::Other(format!("join: {e}")))?
+}
+
 #[tauri::command]
 pub async fn watcher_watch(
     project_id: String,
@@ -25,7 +38,8 @@ pub async fn watcher_watch(
     if !(paths::is_within(&root, &requested) && paths::is_within(&requested, &root)) {
         return Err(AppError::PathNotAllowed(requested.display().to_string()));
     }
-    mgr.watch(project.id, root)
+    let mgr = mgr.inner().clone();
+    blocking(move || mgr.watch(project.id, root)).await
 }
 
 #[tauri::command]
@@ -33,6 +47,10 @@ pub async fn watcher_unwatch(
     project_id: String,
     mgr: State<'_, Arc<WatcherManager>>,
 ) -> AppResult<()> {
-    mgr.unwatch(&project_id);
-    Ok(())
+    let mgr = mgr.inner().clone();
+    blocking(move || {
+        mgr.unwatch(&project_id);
+        Ok(())
+    })
+    .await
 }

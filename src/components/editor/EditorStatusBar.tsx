@@ -32,9 +32,9 @@ export function EditorStatusBar({
   const ranges = status?.ranges ?? 1;
 
   return (
-    <div className="flex h-[22px] shrink-0 select-none items-center justify-between border-t border-hairline-soft bg-canvas px-[12px] text-label text-muted">
+    <div className="flex h-[22px] shrink-0 select-none items-center justify-between border-t border-hairline-soft bg-canvas px-12px text-label text-muted">
       <span className="truncate">{language}</span>
-      <div className="flex shrink-0 items-center gap-[8px] font-mono tabular-nums">
+      <div className="flex shrink-0 items-center gap-8px font-mono tabular-nums">
         <span>{t("editor.lineCol", { line, col })}</span>
         {selChars > 0 ? (
           <>

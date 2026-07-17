@@ -25,6 +25,7 @@ import { WorktreeCreateDialog } from "@/components/source-control/WorktreeCreate
 import { CloneFromGithubDialog } from "@/components/project-rail/CloneFromGithubDialog";
 import { SettingsDialog } from "@/components/settings/SettingsDialog";
 import { Toaster } from "@/components/ui/Toaster";
+import { WhatsNewDialog } from "@/components/whats-new/WhatsNewDialog";
 import { CloseTabsConfirm } from "@/app/CloseTabsConfirm";
 import { EMPTY_BUCKET, RAIL_WIDTH_PX } from "@/app/appShell.helpers";
 import { registerAppCommands } from "@/app/appCommands";
@@ -98,6 +99,9 @@ export function AppShell() {
   // Suspend grid easing while a resize handle is active so width changes track
   // the pointer directly instead of trailing behind it.
   const [resizing, setResizing] = useState(false);
+  // Rendered height of the side panel card (launcher mode hugs its content):
+  // the resize handle rail must match the card, not the full column.
+  const [sidePanelCardH, setSidePanelCardH] = useState<number | null>(null);
 
   // Resizable panel widths, driven by settings, persisted to ~/.metacodex.
   const projectsWidth = useSettingsDataStore((s) => s.settings.panels.projectsWidth);
@@ -339,6 +343,7 @@ export function AppShell() {
                     onNewTerminal={actions.newTerminal}
                     onLaunchCli={actions.launchCli}
                     onOpenDiff={actions.openDiff}
+                    onCardHeightChange={setSidePanelCardH}
                   />
                 </div>
               </div>
@@ -355,7 +360,14 @@ export function AppShell() {
                 ariaLabel={t("appShell.resizeSidePanel")}
                 enabled={panelOpen}
                 onDraggingChange={setResizing}
-                className="bottom-[var(--panel-gap-y)] top-[var(--panel-gap-y)] h-auto"
+                // Track the card's rendered height (launcher mode is shorter
+                // than the column); fall back to the full column until the
+                // first measurement lands.
+                className={cn(
+                  "top-[var(--panel-gap-y)] h-auto",
+                  sidePanelCardH === null && "bottom-[var(--panel-gap-y)]",
+                )}
+                style={sidePanelCardH !== null ? { height: sidePanelCardH } : undefined}
               />
             </>
           ) : null}
@@ -396,6 +408,7 @@ export function AppShell() {
         }}
         onSent={actions.sentToProject}
       />
+      <WhatsNewDialog />
       <Toaster />
     </div>
   );

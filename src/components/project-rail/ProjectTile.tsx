@@ -4,12 +4,10 @@ import { useTranslation } from "react-i18next";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { statusTone } from "@/components/tabs/statusTone";
 import { cn } from "@/lib/cn";
-import { tileIconColor } from "@/features/projects/color";
 import { isCustomIcon } from "@/features/projects/customIcon.service";
-import { useThemeStore } from "@/features/theme/theme.store";
 import { useProjectAgentStatus } from "@/features/terminal/projectStatus";
 import type { Project } from "@/features/projects/project.types";
-import { lookupLucide, monogram } from "./projectIdentity";
+import { lookupProjectGlyph, monogram } from "./projectIdentity";
 import { ProjectStatusDot } from "./ProjectStatusDot";
 
 interface ProjectTileProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -21,11 +19,10 @@ interface ProjectTileProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 /**
  * Project tile in the left rail. Three render paths in priority order:
  *  1. Custom favicon (data: URI chosen by the user): render the image.
- *  2. Lucide icon name from the project picker: render the icon.
+ *  2. Glyph name from the project picker: render the icon.
  *  3. Neither: fall back to the typographic monogram (Fraunces display, upright).
  * The tile itself is always neutral surface-card with a hairline border; the
- * project's accent hex tints the icon stroke / monogram color so the color
- * picker still has visible effect without painting the whole tile.
+ * icon stroke / monogram stays in the default ink (active) or muted tone.
  */
 export const ProjectTile = forwardRef<HTMLButtonElement, ProjectTileProps>(function ProjectTile(
   {
@@ -40,13 +37,11 @@ export const ProjectTile = forwardRef<HTMLButtonElement, ProjectTileProps>(funct
   ref,
 ) {
   const { t } = useTranslation();
-  const theme = useThemeStore((s) => s.effective);
   const [hover, setHover] = useState(false);
 
   const usesCustom = isCustomIcon(project.icon);
-  const LucideIcon = !usesCustom ? lookupLucide(project.icon) : null;
+  const Glyph = !usesCustom ? lookupProjectGlyph(project.icon) : null;
   const mark = useMemo(() => monogram(project.name), [project.name]);
-  const accent = tileIconColor(project.color, theme);
 
   // Aggregated session status: a corner badge on the tile (decorative; the
   // tile's own tooltip carries the readable label, so we don't nest tooltips).
@@ -96,7 +91,6 @@ export const ProjectTile = forwardRef<HTMLButtonElement, ProjectTileProps>(funct
           isDragging && "opacity-40",
           className,
         )}
-        style={active ? { color: accent } : undefined}
         {...rest}
       >
         {usesCustom ? (
@@ -106,19 +100,18 @@ export const ProjectTile = forwardRef<HTMLButtonElement, ProjectTileProps>(funct
             draggable={false}
             className="h-[18px] w-[18px] object-contain"
           />
-        ) : LucideIcon ? (
-          <LucideIcon
+        ) : Glyph ? (
+          <Glyph
             size={16}
             strokeWidth={1.6}
-            color={active ? accent : undefined}
-            className={active ? undefined : "text-muted"}
+            className={active ? "text-ink" : "text-muted"}
             aria-hidden
           />
         ) : (
           <span
             className={cn(
               "font-display leading-none",
-              active ? "font-medium" : "text-muted",
+              active ? "font-medium text-ink" : "text-muted",
             )}
             style={{ fontSize: mark.length > 1 ? "12px" : "15px" }}
           >

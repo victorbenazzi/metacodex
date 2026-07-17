@@ -1,16 +1,14 @@
 import { useEffect, useState } from "react";
-import * as Lucide from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { DialogRoot, DialogContent } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Button";
+import { lookupProjectGlyph } from "@/components/project-rail/projectIdentity";
 import { DirectoryPicker } from "./DirectoryPicker";
 import { fsApi } from "@/features/filesystem/filesystem.service";
 import { useProjectsStore } from "@/features/projects/project.store";
 import type { Project } from "@/features/projects/project.types";
-import { tileIconColor } from "@/features/projects/color";
 import { isCustomIcon } from "@/features/projects/customIcon.service";
-import { useThemeStore } from "@/features/theme/theme.store";
 import { basename } from "@/lib/path";
 import { cn } from "@/lib/cn";
 
@@ -104,10 +102,10 @@ export function SendToProjectDialog({ file, onOpenChange, onSent }: SendToProjec
         {projects.length === 0 ? (
           <p className="text-caption text-muted">{t("sendToProject.noProjects")}</p>
         ) : (
-          <div className="space-y-[14px]">
-            <div className="space-y-[6px]">
+          <div className="space-y-14px">
+            <div className="space-y-6px">
               <p className="editorial-caps text-muted">{t("sendToProject.pickProject")}</p>
-              <div className="flex flex-wrap gap-[6px]">
+              <div className="flex flex-wrap gap-6px">
                 {projects.map((p) => (
                   <ProjectChip
                     key={p.id}
@@ -120,8 +118,8 @@ export function SendToProjectDialog({ file, onOpenChange, onSent }: SendToProjec
             </div>
 
             {selectedProject ? (
-              <div className="space-y-[6px]">
-                <div className="flex items-baseline justify-between gap-[8px]">
+              <div className="space-y-6px">
+                <div className="flex items-baseline justify-between gap-8px">
                   <p className="editorial-caps text-muted">{t("sendToProject.pickFolder")}</p>
                   <p className="truncate font-mono text-label text-muted-soft">
                     {selectedProject.name}
@@ -154,18 +152,14 @@ function ProjectChip({
   active: boolean;
   onClick: () => void;
 }) {
-  const theme = useThemeStore((s) => s.effective);
   const usesCustom = isCustomIcon(project.icon);
-  const LucideIcon = !usesCustom
-    ? ((Lucide as unknown as Record<string, Lucide.LucideIcon>)[project.icon] ?? null)
-    : null;
-  const accent = tileIconColor(project.color, theme);
+  const Glyph = !usesCustom ? lookupProjectGlyph(project.icon) : null;
   return (
     <button
       type="button"
       onClick={onClick}
       className={cn(
-        "inline-flex h-[28px] items-center gap-[6px] rounded-sm border px-[8px] text-caption transition-colors",
+        "inline-flex h-[28px] items-center gap-6px rounded-sm border px-8px text-caption transition-colors",
         active
           ? "border-hairline-strong bg-surface-strong/50 text-ink"
           : "border-hairline text-body hover:bg-surface-strong/30",
@@ -178,10 +172,10 @@ function ProjectChip({
           className="h-[14px] w-[14px] object-contain"
           draggable={false}
         />
-      ) : LucideIcon ? (
-        <LucideIcon size={14} strokeWidth={1.6} color={accent} aria-hidden />
+      ) : Glyph ? (
+        <Glyph size={14} strokeWidth={1.5} aria-hidden />
       ) : (
-        <span className="font-display text-caption leading-none" style={{ color: accent }}>
+        <span className="font-display text-caption leading-none">
           {project.name.slice(0, 1).toUpperCase()}
         </span>
       )}

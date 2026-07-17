@@ -176,7 +176,7 @@ export function DiffTab({ path, projectId, status }: DiffTabProps) {
 
   return (
     <div className="flex h-full w-full flex-col bg-canvas">
-      <div className="flex shrink-0 items-center gap-[10px] border-b border-hairline-soft bg-canvas-soft px-[14px] py-[6px]">
+      <div className="flex shrink-0 items-center gap-10px border-b border-hairline-soft bg-canvas-soft px-14px py-6px">
         <span className={cn("font-mono text-micro", gitColorForBadge(status))}>
           {status}
         </span>
@@ -220,7 +220,7 @@ export function DiffTab({ path, projectId, status }: DiffTabProps) {
           />
         ) : null}
         {phase !== "ready" ? (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-[24px] text-center">
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-24px text-center">
             <span className="font-mono text-caption text-muted">
               {phase === "loading"
                 ? t("common.loading")

@@ -45,16 +45,16 @@ export function ImagePreview({ path, preview = false, previewGrantId }: ImagePre
     <div className="relative flex h-full flex-col bg-canvas">
       <header
         data-tauri-drag-region
-        className="flex h-[34px] shrink-0 items-center justify-between border-b border-hairline-soft px-[14px]"
+        className="flex h-[34px] shrink-0 items-center justify-between border-b border-hairline-soft px-14px"
       >
         <span className="editorial-caps">{t("editor.image")}</span>
         {preview ? <SendToProjectButton path={path} grantId={previewGrantId} /> : null}
       </header>
-      <div className="flex flex-1 items-center justify-center overflow-auto p-[24px]">
+      <div className="flex flex-1 items-center justify-center overflow-auto p-24px">
         {error ? (
           <p className="font-mono text-caption text-danger">{error}</p>
         ) : dataUrl ? (
-          <div className="flex flex-col items-center gap-[14px]">
+          <div className="flex flex-col items-center gap-14px">
             <img
               src={dataUrl}
               alt={basename(path)}

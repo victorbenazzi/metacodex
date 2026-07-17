@@ -1,9 +1,9 @@
 import { forwardRef } from "react";
-import type { LucideIcon } from "lucide-react";
+import type { IconComponent } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 
 interface IconProps extends React.HTMLAttributes<HTMLSpanElement> {
-  icon: LucideIcon;
+  icon: IconComponent;
   size?: number;
   strokeWidth?: number;
 }
@@ -12,10 +12,10 @@ export const Icon = forwardRef<HTMLSpanElement, IconProps>(function Icon(
   { icon: I, size = 16, strokeWidth, className, ...props },
   ref,
 ) {
-  // Lucide strokes render at strokeWidth * size / 24: at micro sizes the
-  // default 1.6 washes out (~0.67px at 10px), so tiny glyphs get 2 by rule
-  // instead of per-call overrides.
-  const stroke = strokeWidth ?? (size <= 11 ? 2 : 1.6);
+  // Strokes render at strokeWidth * size / 24: Hugeicons stroke-rounded is
+  // drawn for 1.5, but at micro sizes that washes out (~0.67px at 10px), so
+  // tiny glyphs get 2 by rule instead of per-call overrides.
+  const stroke = strokeWidth ?? (size <= 11 ? 2 : 1.5);
   return (
     <span
       ref={ref}

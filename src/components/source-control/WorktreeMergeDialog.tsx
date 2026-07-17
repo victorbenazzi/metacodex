@@ -56,7 +56,7 @@ export function WorktreeMergeDialog({
           </>
         }
       >
-        <div role="radiogroup" className="flex flex-col gap-[8px]">
+        <div role="radiogroup" className="flex flex-col gap-8px">
           {STRATEGIES.map((s) => {
             const active = strategy === s.id;
             return (
@@ -67,7 +67,7 @@ export function WorktreeMergeDialog({
                 aria-checked={active}
                 onClick={() => setStrategy(s.id)}
                 className={cn(
-                  "flex flex-col gap-[2px] rounded-sm border px-[12px] py-[8px] text-left transition-colors",
+                  "flex flex-col gap-[2px] rounded-sm border px-12px py-8px text-left transition-colors",
                   active
                     ? "border-ink bg-surface-strong/35"
                     : "border-hairline-strong hover:bg-surface-strong/25",

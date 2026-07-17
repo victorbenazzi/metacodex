@@ -1,5 +1,5 @@
 import { useTranslation, Trans } from "react-i18next";
-import { CheckCircle2, CircleAlert, Loader2 } from "lucide-react";
+import { CheckCircle2, CircleAlert, Loader2 } from "@/components/ui/icons";
 
 import { Badge } from "@/components/ui/Badge";
 import { Icon } from "@/components/ui/Icon";
@@ -27,10 +27,10 @@ export function CliRegistryPane() {
           return (
             <li
               key={cli.id}
-              className="flex items-start justify-between gap-[16px] border-b border-hairline-soft py-[12px] last:border-b-0"
+              className="flex items-start justify-between gap-16px border-b border-hairline-soft py-12px last:border-b-0"
             >
               <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-[8px]">
+                <div className="flex flex-wrap items-center gap-8px">
                   <span className="text-ui font-medium text-ink">{cli.label}</span>
                   <CliStatusBadge status={detection.status} />
                   {cli.dangerLevel === "dangerous" && <Badge tone="warn">{t("cli.dangerous")}</Badge>}
@@ -62,7 +62,7 @@ export function CliRegistryPane() {
         })}
       </ul>
 
-      <p className="mt-[16px] rounded-sm border border-hairline-soft bg-canvas-soft px-[12px] py-[10px] text-caption text-muted">
+      <p className="mt-16px rounded-sm border border-hairline-soft bg-canvas-soft px-12px py-10px text-caption text-muted">
         <Trans
           i18nKey="settings.cli.overridesNote"
           values={{ file: "~/.metacodex/settings.json" }}

@@ -10,4 +10,5 @@ pub mod settings;
 pub mod system;
 pub mod terminal;
 pub mod watcher;
+pub mod whats_new;
 pub mod workspace;

@@ -1,4 +1,4 @@
-import { PanelRightClose, PanelRightOpen } from "lucide-react";
+import { PanelRightClose, PanelRightOpen } from "@/components/ui/icons";
 import { useTranslation } from "react-i18next";
 
 import { Icon } from "@/components/ui/Icon";

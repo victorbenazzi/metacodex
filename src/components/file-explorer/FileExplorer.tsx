@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { FilePlus, FolderPlus, Search } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { FilePlus, FolderPlus, RefreshCw, Search } from "@/components/ui/icons";
 import { useTranslation } from "react-i18next";
 
 import { Icon } from "@/components/ui/Icon";
@@ -7,9 +7,14 @@ import { IconButton } from "@/components/ui/IconButton";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { Kbd } from "@/components/ui/Kbd";
 import { useExplorerStore, type CreateKind } from "@/features/explorer/explorer.store";
+import { syncProjectNow } from "@/features/explorer/syncProject";
 import { useSearchUiStore } from "@/features/search/search.store";
 import { TreeNode, CreateRow, type TreeNodeActions } from "./TreeNode";
 import { basename, dirname } from "@/lib/path";
+
+/** Keep the sync spinner visible for at least one revolution: a sub-100ms
+ *  sync that unspins instantly reads as "the button did nothing". */
+const MIN_SYNC_SPIN_MS = 450;
 
 interface FileExplorerProps extends TreeNodeActions {
   projectId: string;
@@ -53,6 +58,32 @@ export function FileExplorer({
     void beginCreate(projectId, targetDir, kind);
   };
 
+  const [syncing, setSyncing] = useState(false);
+  // Both the sync promise and the minimum-spin timeout can outlive this
+  // component (project closed mid-sync); gate the trailing setState on
+  // liveness instead of letting it fire after unmount.
+  const aliveRef = useRef(true);
+  const spinTimerRef = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    aliveRef.current = true;
+    return () => {
+      aliveRef.current = false;
+      window.clearTimeout(spinTimerRef.current);
+    };
+  }, []);
+  const handleSync = useCallback(() => {
+    if (syncing) return;
+    setSyncing(true);
+    const started = Date.now();
+    void syncProjectNow(projectId, rootPath)
+      .catch((err) => console.warn("[sync] failed", err))
+      .finally(() => {
+        if (!aliveRef.current) return;
+        const hold = Math.max(0, MIN_SYNC_SPIN_MS - (Date.now() - started));
+        spinTimerRef.current = window.setTimeout(() => setSyncing(false), hold);
+      });
+  }, [projectId, rootPath, syncing]);
+
   const headerButton = (
     label: string,
     onClick: () => void,
@@ -68,13 +99,28 @@ export function FileExplorer({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <header className="flex h-[var(--panel-header-h)] shrink-0 items-center justify-between gap-[6px] border-b border-hairline-soft px-[12px]">
+      <header className="flex h-[var(--panel-header-h)] shrink-0 items-center justify-between gap-6px border-b border-hairline-soft px-12px">
         <span className="editorial-caps truncate" title={rootPath}>
           {rootName}
         </span>
         <div className="flex items-center gap-[2px]">
           {headerButton(t("explorer.newFile"), () => handleNewNode("file"), FilePlus)}
           {headerButton(t("explorer.newFolder"), () => handleNewNode("dir"), FolderPlus)}
+          <Tooltip content={t("explorer.syncFiles")} side="bottom">
+            <IconButton
+              size="md"
+              onClick={handleSync}
+              disabled={syncing}
+              aria-label={t("explorer.syncFiles")}
+              aria-busy={syncing || undefined}
+            >
+              <Icon
+                icon={RefreshCw}
+                size={14}
+                className={syncing ? "animate-spin motion-reduce:animate-none" : undefined}
+              />
+            </IconButton>
+          </Tooltip>
           {headerButton(
             t("explorer.searchInProject"),
             () => useSearchUiStore.getState().setOpen(true),
@@ -85,7 +131,7 @@ export function FileExplorer({
       </header>
 
       <nav
-        className="flex-1 overflow-y-auto overflow-x-hidden py-[6px]"
+        className="flex-1 overflow-y-auto overflow-x-hidden py-6px"
         onClick={(e) => {
           // Clicking empty space clears selection (so New File/Folder targets root).
           if (e.target === e.currentTarget) setSelected(projectId, null);
@@ -103,14 +149,14 @@ export function FileExplorer({
 
         {rootChildren === undefined || rootChildren === "loading" ? (
           creatingAtRoot ? null : (
-            <p className="px-[16px] py-[10px] font-mono text-label text-muted-soft">
+            <p className="px-16px py-10px text-label text-muted-soft">
               {t("common.loading")}
             </p>
           )
         ) : Array.isArray(rootChildren) ? (
           rootChildren.length === 0 ? (
             creatingAtRoot ? null : (
-              <p className="px-[16px] py-[10px] font-mono text-label text-muted-soft">
+              <p className="px-16px py-10px text-label text-muted-soft">
                 {t("explorer.emptyFolder")}
               </p>
             )
@@ -128,17 +174,17 @@ export function FileExplorer({
             ))
           )
         ) : (
-          <div className="px-[16px] py-[10px]">
-            <p className="font-mono text-label text-danger">
+          <div className="px-16px py-10px">
+            <p className="text-label text-danger">
               {t("explorer.couldNotReadFolder")}
             </p>
-            <p className="mt-[2px] font-mono text-micro text-muted-soft" title={rootChildren.error}>
+            <p className="mt-[2px] text-micro text-muted-soft" title={rootChildren.error}>
               {rootChildren.error.slice(0, 80)}
             </p>
             <button
               type="button"
               onClick={() => void refresh(projectId, rootPath)}
-              className="mt-[8px] inline-flex h-[24px] items-center rounded-sm border border-hairline-strong px-[10px] text-caption text-ink hover:bg-surface-strong/40"
+              className="mt-8px inline-flex h-[24px] items-center rounded-sm border border-hairline-strong px-10px text-caption text-ink hover:bg-surface-strong/40"
             >
               {t("common.retry")}
             </button>

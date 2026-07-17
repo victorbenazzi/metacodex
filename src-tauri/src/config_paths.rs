@@ -91,6 +91,12 @@ pub fn last_crash_file() -> AppResult<PathBuf> {
     Ok(state_dir()?.join("last-crash.json"))
 }
 
+/// `~/.metacodex/state/whats-new.json`, post-update changelog marker
+/// (which release notes the user has already seen).
+pub fn whats_new_file() -> AppResult<PathBuf> {
+    Ok(state_dir()?.join("whats-new.json"))
+}
+
 /// Path to a single project's workspace file: `state/workspace/{id}.json`.
 ///
 /// Guards the id (which is server-generated, but belt-and-suspenders) so a

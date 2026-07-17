@@ -4,7 +4,7 @@ import {
   FolderOpen,
   Sparkles,
   SquareTerminal,
-} from "lucide-react";
+} from "@/components/ui/icons";
 import { useTranslation } from "react-i18next";
 
 import { ChevronIcon, FileIcon } from "./FileIcon";
@@ -82,14 +82,21 @@ export const TreeNode = memo(function TreeNode({
 
   const indentPx = depth * 12 + 8;
 
+  // A symlinked directory renders folder-shaped (icon, dirs-first sort) but is
+  // NOT expandable: the path sandbox rejects symlinked components, so reading
+  // through the link would only ever surface an error. Selection treats it
+  // like a file so New File/Folder land in its real parent, and the context
+  // menu drops the enter/open actions the sandbox would refuse.
+  const expandable = entry.isDir && !entry.isSymlink;
+
   const handleClick = useCallback(() => {
-    setSelected(projectId, { path: entry.path, isDir: entry.isDir });
-    if (entry.isDir) {
+    setSelected(projectId, { path: entry.path, isDir: expandable });
+    if (expandable) {
       void toggle(projectId, entry.path);
-    } else {
+    } else if (!entry.isDir) {
       onOpenFile(entry.path, entry.name);
     }
-  }, [entry, projectId, toggle, onOpenFile, setSelected]);
+  }, [entry, expandable, projectId, toggle, onOpenFile, setSelected]);
 
   const copyPath = useCallback(() => {
     navigator.clipboard.writeText(entry.path).catch((err) => {
@@ -112,7 +119,7 @@ export const TreeNode = memo(function TreeNode({
           type="button"
           onClick={handleClick}
           className={cn(
-            "group flex w-full items-center gap-[8px] py-[3px] text-left font-mono text-mono",
+            "group flex w-full items-center gap-8px py-[3px] text-left text-ui",
             "focus-visible:outline-none",
             hidden ? "text-muted" : "text-body",
             isSelected
@@ -127,7 +134,7 @@ export const TreeNode = memo(function TreeNode({
           style={{ paddingLeft: indentPx }}
           title={entry.path}
         >
-          {entry.isDir ? <ChevronIcon open={isOpen} /> : <span className="w-[11px] shrink-0" />}
+          {expandable ? <ChevronIcon open={isOpen} /> : <span className="w-[11px] shrink-0" />}
           <FileIcon
             isDir={entry.isDir}
             isOpen={isOpen}
@@ -135,7 +142,7 @@ export const TreeNode = memo(function TreeNode({
             className={entry.isDir ? "text-muted" : "text-muted-soft"}
           />
           <span className={cn("truncate", gitColorForName(gitStatus))}>{entry.name}</span>
-          <span className="ml-auto flex items-center gap-[6px] pr-[8px]">
+          <span className="ml-auto flex items-center gap-6px pr-8px">
             {entry.isSymlink ? <span className="text-micro text-muted-soft">↗</span> : null}
             {gitStatus ? (
               <Tooltip content={t(gitStatusLabelKey(gitStatus))} side="left">
@@ -156,7 +163,7 @@ export const TreeNode = memo(function TreeNode({
         </button>
       </ContextMenuTrigger>
       <ContextMenuContent>
-        {entry.isDir ? (
+        {expandable ? (
           <>
             <ContextMenuItem onSelect={() => onOpenInTerminal(entry.path, entry.name)}>
               <Icon icon={SquareTerminal} size={12} className="text-muted" />
@@ -191,11 +198,15 @@ export const TreeNode = memo(function TreeNode({
           </>
         ) : (
           <>
-            <ContextMenuItem onSelect={() => onOpenFile(entry.path, entry.name)}>
-              <Icon icon={FolderOpen} size={12} className="text-muted" />
-              {t("tree.open")}
-            </ContextMenuItem>
-            <ContextMenuSeparator />
+            {entry.isDir ? null : (
+              <>
+                <ContextMenuItem onSelect={() => onOpenFile(entry.path, entry.name)}>
+                  <Icon icon={FolderOpen} size={12} className="text-muted" />
+                  {t("tree.open")}
+                </ContextMenuItem>
+                <ContextMenuSeparator />
+              </>
+            )}
             <ContextMenuItem onSelect={revealInFinder}>
               <Icon icon={FolderOpen} size={12} className="text-muted" />
               {t("tree.revealInFinder")}
@@ -213,7 +224,7 @@ export const TreeNode = memo(function TreeNode({
   return (
     <>
       {row}
-      {entry.isDir && isOpen ? (
+      {expandable && isOpen ? (
         <TreeChildren
           projectId={projectId}
           path={entry.path}
@@ -280,7 +291,7 @@ export function CreateRow({
 
   return (
     <div
-      className="flex w-full items-center gap-[8px] py-[3px] font-mono text-mono text-body"
+      className="flex w-full items-center gap-8px py-[3px] text-ui text-body"
       style={{ paddingLeft: indentPx }}
       title={error ?? undefined}
     >
@@ -315,8 +326,8 @@ export function CreateRow({
           else cancelCreate(projectId);
         }}
         className={cn(
-          "min-w-0 flex-1 rounded-xs border bg-surface-strong/45 px-[6px] py-[1px]",
-          "text-mono text-ink outline-none",
+          "min-w-0 flex-1 rounded-xs border bg-surface-strong/45 px-6px py-[1px]",
+          "text-ui text-ink outline-none",
           error ? "border-danger focus:border-danger" : "border-accent/60 focus:border-accent",
         )}
         spellCheck={false}
@@ -362,7 +373,7 @@ function TreeChildren({
       <>
         {createRow}
         <div
-          className="flex items-center gap-[6px] py-[3px] font-mono text-label text-muted-soft"
+          className="flex items-center gap-6px py-[3px] text-label text-muted-soft"
           style={{ paddingLeft: indentPx }}
         >
           <span className="h-[8px] w-[8px] animate-pulse rounded-pill bg-hairline-strong motion-reduce:animate-none" />
@@ -378,7 +389,7 @@ function TreeChildren({
           {createRow}
           {createRow ? null : (
             <div
-              className="py-[3px] font-mono text-label text-muted-soft"
+              className="py-[3px] text-label text-muted-soft"
               style={{ paddingLeft: indentPx }}
             >
               {t("tree.empty")}
@@ -409,7 +420,7 @@ function TreeChildren({
     <>
       {createRow}
       <div
-        className="py-[3px] font-mono text-label text-danger"
+        className="py-[3px] text-label text-danger"
         style={{ paddingLeft: indentPx }}
         title={state.error}
       >

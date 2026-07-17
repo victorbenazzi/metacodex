@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { Minus, Plus } from "lucide-react";
+import { Minus, Plus } from "@/components/ui/icons";
 
 import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/cn";

@@ -1,5 +1,5 @@
 import * as RDM from "@radix-ui/react-dropdown-menu";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 import type React from "react";
 
@@ -35,7 +35,7 @@ export function DropdownContent({
         alignOffset={alignOffset}
         collisionPadding={collisionPadding}
         className={cn(
-          "z-50 min-w-[220px] rounded-md border border-hairline bg-surface-card p-[5px]",
+          "z-50 min-w-[220px] rounded-md border border-hairline bg-surface-card p-5px",
           "text-ui text-ink",
           "data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out",
           className,
@@ -77,14 +77,14 @@ export function DropdownItem({
       }}
       disabled={disabled}
       className={cn(
-        "flex w-full cursor-pointer items-center justify-between gap-[12px] rounded-sm px-[10px] py-[7px] outline-none",
+        "flex w-full cursor-pointer items-center justify-between gap-12px rounded-sm px-10px py-7px outline-none",
         "data-[highlighted]:bg-surface-strong/70 data-[highlighted]:text-ink",
         "data-[disabled]:cursor-not-allowed data-[disabled]:opacity-40",
         destructive && "text-danger data-[highlighted]:text-danger data-[highlighted]:bg-danger/10",
         className,
       )}
     >
-      <span className="flex items-center gap-[10px] whitespace-nowrap">{children}</span>
+      <span className="flex items-center gap-10px whitespace-nowrap">{children}</span>
       {trailing ? <span className="shrink-0 text-muted">{trailing}</span> : null}
     </RDM.Item>
   );
@@ -106,14 +106,14 @@ export function DropdownSubTrigger({
     <RDM.SubTrigger
       disabled={disabled}
       className={cn(
-        "flex w-full cursor-pointer items-center justify-between gap-[12px] rounded-sm px-[10px] py-[7px] outline-none",
+        "flex w-full cursor-pointer items-center justify-between gap-12px rounded-sm px-10px py-7px outline-none",
         "data-[highlighted]:bg-surface-strong/70 data-[highlighted]:text-ink",
         "data-[state=open]:bg-surface-strong/70 data-[state=open]:text-ink",
         "data-[disabled]:cursor-not-allowed data-[disabled]:opacity-40",
         className,
       )}
     >
-      <span className="flex items-center gap-[10px] whitespace-nowrap">{children}</span>
+      <span className="flex items-center gap-10px whitespace-nowrap">{children}</span>
       <ChevronRight size={12} strokeWidth={1.6} className="shrink-0 text-muted" />
     </RDM.SubTrigger>
   );
@@ -133,7 +133,7 @@ export function DropdownSubContent({
         alignOffset={-5}
         collisionPadding={8}
         className={cn(
-          "z-50 min-w-[220px] rounded-md border border-hairline bg-surface-card p-[5px]",
+          "z-50 min-w-[220px] rounded-md border border-hairline bg-surface-card p-5px",
           "text-ui text-ink",
           "data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out",
           className,
@@ -146,12 +146,12 @@ export function DropdownSubContent({
 }
 
 export function DropdownSeparator() {
-  return <RDM.Separator className="my-[5px] h-px bg-hairline-soft" />;
+  return <RDM.Separator className="my-5px h-px bg-hairline-soft" />;
 }
 
 export function DropdownLabel({ children }: { children: React.ReactNode }) {
   return (
-    <RDM.Label className="whitespace-nowrap px-[10px] pb-[4px] pt-[6px] editorial-caps">
+    <RDM.Label className="whitespace-nowrap px-10px pb-4px pt-6px editorial-caps">
       {children}
     </RDM.Label>
   );

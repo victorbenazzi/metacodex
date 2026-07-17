@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 import type { Project } from "@/features/projects/project.types";
 import { watcherApi } from "@/features/filesystem/watcher.service";
@@ -14,16 +14,28 @@ import { recordDiag } from "@/features/diagnostics/diagnostics.store";
 
 export function useFilesystemSync(project: Project | null): void {
   const refreshGit = useGitStore((s) => s.refresh);
+  const projects = useProjectsStore((s) => s.projects);
+  const watchedIds = useRef(new Set<string>());
 
+  // Watch EVERY registered project, not just the active one. Terminals (and
+  // the agents running in them) stay alive across project switches, so files
+  // keep changing in background projects; watching only the active root made
+  // those trees go silently stale until the next app-driven refresh. watch()
+  // is idempotent per (id, path) on the Rust side, so re-running this effect
+  // on any projects-array change is cheap. Project removal tears the watcher
+  // down authoritatively in the backend; the diff below is belt and braces.
   useEffect(() => {
-    if (!project) return;
-    void watcherApi.watch(project.id, project.path).catch((err) => {
-      console.warn("[watcher] watch failed", err);
-    });
-    return () => {
-      void watcherApi.unwatch(project.id).catch(() => undefined);
-    };
-  }, [project]);
+    const current = new Set(projects.map((p) => p.id));
+    for (const p of projects) {
+      void watcherApi.watch(p.id, p.path).catch((err) => {
+        console.warn("[watcher] watch failed", err);
+      });
+    }
+    for (const id of watchedIds.current) {
+      if (!current.has(id)) void watcherApi.unwatch(id).catch(() => undefined);
+    }
+    watchedIds.current = current;
+  }, [projects]);
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;
@@ -110,9 +122,18 @@ export function useFilesystemSync(project: Project | null): void {
     };
   }, []);
 
+  // On activation, revalidate what we're about to show: git status, worktrees
+  // and every cached directory listing. The watcher keeps the active project
+  // fresh from here on; this catches anything a background project missed
+  // (watch failure, FSEvents overflow) before the user is looking at it.
+  // Depend on id/path, not the object: metadata churn (lastOpenedAt bumps)
+  // must not re-trigger a full revalidation.
+  const projectId = project?.id;
+  const projectPath = project?.path;
   useEffect(() => {
-    if (!project) return;
-    void refreshGit(project.id, project.path);
-    void useWorktreesStore.getState().refresh(project.id, project.path);
-  }, [project, refreshGit]);
+    if (!projectId || !projectPath) return;
+    void refreshGit(projectId, projectPath);
+    void useWorktreesStore.getState().refresh(projectId, projectPath);
+    void useExplorerStore.getState().refreshAll(projectId);
+  }, [projectId, projectPath, refreshGit]);
 }

@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { X, AlertTriangle } from "lucide-react";
+import { X, AlertTriangle } from "@/components/ui/icons";
 
 import { IconButton } from "@/components/ui/IconButton";
 import { useDiagnosticsStore } from "@/features/diagnostics/diagnostics.store";
@@ -35,7 +35,7 @@ export function TerminalExitBanner({ exitCode, reason, sessionId, onDismiss }: T
   return (
     <div
       role="status"
-      className="flex flex-none items-start gap-[var(--space-xs)] border-b border-hairline bg-danger/[0.06] px-[var(--space-base)] py-[8px] text-caption text-ink"
+      className="flex flex-none items-start gap-[var(--space-xs)] border-b border-hairline bg-danger/[0.06] px-[var(--space-base)] py-8px text-caption text-ink"
     >
       <AlertTriangle size={14} className="mt-[2px] flex-none text-danger" />
       <div className="flex-1 leading-[1.5]">

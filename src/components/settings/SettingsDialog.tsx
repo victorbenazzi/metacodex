@@ -14,8 +14,8 @@ import {
   Bell,
   PersonStanding,
   X,
-  type LucideIcon,
-} from "lucide-react";
+  type IconComponent,
+} from "@/components/ui/icons";
 
 import { Icon } from "@/components/ui/Icon";
 import { IconButton } from "@/components/ui/IconButton";
@@ -53,7 +53,7 @@ type CategoryId =
 interface Category {
   id: CategoryId;
   labelKey: string;
-  icon: LucideIcon;
+  icon: IconComponent;
 }
 
 const CATEGORIES: Category[] = [
@@ -93,8 +93,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
         >
           <RD.Title className="sr-only">metacodex settings</RD.Title>
 
-          <header className="relative flex h-[48px] items-center justify-between border-b border-hairline-soft px-[20px]">
-            <div className="flex items-center gap-[12px]">
+          <header className="relative flex h-[48px] items-center justify-between border-b border-hairline-soft px-20px">
+            <div className="flex items-center gap-12px">
               <span className="editorial-caps">{t("settings.header")}</span>
               <span className="font-mono text-label text-muted-soft">metacodex</span>
             </div>
@@ -106,7 +106,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
           </header>
 
           <div className="grid h-[calc(100%-48px)] grid-cols-[200px_1fr]">
-            <aside className="flex flex-col gap-[1px] overflow-y-auto border-r border-hairline-soft bg-canvas-soft p-[10px]">
+            <aside className="flex flex-col gap-[1px] overflow-y-auto border-r border-hairline-soft bg-canvas-soft p-10px">
               {CATEGORIES.map((c) => (
                 <SidebarRow
                   key={c.id}
@@ -117,7 +117,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               ))}
             </aside>
 
-            <section className="overflow-y-auto px-[32px] py-[26px]">
+            <section className="overflow-y-auto px-32px py-26px">
               {selected === "general" && <GeneralPane />}
               {selected === "appearance" && <AppearancePane />}
               {selected === "interface" && <InterfacePane />}
@@ -152,7 +152,7 @@ function SidebarRow({
       type="button"
       onClick={onClick}
       className={cn(
-        "flex w-full items-center gap-[10px] rounded-sm px-[10px] py-[7px] text-left transition-colors",
+        "flex w-full items-center gap-10px rounded-sm px-10px py-7px text-left transition-colors",
         active
           ? "bg-surface-strong/70 text-ink"
           : "text-body hover:bg-surface-strong/40 hover:text-ink",

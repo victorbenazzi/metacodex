@@ -48,7 +48,7 @@ export function ThemeCard({ theme, selected, onSelect }: ThemeCardProps) {
       >
         {/* Faux chrome strip — surface + hairlines reproduce the app's tab area */}
         <div
-          className="flex h-[14px] items-center gap-[3px] border-b px-[6px]"
+          className="flex h-[14px] items-center gap-[3px] border-b px-6px"
           style={{
             backgroundColor: chrome.canvasSoft,
             borderColor: chrome.hairlineSoft,
@@ -70,7 +70,7 @@ export function ThemeCard({ theme, selected, onSelect }: ThemeCardProps) {
 
         {/* Mini code snippet — covers comment, keyword, fn, string, number, tag */}
         <pre
-          className="m-0 px-[8px] pt-[6px]"
+          className="m-0 px-8px pt-6px"
           style={{ color: chrome.body, whiteSpace: "pre" }}
         >
           <span style={{ color: syntax.comment, fontStyle: "italic" }}>{"// theme"}</span>
@@ -93,7 +93,7 @@ export function ThemeCard({ theme, selected, onSelect }: ThemeCardProps) {
       </div>
 
       <div
-        className="flex items-center justify-between px-[10px] py-[8px]"
+        className="flex items-center justify-between px-10px py-8px"
         style={{
           backgroundColor: "var(--surface-card)",
         }}

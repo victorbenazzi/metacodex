@@ -1,11 +1,11 @@
-import type { LucideIcon } from "lucide-react";
+import type { IconComponent } from "@/components/ui/icons";
 import type { ReactNode } from "react";
 
 import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/cn";
 
 interface EmptyStateProps {
-  icon?: LucideIcon;
+  icon?: IconComponent;
   /** Short headline. Rendered as Fraunces display — keep it 1 line. */
   title?: ReactNode;
   /** Supporting paragraph. */
@@ -38,9 +38,9 @@ export function EmptyState({
     >
       <div
         className={cn(
-          "flex flex-col items-center gap-[10px]",
+          "flex flex-col items-center gap-10px",
           card &&
-            "max-w-[320px] rounded-md border border-hairline-soft bg-surface-card px-[26px] py-[24px] shadow-elevated",
+            "max-w-[320px] rounded-md border border-hairline-soft bg-surface-card px-26px py-24px shadow-elevated",
         )}
       >
         {icon ? <Icon icon={icon} size={20} className="text-muted-soft" /> : null}
@@ -54,7 +54,7 @@ export function EmptyState({
             {body}
           </p>
         ) : null}
-        {action ? <div className="mt-[4px]">{action}</div> : null}
+        {action ? <div className="mt-4px">{action}</div> : null}
       </div>
     </div>
   );

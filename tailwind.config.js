@@ -1,3 +1,18 @@
+// Density-aware pixel spacing scale. `p-10px` / `gap-6px` render as
+// calc(Npx * var(--density-multiplier)), so the Density setting (compact /
+// comfortable / spacious) flexes the whole chrome rhythm; at comfortable
+// (multiplier 1) each class equals its plain px value exactly. Use these for
+// chrome padding/margin/gap instead of hardcoded `p-[10px]`. 1-3px stay as
+// arbitrary values on purpose: hairline nudges must not scale. New steps must
+// ALSO be recognized by tailwind-merge (src/lib/cn.ts handles any `<n>px`
+// value, so adding a step here needs no cn.ts change).
+const DENSITY_PX_STEPS = [
+  4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 32, 40, 56, 64,
+];
+const densitySpacing = Object.fromEntries(
+  DENSITY_PX_STEPS.map((n) => [`${n}px`, `calc(${n}px * var(--density-multiplier))`]),
+);
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
@@ -46,6 +61,12 @@ export default {
         "on-update": "var(--on-update)",
         "update-blue-strong": "var(--update-blue-strong)",
         "win-close": "var(--win-close)",
+
+        // Fixed-media overlays (what's-new hero): absolute in both themes.
+        "on-media": "var(--on-media)",
+        "media-scrim": "var(--media-scrim)",
+        "media-scrim-strong": "var(--media-scrim-strong)",
+        "media-ring": "var(--media-ring)",
 
         // Project palette swatches (warm/neutral)
         "p-1": "#7c7666",
@@ -134,6 +155,7 @@ export default {
         md: "var(--space-md)",
         lg: "var(--space-lg)",
         xl: "var(--space-xl)",
+        ...densitySpacing,
       },
       keyframes: {
         // Unified popup motion — pure opacity, no transform. Every overlay,

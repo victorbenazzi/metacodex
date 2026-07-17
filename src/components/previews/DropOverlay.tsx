@@ -1,4 +1,4 @@
-import { FileDown } from "lucide-react";
+import { FileDown } from "@/components/ui/icons";
 import { useTranslation } from "react-i18next";
 
 import { Icon } from "@/components/ui/Icon";
@@ -22,7 +22,7 @@ export function DropOverlay({ active }: { active: boolean }) {
         active ? "opacity-100" : "opacity-0",
       )}
     >
-      <div className="flex flex-col items-center gap-[8px] text-ink">
+      <div className="flex flex-col items-center gap-8px text-ink">
         <Icon icon={FileDown} size={26} strokeWidth={1.5} />
         <span className="text-ui font-medium tracking-tight">{t("preview.dropHint")}</span>
       </div>

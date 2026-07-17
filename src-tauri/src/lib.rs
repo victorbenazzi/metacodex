@@ -169,6 +169,8 @@ pub fn run() {
             commands::settings::write_settings,
             commands::settings::read_keybindings,
             commands::settings::write_keybindings,
+            commands::whats_new::read_whats_new,
+            commands::whats_new::write_whats_new,
             commands::watcher::watcher_watch,
             commands::watcher::watcher_unwatch,
             commands::search::search_in_project,

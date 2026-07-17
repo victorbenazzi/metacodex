@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { X, Trash2, Copy, FileBadge } from "lucide-react";
+import { X, Trash2, Copy, FileBadge } from "@/components/ui/icons";
 
 import {
   useDiagnosticsStore,
@@ -56,7 +56,7 @@ function DiagRow({ entry, onPickSession }: DiagRowProps) {
   const meta = KIND_META[entry.kind];
   const detailStr = entry.detail ? JSON.stringify(entry.detail) : "";
   return (
-    <div className="grid grid-cols-[14px_72px_minmax(0,1fr)] gap-[var(--space-xs)] border-b border-hairline-soft py-[6px] px-[var(--space-sm)] text-caption leading-[1.4]">
+    <div className="grid grid-cols-[14px_72px_minmax(0,1fr)] gap-[var(--space-xs)] border-b border-hairline-soft py-6px px-[var(--space-sm)] text-caption leading-[1.4]">
       <span className={cn("font-mono font-semibold text-center", TONE_CLASSES[meta.tone])}>
         {meta.letter}
       </span>

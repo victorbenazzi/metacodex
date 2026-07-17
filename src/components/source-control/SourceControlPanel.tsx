@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { GitBranch, Check, ArrowUp, ArrowDown, GitCompare } from "lucide-react";
+import { GitBranch, Check, ArrowUp, ArrowDown, GitCompare } from "@/components/ui/icons";
 
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Icon } from "@/components/ui/Icon";
@@ -105,13 +105,13 @@ export function SourceControlPanel({
         onOpenInTerminal={openTerminalAt}
       />
 
-      <div className="shrink-0 border-b border-hairline-soft px-[12px] py-[12px]">
+      <div className="shrink-0 border-b border-hairline-soft px-12px py-12px">
         {git?.branch ? (
-          <div className="flex min-w-0 items-center gap-[6px] font-mono text-caption">
+          <div className="flex min-w-0 items-center gap-6px font-mono text-caption">
             <Icon icon={GitBranch} size={12} className="shrink-0 text-muted-soft" />
             <span className="min-w-0 truncate text-body" title={git.branch}>{git.branch}</span>
             {git.ahead > 0 || git.behind > 0 ? (
-              <span className="ml-auto inline-flex shrink-0 items-center gap-[6px] font-mono text-label tabular-nums text-muted">
+              <span className="ml-auto inline-flex shrink-0 items-center gap-6px font-mono text-label tabular-nums text-muted">
                 {git.ahead > 0 ? (
                   <span className="inline-flex items-center gap-[1px]">
                     <Icon icon={ArrowUp} size={10} />
@@ -129,7 +129,7 @@ export function SourceControlPanel({
           </div>
         ) : null}
 
-        <div className="mt-[10px] flex items-baseline gap-[12px]">
+        <div className="mt-10px flex items-baseline gap-12px">
           <Tooltip content={t("sourceControl.additions", { count: totalAdditions })} side="bottom">
             <span className="whitespace-nowrap font-mono text-title font-medium leading-none tabular-nums text-success/85">
               +{compactCount(totalAdditions)}
@@ -153,7 +153,7 @@ export function SourceControlPanel({
           <EmptyState icon={Check} body={t("sourceControl.empty")} />
         </div>
       ) : (
-        <div className="min-h-0 flex-1 overflow-y-auto py-[8px]">
+        <div className="min-h-0 flex-1 overflow-y-auto py-8px">
           {entries.map(({ absPath, code }) => {
             const rel = relativeTo(projectPath, absPath);
             const name = basename(rel);
@@ -166,16 +166,16 @@ export function SourceControlPanel({
             return (
               <div
                 key={absPath}
-                className="group grid min-h-[32px] grid-cols-[minmax(0,1fr)_48px_48px_28px] items-center gap-[2px] px-[8px] transition-colors duration-fast hover:bg-surface-strong/35"
+                className="group grid min-h-[32px] grid-cols-[minmax(0,1fr)_48px_48px_28px] items-center gap-[2px] px-8px transition-colors duration-fast hover:bg-surface-strong/35"
               >
                 <button
                   type="button"
                   onClick={() => onOpenDiff(absPath, code)}
                   title={absPath}
                   aria-label={`${t(gitStatusLabelKey(code))}: ${rel}`}
-                  className="flex min-w-0 items-center gap-[8px] rounded-xs px-[6px] py-[5px] text-left transition-colors duration-fast focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-hairline-strong"
+                  className="flex min-w-0 items-center gap-8px rounded-xs px-6px py-5px text-left transition-colors duration-fast focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-hairline-strong"
                 >
-                  <span className="inline-flex h-[18px] min-w-[25px] shrink-0 items-center justify-center rounded-xs border border-hairline bg-surface-card px-[4px] font-mono text-micro leading-none tracking-tight text-muted-soft">
+                  <span className="inline-flex h-[18px] min-w-[25px] shrink-0 items-center justify-center rounded-xs border border-hairline bg-surface-card px-4px font-mono text-micro leading-none tracking-tight text-muted-soft">
                     {fileBadge(name)}
                   </span>
                   <span className="min-w-0 flex-1 truncate font-mono text-mono text-body group-hover:text-ink">

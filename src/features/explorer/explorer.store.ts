@@ -46,6 +46,9 @@ interface ExplorerState {
   toggleExpand: (projectId: string, path: string) => Promise<void>;
   loadIfNeeded: (projectId: string, path: string) => Promise<void>;
   refresh: (projectId: string, path: string) => Promise<void>;
+  /** Re-read every cached directory listing of a project (stale-cache
+   *  revalidation on project switch and the manual sync button). */
+  refreshAll: (projectId: string) => Promise<void>;
   clearProject: (projectId: string) => void;
   /** Set (or clear) the selected node for a project. */
   setSelected: (projectId: string, selected: SelectedNode | null) => void;
@@ -76,77 +79,22 @@ const emptyBucket = (): ExplorerBucket => ({
   recentlyAdded: {},
 });
 
-export const useExplorerStore = create<ExplorerState>((set, get) => ({
-  byProject: {},
+/** In-flight refresh reads keyed by `projectId\0path`. Module-local on
+ *  purpose: promises are ephemeral machinery, not store state. */
+const refreshInflight = new Map<
+  string,
+  { promise: Promise<void>; dirty: boolean }
+>();
 
-  getBucket: (projectId) => get().byProject[projectId] ?? emptyBucket(),
-
-  toggleExpand: async (projectId, path) => {
-    const cur = get().byProject[projectId] ?? emptyBucket();
-    const next = new Set(cur.expanded);
-    const wasExpanded = next.has(path);
-    if (wasExpanded) {
-      next.delete(path);
-    } else {
-      next.add(path);
-    }
-    set((state) => ({
-      byProject: {
-        ...state.byProject,
-        [projectId]: { ...cur, expanded: next },
-      },
-    }));
-    if (!wasExpanded && !cur.children[path]) {
-      await get().loadIfNeeded(projectId, path);
-    }
-  },
-
-  loadIfNeeded: async (projectId, path) => {
-    const cur = get().byProject[projectId] ?? emptyBucket();
-    if (cur.children[path]) return;
-    // Mark loading
-    set((state) => ({
-      byProject: {
-        ...state.byProject,
-        [projectId]: {
-          ...cur,
-          children: { ...cur.children, [path]: "loading" },
-        },
-      },
-    }));
-    try {
-      const entries = await fsApi.readDir(path);
-      set((state) => {
-        const b = state.byProject[projectId] ?? emptyBucket();
-        return {
-          byProject: {
-            ...state.byProject,
-            [projectId]: {
-              ...b,
-              children: { ...b.children, [path]: entries },
-            },
-          },
-        };
-      });
-    } catch (err: any) {
-      const message = err?.message ?? String(err);
-      set((state) => {
-        const b = state.byProject[projectId] ?? emptyBucket();
-        return {
-          byProject: {
-            ...state.byProject,
-            [projectId]: {
-              ...b,
-              children: { ...b.children, [path]: { error: message } },
-            },
-          },
-        };
-      });
-    }
-  },
-
-  refresh: async (projectId, path) => {
-    const cur = get().byProject[projectId] ?? emptyBucket();
+export const useExplorerStore = create<ExplorerState>((set, get) => {
+  /** One uncoalesced read-and-swap of a directory listing. Callers go through
+   *  `refresh`, which serializes concurrent calls for the same dir. */
+  const performRefresh = async (projectId: string, path: string) => {
+    // No bucket means the project was removed (clearProject) while this
+    // refresh sat in the coalescing queue; proceeding would resurrect a ghost
+    // bucket for a project the app no longer knows.
+    const cur = get().byProject[projectId];
+    if (!cur) return;
     // Snapshot the previous listing so we can diff after the reload.
     // We only mark "recent" when there was a prior listing , first-time
     // loads of a folder shouldn't tint every single entry.
@@ -165,7 +113,8 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
     } catch (err: any) {
       const message = err?.message ?? String(err);
       set((state) => {
-        const b = state.byProject[projectId] ?? emptyBucket();
+        const b = state.byProject[projectId];
+        if (!b) return state;
         // Keep the last good listing rather than blanking it on a transient
         // read failure; only surface an error if we had nothing before.
         if (Array.isArray(b.children[path])) return state;
@@ -185,7 +134,8 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
     // Swap atomically against the *current* state (not the stale `cur`
     // snapshot) so concurrent refreshes of sibling dirs don't clobber it.
     set((state) => {
-      const b = state.byProject[projectId] ?? emptyBucket();
+      const b = state.byProject[projectId];
+      if (!b) return state;
       return {
         byProject: {
           ...state.byProject,
@@ -194,7 +144,9 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
       };
     });
 
-    if (!beforePaths) return;
+    // The project can also vanish DURING the read; the guarded set above
+    // no-ops then, and the recent-tint pass below must not run either.
+    if (!beforePaths || !get().byProject[projectId]) return;
     const created = entries
       .map((e) => e.path)
       .filter((p) => !beforePaths.has(p));
@@ -202,7 +154,8 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
 
     const now = Date.now();
     set((state) => {
-      const b = state.byProject[projectId] ?? emptyBucket();
+      const b = state.byProject[projectId];
+      if (!b) return state;
       const recent = { ...b.recentlyAdded };
       for (const p of created) recent[p] = now;
       return {
@@ -217,82 +170,198 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
     for (const p of created) {
       setTimeout(() => get().clearRecent(projectId, p), RECENT_TTL_MS);
     }
-  },
+  };
 
-  clearProject: (projectId) =>
-    set((state) => {
-      const { [projectId]: _, ...rest } = state.byProject;
-      return { byProject: rest };
-    }),
+  return {
+    byProject: {},
 
-  clearRecent: (projectId, path) =>
-    set((state) => {
-      const cur = state.byProject[projectId];
-      if (!cur || !(path in cur.recentlyAdded)) return state;
-      const { [path]: _, ...rest } = cur.recentlyAdded;
-      return {
+    getBucket: (projectId) => get().byProject[projectId] ?? emptyBucket(),
+
+    toggleExpand: async (projectId, path) => {
+      const cur = get().byProject[projectId] ?? emptyBucket();
+      const next = new Set(cur.expanded);
+      const wasExpanded = next.has(path);
+      if (wasExpanded) {
+        next.delete(path);
+      } else {
+        next.add(path);
+      }
+      set((state) => ({
         byProject: {
           ...state.byProject,
-          [projectId]: { ...cur, recentlyAdded: rest },
+          [projectId]: { ...cur, expanded: next },
         },
-      };
-    }),
+      }));
+      if (!wasExpanded && !cur.children[path]) {
+        await get().loadIfNeeded(projectId, path);
+      }
+    },
 
-  setSelected: (projectId, selected) =>
-    set((state) => {
-      const cur = state.byProject[projectId] ?? emptyBucket();
-      return {
-        byProject: { ...state.byProject, [projectId]: { ...cur, selected } },
-      };
-    }),
-
-  beginCreate: async (projectId, parentPath, kind) => {
-    // Ensure the parent is expanded and its children are loaded so the inline
-    // input shows up in the right place.
-    const cur = get().byProject[projectId] ?? emptyBucket();
-    const nextExpanded = new Set(cur.expanded);
-    nextExpanded.add(parentPath);
-    set((state) => {
-      const b = state.byProject[projectId] ?? emptyBucket();
-      return {
+    loadIfNeeded: async (projectId, path) => {
+      const cur = get().byProject[projectId] ?? emptyBucket();
+      if (cur.children[path]) return;
+      // Mark loading
+      set((state) => ({
         byProject: {
           ...state.byProject,
           [projectId]: {
-            ...b,
-            expanded: nextExpanded,
-            creating: { parentPath, kind },
+            ...cur,
+            children: { ...cur.children, [path]: "loading" },
           },
         },
-      };
-    });
-    await get().loadIfNeeded(projectId, parentPath);
-  },
+      }));
+      try {
+        const entries = await fsApi.readDir(path);
+        set((state) => {
+          // Project removed while the read was in flight: don't resurrect.
+          const b = state.byProject[projectId];
+          if (!b) return state;
+          return {
+            byProject: {
+              ...state.byProject,
+              [projectId]: {
+                ...b,
+                children: { ...b.children, [path]: entries },
+              },
+            },
+          };
+        });
+      } catch (err: any) {
+        const message = err?.message ?? String(err);
+        set((state) => {
+          const b = state.byProject[projectId];
+          if (!b) return state;
+          return {
+            byProject: {
+              ...state.byProject,
+              [projectId]: {
+                ...b,
+                children: { ...b.children, [path]: { error: message } },
+              },
+            },
+          };
+        });
+      }
+    },
 
-  cancelCreate: (projectId) =>
-    set((state) => {
-      const cur = state.byProject[projectId];
-      if (!cur) return state;
-      return {
-        byProject: { ...state.byProject, [projectId]: { ...cur, creating: null } },
-      };
-    }),
+    refresh: async (projectId, path) => {
+      // Coalesce concurrent refreshes of the same dir: during an agent write
+      // burst the watcher fires many fs://changed events per second, and each
+      // used to issue its own readDir IPC. While a read is in flight, later
+      // requests only mark it dirty; one trailing re-read runs afterwards, so a
+      // whole burst costs at most two reads per dir.
+      const key = `${projectId}\0${path}`;
+      const inflight = refreshInflight.get(key);
+      if (inflight) {
+        inflight.dirty = true;
+        return inflight.promise;
+      }
+      const entry = { dirty: false, promise: Promise.resolve() };
+      entry.promise = (async () => {
+        try {
+          do {
+            entry.dirty = false;
+            await performRefresh(projectId, path);
+          } while (entry.dirty);
+        } catch (err) {
+          // performRefresh handles expected read failures itself (keeps the last
+          // good listing / stores an error state); anything reaching here is
+          // unexpected, and refresh is fire-and-forget for most callers, so log
+          // instead of rejecting into the void.
+          console.warn("[explorer] refresh failed", err);
+        } finally {
+          refreshInflight.delete(key);
+        }
+      })();
+      refreshInflight.set(key, entry);
+      return entry.promise;
+    },
 
-  createNode: async (projectId, parentPath, name, kind) => {
-    const newPath =
-      kind === "dir"
-        ? await fsApi.createDir(parentPath, name)
-        : await fsApi.createFile(parentPath, name);
-    set((state) => {
-      const cur = state.byProject[projectId] ?? emptyBucket();
-      return {
-        byProject: {
-          ...state.byProject,
-          [projectId]: { ...cur, creating: null },
-        },
-      };
-    });
-    await get().refresh(projectId, parentPath);
-    return newPath;
-  },
+    refreshAll: async (projectId) => {
+      const bucket = get().byProject[projectId];
+      if (!bucket) return;
+      // Skip "loading" entries: those already have a first read in flight.
+      const dirs = Object.keys(bucket.children).filter(
+        (d) => bucket.children[d] !== "loading",
+      );
+      await Promise.all(dirs.map((d) => get().refresh(projectId, d)));
+    },
 
-}));
+    clearProject: (projectId) =>
+      set((state) => {
+        const { [projectId]: _, ...rest } = state.byProject;
+        return { byProject: rest };
+      }),
+
+    clearRecent: (projectId, path) =>
+      set((state) => {
+        const cur = state.byProject[projectId];
+        if (!cur || !(path in cur.recentlyAdded)) return state;
+        const { [path]: _, ...rest } = cur.recentlyAdded;
+        return {
+          byProject: {
+            ...state.byProject,
+            [projectId]: { ...cur, recentlyAdded: rest },
+          },
+        };
+      }),
+
+    setSelected: (projectId, selected) =>
+      set((state) => {
+        const cur = state.byProject[projectId] ?? emptyBucket();
+        return {
+          byProject: { ...state.byProject, [projectId]: { ...cur, selected } },
+        };
+      }),
+
+    beginCreate: async (projectId, parentPath, kind) => {
+      // Ensure the parent is expanded and its children are loaded so the inline
+      // input shows up in the right place.
+      const cur = get().byProject[projectId] ?? emptyBucket();
+      const nextExpanded = new Set(cur.expanded);
+      nextExpanded.add(parentPath);
+      set((state) => {
+        const b = state.byProject[projectId] ?? emptyBucket();
+        return {
+          byProject: {
+            ...state.byProject,
+            [projectId]: {
+              ...b,
+              expanded: nextExpanded,
+              creating: { parentPath, kind },
+            },
+          },
+        };
+      });
+      await get().loadIfNeeded(projectId, parentPath);
+    },
+
+    cancelCreate: (projectId) =>
+      set((state) => {
+        const cur = state.byProject[projectId];
+        if (!cur) return state;
+        return {
+          byProject: { ...state.byProject, [projectId]: { ...cur, creating: null } },
+        };
+      }),
+
+    createNode: async (projectId, parentPath, name, kind) => {
+      const newPath =
+        kind === "dir"
+          ? await fsApi.createDir(parentPath, name)
+          : await fsApi.createFile(parentPath, name);
+      set((state) => {
+        const cur = state.byProject[projectId] ?? emptyBucket();
+        return {
+          byProject: {
+            ...state.byProject,
+            [projectId]: { ...cur, creating: null },
+          },
+        };
+      });
+      await get().refresh(projectId, parentPath);
+      return newPath;
+    },
+
+  };
+});

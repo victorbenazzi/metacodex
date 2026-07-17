@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { GitBranch } from "lucide-react";
+import { GitBranch } from "@/components/ui/icons";
 
 import { Icon } from "@/components/ui/Icon";
 import { useTerminalStore } from "@/features/terminal/terminal.store";
@@ -49,14 +49,14 @@ export function TabTooltip({ tab }: TabTooltipProps) {
       : null;
 
   return (
-    <div className="flex max-w-[320px] flex-col gap-[6px]">
+    <div className="flex max-w-[320px] flex-col gap-6px">
       <span className="text-caption font-medium text-ink truncate">{resolveTabTitle(tab)}</span>
       {titleOrigin ? (
         <span className="text-micro text-muted-soft">{t(titleOrigin)}</span>
       ) : null}
 
       {meta?.branch ? (
-        <span className="flex items-center gap-[5px] text-label text-body">
+        <span className="flex items-center gap-5px text-label text-body">
           <Icon icon={GitBranch} size={10} className="text-muted" />
           <span className="font-mono">{meta.branch}</span>
         </span>
@@ -73,11 +73,11 @@ export function TabTooltip({ tab }: TabTooltipProps) {
       ) : null}
 
       {meta && meta.listeningPorts.length > 0 ? (
-        <div className="flex flex-wrap gap-[4px]">
+        <div className="flex flex-wrap gap-4px">
           {meta.listeningPorts.map((p) => (
             <span
               key={`${p.protocol}-${p.port}`}
-              className="inline-flex items-center rounded-xs border border-hairline px-[5px] py-[1px] font-mono text-micro tabular-nums text-body"
+              className="inline-flex items-center rounded-xs border border-hairline px-5px py-[1px] font-mono text-micro tabular-nums text-body"
             >
               {p.address === "*" || p.address === "0.0.0.0" ? "localhost" : p.address}:
               {p.port}

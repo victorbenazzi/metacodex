@@ -1,5 +1,5 @@
 import { type ReactNode } from "react";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle } from "@/components/ui/icons";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/Button";
@@ -90,7 +90,7 @@ export function ConfirmDialog({
           </>
         }
       >
-        <div className="flex gap-[12px]">
+        <div className="flex gap-12px">
           {showIcon ? (
             <span
               aria-hidden
@@ -104,7 +104,7 @@ export function ConfirmDialog({
               {iconNode}
             </span>
           ) : null}
-          <div className="flex-1 space-y-[8px]">
+          <div className="flex-1 space-y-8px">
             {description ? (
               <p className="text-ui leading-relaxed text-body">
                 {description}
@@ -116,7 +116,7 @@ export function ConfirmDialog({
             {skipOption ? (
               <label
                 className={cn(
-                  "mt-[4px] flex cursor-pointer items-center gap-[8px] text-caption text-muted",
+                  "mt-4px flex cursor-pointer items-center gap-8px text-caption text-muted",
                   "select-none hover:text-body",
                 )}
               >

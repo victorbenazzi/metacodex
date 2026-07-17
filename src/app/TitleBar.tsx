@@ -13,13 +13,14 @@ import {
   Square,
   Copy,
   X,
-} from "lucide-react";
+} from "@/components/ui/icons";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import { cn } from "@/lib/cn";
 import { isMac, isWindows } from "@/lib/platform";
 import { useGitStore } from "@/features/git/git.store";
 import { useProjectsStore } from "@/features/projects/project.store";
+import { useSidePanelStore } from "@/features/side-panel/sidePanel.store";
 import { useCodeSidebarStore } from "@/features/ui/codeSidebar.store";
 import { Icon } from "@/components/ui/Icon";
 import { Kbd } from "@/components/ui/Kbd";
@@ -67,6 +68,8 @@ export function TitleBar({
     (s) => s.projects.find((p) => p.id === s.activeProjectId) ?? null,
   );
   const git = useGitStore((s) => (activeId ? s.byProject[activeId] : null));
+  const changeCount = git ? Object.keys(git.statuses).length : 0;
+  const showReview = useSidePanelStore((s) => s.showReview);
   const codeCollapsed = useCodeSidebarStore((s) => s.collapsed);
   const toggleCodeSidebar = useCodeSidebarStore((s) => s.toggleCollapsed);
 
@@ -79,17 +82,17 @@ export function TitleBar({
         // light ends around 82px; 94px keeps a 12px gap between the lights
         // and the first control.
         isMac
-          ? "pl-[94px] pr-[16px]"
+          ? "pl-[94px] pr-16px"
           : isWindows
-            ? "pl-[14px] pr-[138px]"
-            : "pl-[14px] pr-[14px]",
+            ? "pl-14px pr-[138px]"
+            : "pl-14px pr-14px",
         className,
       )}
     >
       {/* Workspace controls sit where the wordmark used to, just past the macOS
           traffic lights. Interactive controls opt out of the drag region; the
           rest of the header still drags the window. */}
-      <div className="flex items-center gap-[8px] justify-self-start">
+      <div className="flex items-center gap-8px justify-self-start">
         <div className="flex items-center gap-[2px]">
           <Tooltip
             content={codeCollapsed ? t("codeSidebar.expand") : t("codeSidebar.collapse")}
@@ -144,12 +147,12 @@ export function TitleBar({
 
       <div
         data-tauri-drag-region
-        className="flex items-center justify-self-center gap-[12px]"
+        className="flex items-center justify-self-center gap-8px"
       >
         {activeProject ? (
           <span
             data-tauri-drag-region
-            className="inline-flex items-center gap-[6px] font-mono text-label text-ink"
+            className="inline-flex items-center gap-6px font-mono text-label text-ink"
             title={activeProject.path}
           >
             {/* pointer-events:none keeps mousedown on the glyph hitting the
@@ -164,33 +167,50 @@ export function TitleBar({
           <span data-tauri-drag-region className="h-[10px] w-px bg-hairline-strong" />
         ) : null}
         {git && git.branch ? (
-          <span
-            data-tauri-drag-region
-            className="inline-flex items-center gap-[5px] font-mono text-label text-muted"
+          <Tooltip
+            side="bottom"
+            content={
+              <span className="inline-flex items-center gap-6px">
+                {t("sidePanel.review")}
+                {changeCount > 0 ? (
+                  <span className="font-mono text-micro tabular-nums text-muted-soft">
+                    {changeCount > 99 ? "99+" : changeCount}
+                  </span>
+                ) : null}
+              </span>
+            }
           >
-            <Icon icon={GitBranch} size={10} />
-            <span data-tauri-drag-region className="text-ink">
-              {git.branch}
-            </span>
-            {git.ahead > 0 ? (
-              <span data-tauri-drag-region className="inline-flex items-center text-muted-soft">
-                <Icon icon={ArrowUp} size={10} />
-                {git.ahead}
-              </span>
-            ) : null}
-            {git.behind > 0 ? (
-              <span data-tauri-drag-region className="inline-flex items-center text-muted-soft">
-                <Icon icon={ArrowDown} size={10} />
-                {git.behind}
-              </span>
-            ) : null}
-          </span>
+            <button
+              type="button"
+              onClick={showReview}
+              aria-label={t("sidePanel.review")}
+              className={cn(
+                "inline-flex h-[22px] cursor-pointer items-center gap-5px rounded-sm px-6px font-mono text-label text-muted transition-colors",
+                "hover:bg-surface-strong/55 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-hairline-strong",
+              )}
+            >
+              <Icon icon={GitBranch} size={10} />
+              <span className="text-ink">{git.branch}</span>
+              {git.ahead > 0 ? (
+                <span className="inline-flex items-center text-muted-soft">
+                  <Icon icon={ArrowUp} size={10} />
+                  {git.ahead}
+                </span>
+              ) : null}
+              {git.behind > 0 ? (
+                <span className="inline-flex items-center text-muted-soft">
+                  <Icon icon={ArrowDown} size={10} />
+                  {git.behind}
+                </span>
+              ) : null}
+            </button>
+          </Tooltip>
         ) : null}
         <UpdatePill />
       </div>
 
       {/* Right slot: side panel toggle. */}
-      <div className="flex items-center gap-[6px] justify-self-end">
+      <div className="flex items-center gap-6px justify-self-end">
         <SidePanelToggle />
       </div>
 

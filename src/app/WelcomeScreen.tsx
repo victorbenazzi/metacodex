@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ChevronDown, FileText, FolderOpen, Github, TerminalSquare } from "lucide-react";
+import { ChevronDown, FileText, FolderOpen, Github, TerminalSquare } from "@/components/ui/icons";
 import { getVersion } from "@tauri-apps/api/app";
 import { useTranslation } from "react-i18next";
 
@@ -12,6 +12,7 @@ import {
   DropdownRoot,
   DropdownTrigger,
 } from "@/components/ui/DropdownMenu";
+import { MetacodexMark } from "@/components/icons/brand";
 import { ResumeCards } from "@/components/resume/ResumeCards";
 
 interface WelcomeScreenProps {
@@ -37,30 +38,19 @@ export function WelcomeScreen({
   const { t } = useTranslation();
   return (
     <div className="relative flex h-full w-full overflow-hidden bg-canvas">
-      <div className="relative z-10 mx-auto flex w-full max-w-[760px] flex-col px-[40px] pt-[64px]">
+      <div className="relative z-10 mx-auto flex w-full max-w-[760px] flex-col px-40px pt-64px">
         <span className="editorial-caps">{t("welcome.eyebrow")}</span>
 
-        <div className="mt-[16px] flex items-center gap-[16px]">
-          <img
-            src="/black-metacodex-icon.png"
-            alt=""
-            draggable={false}
-            className="h-[40px] w-[40px] select-none dark:hidden"
-          />
-          <img
-            src="/white-metacodex-icon.png"
-            alt=""
-            draggable={false}
-            className="hidden h-[40px] w-[40px] select-none dark:block"
-          />
+        <div className="mt-16px flex items-center gap-16px">
+          <MetacodexMark size={40} className="shrink-0 select-none text-ink" />
           <h1 className="font-display text-display font-medium text-ink">metacodex</h1>
         </div>
 
-        <p className="mt-[12px] max-w-[520px] text-content text-body">
+        <p className="mt-12px max-w-[520px] text-content text-body">
           {t("welcome.tagline")}
         </p>
 
-        <div className="mt-[32px] flex items-center gap-[10px]">
+        <div className="mt-32px flex items-center gap-10px">
           <DropdownRoot>
             <DropdownTrigger asChild>
               <Button variant="primary" size="md">
@@ -90,7 +80,7 @@ export function WelcomeScreen({
           <Button variant="outline" size="md" onClick={onOpenTerminal}>
             <Icon icon={TerminalSquare} size={14} />
             <span>{t("welcome.openTerminal")}</span>
-            <Kbd keys={["Mod", "T"]} className="ml-[6px]" />
+            <Kbd keys={["Mod", "T"]} className="ml-6px" />
           </Button>
 
           <Button variant="outline" size="md" onClick={onOpenPreviewFile}>
@@ -99,12 +89,12 @@ export function WelcomeScreen({
           </Button>
         </div>
 
-        <div className="mt-[64px] grid max-w-[640px] grid-cols-2 gap-[1px] overflow-hidden rounded-sm border border-hairline bg-hairline">
+        <div className="mt-64px grid max-w-[640px] grid-cols-2 gap-[1px] overflow-hidden rounded-sm border border-hairline bg-hairline">
           <PrincipleCard label={t("welcome.localFirstLabel")} body={t("welcome.localFirstBody")} />
           <PrincipleCard label={t("welcome.realPtyLabel")} body={t("welcome.realPtyBody")} />
         </div>
 
-        <div className="mt-[40px] max-w-[640px]">
+        <div className="mt-40px max-w-[640px]">
           <ResumeCards title={t("resume.titleGlobal")} limit={3} />
         </div>
 
@@ -116,9 +106,9 @@ export function WelcomeScreen({
 
 function PrincipleCard({ label, body }: { label: string; body: string }) {
   return (
-    <article className="bg-canvas-soft px-[18px] py-[20px]">
+    <article className="bg-canvas-soft px-18px py-20px">
       <header className="editorial-caps text-muted-soft">{label}</header>
-      <p className="mt-[10px] text-ui leading-[1.55] text-body">{body}</p>
+      <p className="mt-10px text-ui leading-[1.55] text-body">{body}</p>
     </article>
   );
 }
@@ -132,7 +122,7 @@ function FooterMeta() {
       .catch(() => undefined);
   }, []);
   return (
-    <footer className="mt-auto flex flex-wrap items-center gap-x-[14px] gap-y-[4px] pb-[28px] pt-[40px] font-mono text-label text-muted-soft">
+    <footer className="mt-auto flex flex-wrap items-center gap-x-14px gap-y-4px pb-28px pt-40px font-mono text-label text-muted-soft">
       {version ? (
         <>
           <span>v{version}</span>

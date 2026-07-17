@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { Trash2 } from "lucide-react";
+import { Trash2 } from "@/components/ui/icons";
 
 import { DialogContent, DialogRoot } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Button";
@@ -49,7 +49,7 @@ export function RemoveProjectDialog({ project, open, onOpenChange }: RemoveProje
             </>
           }
         >
-          <div className="space-y-[8px]">
+          <div className="space-y-8px">
             <p className="text-ui text-body">
               <span className="font-medium text-ink">{project.name}</span>
               {t("projectRail.removeBodySuffix")}

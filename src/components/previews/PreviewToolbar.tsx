@@ -1,5 +1,5 @@
 import { type ReactNode } from "react";
-import { FolderInput } from "lucide-react";
+import { FolderInput } from "@/components/ui/icons";
 import { useTranslation } from "react-i18next";
 
 import { Icon } from "@/components/ui/Icon";
@@ -29,7 +29,7 @@ export function SendToProjectButton({
       type="button"
       onClick={() => sendToProject({ path, grantId })}
       className={cn(
-        "inline-flex h-[22px] items-center gap-[6px] rounded-xs px-[8px] text-label text-muted",
+        "inline-flex h-[22px] items-center gap-6px rounded-xs px-8px text-label text-muted",
         "hover:bg-surface-strong/55 hover:text-ink",
         className,
       )}
@@ -58,10 +58,10 @@ export function PreviewToolbar({
   return (
     <header
       data-tauri-drag-region
-      className="flex h-[34px] shrink-0 items-center justify-between border-b border-hairline-soft px-[14px]"
+      className="flex h-[34px] shrink-0 items-center justify-between border-b border-hairline-soft px-14px"
     >
       <span className="editorial-caps text-muted">{t("preview.badge")}</span>
-      <div className="flex items-center gap-[6px]">
+      <div className="flex items-center gap-6px">
         {right}
         <SendToProjectButton path={path} grantId={grantId} />
       </div>

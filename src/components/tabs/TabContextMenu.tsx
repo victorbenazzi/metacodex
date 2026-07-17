@@ -9,7 +9,7 @@ import {
   CornerDownLeft,
   Pencil,
   RotateCcw,
-} from "lucide-react";
+} from "@/components/ui/icons";
 import { useTranslation } from "react-i18next";
 
 import {

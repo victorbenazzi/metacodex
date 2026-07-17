@@ -390,8 +390,8 @@ export function EditorTab({
 
   if (loadError) {
     return (
-      <div className="flex h-full items-center justify-center px-[24px]">
-        <div className="max-w-[440px] space-y-[8px]">
+      <div className="flex h-full items-center justify-center px-24px">
+        <div className="max-w-[440px] space-y-8px">
           <p className="editorial-caps text-danger">{t("editor.couldNotRead")}</p>
           <p className="font-mono text-caption text-body">{loadError}</p>
         </div>
@@ -401,8 +401,8 @@ export function EditorTab({
 
   if (binary) {
     return (
-      <div className="flex h-full items-center justify-center px-[24px]">
-        <div className="max-w-[440px] space-y-[8px]">
+      <div className="flex h-full items-center justify-center px-24px">
+        <div className="max-w-[440px] space-y-8px">
           <p className="editorial-caps">{t("editor.binaryFile")}</p>
           <p className="font-mono text-caption text-body">
             {t("editor.binaryBody")}
@@ -442,7 +442,7 @@ export function EditorTab({
         <div
           className={cn(
             "pointer-events-none absolute bottom-[32px] right-[14px]",
-            "rounded-sm border border-hairline bg-surface-card px-[10px] py-[4px] font-mono text-label text-ink",
+            "rounded-sm border border-hairline bg-surface-card px-10px py-4px font-mono text-label text-ink",
           )}
         >
           {savingNotice}
@@ -471,11 +471,11 @@ function ExternalChangeBar({
   const { t } = useTranslation();
   const deleted = state === "deleted";
   return (
-    <div className="flex shrink-0 items-center justify-between gap-[12px] border-b border-hairline bg-surface-card px-[14px] py-[6px]">
+    <div className="flex shrink-0 items-center justify-between gap-12px border-b border-hairline bg-surface-card px-14px py-6px">
       <span className="truncate font-mono text-label text-body">
         {deleted ? t("editor.externalDeleted") : t("editor.externalChanged")}
       </span>
-      <div className="flex shrink-0 items-center gap-[6px]">
+      <div className="flex shrink-0 items-center gap-6px">
         {deleted ? (
           <>
             <BarButton onClick={onKeepMine}>{t("editor.keepOpen")}</BarButton>
@@ -510,7 +510,7 @@ function BarButton({
       type="button"
       onClick={onClick}
       className={cn(
-        "inline-flex h-[22px] items-center rounded-xs px-[8px] text-label transition-colors",
+        "inline-flex h-[22px] items-center rounded-xs px-8px text-label transition-colors",
         tone === "primary" && "bg-surface-strong/60 text-ink hover:bg-surface-strong",
         tone === "danger" && "text-danger hover:bg-surface-strong/45",
         tone === "secondary" && "text-muted hover:bg-surface-strong/55 hover:text-ink",

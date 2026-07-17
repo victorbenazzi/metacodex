@@ -17,8 +17,8 @@ import {
   FileType2,
   FileVideo,
   Hash,
-  type LucideIcon,
-} from "lucide-react";
+  type IconComponent,
+} from "@/components/ui/icons";
 import {
   siAngular,
   siApache,
@@ -103,10 +103,10 @@ import { basename, ext } from "@/lib/path";
 
 export type FileIconEntry =
   | { kind: "brand"; icon: SimpleIcon }
-  | { kind: "lucide"; icon: LucideIcon };
+  | { kind: "glyph"; icon: IconComponent };
 
 const brand = (icon: SimpleIcon): FileIconEntry => ({ kind: "brand", icon });
-const lucide = (icon: LucideIcon): FileIconEntry => ({ kind: "lucide", icon });
+const glyph = (icon: IconComponent): FileIconEntry => ({ kind: "glyph", icon });
 
 /** Exact filename match (case-insensitive). Highest priority — beats both
  *  glob patterns and the extension map. */
@@ -201,8 +201,8 @@ const BY_FILENAME: Record<string, FileIconEntry> = {
   "vitest.config.js": brand(siVitest),
   "vitest.config.ts": brand(siVitest),
   "vitest.config.mjs": brand(siVitest),
-  "playwright.config.js": lucide(FileTerminal),
-  "playwright.config.ts": lucide(FileTerminal),
+  "playwright.config.js": glyph(FileTerminal),
+  "playwright.config.ts": glyph(FileTerminal),
   "cypress.config.js": brand(siCypress),
   "cypress.config.ts": brand(siCypress),
 
@@ -268,11 +268,11 @@ const BY_FILENAME: Record<string, FileIconEntry> = {
   ".editorconfig": brand(siEditorconfig),
 
   // Generic infra
-  makefile: lucide(FileCog),
+  makefile: glyph(FileCog),
   "rakefile.rb": brand(siRuby),
-  "license": lucide(FileText),
-  "license.md": lucide(FileText),
-  "licence": lucide(FileText),
+  "license": glyph(FileText),
+  "license.md": glyph(FileText),
+  "licence": glyph(FileText),
   "readme": brand(siMarkdown),
   "readme.md": brand(siMarkdown),
   "changelog": brand(siMarkdown),
@@ -355,14 +355,14 @@ const BY_EXTENSION: Record<string, FileIconEntry> = {
   md: brand(siMarkdown),
   markdown: brand(siMarkdown),
   mdx: brand(siMdx),
-  // The official JSON sphere logo turns into a blob at 13px — use Lucide's
-  // clean `{}` glyph instead. Same for XML's W3C wordmark, which is too thin.
-  json: lucide(FileJson),
-  jsonc: lucide(FileJson),
-  json5: lucide(FileJson),
+  // The official JSON sphere logo turns into a blob at 13px — use the
+  // braces-file glyph instead. Same for XML's W3C wordmark, which is too thin.
+  json: glyph(FileJson),
+  jsonc: glyph(FileJson),
+  json5: glyph(FileJson),
   yaml: brand(siYaml),
   yml: brand(siYaml),
-  xml: lucide(FileCode),
+  xml: glyph(FileCode),
   graphql: brand(siGraphql),
   gql: brand(siGraphql),
 
@@ -380,103 +380,103 @@ const BY_EXTENSION: Record<string, FileIconEntry> = {
   // Notebooks
   ipynb: brand(siJupyter),
 
-  // Plain Lucide fallbacks for non-branded but well-known categories
-  c: lucide(FileCode),
-  h: lucide(FileCode),
-  cs: lucide(FileCode),
-  java: lucide(FileCode),
-  fish: lucide(FileTerminal),
-  ps1: lucide(FileTerminal),
-  bat: lucide(FileTerminal),
-  cmd: lucide(FileTerminal),
+  // Plain glyph fallbacks for non-branded but well-known categories
+  c: glyph(FileCode),
+  h: glyph(FileCode),
+  cs: glyph(FileCode),
+  java: glyph(FileCode),
+  fish: glyph(FileTerminal),
+  ps1: glyph(FileTerminal),
+  bat: glyph(FileTerminal),
+  cmd: glyph(FileTerminal),
 
   // Config-ish
-  toml: lucide(FileCog),
-  ini: lucide(FileCog),
-  conf: lucide(FileCog),
-  cfg: lucide(FileCog),
-  properties: lucide(FileCog),
-  env: lucide(FileKey),
+  toml: glyph(FileCog),
+  ini: glyph(FileCog),
+  conf: glyph(FileCog),
+  cfg: glyph(FileCog),
+  properties: glyph(FileCog),
+  env: glyph(FileKey),
 
   // Docs / text
-  txt: lucide(FileText),
-  log: lucide(FileText),
-  rst: lucide(FileText),
-  rtf: lucide(FileText),
+  txt: glyph(FileText),
+  log: glyph(FileText),
+  rst: glyph(FileText),
+  rtf: glyph(FileText),
 
   // Images
-  png: lucide(FileImage),
-  jpg: lucide(FileImage),
-  jpeg: lucide(FileImage),
-  gif: lucide(FileImage),
-  webp: lucide(FileImage),
-  avif: lucide(FileImage),
-  bmp: lucide(FileImage),
-  ico: lucide(FileImage),
-  svg: lucide(FileImage),
-  heic: lucide(FileImage),
+  png: glyph(FileImage),
+  jpg: glyph(FileImage),
+  jpeg: glyph(FileImage),
+  gif: glyph(FileImage),
+  webp: glyph(FileImage),
+  avif: glyph(FileImage),
+  bmp: glyph(FileImage),
+  ico: glyph(FileImage),
+  svg: glyph(FileImage),
+  heic: glyph(FileImage),
 
   // PDF / docs
-  pdf: lucide(FileType2),
-  doc: lucide(FileText),
-  docx: lucide(FileText),
+  pdf: glyph(FileType2),
+  doc: glyph(FileText),
+  docx: glyph(FileText),
 
   // Spreadsheets
-  csv: lucide(FileSpreadsheet),
-  tsv: lucide(FileSpreadsheet),
-  xls: lucide(FileSpreadsheet),
-  xlsx: lucide(FileSpreadsheet),
+  csv: glyph(FileSpreadsheet),
+  tsv: glyph(FileSpreadsheet),
+  xls: glyph(FileSpreadsheet),
+  xlsx: glyph(FileSpreadsheet),
 
   // Audio / video
-  mp3: lucide(FileAudio),
-  wav: lucide(FileAudio),
-  ogg: lucide(FileAudio),
-  flac: lucide(FileAudio),
-  m4a: lucide(FileAudio),
-  mp4: lucide(FileVideo),
-  mov: lucide(FileVideo),
-  mkv: lucide(FileVideo),
-  webm: lucide(FileVideo),
-  avi: lucide(FileVideo),
+  mp3: glyph(FileAudio),
+  wav: glyph(FileAudio),
+  ogg: glyph(FileAudio),
+  flac: glyph(FileAudio),
+  m4a: glyph(FileAudio),
+  mp4: glyph(FileVideo),
+  mov: glyph(FileVideo),
+  mkv: glyph(FileVideo),
+  webm: glyph(FileVideo),
+  avi: glyph(FileVideo),
 
   // Archives
-  zip: lucide(FileArchive),
-  tar: lucide(FileArchive),
-  gz: lucide(FileArchive),
-  bz2: lucide(FileArchive),
-  rar: lucide(FileArchive),
-  "7z": lucide(FileArchive),
+  zip: glyph(FileArchive),
+  tar: glyph(FileArchive),
+  gz: glyph(FileArchive),
+  bz2: glyph(FileArchive),
+  rar: glyph(FileArchive),
+  "7z": glyph(FileArchive),
 
   // Fonts
-  ttf: lucide(FileType),
-  otf: lucide(FileType),
-  woff: lucide(FileType),
-  woff2: lucide(FileType),
+  ttf: glyph(FileType),
+  otf: glyph(FileType),
+  woff: glyph(FileType),
+  woff2: glyph(FileType),
 
   // Databases
-  sql: lucide(Database),
-  sqlite: lucide(Database),
-  db: lucide(Database),
+  sql: glyph(Database),
+  sqlite: glyph(Database),
+  db: glyph(Database),
 
   // Binary / locks
-  bin: lucide(Binary),
-  exe: lucide(Binary),
-  lock: lucide(FileLock2),
+  bin: glyph(Binary),
+  exe: glyph(Binary),
+  lock: glyph(FileLock2),
 
   // Stylesheets-ish
-  styl: lucide(Hash),
+  styl: glyph(Hash),
 };
 
 /** Generic prefix patterns that the filename map can't express literally
  *  (e.g. `.env.local`, `.env.development.local`). Order matters — first match wins. */
 const PREFIX_PATTERNS: { test: (lower: string) => boolean; entry: FileIconEntry }[] = [
-  { test: (n) => n.startsWith(".env"), entry: lucide(FileKey) },
+  { test: (n) => n.startsWith(".env"), entry: glyph(FileKey) },
   { test: (n) => n.startsWith("dockerfile"), entry: brand(siDocker) },
-  { test: (n) => n === "makefile" || n.startsWith("makefile."), entry: lucide(FileCog) },
+  { test: (n) => n === "makefile" || n.startsWith("makefile."), entry: glyph(FileCog) },
 ];
 
-const GENERIC_JSON = lucide(FileJson);
-const GENERIC_FILE = lucide(File);
+const GENERIC_JSON = glyph(FileJson);
+const GENERIC_FILE = glyph(File);
 
 /** Resolve a filename to its icon entry. Pure / safe to call frequently —
  *  every map lookup is O(1) and the only fallback iteration is `PREFIX_PATTERNS`

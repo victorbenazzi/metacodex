@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { RotateCcw } from "lucide-react";
+import { RotateCcw } from "@/components/ui/icons";
 
 import { Icon } from "@/components/ui/Icon";
 import { IconButton } from "@/components/ui/IconButton";
@@ -23,12 +23,12 @@ export function ShortcutsPane() {
 
   return (
     <div>
-      <div className="mb-[12px] flex items-start justify-between gap-[16px]">
+      <div className="mb-12px flex items-start justify-between gap-16px">
         <PaneHeader title={t("settings.shortcuts.title")} description={t("settings.shortcuts.description")} />
         <button
           type="button"
           onClick={resetAll}
-          className="mt-[4px] shrink-0 rounded-sm border border-hairline-strong px-[10px] py-[5px] text-label text-body transition-colors hover:bg-surface-strong/45 hover:text-ink"
+          className="mt-4px shrink-0 rounded-sm border border-hairline-strong px-10px py-5px text-label text-body transition-colors hover:bg-surface-strong/45 hover:text-ink"
         >
           {t("settings.shortcuts.resetAll")}
         </button>
@@ -95,7 +95,7 @@ function ShortcutRow({ command }: { command: CommandDef }) {
   }, [capturing]);
 
   return (
-    <li className="flex items-center justify-between gap-[16px] border-b border-hairline-soft py-[12px] last:border-b-0">
+    <li className="flex items-center justify-between gap-16px border-b border-hairline-soft py-12px last:border-b-0">
       <div className="min-w-0 flex-1">
         <div className="text-ui text-ink">{t(command.descriptionKey)}</div>
         {conflict ? (
@@ -106,7 +106,7 @@ function ShortcutRow({ command }: { command: CommandDef }) {
           </div>
         ) : null}
       </div>
-      <div className="flex shrink-0 items-center gap-[8px]">
+      <div className="flex shrink-0 items-center gap-8px">
         {overridden && !capturing ? (
           <IconButton
             onClick={() => resetToDefault(command.id)}
@@ -120,7 +120,7 @@ function ShortcutRow({ command }: { command: CommandDef }) {
           type="button"
           onClick={() => setCapturing((c) => !c)}
           className={cn(
-            "inline-flex h-[26px] min-w-[96px] items-center justify-center rounded-sm border px-[8px] text-label outline-none transition-colors",
+            "inline-flex h-[26px] min-w-[96px] items-center justify-center rounded-sm border px-8px text-label outline-none transition-colors",
             "focus-visible:ring-2 focus-visible:ring-ink/25",
             capturing
               ? "border-ink bg-surface-strong/40"
@@ -144,9 +144,9 @@ function ShortcutRow({ command }: { command: CommandDef }) {
 function RangeShortcutRow({ command }: { command: CommandDef }) {
   const { t } = useTranslation();
   return (
-    <li className="flex items-center justify-between gap-[16px] border-b border-hairline-soft py-[12px] last:border-b-0">
+    <li className="flex items-center justify-between gap-16px border-b border-hairline-soft py-12px last:border-b-0">
       <span className="text-ui text-ink">{t(command.descriptionKey)}</span>
-      <span className="inline-flex items-center gap-[5px]">
+      <span className="inline-flex items-center gap-5px">
         <Kbd keys={["Mod", "1"]} />
         <span className="text-label text-muted-soft">…</span>
         <Kbd keys={["Mod", "9"]} />

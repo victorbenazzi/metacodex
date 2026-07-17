@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { FolderSearch, Loader2 } from "lucide-react";
+import { FolderSearch, Loader2 } from "@/components/ui/icons";
 
 import { DialogContent, DialogRoot } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Button";
@@ -221,9 +221,9 @@ export function CloneFromGithubDialog({ open, onOpenChange }: CloneFromGithubDia
             e.preventDefault();
             void submit();
           }}
-          className="space-y-[14px]"
+          className="space-y-14px"
         >
-          <div className="space-y-[6px]">
+          <div className="space-y-6px">
             <label className="editorial-caps block" htmlFor="clone-url-input">
               {t("cloneFromGithub.url.label")}
             </label>
@@ -236,17 +236,17 @@ export function CloneFromGithubDialog({ open, onOpenChange }: CloneFromGithubDia
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               disabled={busy}
-              className="block w-full rounded-sm border border-hairline-strong bg-canvas px-[10px] py-[7px] font-mono text-caption text-ink outline-none placeholder:text-muted-soft focus:border-ink disabled:opacity-60"
+              className="block w-full rounded-sm border border-hairline-strong bg-canvas px-10px py-7px font-mono text-caption text-ink outline-none placeholder:text-muted-soft focus:border-ink disabled:opacity-60"
               placeholder={t("cloneFromGithub.url.placeholder")}
               maxLength={2048}
             />
           </div>
 
-          <div className="space-y-[6px]">
+          <div className="space-y-6px">
             <label className="editorial-caps block" htmlFor="clone-parent-input">
               {t("cloneFromGithub.parent.label")}
             </label>
-            <div className="flex items-stretch gap-[6px]">
+            <div className="flex items-stretch gap-6px">
               <input
                 id="clone-parent-input"
                 type="text"
@@ -255,7 +255,7 @@ export function CloneFromGithubDialog({ open, onOpenChange }: CloneFromGithubDia
                 value={parentDir}
                 readOnly
                 disabled={busy}
-                className="block w-full rounded-sm border border-hairline-strong bg-canvas px-[10px] py-[7px] font-mono text-caption text-ink outline-none placeholder:text-muted-soft focus:border-ink disabled:opacity-60"
+                className="block w-full rounded-sm border border-hairline-strong bg-canvas px-10px py-7px font-mono text-caption text-ink outline-none placeholder:text-muted-soft focus:border-ink disabled:opacity-60"
                 placeholder={t("cloneFromGithub.parent.placeholder")}
               />
               <Button
@@ -271,7 +271,7 @@ export function CloneFromGithubDialog({ open, onOpenChange }: CloneFromGithubDia
             </div>
           </div>
 
-          <div className="space-y-[6px]">
+          <div className="space-y-6px">
             <label className="editorial-caps block" htmlFor="clone-name-input">
               {t("cloneFromGithub.name.label")}
             </label>
@@ -286,7 +286,7 @@ export function CloneFromGithubDialog({ open, onOpenChange }: CloneFromGithubDia
                 if (!folderNameTouched) setFolderNameTouched(true);
               }}
               disabled={busy}
-              className="block w-full rounded-sm border border-hairline-strong bg-canvas px-[10px] py-[7px] font-mono text-caption text-ink outline-none placeholder:text-muted-soft focus:border-ink disabled:opacity-60"
+              className="block w-full rounded-sm border border-hairline-strong bg-canvas px-10px py-7px font-mono text-caption text-ink outline-none placeholder:text-muted-soft focus:border-ink disabled:opacity-60"
               placeholder={t("cloneFromGithub.name.placeholder")}
               maxLength={200}
             />
@@ -305,9 +305,9 @@ export function CloneFromGithubDialog({ open, onOpenChange }: CloneFromGithubDia
           ) : null}
 
           {busy ? (
-            <div className="space-y-[6px]" aria-live="polite">
-              <div className="flex items-center justify-between gap-[8px] text-caption text-muted">
-                <span className="flex items-center gap-[6px]">
+            <div className="space-y-6px" aria-live="polite">
+              <div className="flex items-center justify-between gap-8px text-caption text-muted">
+                <span className="flex items-center gap-6px">
                   <Icon
                     icon={Loader2}
                     size={12}

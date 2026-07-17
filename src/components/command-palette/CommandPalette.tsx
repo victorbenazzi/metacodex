@@ -6,7 +6,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 import * as RD from "@radix-ui/react-dialog";
-import { File, ChevronRight } from "lucide-react";
+import { File, ChevronRight } from "@/components/ui/icons";
 import { useTranslation } from "react-i18next";
 
 import { cn } from "@/lib/cn";
@@ -198,7 +198,7 @@ export function CommandPalette() {
             {mode === "files" ? t("commandPalette.titleFiles") : t("commandPalette.titleCommands")}
           </RD.Title>
 
-          <header className="flex items-center gap-[10px] border-b border-hairline-soft px-[14px] py-[10px]">
+          <header className="flex items-center gap-10px border-b border-hairline-soft px-14px py-10px">
             <span className="font-mono text-caption text-muted-soft">
               {mode === "files" ? "›" : "⌘"}
             </span>
@@ -218,13 +218,13 @@ export function CommandPalette() {
             />
           </header>
 
-          <ul ref={listRef} className="max-h-[60vh] overflow-y-auto px-[6px] py-[6px]">
+          <ul ref={listRef} className="max-h-[60vh] overflow-y-auto px-6px py-6px">
             {mode === "files" && loading && items.length === 0 ? (
-              <li className="px-[14px] py-[12px] font-mono text-label text-muted-soft">
+              <li className="px-14px py-12px font-mono text-label text-muted-soft">
                 {t("common.loading")}
               </li>
             ) : items.length === 0 ? (
-              <li className="px-[14px] py-[12px] text-caption text-muted">
+              <li className="px-14px py-12px text-caption text-muted">
                 {filesDisabled ? t("commandPalette.noProjectOpen") : t("commandPalette.nothingFound")}
               </li>
             ) : (
@@ -235,7 +235,7 @@ export function CommandPalette() {
                     onMouseMove={() => setActive(i)}
                     onClick={() => choose(i)}
                     className={cn(
-                      "flex w-full items-center gap-[10px] rounded-sm px-[10px] py-[6px] text-left",
+                      "flex w-full items-center gap-10px rounded-sm px-10px py-6px text-left",
                       i === active ? "bg-surface-strong/55" : "hover:bg-surface-strong/35",
                     )}
                   >
@@ -246,7 +246,7 @@ export function CommandPalette() {
                     />
                     <span className="truncate text-ui text-ink">{it.primary}</span>
                     {it.secondary ? (
-                      <span className="ml-auto shrink-0 truncate pl-[12px] font-mono text-label text-muted-soft">
+                      <span className="ml-auto shrink-0 truncate pl-12px font-mono text-label text-muted-soft">
                         {it.secondary}
                       </span>
                     ) : null}

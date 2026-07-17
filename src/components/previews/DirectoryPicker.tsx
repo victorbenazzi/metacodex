@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { ChevronRight, Folder } from "lucide-react";
+import { ChevronRight, Folder } from "@/components/ui/icons";
 import { useTranslation } from "react-i18next";
 
 import { fsApi } from "@/features/filesystem/filesystem.service";
@@ -87,7 +87,7 @@ export function DirectoryPicker({
             }
           }}
           className={cn(
-            "flex h-[26px] cursor-pointer items-center gap-[4px] rounded-xs pr-[8px] text-caption",
+            "flex h-[26px] cursor-pointer items-center gap-4px rounded-xs pr-8px text-caption",
             isSel
               ? "bg-surface-strong/70 text-ink"
               : "text-body hover:bg-surface-strong/40",
@@ -134,7 +134,7 @@ export function DirectoryPicker({
   };
 
   return (
-    <div className="max-h-[280px] min-h-[180px] overflow-y-auto rounded-sm border border-hairline bg-canvas py-[4px]">
+    <div className="max-h-[280px] min-h-[180px] overflow-y-auto rounded-sm border border-hairline bg-canvas py-4px">
       {renderRow(rootPath, rootLabel, 0)}
     </div>
   );

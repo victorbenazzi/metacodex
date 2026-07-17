@@ -1,6 +1,6 @@
 import { useMemo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Bot, FolderOpen, MoreHorizontal, Pencil, Plus, SquareTerminal, Trash2, X } from "lucide-react";
+import { Bot, FolderOpen, MoreHorizontal, Pencil, Plus, SquareTerminal, Trash2, X } from "@/components/ui/icons";
 
 import { Icon } from "@/components/ui/Icon";
 import { IconButton } from "@/components/ui/IconButton";
@@ -25,9 +25,7 @@ import { NewTabBody, DROPDOWN_COMPONENTS } from "@/components/tabs/NewTabMenu";
 import { TabStatusDot } from "@/components/tabs/TabStatusDot";
 import { statusTone } from "@/components/tabs/statusTone";
 import { useProjectsStore } from "@/features/projects/project.store";
-import { tileIconColor } from "@/features/projects/color";
 import { useSettingsDataStore } from "@/features/settings/settings.data.store";
-import { useThemeStore } from "@/features/theme/theme.store";
 import { useProjectAgentStatus } from "@/features/terminal/projectStatus";
 import { useCodeSidebarStore } from "@/features/ui/codeSidebar.store";
 import { useResumeStore } from "@/features/resume/resume.store";
@@ -117,9 +115,6 @@ export function CodeProjectGroup({
   );
   const aggTone = aggStatus ? statusTone(aggStatus, aggUrgency) : null;
 
-  const theme = useThemeStore((s) => s.effective);
-  const accent = tileIconColor(project.color, theme);
-
   const sessions = useTerminalStore((s) => s.sessions);
   const portsBySession = useTabMetadataStore((s) => s.bySessionId);
   // Index the listening ports by the tab that owns the session, once per change,
@@ -198,7 +193,7 @@ export function CodeProjectGroup({
       >
         <SidebarRow
           active={active}
-          accent={accent}
+          accent="var(--accent)"
           leading={<ProjectGlyph project={project} size={16} />}
           label={project.name}
           title={project.path}
@@ -220,7 +215,7 @@ export function CodeProjectGroup({
                   }
                   side="bottom"
                 >
-                  <span className="mr-[5px] inline-flex">
+                  <span className="mr-5px inline-flex">
                     <ProjectStatusDot
                       status={aggStatus}
                       urgency={aggUrgency}
@@ -348,8 +343,8 @@ export function CodeProjectGroup({
 
 function Section({ label, count, children }: { label: string; count: number; children: ReactNode }) {
   return (
-    <div className="pt-[4px]">
-      <div className="flex items-center justify-between px-[8px] pb-[1px] pt-[2px]">
+    <div className="pt-4px">
+      <div className="flex items-center justify-between px-8px pb-[1px] pt-[2px]">
         <span className="text-label font-medium text-muted-soft">
           {label}
         </span>
@@ -377,7 +372,7 @@ function RowShell({ leading, label, trailing, title, ariaLabel, onClick, onClose
   return (
     <div
       className={cn(
-        "group/row flex w-full items-center gap-[8px] rounded-sm px-[8px] py-[4px] text-ui text-body transition-colors duration-fast",
+        "group/row flex w-full items-center gap-8px rounded-sm px-8px py-4px text-ui text-body transition-colors duration-fast",
         "hover:bg-surface-strong/40 hover:text-ink",
       )}
     >
@@ -386,7 +381,7 @@ function RowShell({ leading, label, trailing, title, ariaLabel, onClick, onClose
         onClick={onClick}
         aria-label={ariaLabel}
         title={title}
-        className="flex min-w-0 flex-1 items-center gap-[8px] rounded-sm text-left outline-none focus-visible:ring-1 focus-visible:ring-hairline-strong"
+        className="flex min-w-0 flex-1 items-center gap-8px rounded-sm text-left outline-none focus-visible:ring-1 focus-visible:ring-hairline-strong"
       >
         <span className="grid h-[16px] w-[16px] shrink-0 place-items-center text-muted">{leading}</span>
         <span className="min-w-0 flex-1 truncate">{label}</span>
@@ -463,11 +458,11 @@ function TabRow({
       leading={leading}
       label={resolveTabTitle(tab)}
       trailing={
-        <span className="flex shrink-0 items-center gap-[4px]">
+        <span className="flex shrink-0 items-center gap-4px">
           {ports.slice(0, 2).map((p) => (
             <span
               key={`${p.address}:${p.port}`}
-              className="rounded-xs border border-hairline px-[4px] font-mono text-micro tabular-nums text-muted-soft"
+              className="rounded-xs border border-hairline px-4px font-mono text-micro tabular-nums text-muted-soft"
             >
               :{p.port}
             </span>

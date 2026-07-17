@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import * as RD from "@radix-ui/react-dialog";
-import { Search, X, CaseSensitive, Regex, WholeWord } from "lucide-react";
+import { Search, X, CaseSensitive, Regex, WholeWord } from "@/components/ui/icons";
 import { useTranslation } from "react-i18next";
 
 import { Icon } from "@/components/ui/Icon";
@@ -110,7 +110,7 @@ export function SearchDialog() {
         >
           <RD.Title className="sr-only">{t("search.title")}</RD.Title>
 
-          <header className="flex items-center gap-[10px] border-b border-hairline-soft px-[14px] py-[10px]">
+          <header className="flex items-center gap-10px border-b border-hairline-soft px-14px py-10px">
             <Icon icon={Search} size={14} className="text-muted" />
             <SearchInput
               query={query}
@@ -147,23 +147,23 @@ export function SearchDialog() {
             </RD.Close>
           </header>
 
-          <div className="max-h-[60vh] overflow-y-auto px-[6px] py-[6px]">
+          <div className="max-h-[60vh] overflow-y-auto px-6px py-6px">
             {!project ? (
-              <p className="px-[14px] py-[14px] text-caption text-muted">
+              <p className="px-14px py-14px text-caption text-muted">
                 {t("search.openToSearch")}
               </p>
             ) : err ? (
-              <p className="px-[14px] py-[14px] text-caption text-danger">{err}</p>
+              <p className="px-14px py-14px text-caption text-danger">{err}</p>
             ) : busy && !results ? (
-              <p className="px-[14px] py-[14px] font-mono text-label text-muted-soft">{t("common.searching")}</p>
+              <p className="px-14px py-14px font-mono text-label text-muted-soft">{t("common.searching")}</p>
             ) : !results ? (
               query.trim() ? null : (
-                <p className="px-[14px] py-[14px] text-caption text-muted">
+                <p className="px-14px py-14px text-caption text-muted">
                   {t("search.typeToSearch")}
                 </p>
               )
             ) : results.totalMatches === 0 ? (
-              <p className="px-[14px] py-[14px] text-caption text-muted">{t("search.noMatches")}</p>
+              <p className="px-14px py-14px text-caption text-muted">{t("search.noMatches")}</p>
             ) : (
               <ResultsList
                 results={results}
@@ -174,7 +174,7 @@ export function SearchDialog() {
           </div>
 
           {results ? (
-            <footer className="flex items-center justify-between border-t border-hairline-soft px-[14px] py-[8px] font-mono text-label text-muted-soft">
+            <footer className="flex items-center justify-between border-t border-hairline-soft px-14px py-8px font-mono text-label text-muted-soft">
               <span>
                 {t("search.summary", { matches: results.totalMatches, files: results.files.length })}
                 {results.truncated ? t("search.truncated") : ""}
@@ -257,12 +257,12 @@ function ResultsList({
   onResultClick: (path: string, line: number) => void;
 }) {
   return (
-    <ul className="flex flex-col gap-[4px]">
+    <ul className="flex flex-col gap-4px">
       {results.files.map((file) => {
         const rel = relativeTo(file.path, rootPath);
         return (
           <li key={file.path} className="rounded-sm">
-            <header className="px-[10px] py-[6px] font-mono text-label text-muted">
+            <header className="px-10px py-6px font-mono text-label text-muted">
               <span className="text-ink">{basename(file.path)}</span>{" "}
               <span className="text-muted-soft">{dirOf(rel)}</span>
             </header>
@@ -272,7 +272,7 @@ function ResultsList({
                   <button
                     type="button"
                     onClick={() => onResultClick(file.path, m.line)}
-                    className="group flex w-full items-baseline gap-[10px] rounded-sm px-[10px] py-[3px] text-left hover:bg-surface-strong/45"
+                    className="group flex w-full items-baseline gap-10px rounded-sm px-10px py-[3px] text-left hover:bg-surface-strong/45"
                   >
                     <span className="w-[36px] shrink-0 text-right font-mono text-micro text-muted-soft">
                       {m.line}

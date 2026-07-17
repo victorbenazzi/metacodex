@@ -1,5 +1,5 @@
 import { forwardRef, type HTMLAttributes, type ReactNode } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown } from "@/components/ui/icons";
 
 import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/cn";
@@ -35,7 +35,7 @@ export const SidebarRow = forwardRef<HTMLDivElement, SidebarRowProps>(function S
     <div
       ref={ref}
       className={cn(
-        "group/proj relative flex w-full items-center gap-[8px] rounded-sm px-[10px] py-[6px] text-ui",
+        "group/proj relative flex w-full items-center gap-8px rounded-sm px-10px py-6px text-ui",
         active ? "bg-surface-strong/45 text-ink" : "text-body hover:bg-surface-strong/30",
         className,
       )}
@@ -101,6 +101,6 @@ export function SidebarChevron({
 /** The indented, hairline-ruled container for a SidebarRow's nested section. */
 export function SidebarNest({ children }: { children: ReactNode }) {
   return (
-    <div className="mb-[4px] ml-[16px] border-l border-hairline-soft pl-[6px]">{children}</div>
+    <div className="mb-4px ml-16px border-l border-hairline-soft pl-6px">{children}</div>
   );
 }

@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { SquareTerminal } from "lucide-react";
+import { SquareTerminal } from "@/components/ui/icons";
 
 import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/cn";

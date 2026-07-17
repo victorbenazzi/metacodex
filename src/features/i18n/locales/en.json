@@ -217,7 +217,8 @@
       "checking": "Checking…",
       "upToDate": "You're on the latest version",
       "devNoUpdates": "Updates are disabled in dev mode",
-      "checkFailed": "Couldn't reach the update server"
+      "checkFailed": "Couldn't reach the update server",
+      "whatsNew": "What's new"
     }
   },
   "cli": {
@@ -261,6 +262,7 @@
     "newFile": "New File",
     "newFolder": "New Folder",
     "searchInProject": "Search in project",
+    "syncFiles": "Sync files",
     "emptyFolder": "(empty folder)",
     "couldNotReadFolder": "could not read folder"
   },
@@ -321,14 +323,12 @@
       "revealInFinder": "Reveal in Finder",
       "moveUp": "Move up",
       "moveDown": "Move down",
-      "color": "Color",
       "icon": "Icon",
       "changeImage": "Change image…",
       "chooseFromComputer": "Choose from computer…",
       "imageHint": "Use the project favicon or another image.",
       "removeImage": "Remove image",
       "removeFromApp": "Remove from metacodex",
-      "useColor": "Use color {{color}}",
       "useIcon": "Use icon {{name}}",
       "changeProjectImage": "Change project image",
       "chooseImage": "Choose image from computer",
@@ -505,7 +505,6 @@
     "review": "Git and Review",
     "showTools": "Show side panel tools",
     "sections": {
-      "repository": "Repository",
       "workspace": "Workspace"
     }
   },
@@ -594,6 +593,20 @@
       "downloadingIndeterminate": "Updating…",
       "installing": "Relaunching…",
       "error": "Update failed; retry"
+    }
+  },
+  "whatsNew": {
+    "eyebrow": "What's new in {{version}}",
+    "cta": "Continue",
+    "releaseNotes": "Read the full release notes on GitHub",
+    "r0018": {
+      "title": "A fresh face for metacodex",
+      "identityTitle": "New visual identity",
+      "identityBody": "New app icon, refreshed brand mark and a redrawn icon set across the whole app.",
+      "explorerTitle": "The explorer stays fresh",
+      "explorerBody": "Every project is watched in the background, with a manual sync button and natural file sorting.",
+      "notesTitle": "Release notes, right here",
+      "notesBody": "This summary appears once after each update, with a link to the full notes on GitHub."
     }
   }
 }

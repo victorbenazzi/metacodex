@@ -217,7 +217,8 @@
       "checking": "Verificando…",
       "upToDate": "Você está na versão mais recente",
       "devNoUpdates": "Atualizações desabilitadas em dev mode",
-      "checkFailed": "Não foi possível contatar o servidor de updates"
+      "checkFailed": "Não foi possível contatar o servidor de updates",
+      "whatsNew": "Ver novidades"
     }
   },
   "cli": {
@@ -261,6 +262,7 @@
     "newFile": "Novo arquivo",
     "newFolder": "Nova pasta",
     "searchInProject": "Buscar no projeto",
+    "syncFiles": "Sincronizar arquivos",
     "emptyFolder": "(pasta vazia)",
     "couldNotReadFolder": "não foi possível ler a pasta"
   },
@@ -321,14 +323,12 @@
       "revealInFinder": "Revelar no Finder",
       "moveUp": "Mover para cima",
       "moveDown": "Mover para baixo",
-      "color": "Cor",
       "icon": "Ícone",
       "changeImage": "Trocar imagem…",
       "chooseFromComputer": "Escolher do computador…",
       "imageHint": "Use o favicon do projeto ou outra imagem.",
       "removeImage": "Remover imagem",
       "removeFromApp": "Remover do metacodex",
-      "useColor": "Usar a cor {{color}}",
       "useIcon": "Usar o ícone {{name}}",
       "changeProjectImage": "Trocar imagem do projeto",
       "chooseImage": "Escolher imagem do computador",
@@ -505,7 +505,6 @@
     "review": "Git e revisão",
     "showTools": "Mostrar ferramentas do painel lateral",
     "sections": {
-      "repository": "Repositório",
       "workspace": "Área de trabalho"
     }
   },
@@ -594,6 +593,20 @@
       "downloadingIndeterminate": "Atualizando…",
       "installing": "Reiniciando…",
       "error": "Falha ao atualizar; tentar de novo"
+    }
+  },
+  "whatsNew": {
+    "eyebrow": "Novidades da versão {{version}}",
+    "cta": "Continuar",
+    "releaseNotes": "Ver as notas completas no GitHub",
+    "r0018": {
+      "title": "Uma nova cara para o metacodex",
+      "identityTitle": "Nova identidade visual",
+      "identityBody": "Ícone novo, marca renovada e conjunto de ícones redesenhado no app inteiro.",
+      "explorerTitle": "Explorador sempre em dia",
+      "explorerBody": "Todos os projetos ficam observados em segundo plano, com botão de sincronizar e ordenação natural de arquivos.",
+      "notesTitle": "Novidades a cada atualização",
+      "notesBody": "Este resumo aparece uma vez após cada update, com o link para as notas completas no GitHub."
     }
   }
 }

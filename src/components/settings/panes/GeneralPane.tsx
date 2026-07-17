@@ -13,7 +13,7 @@ export function GeneralPane() {
       <PaneHeader title={t("settings.general.title")} description={t("settings.general.description")} />
 
       <Row label={t("settings.general.language")} hint={t("settings.general.languageHint")}>
-        <div className="flex gap-[6px]">
+        <div className="flex gap-6px">
           {SUPPORTED_LANGUAGES.map((lang) => {
             const active = i18n.language === lang.id;
             return (
@@ -22,7 +22,7 @@ export function GeneralPane() {
                 type="button"
                 onClick={() => void i18n.changeLanguage(lang.id)}
                 className={cn(
-                  "inline-flex h-[30px] items-center rounded-sm border px-[12px] text-caption transition-colors",
+                  "inline-flex h-[30px] items-center rounded-sm border px-12px text-caption transition-colors",
                   active
                     ? "border-ink bg-ink text-on-primary"
                     : "border-hairline-strong text-ink hover:bg-surface-strong/45",

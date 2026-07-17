@@ -37,12 +37,12 @@ export function Tooltip({
           sideOffset={8}
           collisionPadding={8}
           className={cn(
-            "z-50 rounded-sm border border-hairline bg-surface-card px-[8px] py-[5px]",
+            "z-50 rounded-sm border border-hairline bg-surface-card px-8px py-5px",
             "text-caption text-ink font-medium tracking-tight",
             "data-[state=delayed-open]:animate-fade-in data-[state=closed]:animate-fade-out",
           )}
         >
-          <span className="flex items-center gap-[8px]">
+          <span className="flex items-center gap-8px">
             {content}
             {shortcut ? (
               <span className="ml-[2px] inline-flex items-center text-muted">{shortcut}</span>

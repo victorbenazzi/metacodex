@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Copy, ExternalLink, Terminal, RefreshCw, AlertTriangle, Wrench } from "lucide-react";
+import { Copy, ExternalLink, Terminal, RefreshCw, AlertTriangle, Wrench } from "@/components/ui/icons";
 import { writeText as writeClipboard } from "@tauri-apps/plugin-clipboard-manager";
 import { useTranslation, Trans } from "react-i18next";
 
@@ -32,8 +32,8 @@ export function CliMissingPanel({ cli, onRetry, onOpenInTerminal }: CliMissingPa
 
   return (
     <div className="relative flex h-full w-full overflow-hidden bg-canvas">
-      <div className="mx-auto flex w-full max-w-[640px] flex-col gap-[20px] px-[32px] pt-[56px]">
-        <div className="flex items-center gap-[10px]">
+      <div className="mx-auto flex w-full max-w-[640px] flex-col gap-20px px-32px pt-56px">
+        <div className="flex items-center gap-10px">
           <span className="editorial-caps">
             {needsConfig ? t("cli.needsConfig") : t("terminal.notInstalled")}
           </span>
@@ -61,29 +61,29 @@ export function CliMissingPanel({ cli, onRetry, onOpenInTerminal }: CliMissingPa
         <p className="max-w-[520px] text-content leading-[1.55] text-body">{cli.description}</p>
 
         {needsConfig ? (
-          <div className="rounded-sm border border-hairline-soft bg-canvas-soft px-[16px] py-[14px]">
+          <div className="rounded-sm border border-hairline-soft bg-canvas-soft px-16px py-14px">
             <p className="text-ui text-body">
               <span className="font-medium text-ink">{t("terminal.piNotConfigured")}</span>
               {t("terminal.piNotConfiguredBody")}
             </p>
-            <p className="mt-[6px] font-mono text-label text-muted-soft">
+            <p className="mt-6px font-mono text-label text-muted-soft">
               metacodex.store.json · cliRegistryOverrides
             </p>
           </div>
         ) : (
-          <div className="flex flex-col gap-[10px]">
+          <div className="flex flex-col gap-10px">
             <p className="editorial-caps">{t("terminal.installCommand")}</p>
             <InstallBlock command={installCmd} />
             {altInstallCmd ? (
               <>
-                <p className="mt-[6px] editorial-caps">{t("terminal.orViaNpm")}</p>
+                <p className="mt-6px editorial-caps">{t("terminal.orViaNpm")}</p>
                 <InstallBlock command={altInstallCmd} secondary />
               </>
             ) : null}
           </div>
         )}
 
-        <div className="mt-[8px] flex flex-wrap items-center gap-[8px]">
+        <div className="mt-8px flex flex-wrap items-center gap-8px">
           {!needsConfig && installCmd ? (
             <Button
               variant="primary"
@@ -104,7 +104,7 @@ export function CliMissingPanel({ cli, onRetry, onOpenInTerminal }: CliMissingPa
               target="_blank"
               rel="noreferrer"
               className={cn(
-                "inline-flex h-[32px] items-center gap-[6px] rounded-sm border border-hairline-strong bg-canvas px-[14px] text-ui font-medium text-ink",
+                "inline-flex h-[32px] items-center gap-6px rounded-sm border border-hairline-strong bg-canvas px-14px text-ui font-medium text-ink",
                 "hover:bg-surface-strong/40 transition-colors",
               )}
             >
@@ -114,7 +114,7 @@ export function CliMissingPanel({ cli, onRetry, onOpenInTerminal }: CliMissingPa
           ) : null}
         </div>
 
-        <p className="mt-auto pb-[24px] pt-[28px] font-mono text-label text-muted-soft">
+        <p className="mt-auto pb-24px pt-28px font-mono text-label text-muted-soft">
           <Trans
             i18nKey="terminal.lookup"
             values={{ command: cli.command, detect: detectCmd }}
@@ -143,7 +143,7 @@ function InstallBlock({ command, secondary }: { command: string; secondary?: boo
   return (
     <div
       className={cn(
-        "relative flex items-center gap-[10px] rounded-sm border px-[12px] py-[10px] font-mono text-caption leading-[1.5]",
+        "relative flex items-center gap-10px rounded-sm border px-12px py-10px font-mono text-caption leading-[1.5]",
         secondary
           ? "border-hairline bg-canvas-soft text-body"
           : "border-hairline-strong bg-canvas text-ink",
@@ -155,7 +155,7 @@ function InstallBlock({ command, secondary }: { command: string; secondary?: boo
         type="button"
         onClick={copy}
         className={cn(
-          "inline-flex h-[22px] items-center gap-[4px] rounded-xs border border-hairline-soft px-[8px] text-label text-muted",
+          "inline-flex h-[22px] items-center gap-4px rounded-xs border border-hairline-soft px-8px text-label text-muted",
           "hover:bg-surface-strong/55 hover:text-ink",
         )}
         aria-label={t("terminal.copyInstall")}

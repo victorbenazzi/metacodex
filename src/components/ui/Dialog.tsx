@@ -1,5 +1,5 @@
 import * as RD from "@radix-ui/react-dialog";
-import { X } from "lucide-react";
+import { X } from "@/components/ui/icons";
 import { useTranslation } from "react-i18next";
 
 import { Icon } from "@/components/ui/Icon";
@@ -47,24 +47,24 @@ export function DialogContent({
         )}
       >
         {title || description ? (
-          <header className="shrink-0 border-b border-hairline-soft px-[18px] pb-[12px] pt-[16px]">
+          <header className="shrink-0 border-b border-hairline-soft px-18px pb-12px pt-16px">
             {title ? (
               <RD.Title className="text-ui font-medium tracking-tight text-ink">
                 {title}
               </RD.Title>
             ) : null}
             {description ? (
-              <RD.Description className="mt-[4px] text-caption text-muted">
+              <RD.Description className="mt-4px text-caption text-muted">
                 {description}
               </RD.Description>
             ) : null}
           </header>
         ) : null}
 
-        <div className="min-h-0 overflow-y-auto px-[18px] py-[16px]">{children}</div>
+        <div className="min-h-0 overflow-y-auto px-18px py-16px">{children}</div>
 
         {footer ? (
-          <footer className="flex shrink-0 items-center justify-end gap-[8px] border-t border-hairline-soft px-[18px] py-[12px]">
+          <footer className="flex shrink-0 items-center justify-end gap-8px border-t border-hairline-soft px-18px py-12px">
             {footer}
           </footer>
         ) : null}

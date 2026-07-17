@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Settings } from "lucide-react";
+import { Settings } from "@/components/ui/icons";
 import { useTranslation } from "react-i18next";
 
 import { Icon } from "@/components/ui/Icon";
@@ -54,7 +54,7 @@ export function MiniProjectSidebar() {
         className="atmosphere-soft relative flex h-full w-full flex-col items-center overflow-hidden rounded-lg border border-hairline"
         aria-label={t("projectRail.ariaLabel")}
       >
-        <div className="relative flex flex-1 flex-col items-center gap-[8px] overflow-y-auto overflow-x-hidden px-[8px] py-[14px]">
+        <div className="relative flex flex-1 flex-col items-center gap-8px overflow-y-auto overflow-x-hidden px-8px py-14px">
           {drag.indicatorTop !== null ? <ReorderDropLine top={drag.indicatorTop} /> : null}
 
           {projects.map((p) => (
@@ -89,7 +89,7 @@ export function MiniProjectSidebar() {
           ))}
         </div>
 
-        <div className="flex w-full shrink-0 flex-col items-center gap-[6px] border-t border-hairline-soft py-[10px]">
+        <div className="flex w-full shrink-0 flex-col items-center gap-6px border-t border-hairline-soft py-10px">
           <Tooltip content={t("projectRail.settings")} shortcut={<Kbd keys={["Mod", ","]} />} side="right">
             <button
               type="button"

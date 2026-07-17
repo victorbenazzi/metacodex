@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "@/components/ui/icons";
 import { useTranslation } from "react-i18next";
 
 import { fsApi } from "@/features/filesystem/filesystem.service";
@@ -95,10 +95,10 @@ export function PdfPreview({ path, preview = false, previewGrantId }: PdfPreview
     <div className="relative flex h-full flex-col bg-canvas">
       <header
         data-tauri-drag-region
-        className="flex h-[34px] shrink-0 items-center justify-between border-b border-hairline-soft px-[14px]"
+        className="flex h-[34px] shrink-0 items-center justify-between border-b border-hairline-soft px-14px"
       >
         <span className="editorial-caps truncate">{t("editor.pdfLabel", { name: basename(path) })}</span>
-        <div className="flex items-center gap-[6px]">
+        <div className="flex items-center gap-6px">
           {preview ? <SendToProjectButton path={path} grantId={previewGrantId} /> : null}
           <Button
             variant="ghost"
@@ -123,7 +123,7 @@ export function PdfPreview({ path, preview = false, previewGrantId }: PdfPreview
           </Button>
         </div>
       </header>
-      <div className="flex flex-1 items-start justify-center overflow-auto bg-canvas-soft p-[24px]">
+      <div className="flex flex-1 items-start justify-center overflow-auto bg-canvas-soft p-24px">
         {error ? (
           <p className="font-mono text-caption text-danger">{error}</p>
         ) : (

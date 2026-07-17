@@ -14,7 +14,7 @@ export function ThemePicker() {
 
   return (
     <div>
-      <div className="mb-[10px] flex items-center justify-between">
+      <div className="mb-10px flex items-center justify-between">
         <span className="text-caption font-medium text-ink">
           {t("settings.appearance.themeGallery")}
         </span>
@@ -22,7 +22,7 @@ export function ThemePicker() {
           {t("settings.appearance.themeCount", { count: THEMES.length })}
         </span>
       </div>
-      <div className="grid grid-cols-2 gap-[12px]">
+      <div className="grid grid-cols-2 gap-12px">
         {THEMES.map((theme) => (
           <ThemeCard
             key={theme.id}

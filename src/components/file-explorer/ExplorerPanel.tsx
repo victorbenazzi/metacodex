@@ -1,4 +1,4 @@
-import { FolderSearch } from "lucide-react";
+import { FolderSearch } from "@/components/ui/icons";
 import { useTranslation } from "react-i18next";
 
 import { Icon } from "@/components/ui/Icon";
@@ -41,7 +41,7 @@ export function ExplorerPanel({
         />
       ) : (
         <>
-          <header className="flex h-[var(--panel-header-h)] shrink-0 items-center justify-between border-b border-hairline-soft px-[12px]">
+          <header className="flex h-[var(--panel-header-h)] shrink-0 items-center justify-between border-b border-hairline-soft px-12px">
             <span className="editorial-caps">{t("explorer.title")}</span>
           </header>
           <ExplorerEmpty onOpenFolder={onOpenFolder} />
@@ -54,11 +54,11 @@ export function ExplorerPanel({
 function ExplorerEmpty({ onOpenFolder }: { onOpenFolder: () => void }) {
   const { t } = useTranslation();
   return (
-    <div className="flex flex-1 flex-col items-start gap-[12px] px-[16px] pt-[20px]">
+    <div className="flex flex-1 flex-col items-start gap-12px px-16px pt-20px">
       <div className="flex h-[28px] w-[28px] items-center justify-center rounded-sm border border-hairline text-muted">
         <Icon icon={FolderSearch} size={14} />
       </div>
-      <div className="space-y-[4px]">
+      <div className="space-y-4px">
         <p className="text-ui font-medium text-ink">{t("explorer.noProject")}</p>
         <p className="text-caption leading-[1.5] text-muted">
           {t("explorer.noProjectBody")}
@@ -68,7 +68,7 @@ function ExplorerEmpty({ onOpenFolder }: { onOpenFolder: () => void }) {
         type="button"
         onClick={onOpenFolder}
         className={cn(
-          "mt-[4px] inline-flex h-[28px] items-center gap-[6px] rounded-sm border border-hairline-strong bg-transparent px-[12px] text-caption font-medium text-ink",
+          "mt-4px inline-flex h-[28px] items-center gap-6px rounded-sm border border-hairline-strong bg-transparent px-12px text-caption font-medium text-ink",
           "hover:bg-surface-strong/40 transition-colors",
         )}
       >

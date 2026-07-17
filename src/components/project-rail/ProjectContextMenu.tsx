@@ -1,16 +1,15 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import * as RCM from "@radix-ui/react-context-menu";
 import {
   ArrowDown,
   ArrowUp,
   Pencil,
   Trash2,
-  Paintbrush,
   FolderOpen,
   Shapes,
   ImagePlus,
   ImageOff,
-} from "lucide-react";
+} from "@/components/ui/icons";
 import { useTranslation } from "react-i18next";
 
 import { CMD, invoke } from "@/lib/ipc";
@@ -23,14 +22,9 @@ import {
   ContextMenuSub,
 } from "@/components/ui/ContextMenu";
 import { Icon } from "@/components/ui/Icon";
+import { lookupProjectGlyph } from "./projectIdentity";
 import { useProjectsStore } from "@/features/projects/project.store";
-import { useThemeStore } from "@/features/theme/theme.store";
 import {
-  tileBackground,
-  tileIconColor,
-} from "@/features/projects/color";
-import {
-  PROJECT_PALETTE,
   PROJECT_ICONS,
   type Project,
 } from "@/features/projects/project.types";
@@ -116,55 +110,28 @@ export function ProjectContextMenu({
         <ContextMenuSub
           trigger={
             <>
-              <Icon icon={Paintbrush} size={12} className="text-muted" />
-              <span>{t("projectRail.menu.color")}</span>
-              <span
-                aria-hidden
-                className="ml-[6px] inline-block h-[10px] w-[10px] rounded-pill border border-hairline"
-                style={{ backgroundColor: project.color }}
-              />
-            </>
-          }
-        >
-          <div className="grid grid-cols-4 gap-[8px] p-[10px]">
-            {PROJECT_PALETTE.map((entry) => (
-              <SwatchButton
-                key={entry.hex}
-                color={entry.hex}
-                selected={project.color === entry.hex}
-                onClick={() => updateMeta(project.id, { color: entry.hex })}
-              />
-            ))}
-          </div>
-        </ContextMenuSub>
-
-        <ContextMenuSub
-          trigger={
-            <>
               <Icon icon={Shapes} size={12} className="text-muted" />
               <span>{t("projectRail.menu.icon")}</span>
             </>
           }
         >
-          <div className="max-h-[320px] w-[236px] overflow-y-auto p-[8px]">
-            <div className="grid grid-cols-5 gap-[6px]">
+          <div className="max-h-[320px] w-[236px] overflow-y-auto p-8px">
+            <div className="grid grid-cols-5 gap-6px">
               {PROJECT_ICONS.map((name) => (
                 <IconChoice
                   key={name}
                   name={name}
-                  color={project.color}
                   selected={!hasCustomIcon && project.icon === name}
                   onClick={() => updateMeta(project.id, { icon: name })}
                 />
               ))}
             </div>
 
-            <div className="my-[8px] h-px bg-hairline-soft" />
+            <div className="my-8px h-px bg-hairline-soft" />
 
-            <div className="flex items-center gap-[8px] px-[2px]">
+            <div className="flex items-center gap-8px px-[2px]">
               <CustomImageButton
                 imageUri={hasCustomIcon ? project.icon : null}
-                ringColor={project.color}
                 onClick={handlePickIcon}
               />
               <div className="min-w-0 flex-1 leading-tight">
@@ -181,7 +148,7 @@ export function ProjectContextMenu({
               <button
                 type="button"
                 onClick={() => updateMeta(project.id, { icon: "Folder" })}
-                className="mt-[8px] flex w-full items-center gap-[6px] rounded-sm px-[6px] py-[5px] text-label text-muted transition-colors hover:bg-surface-strong/40 hover:text-body focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[-1px]"
+                className="mt-8px flex w-full items-center gap-6px rounded-sm px-6px py-5px text-label text-muted transition-colors hover:bg-surface-strong/40 hover:text-body focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[-1px]"
               >
                 <Icon icon={ImageOff} size={12} />
                 {t("projectRail.menu.removeImage")}
@@ -201,96 +168,17 @@ export function ProjectContextMenu({
   );
 }
 
-function SwatchButton({
-  color,
-  selected,
-  onClick,
-}: {
-  color: string;
-  selected: boolean;
-  onClick: () => void;
-}) {
-  const { t } = useTranslation();
-  const theme = useThemeStore((s) => s.effective);
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={t("projectRail.menu.useColor", { color })}
-      aria-pressed={selected}
-      className="relative inline-flex h-[28px] w-[28px] items-center justify-center rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[3px]"
-      style={{
-        backgroundColor: tileBackground(color, {
-          theme,
-          active: selected,
-          hover: false,
-        }),
-        boxShadow: selected
-          ? `0 0 0 2px var(--surface-card), 0 0 0 4px ${color}`
-          : "inset 0 0 0 1px var(--hairline)",
-      }}
-    >
-      <span
-        aria-hidden
-        className="h-[14px] w-[14px] rounded-pill"
-        style={{ backgroundColor: color }}
-      />
-    </button>
-  );
-}
-
 function IconChoice({
   name,
-  color,
   selected,
   onClick,
 }: {
   name: string;
-  color: string;
-  selected: boolean;
-  onClick: () => void;
-}) {
-  const theme = useThemeStore((s) => s.effective);
-  return (
-    <LazyIcon
-      name={name}
-      selected={selected}
-      onClick={onClick}
-      iconColor={tileIconColor(color, theme)}
-      ringColor={color}
-      tintBg={tileBackground(color, { theme, active: selected, hover: false })}
-    />
-  );
-}
-
-function LazyIcon({
-  name,
-  iconColor,
-  tintBg,
-  ringColor,
-  selected,
-  onClick,
-}: {
-  name: string;
-  iconColor: string;
-  tintBg: string;
-  ringColor: string;
   selected: boolean;
   onClick: () => void;
 }) {
   const { t } = useTranslation();
-  const [Comp, setComp] = useState<any>(null);
-  useEffect(() => {
-    let cancelled = false;
-    import("lucide-react").then((m) => {
-      if (cancelled) return;
-      const C = (m as any)[name] ?? m.Folder;
-      setComp(() => C);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [name]);
+  const Comp = lookupProjectGlyph(name);
   return (
     <button
       type="button"
@@ -300,18 +188,15 @@ function LazyIcon({
       className={cn(
         "flex h-[30px] w-[30px] items-center justify-center rounded-sm transition-colors",
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[2px]",
-        !selected && "hover:bg-surface-strong/40",
+        selected ? "bg-surface-strong/55" : "hover:bg-surface-strong/40",
       )}
-      style={{
-        backgroundColor: selected ? tintBg : "transparent",
-        boxShadow: selected ? `0 0 0 1.5px ${ringColor}` : undefined,
-      }}
+      style={selected ? { boxShadow: "0 0 0 1.5px var(--accent)" } : undefined}
     >
       {Comp ? (
         <Comp
           size={14}
-          strokeWidth={1.6}
-          color={selected ? iconColor : "var(--body)"}
+          strokeWidth={1.5}
+          color={selected ? "var(--ink)" : "var(--body)"}
         />
       ) : (
         <span className="h-[14px] w-[14px]" />
@@ -323,16 +208,14 @@ function LazyIcon({
 /**
  * The 1:1 "choose an image" button. Empty state: a dashed tile with an
  * ImagePlus glyph. Active state: the chosen image thumbnail (object-cover) with
- * an accent ring matching the project color. This uses the same selection language as the
- * preset icon tiles.
+ * an accent ring. This uses the same selection language as the preset icon
+ * tiles.
  */
 function CustomImageButton({
   imageUri,
-  ringColor,
   onClick,
 }: {
   imageUri: string | null;
-  ringColor: string;
   onClick: () => void;
 }) {
   const { t } = useTranslation();
@@ -346,7 +229,7 @@ function CustomImageButton({
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[2px]",
         !imageUri && "border border-dashed border-hairline-strong hover:bg-surface-strong/40",
       )}
-      style={imageUri ? { boxShadow: `0 0 0 1.5px ${ringColor}` } : undefined}
+      style={imageUri ? { boxShadow: "0 0 0 1.5px var(--accent)" } : undefined}
     >
       {imageUri ? (
         <img src={imageUri} alt="" draggable={false} className="h-full w-full object-contain p-[3px]" />

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { FolderOpen, Settings } from "lucide-react";
+import { FolderOpen, Settings } from "@/components/ui/icons";
 
 import { Icon } from "@/components/ui/Icon";
 import { ReorderDropLine, useListReorder } from "@/components/ui/useListReorder";
@@ -64,22 +64,22 @@ export function ExpandedProjectsSidebar({ onOpenFolder }: ExpandedProjectsSideba
         className="atmosphere-soft flex h-full w-full flex-col overflow-hidden rounded-lg border border-hairline"
         aria-label={t("codeSidebar.projects")}
       >
-        <header className="flex h-[var(--panel-header-h)] shrink-0 items-center border-b border-hairline-soft px-[12px]">
+        <header className="flex h-[var(--panel-header-h)] shrink-0 items-center border-b border-hairline-soft px-12px">
           <span className="editorial-caps truncate">{t("codeSidebar.projects")}</span>
         </header>
 
-        <div className="relative min-h-0 flex-1 overflow-y-auto px-[8px] py-[8px]">
+        <div className="relative min-h-0 flex-1 overflow-y-auto px-8px py-8px">
           {drag.indicatorTop !== null ? (
             <ReorderDropLine top={drag.indicatorTop} insetX={10} />
           ) : null}
 
           {projects.length === 0 ? (
-            <div className="flex flex-col items-start gap-[10px] px-[8px] pt-[12px]">
+            <div className="flex flex-col items-start gap-10px px-8px pt-12px">
               <p className="text-caption leading-[1.5] text-muted">{t("explorer.noProjectBody")}</p>
               <button
                 type="button"
                 onClick={onOpenFolder}
-                className="inline-flex h-[28px] items-center gap-[6px] rounded-sm border border-hairline-strong bg-transparent px-[12px] text-caption font-medium text-ink transition-colors hover:bg-surface-strong/40"
+                className="inline-flex h-[28px] items-center gap-6px rounded-sm border border-hairline-strong bg-transparent px-12px text-caption font-medium text-ink transition-colors hover:bg-surface-strong/40"
               >
                 <Icon icon={FolderOpen} size={12} className="text-muted" />
                 {t("explorer.openFolder")}
@@ -109,11 +109,11 @@ export function ExpandedProjectsSidebar({ onOpenFolder }: ExpandedProjectsSideba
           )}
         </div>
 
-        <footer className="border-t border-hairline-soft px-[8px] py-[4px]">
+        <footer className="border-t border-hairline-soft px-8px py-4px">
           <button
             type="button"
             onClick={() => setSettingsOpen(true)}
-            className="flex w-full items-center gap-[10px] rounded-sm px-[10px] py-[6px] text-left text-ui text-body transition-colors hover:bg-surface-strong/40 hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-hairline-strong"
+            className="flex w-full items-center gap-10px rounded-sm px-10px py-6px text-left text-ui text-body transition-colors hover:bg-surface-strong/40 hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-hairline-strong"
           >
             <Icon icon={Settings} size={14} className="text-muted" />
             {t("projectRail.settings")}
@@ -134,7 +134,7 @@ export function ExpandedProjectsSidebar({ onOpenFolder }: ExpandedProjectsSideba
               "translate(-50%, -50%) rotate(-2deg)",
           }}
         >
-          <div className="flex h-[28px] max-w-[220px] items-center gap-[8px] rounded-md border border-hairline bg-surface-card px-[10px] shadow-drag">
+          <div className="flex h-[28px] max-w-[220px] items-center gap-8px rounded-md border border-hairline bg-surface-card px-10px shadow-drag">
             <ProjectGlyph project={draggingProject} size={14} />
             <span className="truncate text-ui text-ink">{draggingProject.name}</span>
           </div>

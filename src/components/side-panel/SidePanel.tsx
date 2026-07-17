@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ChevronLeft, GitBranch, SquareTerminal } from "lucide-react";
+import { ChevronLeft, GitBranch, SquareTerminal } from "@/components/ui/icons";
 import { useTranslation } from "react-i18next";
 
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -24,6 +24,9 @@ interface SidePanelProps {
   onNewTerminal: () => void;
   onLaunchCli: (cli: CliTool) => void;
   onOpenDiff: (path: string, status: string) => void;
+  /** Reports the card's rendered height (border-box px) so the shell can size
+   *  the resize handle to the card, not the full column. Null on unmount. */
+  onCardHeightChange?: (height: number | null) => void;
 }
 
 export function SidePanel({
@@ -31,10 +34,10 @@ export function SidePanel({
   onNewTerminal,
   onLaunchCli,
   onOpenDiff,
+  onCardHeightChange,
 }: SidePanelProps) {
   const { t } = useTranslation();
   const view = useSidePanelStore((s) => s.view);
-  const showReview = useSidePanelStore((s) => s.showReview);
   const showLauncher = useSidePanelStore((s) => s.showLauncher);
   const close = useSidePanelStore((s) => s.close);
   const git = useGitStore((s) => (project ? s.byProject[project.id] : null));
@@ -57,10 +60,28 @@ export function SidePanel({
   // launcherH intentionally survives while review is open so the launcher can
   // return to its measured height.
   const frameRef = useRef<HTMLDivElement | null>(null);
+  const asideRef = useRef<HTMLElement | null>(null);
   const launcherScrollRef = useRef<HTMLDivElement | null>(null);
   const launcherBlockRef = useRef<HTMLDivElement | null>(null);
   const [frameH, setFrameH] = useState<number | null>(null);
   const [launcherH, setLauncherH] = useState<number | null>(null);
+
+  // Mirror the card's real rendered height to the shell (the resize handle
+  // rail must hug the card, which is shorter than the column in launcher
+  // mode). DOM-measured rather than derived from asideHeight so the first
+  // auto-height render and any in-flight collapse are reported faithfully.
+  useEffect(() => {
+    const el = asideRef.current;
+    if (!el || !onCardHeightChange) return;
+    const sync = () => onCardHeightChange(el.offsetHeight);
+    sync();
+    const ro = new ResizeObserver(sync);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      onCardHeightChange(null);
+    };
+  }, [onCardHeightChange]);
 
   useEffect(() => {
     const el = frameRef.current;
@@ -99,6 +120,7 @@ export function SidePanel({
   return (
     <div ref={frameRef} className="h-full min-h-0">
     <aside
+      ref={asideRef}
       className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-hairline bg-surface-card"
       // Undefined until the first measurement: the card renders height:auto,
       // which visually equals the measured collapsed height, so nothing jumps.
@@ -107,7 +129,7 @@ export function SidePanel({
     >
       {view === "review" ? (
         <>
-          <header className="flex h-[var(--panel-header-h)] shrink-0 items-center gap-[6px] border-b border-hairline-soft px-[8px]">
+          <header className="flex h-[var(--panel-header-h)] shrink-0 items-center gap-6px border-b border-hairline-soft px-8px">
             <Tooltip content={t("sidePanel.showTools")} side="bottom">
               <IconButton
                 aria-label={t("sidePanel.showTools")}
@@ -117,7 +139,7 @@ export function SidePanel({
                 <Icon icon={ChevronLeft} size={14} />
               </IconButton>
             </Tooltip>
-            <div className="flex min-w-0 flex-1 items-center gap-[7px] text-caption text-ink">
+            <div className="flex min-w-0 flex-1 items-center gap-7px text-caption text-ink">
               <Icon icon={GitBranch} size={12} className="shrink-0" />
               <span className="truncate">{t("sidePanel.review")}</span>
               {changeCount > 0 ? (
@@ -144,30 +166,15 @@ export function SidePanel({
       ) : (
         <div
           ref={launcherScrollRef}
-          className="flex min-h-0 flex-1 overflow-y-auto px-[20px] py-[16px]"
+          className="flex min-h-0 flex-1 overflow-y-auto px-20px py-16px"
         >
           {/* self-start opts out of the flex row's default align stretch: the
               block must keep its natural content height at all times, it is
               the source of truth for the card's collapsed height. */}
           <div
             ref={launcherBlockRef}
-            className="mx-auto w-full max-w-[420px] self-start space-y-[18px]"
+            className="mx-auto w-full max-w-[420px] self-start space-y-18px"
           >
-            <LauncherSection label={t("sidePanel.sections.repository")}>
-              <LauncherRow
-                icon={<Icon icon={GitBranch} size={14} />}
-                label={t("sidePanel.review")}
-                trailing={
-                  changeCount > 0 ? (
-                    <span className="font-mono text-micro tabular-nums text-muted-soft">
-                      {changeCount > 99 ? "99+" : changeCount}
-                    </span>
-                  ) : null
-                }
-                onClick={() => showReview()}
-              />
-            </LauncherSection>
-
             <LauncherSection label={t("sidePanel.sections.workspace")}>
               <LauncherRow
                 icon={<Icon icon={SquareTerminal} size={14} />}
@@ -223,11 +230,11 @@ function LauncherSection({
   children: React.ReactNode;
 }) {
   return (
-    <section className="space-y-[6px]">
+    <section className="space-y-6px">
       <div className="px-[2px] editorial-caps text-muted-soft">
         {label}
       </div>
-      <div className="space-y-[4px]">{children}</div>
+      <div className="space-y-4px">{children}</div>
     </section>
   );
 }
@@ -238,7 +245,7 @@ function LauncherRow({ icon, label, trailing, onClick }: LauncherRowProps) {
       type="button"
       onClick={onClick}
       className={cn(
-        "flex h-[40px] w-full items-center gap-[10px] rounded-sm bg-surface-strong/20 px-[12px] text-left text-ui text-body",
+        "flex h-[40px] w-full items-center gap-10px rounded-sm bg-surface-strong/20 px-12px text-left text-ui text-body",
         "border border-transparent transition-colors duration-fast hover:border-hairline-soft hover:bg-surface-strong/50 hover:text-ink",
         "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-hairline-strong",
       )}

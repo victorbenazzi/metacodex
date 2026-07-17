@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight } from "@/components/ui/icons";
 
 import { BrandFileIcon } from "@/components/icons/files/BrandFileIcon";
 import { resolveFileIcon } from "@/components/icons/files/fileIconMap";

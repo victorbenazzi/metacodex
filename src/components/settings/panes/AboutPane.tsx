@@ -7,10 +7,12 @@ import {
   Download,
   Loader2,
   RefreshCw,
-} from "lucide-react";
+  Sparkles,
+} from "@/components/ui/icons";
 import { getVersion } from "@tauri-apps/api/app";
 
 import { Icon } from "@/components/ui/Icon";
+import { MetacodexMark } from "@/components/icons/brand";
 import { PaneHeader } from "@/components/settings/SettingsPrimitives";
 import { CMD, invoke } from "@/lib/ipc";
 import { isMac, isWindows } from "@/lib/platform";
@@ -19,6 +21,8 @@ import {
   checkForUpdatesManual,
   startInstall,
 } from "@/features/updates/updates.service";
+import { useWhatsNewStore } from "@/features/whats-new/whatsNew.store";
+import { useSettingsStore } from "@/features/settings/settings.store";
 
 export function AboutPane() {
   const { t } = useTranslation();
@@ -57,6 +61,13 @@ export function AboutPane() {
     void startInstall();
   };
 
+  const handleShowWhatsNew = () => {
+    // The changelog sheet is a sibling dialog; close Settings so they don't
+    // stack scrims.
+    useSettingsStore.getState().setOpen(false);
+    useWhatsNewStore.getState().showLatest();
+  };
+
   const openAuthorSite = () => {
     invoke(CMD.openExternalUrl, {
       url: "https://www.victorbenazzi.com.br/?utm_source=metacodex&utm_medium=app&utm_campaign=about",
@@ -66,16 +77,19 @@ export function AboutPane() {
   return (
     <div>
       <PaneHeader title={t("settings.about.title")} />
-      <h1
-        className="font-display text-display font-medium text-ink"
-        style={{ lineHeight: 1.05 }}
-      >
-        metacodex
-      </h1>
-      <p className="mt-[10px] font-display text-title leading-[1.5] text-body">
+      <div className="flex items-center gap-12px">
+        <MetacodexMark size={32} className="shrink-0 select-none text-ink" />
+        <h1
+          className="font-display text-display font-medium text-ink"
+          style={{ lineHeight: 1.05 }}
+        >
+          metacodex
+        </h1>
+      </div>
+      <p className="mt-10px font-display text-title leading-[1.5] text-body">
         {t("settings.about.tagline")}
       </p>
-      <ul className="mt-[20px] flex flex-col gap-[6px]">
+      <ul className="mt-20px flex flex-col gap-6px">
         <li className="font-mono text-label text-muted">
           {t("settings.about.version")}{" "}
           <span className="text-ink">{version ?? "…"}</span>
@@ -92,12 +106,12 @@ export function AboutPane() {
         </li>
       </ul>
 
-      <div className="mt-[18px] flex flex-wrap items-center gap-[10px]">
+      <div className="mt-18px flex flex-wrap items-center gap-10px">
         {isAvailable ? (
           <button
             type="button"
             onClick={handleInstall}
-            className="inline-flex items-center gap-[6px] rounded-sm border border-update-blue-strong bg-update-blue-strong px-[10px] py-[5px] font-mono text-label leading-none text-on-update transition duration-fast hover:brightness-110"
+            className="inline-flex items-center gap-6px rounded-sm border border-update-blue-strong bg-update-blue-strong px-10px py-5px font-mono text-label leading-none text-on-update transition duration-fast hover:brightness-110"
             title={t("updates.pill.available", { version: updateStatus.version })}
           >
             <Icon icon={Download} size={10} />
@@ -108,7 +122,7 @@ export function AboutPane() {
             type="button"
             onClick={handleCheck}
             disabled={isChecking || isBusy}
-            className="inline-flex items-center gap-[6px] rounded-sm border border-hairline-strong px-[10px] py-[5px] font-mono text-label leading-none text-ink transition-colors duration-fast hover:bg-surface-strong/45 disabled:cursor-default disabled:opacity-40"
+            className="inline-flex items-center gap-6px rounded-sm border border-hairline-strong px-10px py-5px font-mono text-label leading-none text-ink transition-colors duration-fast hover:bg-surface-strong/45 disabled:cursor-default disabled:opacity-40"
           >
             <Icon
               icon={isChecking ? Loader2 : RefreshCw}
@@ -123,8 +137,17 @@ export function AboutPane() {
           </button>
         )}
 
+        <button
+          type="button"
+          onClick={handleShowWhatsNew}
+          className="inline-flex items-center gap-6px rounded-sm border border-hairline-strong px-10px py-5px font-mono text-label leading-none text-ink transition-colors duration-fast hover:bg-surface-strong/45"
+        >
+          <Icon icon={Sparkles} size={10} />
+          <span>{t("settings.about.whatsNew")}</span>
+        </button>
+
         {!isChecking && !isAvailable && lastResult === "up-to-date" && (
-          <span className="inline-flex items-center gap-[4px] font-mono text-label text-success">
+          <span className="inline-flex items-center gap-4px font-mono text-label text-success">
             <Icon icon={CheckCircle2} size={10} />
             {t("settings.about.upToDate")}
           </span>
@@ -136,7 +159,7 @@ export function AboutPane() {
         )}
         {!isChecking && !isAvailable && isError && (
           <span
-            className="inline-flex items-center gap-[4px] font-mono text-label text-warn"
+            className="inline-flex items-center gap-4px font-mono text-label text-warn"
             title={updateStatus.message}
           >
             <Icon icon={CircleAlert} size={10} />
@@ -145,7 +168,7 @@ export function AboutPane() {
         )}
       </div>
 
-      <p className="mt-[18px] font-mono text-label text-muted">
+      <p className="mt-18px font-mono text-label text-muted">
         {t("settings.about.author")}{" "}
         <button
           type="button"

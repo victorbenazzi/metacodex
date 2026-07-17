@@ -7,7 +7,7 @@ import {
   type TransitionEvent,
 } from "react";
 import { useTranslation } from "react-i18next";
-import { AlertCircle, CheckCircle2, Info, X } from "lucide-react";
+import { AlertCircle, CheckCircle2, Info, X } from "@/components/ui/icons";
 
 import { Icon } from "@/components/ui/Icon";
 import { IconButton } from "@/components/ui/IconButton";
@@ -136,7 +136,7 @@ function ToastRow({ toast, registerRow, onSettledPosition }: ToastRowProps) {
         role="status"
         data-state={visualState}
         onTransitionEnd={handleTransitionEnd}
-        className="toast-row pointer-events-auto flex w-[340px] items-start gap-[10px] rounded-lg border border-hairline bg-canvas/95 px-[14px] py-[11px] shadow-lg backdrop-blur-sm"
+        className="toast-row pointer-events-auto flex w-[340px] items-start gap-10px rounded-lg border border-hairline bg-canvas/95 px-14px py-11px shadow-lg backdrop-blur-sm"
       >
         <Icon icon={toneIcon[toast.tone]} className={cn("mt-[1px] shrink-0", toneAccent[toast.tone])} size={16} />
         <div className="min-w-0 flex-1 space-y-[2px]">
@@ -242,7 +242,7 @@ export function Toaster() {
 
   if (toasts.length === 0) return null;
   return (
-    <div className="pointer-events-none fixed bottom-[16px] right-[16px] z-[1000] flex flex-col gap-[8px]">
+    <div className="pointer-events-none fixed bottom-[16px] right-[16px] z-[1000] flex flex-col gap-8px">
       {toasts.map((tst) => (
         <ToastRow
           key={tst.id}

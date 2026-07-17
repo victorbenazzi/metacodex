@@ -91,12 +91,12 @@ export function InterfacePane() {
         />
       </Row>
 
-      <div className="mb-[8px] mt-[20px] flex items-center justify-between">
+      <div className="mb-8px mt-20px flex items-center justify-between">
         <h3 className="editorial-caps text-muted">
           {t("settings.interface.launcherVisibilityTitle")}
         </h3>
       </div>
-      <p className="mb-[10px] text-caption text-muted">
+      <p className="mb-10px text-caption text-muted">
         {t("settings.interface.launcherVisibilityHint")}
       </p>
 
@@ -107,16 +107,16 @@ export function InterfacePane() {
           return (
             <li
               key={cli.id}
-              className="flex items-center justify-between gap-[16px] border-b border-hairline-soft py-[12px] last:border-b-0"
+              className="flex items-center justify-between gap-16px border-b border-hairline-soft py-12px last:border-b-0"
             >
-              <div className="flex min-w-0 items-center gap-[10px]">
+              <div className="flex min-w-0 items-center gap-10px">
                 {BrandIcon ? (
                   <span className="flex h-[20px] w-[20px] shrink-0 items-center justify-center text-ink">
                     <BrandIcon size={16} />
                   </span>
                 ) : null}
                 <div className="min-w-0">
-                  <div className="flex items-center gap-[8px]">
+                  <div className="flex items-center gap-8px">
                     <span className="text-ui font-medium text-ink">{cli.label}</span>
                     {cliCategory(cli) === "autonomous" ? (
                       <Badge tone="muted">{t("settings.interface.autonomousTag")}</Badge>

@@ -4,6 +4,7 @@ import { AntigravityIcon } from "./AntigravityIcon";
 import { ClaudeCodeIcon } from "./ClaudeCodeIcon";
 import { CodexIcon } from "./CodexIcon";
 import { GrokIcon } from "./GrokIcon";
+import { MetacodexMark } from "./MetacodexMark";
 import { OpenCodeIcon } from "./OpenCodeIcon";
 import { PiIcon } from "./PiIcon";
 import type { BrandIconProps } from "./types";
@@ -14,6 +15,7 @@ export {
   ClaudeCodeIcon,
   CodexIcon,
   GrokIcon,
+  MetacodexMark,
   OpenCodeIcon,
   PiIcon,
   XiaomiMiMoIcon,

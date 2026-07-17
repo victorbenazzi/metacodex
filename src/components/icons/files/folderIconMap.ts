@@ -6,17 +6,17 @@ import {
   FolderGit2,
   FolderLock,
   FolderOpen,
-  type LucideIcon,
-} from "lucide-react";
+  type IconComponent,
+} from "@/components/ui/icons";
 
 /**
- * Smart folder icons — pure Lucide so the visual weight matches generic folders.
+ * Smart folder icons — one glyph set so the visual weight matches generic folders.
  * Lookups are case-insensitive against the folder basename. Anything not in the
  * map falls back to the default `Folder` / `FolderOpen` pair.
  */
 interface FolderIconPair {
-  closed: LucideIcon;
-  open: LucideIcon;
+  closed: IconComponent;
+  open: IconComponent;
 }
 
 const DEFAULT_PAIR: FolderIconPair = { closed: Folder, open: FolderOpen };
@@ -67,7 +67,7 @@ const BY_NAME: Record<string, FolderIconPair> = {
   ".aws": LOCK_PAIR,
 };
 
-export function resolveFolderIcon(name: string, isOpen: boolean): LucideIcon {
+export function resolveFolderIcon(name: string, isOpen: boolean): IconComponent {
   const pair = BY_NAME[name.toLowerCase()] ?? DEFAULT_PAIR;
   return isOpen ? pair.open : pair.closed;
 }

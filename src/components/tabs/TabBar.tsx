@@ -5,7 +5,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { X, TerminalSquare, GitCompare } from "lucide-react";
+import { X, TerminalSquare, GitCompare } from "@/components/ui/icons";
 import { useTranslation } from "react-i18next";
 
 import { Icon } from "@/components/ui/Icon";
@@ -286,7 +286,7 @@ export function TabBar({
       <div
         ref={scrollRef}
         className={cn(
-          "tab-scroll absolute inset-x-0 top-0 bottom-0 flex min-w-0 items-center gap-[4px] overflow-x-auto overflow-y-hidden px-[6px]",
+          "tab-scroll absolute inset-x-0 top-0 bottom-0 flex min-w-0 items-center gap-4px overflow-x-auto overflow-y-hidden px-6px",
         )}
         // Reserve room on the right so tabs don't slide under the
         // absolutely-positioned trailing strip. Width is measured dynamically
@@ -367,7 +367,7 @@ export function TabBar({
                   e.stopPropagation();
                 }}
                 className={cn(
-                  "group relative flex h-[26px] min-w-[120px] max-w-[220px] shrink-0 items-center gap-[7px] rounded-md px-[10px]",
+                  "group relative flex h-[26px] min-w-[120px] max-w-[220px] shrink-0 items-center gap-7px rounded-md px-10px",
                   "touch-none border",
                   active
                     ? "border-tab-active-border bg-tab-active text-tab-active-text"
@@ -465,7 +465,7 @@ export function TabBar({
           />
           <div
             ref={trailingRef}
-            className="absolute right-0 top-0 bottom-0 z-10 flex items-center gap-[6px] bg-canvas px-[10px]"
+            className="absolute right-0 top-0 bottom-0 z-10 flex items-center gap-6px bg-canvas px-10px"
           >
             {trailing}
           </div>
@@ -492,7 +492,7 @@ export function TabBar({
               <div
                 ref={dragGhostRef}
                 aria-hidden
-                className="pointer-events-none fixed left-0 top-0 z-[60] flex h-[26px] min-w-[120px] max-w-[220px] items-center gap-[7px] rounded-md border border-hairline bg-canvas px-[10px] text-caption text-ink shadow-drag will-change-transform"
+                className="pointer-events-none fixed left-0 top-0 z-[60] flex h-[26px] min-w-[120px] max-w-[220px] items-center gap-7px rounded-md border border-hairline bg-canvas px-10px text-caption text-ink shadow-drag will-change-transform"
                 style={{
                   transform: `translate3d(${drag.pointerPos.x + 10}px, ${drag.pointerPos.y - 10}px, 0)`,
                 }}
@@ -574,7 +574,7 @@ function TabRenameInput({ initial, onCommit, onCancel }: TabRenameInputProps) {
       onBlur={commit}
       className={cn(
         // Solid canvas keeps the input distinct from the active tab surface.
-        "flex-1 min-w-0 truncate rounded-xs border border-accent/60 bg-canvas px-[4px]",
+        "flex-1 min-w-0 truncate rounded-xs border border-accent/60 bg-canvas px-4px",
         "text-left text-caption text-ink",
         "outline-none focus:border-accent focus:outline-none",
       )}

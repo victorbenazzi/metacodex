@@ -93,6 +93,14 @@
      both themes (a platform color, not a theme color). */
   --win-close: #e81123;
 
+  /* Controls layered over fixed dark imagery (the what's-new hero). The
+     artwork doesn't change with the theme, so these stay absolute in BOTH
+     themes; theme-relative ink/on-primary would invert and fail on it. */
+  --on-media: #ffffff;
+  --media-scrim: rgba(10, 10, 16, 0.42);
+  --media-scrim-strong: rgba(10, 10, 16, 0.62);
+  --media-ring: rgba(255, 255, 255, 0.22);
+
   /* BackgroundGrain: the two faint radial spots behind editorial empty
      states. Warm ink tint, same in both themes (over the dark canvas they
      read as near-invisible texture, which is intended). */
@@ -210,14 +218,17 @@
   --title-bar-h: 44px;
   /* Single height for every panel header strip (explorer, projects sidebar,
      side panel, diagnostics) and the tab bar, so the top line of all columns
-     stays coplanar. The title bar (--title-bar-h) is a separate concern. */
-  --panel-header-h: 34px;
+     stays coplanar. The title bar (--title-bar-h) is a separate concern.
+     Density-scaled: every consumer reads this var, so compact/spacious flex
+     all headers together and the columns stay coplanar at any density. */
+  --panel-header-h: calc(34px * var(--density-multiplier));
   /* Breathing room around the floating sidebar cards: `x` is the gap between a
      card and the window edge or another card (also the resize-handle hit-zone
      width); `y` is the gap above and below each card. Single source of truth
-     for the grid template, the handle offsets and the vertical insets. */
-  --panel-gap-x: 8px;
-  --panel-gap-y: 4px;
+     for the grid template, the handle offsets and the vertical insets.
+     Density-scaled like the spacing tokens. */
+  --panel-gap-x: calc(8px * var(--density-multiplier));
+  --panel-gap-y: calc(4px * var(--density-multiplier));
 
   /* Terminal palette (warm, neutral ANSI) */
   --term-bg: var(--canvas);

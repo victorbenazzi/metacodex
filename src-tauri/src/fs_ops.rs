@@ -164,23 +164,84 @@ pub fn read_dir(app: &AppHandle, path: &str) -> AppResult<Vec<DirEntry>> {
             Ok(m) => m,
             Err(_) => continue,
         };
+        let is_symlink = meta.file_type().is_symlink();
+        // The link's own metadata says nothing about what it points at; resolve
+        // the target so a symlinked directory renders folder-shaped (icon and
+        // dirs-first sorting). Reading THROUGH the link stays blocked by the
+        // path sandbox (symlinked components are rejected), so the explorer
+        // shows these rows as non-expandable instead of erroring on expand.
+        // A broken link falls back to file-shaped.
+        let is_dir = if is_symlink {
+            fs::metadata(entry.path()).map(|m| m.is_dir()).unwrap_or(false)
+        } else {
+            meta.is_dir()
+        };
         out.push(DirEntry {
             name,
             path: path_s,
-            is_dir: meta.is_dir(),
-            is_symlink: meta.file_type().is_symlink(),
+            is_dir,
+            is_symlink,
             size: meta.len(),
             mtime_ms: mtime_ms(&meta),
         });
     }
 
-    // Folders first, then files; both case-insensitive alphabetical.
+    // Folders first, then files; both in natural order (VS Code parity), with
+    // an exact-name tiebreak so listings stay deterministic for the frontend
+    // to diff against.
     out.sort_by(|a, b| match (a.is_dir, b.is_dir) {
         (true, false) => std::cmp::Ordering::Less,
         (false, true) => std::cmp::Ordering::Greater,
-        _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+        _ => natural_cmp(&a.name, &b.name).then_with(|| a.name.cmp(&b.name)),
     });
     Ok(out)
+}
+
+/// Case-insensitive "natural" ordering: digit runs compare as numbers, so
+/// `file2` sorts before `file10` (explorer parity with VS Code / Finder).
+/// Equal numeric values with different zero-padding order shorter-run first
+/// (`1` before `01`) to stay total and deterministic.
+fn natural_cmp(a: &str, b: &str) -> std::cmp::Ordering {
+    use std::cmp::Ordering;
+
+    fn digit_run_len(s: &str) -> usize {
+        s.bytes().take_while(|b| b.is_ascii_digit()).count()
+    }
+
+    let (mut a, mut b) = (a, b);
+    loop {
+        match (a.chars().next(), b.chars().next()) {
+            (None, None) => return Ordering::Equal,
+            (None, Some(_)) => return Ordering::Less,
+            (Some(_), None) => return Ordering::Greater,
+            (Some(ca), Some(cb)) => {
+                if ca.is_ascii_digit() && cb.is_ascii_digit() {
+                    let (ra, rb) = (digit_run_len(a), digit_run_len(b));
+                    let (na, nb) = (&a[..ra], &b[..rb]);
+                    let (ta, tb) = (na.trim_start_matches('0'), nb.trim_start_matches('0'));
+                    // Compare as integers without parsing (runs can exceed
+                    // u64): more significant digits wins, then lexicographic.
+                    let ord = ta.len().cmp(&tb.len()).then_with(|| ta.cmp(tb));
+                    if ord != Ordering::Equal {
+                        return ord;
+                    }
+                    if na.len() != nb.len() {
+                        return na.len().cmp(&nb.len());
+                    }
+                    a = &a[ra..];
+                    b = &b[rb..];
+                } else {
+                    let la = ca.to_lowercase().next().unwrap_or(ca);
+                    let lb = cb.to_lowercase().next().unwrap_or(cb);
+                    if la != lb {
+                        return la.cmp(&lb);
+                    }
+                    a = &a[ca.len_utf8()..];
+                    b = &b[cb.len_utf8()..];
+                }
+            }
+        }
+    }
 }
 
 pub fn stat(app: &AppHandle, path: &str) -> AppResult<FileMeta> {
@@ -545,5 +606,41 @@ fn io_error(ctx: &str, e: std::io::Error) -> AppError {
         ErrorKind::NotFound => AppError::NotFound(format!("{ctx}: {e}")),
         ErrorKind::PermissionDenied => AppError::PermissionDenied(format!("{ctx}: {e}")),
         _ => AppError::Io(e),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::natural_cmp;
+    use std::cmp::Ordering;
+
+    #[test]
+    fn natural_orders_digit_runs_numerically() {
+        assert_eq!(natural_cmp("file2", "file10"), Ordering::Less);
+        assert_eq!(natural_cmp("file10", "file2"), Ordering::Greater);
+        assert_eq!(natural_cmp("2", "10"), Ordering::Less);
+        assert_eq!(natural_cmp("v1.9", "v1.10"), Ordering::Less);
+    }
+
+    #[test]
+    fn natural_is_case_insensitive_with_exact_tiebreak_left_to_callers() {
+        assert_eq!(natural_cmp("Alpha", "alpha"), Ordering::Equal);
+        assert_eq!(natural_cmp("apple", "Banana"), Ordering::Less);
+    }
+
+    #[test]
+    fn natural_handles_zero_padding_and_prefixes() {
+        assert_eq!(natural_cmp("1", "01"), Ordering::Less);
+        assert_eq!(natural_cmp("01", "2"), Ordering::Less);
+        assert_eq!(natural_cmp("file", "file1"), Ordering::Less);
+    }
+
+    #[test]
+    fn natural_survives_long_runs_and_multibyte_chars() {
+        assert_eq!(
+            natural_cmp("a184467440737095516150", "a184467440737095516151"),
+            Ordering::Less
+        );
+        assert_eq!(natural_cmp("ábaco", "ábaco"), Ordering::Equal);
     }
 }

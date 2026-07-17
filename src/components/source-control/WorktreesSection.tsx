@@ -7,7 +7,7 @@ import {
   MoreHorizontal,
   Plus,
   RefreshCw,
-} from "lucide-react";
+} from "@/components/ui/icons";
 
 import { Icon } from "@/components/ui/Icon";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -86,7 +86,7 @@ export function WorktreesSection({
   return (
     <section className="border-b border-hairline-soft">
       <header
-        className="flex items-center justify-between px-[12px] py-[8px]"
+        className="flex items-center justify-between px-12px py-8px"
         role="button"
         tabIndex={0}
         onClick={() => setExpanded((v) => !v)}
@@ -97,7 +97,7 @@ export function WorktreesSection({
           }
         }}
       >
-        <span className="flex items-center gap-[6px]">
+        <span className="flex items-center gap-6px">
           <Icon
             icon={expanded ? ChevronDown : ChevronRight}
             size={12}
@@ -134,9 +134,9 @@ export function WorktreesSection({
       </header>
 
       {expanded ? (
-        <ul className="pb-[6px]">
+        <ul className="pb-6px">
           {visible.length === 0 ? (
-            <li className="px-[12px] pb-[8px] text-label text-muted-soft">
+            <li className="px-12px pb-8px text-label text-muted-soft">
               {t("sourceControl.worktrees.empty")}
             </li>
           ) : (
@@ -145,10 +145,10 @@ export function WorktreesSection({
               return (
                 <li
                   key={w.path}
-                  className="group flex items-center justify-between gap-[8px] px-[12px] py-[6px] transition-colors hover:bg-surface-strong/35"
+                  className="group flex items-center justify-between gap-8px px-12px py-6px transition-colors hover:bg-surface-strong/35"
                 >
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-[6px]">
+                    <div className="flex items-center gap-6px">
                       <Icon icon={GitBranch} size={12} className="text-muted" />
                       <span className="truncate font-mono text-caption text-ink">
                         {w.branch ?? basename(w.path)}
@@ -162,7 +162,7 @@ export function WorktreesSection({
                         />
                       ) : null}
                       {w.locked ? (
-                        <span className="rounded-xs border border-hairline px-[4px] py-0 font-mono text-micro uppercase text-muted">
+                        <span className="rounded-xs border border-hairline px-4px py-0 font-mono text-micro uppercase text-muted">
                           {t("sourceControl.worktrees.locked")}
                         </span>
                       ) : null}

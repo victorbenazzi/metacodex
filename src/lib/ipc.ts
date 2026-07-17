@@ -64,6 +64,10 @@ export const CMD = {
   watcherWatch: "watcher_watch",
   watcherUnwatch: "watcher_unwatch",
 
+  // whats-new (post-update changelog marker)
+  readWhatsNew: "read_whats_new",
+  writeWhatsNew: "write_whats_new",
+
   // search
   searchInProject: "search_in_project",
   listFiles: "list_files",

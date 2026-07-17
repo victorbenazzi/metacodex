@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { Laptop, Moon, Sun, type LucideIcon } from "lucide-react";
+import { Laptop, Moon, Sun, type IconComponent } from "@/components/ui/icons";
 
 import { Segmented } from "@/components/ui/Segmented";
 import { ThemePicker } from "@/components/settings/ThemePicker";
@@ -11,7 +11,7 @@ export function AppearancePane() {
   const mode = useThemeStore((s) => s.mode);
   const setMode = useThemeStore((s) => s.setMode);
 
-  const options: { id: ThemeMode; label: string; icon: LucideIcon }[] = [
+  const options: { id: ThemeMode; label: string; icon: IconComponent }[] = [
     { id: "system", label: t("settings.appearance.system"), icon: Laptop },
     { id: "light", label: t("settings.appearance.light"), icon: Sun },
     { id: "dark", label: t("settings.appearance.dark"), icon: Moon },
@@ -25,7 +25,7 @@ export function AppearancePane() {
         <Segmented value={mode} options={options} onChange={setMode} />
       </Row>
 
-      <div className="pt-[20px]">
+      <div className="pt-20px">
         <ThemePicker />
       </div>
     </div>

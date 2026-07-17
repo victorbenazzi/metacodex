@@ -67,7 +67,7 @@ export function RenameProjectDialog({ project, open, onOpenChange }: RenameProje
             e.preventDefault();
             submit();
           }}
-          className="space-y-[10px]"
+          className="space-y-10px"
         >
           <label className="editorial-caps block" htmlFor="project-name-input">
             {t("projectRail.rename.label")}
@@ -78,7 +78,7 @@ export function RenameProjectDialog({ project, open, onOpenChange }: RenameProje
             autoFocus
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            className="block w-full rounded-sm border border-hairline-strong bg-canvas px-[10px] py-[7px] text-ui text-ink outline-none placeholder:text-muted-soft focus:border-ink"
+            className="block w-full rounded-sm border border-hairline-strong bg-canvas px-10px py-7px text-ui text-ink outline-none placeholder:text-muted-soft focus:border-ink"
             placeholder={project.name}
             maxLength={120}
           />
