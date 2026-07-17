@@ -91,6 +91,28 @@
     background: var(--atmosphere), var(--canvas);
   }
 
+  /* Empty-state stage decorations. `dot-grid` is a faint hairline dot lattice
+     masked so it dissolves before reaching the edges (the vignette keeps the
+     canvas reading as negative space, not wallpaper). `accent-bloom` is the
+     soft radial glow behind the hero glyph; both derive from tokens so every
+     theme keeps its own tint. */
+  .dot-grid {
+    background-image: radial-gradient(var(--hairline-strong) 1px, transparent 1px);
+    background-size: 22px 22px;
+    /* Soft radial falloff that dissolves the lattice well before every edge, so
+       the decoration melts into the plain canvas instead of ending on a seam. */
+    -webkit-mask-image: radial-gradient(68% 60% at 50% 38%, black 0%, transparent 70%);
+    mask-image: radial-gradient(68% 60% at 50% 38%, black 0%, transparent 70%);
+    opacity: 0.45;
+  }
+  .accent-bloom {
+    background: radial-gradient(
+      closest-side,
+      color-mix(in srgb, var(--accent) 16%, transparent),
+      transparent 72%
+    );
+  }
+
   /* Editorial section label, used for section labels and titles. Historical
      name: it used to be all-caps mono; titles are now sentence case in the
      default UI face (SF Pro) by design. Source strings must already be

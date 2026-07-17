@@ -1,8 +1,7 @@
+import type { CSSProperties, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Folder, TerminalSquare } from "@/components/ui/icons";
-import { Button } from "@/components/ui/Button";
-import { Icon } from "@/components/ui/Icon";
+import { Folder } from "@/components/ui/icons";
 import { Kbd } from "@/components/ui/Kbd";
 import { CLI_BRAND_ICONS } from "@/components/icons/brand";
 import { lookupProjectGlyph } from "@/components/project-rail/projectIdentity";
@@ -18,12 +17,23 @@ interface ProjectEmptyStateProps {
   onLaunchCli: (cli: CliTool) => void;
 }
 
+/** Staggered entrance: each block rises in sequence (respects reduced motion). */
+function Rise({ delay, className, children }: { delay: number; className?: string; children: ReactNode }) {
+  const style: CSSProperties = { animationDelay: `${delay}ms` };
+  return (
+    <div className={cn("animate-rise-in motion-reduce:animate-none", className)} style={style}>
+      {children}
+    </div>
+  );
+}
+
 /**
  * Shown in the work area when a project is open but has no tabs yet, distinct
- * from `WelcomeScreen` (no project at all). Same editorial language: project
- * icon + name as the hero, then the two ways to start working (a terminal, or a
- * dedicated button per AI agent). Reuses the project tile's icon logic so the
- * hero matches the rail.
+ * from `WelcomeScreen` (no project at all). A centered "launch stage": the
+ * project glyph as hero over an accent bloom, a command-palette-styled bar as
+ * the single primary action, recent sessions as the fast lane, and one chip
+ * per AI agent. Backdrop is the token atmosphere plus a masked dot lattice.
+ * Reuses the project tile's icon logic so the hero matches the rail.
  */
 export function ProjectEmptyState({ project, onNewTerminal, onLaunchCli }: ProjectEmptyStateProps) {
   const { t } = useTranslation();
@@ -32,96 +42,131 @@ export function ProjectEmptyState({ project, onNewTerminal, onLaunchCli }: Proje
   const FallbackIcon = usesCustom ? Folder : (lookupProjectGlyph(project.icon) ?? Folder);
 
   return (
-    <div className="relative flex h-full w-full overflow-hidden bg-canvas">
-      <div className="relative z-10 mx-auto flex w-full max-w-[760px] flex-col px-40px pt-64px">
-        <span className="editorial-caps">{t("projectEmpty.eyebrow")}</span>
+    <div className="relative h-full w-full overflow-y-auto bg-canvas">
+      <div aria-hidden className="dot-grid pointer-events-none absolute inset-0" />
 
-        {/* Hero: project icon + name + path */}
-        <div className="mt-14px flex items-center gap-14px">
-          <span
-            aria-hidden
-            className="flex shrink-0 items-center justify-center rounded-md border border-hairline bg-surface-card"
-            style={{ width: 44, height: 44 }}
-          >
-            {usesCustom ? (
-              <img
-                src={project.icon}
-                alt=""
-                draggable={false}
-                className="h-[22px] w-[22px] object-contain"
+      <div className="relative z-10 flex min-h-full w-full flex-col items-center px-40px">
+        <div className="my-auto flex w-full max-w-[640px] flex-col items-center py-40px">
+          {/* Hero: project glyph over an accent bloom, name, path */}
+          <Rise delay={40} className="flex flex-col items-center text-center">
+            <div className="relative mb-18px" style={{ width: 64, height: 64 }}>
+              <div
+                aria-hidden
+                className="accent-bloom pointer-events-none absolute -inset-[70px]"
               />
-            ) : (
-              <FallbackIcon size={20} strokeWidth={1.5} className="text-ink" />
-            )}
-          </span>
-          <div className="min-w-0">
-            <h1 className="break-words font-display text-display-s font-medium text-ink">
+              <span
+                aria-hidden
+                className="relative flex h-full w-full items-center justify-center rounded-xl border border-hairline bg-gradient-to-b from-surface-card to-canvas-soft shadow-elevated"
+              >
+                {usesCustom ? (
+                  <img
+                    src={project.icon}
+                    alt=""
+                    draggable={false}
+                    className="h-[28px] w-[28px] object-contain"
+                  />
+                ) : (
+                  <FallbackIcon size={26} strokeWidth={1.5} className="text-ink" />
+                )}
+              </span>
+            </div>
+
+            <h1 className="max-w-full break-words font-display text-display font-medium leading-[1.1] text-ink">
               {project.name}
             </h1>
-            <p
-              className="mt-[2px] truncate font-mono text-caption text-muted-soft"
+
+            <span
+              className="mt-12px inline-flex max-w-full items-center rounded-pill border border-hairline bg-surface-card/60 px-12px py-4px font-mono text-label text-muted"
               title={project.path}
             >
-              {project.path}
-            </p>
-          </div>
-        </div>
+              <span className="truncate">{project.path}</span>
+            </span>
+          </Rise>
 
-        <p className="mt-16px max-w-[520px] text-content text-body">
-          {t("projectEmpty.tagline")}
-        </p>
+          {/* Primary: the command bar. One action, keyboard-first. */}
+          <Rise delay={100} className="mt-32px w-full max-w-[560px]">
+            <button
+              type="button"
+              onClick={onNewTerminal}
+              className={cn(
+                "press-feedback flex h-[54px] w-full items-center gap-12px rounded-lg border border-hairline bg-surface-card px-18px shadow-elevated",
+                "transition-all duration-base hover:border-accent/30 hover:ring-[3px] hover:ring-accent/10",
+                "focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[2px]",
+              )}
+            >
+              <span aria-hidden className="font-mono text-title font-semibold text-accent">
+                ❯
+              </span>
+              <span className="text-content font-medium text-ink">
+                {t("projectEmpty.openTerminal")}
+              </span>
+              <span className="hidden text-ui text-muted-soft sm:inline">
+                {t("projectEmpty.terminalHint")}
+              </span>
+              <span className="flex-1" />
+              <Kbd keys={["Mod", "T"]} />
+            </button>
+          </Rise>
 
-        {/* Resume tile group only renders when there are recent sessions for
-            this project. Lives before the terminal/agent CTAs so it grabs
-            attention as the "fast lane" back to in-flight work. */}
-        <div className="mt-28px max-w-[640px]">
-          <ResumeCards
-            projectId={project.id}
-            title={t("resume.titleProject", { name: project.name })}
-            limit={5}
-          />
-        </div>
+          {/* Fast lane: recent sessions (self-hides when empty) */}
+          <Rise delay={160} className="mt-32px w-full max-w-[560px] empty:mt-0">
+            <ResumeCards
+              projectId={project.id}
+              title={t("resume.titleProject", { name: project.name })}
+              limit={5}
+            />
+          </Rise>
 
-        {/* Primary: open a terminal */}
-        <div className="mt-28px">
-          <Button variant="primary" size="md" onClick={onNewTerminal}>
-            <Icon icon={TerminalSquare} size={14} className="text-on-primary" />
-            <span>{t("projectEmpty.openTerminal")}</span>
-            <Kbd keys={["Mod", "T"]} className="ml-6px text-on-primary/70" />
-          </Button>
-        </div>
+          {/* One chip per AI agent */}
+          <Rise delay={220} className="mt-32px flex w-full flex-col items-center gap-12px">
+            <span className="editorial-caps text-muted-soft">{t("projectEmpty.agentsLead")}</span>
+            <div className="flex flex-wrap justify-center gap-8px">
+              {DEFAULT_CLI_REGISTRY.map((cli) => {
+                const BrandIcon = CLI_BRAND_ICONS[cli.id];
+                // Chips stay quiet about detection state. Clicking a missing
+                // CLI opens its tab with the CliMissingPanel guide.
+                return (
+                  <button
+                    key={cli.id}
+                    type="button"
+                    onClick={() => onLaunchCli(cli)}
+                    className={cn(
+                      "inline-flex h-[36px] items-center gap-8px rounded-pill border border-hairline bg-surface-card/70 pl-11px pr-14px",
+                      "text-ui font-medium text-body",
+                      "transition-colors duration-fast hover:border-accent/30 hover:bg-surface-card hover:text-ink",
+                      "focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[2px]",
+                    )}
+                  >
+                    {BrandIcon ? (
+                      <span className="flex h-[16px] w-[16px] shrink-0 items-center justify-center">
+                        <BrandIcon size={15} />
+                      </span>
+                    ) : null}
+                    <span className="truncate">{cli.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </Rise>
 
-        {/* One button per AI agent */}
-        <div className="mt-40px">
-          <span className="editorial-caps text-muted-soft">{t("projectEmpty.agents")}</span>
-          <div className="mt-14px grid max-w-[600px] grid-cols-2 gap-10px sm:grid-cols-3">
-            {DEFAULT_CLI_REGISTRY.map((cli) => {
-              const BrandIcon = CLI_BRAND_ICONS[cli.id];
-              // Launcher rows stay quiet about detection state. Clicking a
-              // missing CLI opens its tab with the CliMissingPanel guide.
-              return (
-                <button
-                  key={cli.id}
-                  type="button"
-                  onClick={() => onLaunchCli(cli)}
-                  className={cn(
-                    "inline-flex h-[48px] w-full items-center gap-10px rounded-md border border-hairline bg-canvas-soft px-12px text-left",
-                    "transition-colors duration-fast hover:border-hairline-strong hover:bg-surface-strong/40",
-                    "focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[2px]",
-                  )}
-                >
-                  {BrandIcon ? (
-                    <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center">
-                      <BrandIcon size={18} />
-                    </span>
-                  ) : null}
-                  <span className="min-w-0 flex-1 truncate text-ui font-medium text-ink">
-                    {cli.label}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+          {/* Keyboard identity footer */}
+          <Rise
+            delay={280}
+            className="mt-56px flex flex-wrap items-center justify-center gap-x-22px gap-y-8px font-mono text-label text-muted-soft"
+          >
+            <span className="inline-flex items-center gap-7px">
+              <Kbd keys={["Mod", "Shift", "P"]} />
+              {t("projectEmpty.hintCommands")}
+            </span>
+            <span className="inline-flex items-center gap-7px">
+              <Kbd keys={["Mod", "P"]} />
+              {t("projectEmpty.hintFiles")}
+            </span>
+            <span className="inline-flex items-center gap-7px">
+              <Kbd keys={["Mod", "T"]} />
+              {t("projectEmpty.hintTerminal")}
+            </span>
+          </Rise>
         </div>
       </div>
     </div>

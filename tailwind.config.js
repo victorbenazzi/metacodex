@@ -197,6 +197,13 @@ export default {
           from: { opacity: "0", transform: "translateX(-8px)" },
           to: { opacity: "1", transform: "translateX(0)" },
         },
+        // Editorial empty-state entrance: in-flow content rising into place.
+        // Same family as slide-in-left (transform is safe outside popups).
+        // Staggered per block via inline animation-delay.
+        "rise-in": {
+          from: { opacity: "0", transform: "translateY(10px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
       },
       animation: {
         // Enter decelerates in (ease-out); exit accelerates out (ease-in) and
@@ -208,6 +215,7 @@ export default {
         "tab-status-pulse": "tab-status-pulse 1.6s ease-in-out infinite",
         "progress-indeterminate": "progress-indeterminate 1.4s linear infinite",
         "slide-in-left": "slide-in-left 180ms var(--ease-out) both",
+        "rise-in": "rise-in 420ms var(--ease-out) both",
       },
     },
   },

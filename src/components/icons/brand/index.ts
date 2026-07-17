@@ -4,6 +4,7 @@ import { AntigravityIcon } from "./AntigravityIcon";
 import { ClaudeCodeIcon } from "./ClaudeCodeIcon";
 import { CodexIcon } from "./CodexIcon";
 import { GrokIcon } from "./GrokIcon";
+import { KimiIcon } from "./KimiIcon";
 import { MetacodexMark } from "./MetacodexMark";
 import { OpenCodeIcon } from "./OpenCodeIcon";
 import { PiIcon } from "./PiIcon";
@@ -15,6 +16,7 @@ export {
   ClaudeCodeIcon,
   CodexIcon,
   GrokIcon,
+  KimiIcon,
   MetacodexMark,
   OpenCodeIcon,
   PiIcon,
@@ -30,6 +32,7 @@ export const CLI_BRAND_ICONS: Record<string, ComponentType<BrandIconProps>> = {
   "codex-cli": CodexIcon,
   opencode: OpenCodeIcon,
   grok: GrokIcon,
+  "kimi-code": KimiIcon,
   "antigravity-cli": AntigravityIcon,
   "pi-cli": PiIcon,
   "mimo-code": XiaomiMiMoIcon,

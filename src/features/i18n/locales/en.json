@@ -50,10 +50,12 @@
     "realPtyBody": "Same shell as Terminal.app, Claude Code, Codex, OpenCode, Antigravity."
   },
   "projectEmpty": {
-    "eyebrow": "Workspace",
-    "tagline": "Nothing open yet. Start a terminal, or hand it to an AI agent.",
     "openTerminal": "Open terminal",
-    "agents": "AI agents"
+    "terminalHint": "project login shell",
+    "agentsLead": "Or hand it to an agent",
+    "hintCommands": "commands",
+    "hintFiles": "files",
+    "hintTerminal": "terminal"
   },
   "settings": {
     "header": "Settings",
@@ -599,6 +601,13 @@
     "eyebrow": "What's new in {{version}}",
     "cta": "Continue",
     "releaseNotes": "Read the full release notes on GitHub",
+    "r0019": {
+      "title": "A brighter place to start",
+      "launchTitle": "Redesigned launch screen",
+      "launchBody": "Opening a project now greets you with a centered launch stage: a command bar to start a terminal, your recent sessions, and one tap per AI agent.",
+      "kimiTitle": "New agent: Kimi Code",
+      "kimiBody": "Kimi Code joins the launcher, ready to run in a single click alongside the other agents."
+    },
     "r0018": {
       "title": "A fresh face for metacodex",
       "identityTitle": "New visual identity",

@@ -1,4 +1,4 @@
-import { Palette, RefreshCw, Sparkles, type IconComponent } from "@/components/ui/icons";
+import { Bot, Palette, RefreshCw, Sparkles, type IconComponent } from "@/components/ui/icons";
 
 /** One highlight row in the post-update dialog. Copy lives in i18n (both
  *  locales); this file only wires structure, icons and ordering. */
@@ -27,6 +27,22 @@ export function githubReleaseUrl(version: string): string {
  * version as seen). Keys must exist in BOTH locale JSONs under `whatsNew`.
  */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.0.19",
+    titleKey: "whatsNew.r0019.title",
+    highlights: [
+      {
+        icon: Sparkles,
+        titleKey: "whatsNew.r0019.launchTitle",
+        bodyKey: "whatsNew.r0019.launchBody",
+      },
+      {
+        icon: Bot,
+        titleKey: "whatsNew.r0019.kimiTitle",
+        bodyKey: "whatsNew.r0019.kimiBody",
+      },
+    ],
+  },
   {
     version: "0.0.18",
     titleKey: "whatsNew.r0018.title",
