@@ -20,7 +20,7 @@ interface ProjectTileProps extends ButtonHTMLAttributes<HTMLButtonElement> {
  * Project tile in the left rail. Three render paths in priority order:
  *  1. Custom favicon (data: URI chosen by the user): render the image.
  *  2. Glyph name from the project picker: render the icon.
- *  3. Neither: fall back to the typographic monogram (Fraunces display, upright).
+ *  3. Neither: fall back to the typographic monogram (display face, upright).
  * The tile itself is always neutral surface-card with a hairline border; the
  * icon stroke / monogram stays in the default ink (active) or muted tone.
  */

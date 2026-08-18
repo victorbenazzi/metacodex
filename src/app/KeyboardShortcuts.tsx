@@ -7,6 +7,7 @@ import { useSearchUiStore } from "@/features/search/search.store";
 import { useCommandPaletteStore } from "@/features/command-palette/command-palette.store";
 import { useDiagnosticsStore } from "@/features/diagnostics/diagnostics.store";
 import { getAppCommands } from "@/app/appCommands";
+import { useV3ShellStore } from "@/features/v3-shell/v3Shell.store";
 
 /**
  * Route a resolved command to its side effect. Implementations stay on
@@ -66,6 +67,9 @@ function dispatchCommand(cmd: ResolvedCommand) {
       break;
     case "diagnostics.toggle":
       useDiagnosticsStore.getState().toggle();
+      break;
+    case "agent.new":
+      useV3ShellStore.getState().setNewAgentOpen(true);
       break;
   }
 }

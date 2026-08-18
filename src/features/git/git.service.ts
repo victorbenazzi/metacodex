@@ -9,4 +9,16 @@ export const gitApi = {
   fileHeadContent(path: string): Promise<string | null> {
     return invoke<string | null>(CMD.gitFileHeadContent, { path });
   },
+  commit(root: string, message: string, paths: string[]): Promise<void> {
+    return invoke<void>(CMD.gitCommit, { root, message, paths });
+  },
+  discard(root: string, paths: string[]): Promise<void> {
+    return invoke<void>(CMD.gitDiscard, { root, paths });
+  },
+  createBranch(root: string, name: string): Promise<void> {
+    return invoke<void>(CMD.gitCreateBranch, { root, name });
+  },
+  push(root: string): Promise<void> {
+    return invoke<void>(CMD.gitPush, { root });
+  },
 };

@@ -99,13 +99,13 @@ export function SearchDialog() {
     <RD.Root open={open} onOpenChange={setOpen}>
       <RD.Portal>
         <RD.Overlay
-          className="fixed inset-0 z-[100] bg-scrim"
+          className="fixed inset-0 z-[100] overlay-scrim"
         />
         <RD.Content
           aria-describedby={undefined}
           className={cn(
             "fixed left-1/2 top-[12vh] z-[101] -translate-x-1/2",
-            "max-h-[72vh] w-[min(720px,92vw)] overflow-hidden rounded-md border border-hairline bg-surface-card",
+            "max-h-[72vh] w-[min(720px,92vw)] overflow-hidden rounded-md border border-hairline surface-raised",
           )}
         >
           <RD.Title className="sr-only">{t("search.title")}</RD.Title>
@@ -238,7 +238,7 @@ function ToggleButton({
       className={cn(
         "inline-flex h-[22px] w-[22px] items-center justify-center rounded-xs transition-colors",
         active
-          ? "bg-ink text-on-primary"
+          ? "bg-ink text-canvas"
           : "text-muted hover:bg-surface-strong/55 hover:text-ink",
       )}
     >

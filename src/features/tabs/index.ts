@@ -5,7 +5,9 @@ export {
   makePreviewTab,
   makePathTab,
   makeDiffTab,
+  makeChangesTab,
   isProcessTab,
+  isWorkbenchDocTab,
 } from "./factories";
 
 export {
@@ -30,5 +32,6 @@ export {
   openFileInProject,
   openPreview,
   openDiffInProject,
+  openChangesInProject,
   openAfterSentToProject,
 } from "./tabLifecycle";

@@ -10,6 +10,7 @@ import { basename } from "@/lib/path";
 import {
   makeCliTab,
   makeDiffTab,
+  makeChangesTab,
   makeFileTab,
   makePreviewTab,
   makeTerminalTab,
@@ -17,6 +18,7 @@ import {
 } from "./factories";
 import { planClose, planCloseTab, type ClosePlan, type PendingClose } from "./closePolicy";
 import { usePendingCloseStore } from "./pendingClose.store";
+import { useChangesUiStore } from "@/features/git/changes.store";
 
 function openTabInProject(projectKey: string, tab: Tab, setActive = true): void {
   useTabsStore.getState().openTab(projectKey, tab, setActive);
@@ -104,33 +106,44 @@ export function openFileInProject(
   path: string,
   name: string,
   openInEditMode?: boolean,
-): void {
-  openTabInProject(
-    project.id,
-    makeFileTab({ projectId: project.id, path, name, openInEditMode }),
-  );
+): string {
+  const tab = makeFileTab({ projectId: project.id, path, name, openInEditMode });
+  openTabInProject(project.id, tab);
+  return tab.id;
 }
 
-export function openPreview(projectKey: string, grant: PreviewGrant): void {
-  openTabInProject(
-    projectKey,
-    makePreviewTab({ path: grant.path, grantId: grant.grantId }),
-  );
+export function openPreview(projectKey: string, grant: PreviewGrant): string {
+  const tab = makePreviewTab({ path: grant.path, grantId: grant.grantId });
+  openTabInProject(projectKey, tab);
+  return tab.id;
 }
 
 export function openDiffInProject(args: {
   project: Project;
   path: string;
   status: string;
+}): string {
+  const tab = makeDiffTab({
+    projectId: args.project.id,
+    path: args.path,
+    status: args.status,
+  });
+  openTabInProject(args.project.id, tab);
+  return tab.id;
+}
+
+export function openChangesInProject(args: {
+  project: Project;
+  title: string;
+  expandPath?: string;
 }): void {
   openTabInProject(
     args.project.id,
-    makeDiffTab({
-      projectId: args.project.id,
-      path: args.path,
-      status: args.status,
-    }),
+    makeChangesTab({ projectId: args.project.id, title: args.title }),
   );
+  if (args.expandPath) {
+    useChangesUiStore.getState().setExpanded(args.project.id, args.expandPath);
+  }
 }
 
 export function openAfterSentToProject(args: {
@@ -138,7 +151,7 @@ export function openAfterSentToProject(args: {
   oldPath: string;
   newPath: string;
   toDir: string;
-}): void {
+}): string {
   const previewId = `pf-${args.oldPath}`;
   const buckets = useTabsStore.getState().byProject;
   for (const [key, b] of Object.entries(buckets)) {
@@ -146,14 +159,13 @@ export function openAfterSentToProject(args: {
       useTabsStore.getState().closeTab(key, previewId);
     }
   }
-  openTabInProject(
-    args.dest.id,
-    makeFileTab({
-      projectId: args.dest.id,
-      path: args.newPath,
-      name: basename(args.newPath),
-    }),
-  );
+  const tab = makeFileTab({
+    projectId: args.dest.id,
+    path: args.newPath,
+    name: basename(args.newPath),
+  });
+  openTabInProject(args.dest.id, tab);
   void useProjectsStore.getState().setActive(args.dest.id);
   void useExplorerStore.getState().refresh(args.dest.id, args.toDir);
+  return tab.id;
 }

@@ -75,6 +75,10 @@ export const CMD = {
   // git
   gitStatus: "git_status",
   gitFileHeadContent: "git_file_head_content",
+  gitCommit: "git_commit",
+  gitDiscard: "git_discard",
+  gitCreateBranch: "git_create_branch",
+  gitPush: "git_push",
   gitWorktreeList: "git_worktree_list",
   gitWorktreeAdd: "git_worktree_add",
   gitWorktreeRemove: "git_worktree_remove",

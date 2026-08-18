@@ -36,7 +36,7 @@ export const SidebarRow = forwardRef<HTMLDivElement, SidebarRowProps>(function S
       ref={ref}
       className={cn(
         "group/proj relative flex w-full items-center gap-8px rounded-sm px-10px py-6px text-ui",
-        active ? "bg-surface-strong/45 text-ink" : "text-body hover:bg-surface-strong/30",
+        active ? "bg-surface-strong text-ink" : "text-ink hover:bg-surface-strong",
         className,
       )}
       {...rest}
@@ -82,7 +82,7 @@ export function SidebarChevron({
       aria-label={collapsed ? expandLabel : collapseLabel}
       aria-expanded={!collapsed}
       className={cn(
-        "flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-sm text-muted-soft transition-colors duration-fast hover:bg-surface-strong/55 hover:text-ink",
+        "flex h-[18px] w-[18px] shrink-0 cursor-pointer items-center justify-center rounded-sm text-muted transition-colors duration-fast hover:bg-surface-strong hover:text-ink",
         collapsed ? "" : "opacity-0 transition-opacity focus-visible:opacity-100 group-hover/proj:opacity-100",
       )}
     >

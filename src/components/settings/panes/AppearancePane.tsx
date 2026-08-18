@@ -2,7 +2,6 @@ import { useTranslation } from "react-i18next";
 import { Laptop, Moon, Sun, type IconComponent } from "@/components/ui/icons";
 
 import { Segmented } from "@/components/ui/Segmented";
-import { ThemePicker } from "@/components/settings/ThemePicker";
 import { PaneHeader, Row } from "@/components/settings/SettingsPrimitives";
 import { useThemeStore, type ThemeMode } from "@/features/theme/theme.store";
 
@@ -24,10 +23,6 @@ export function AppearancePane() {
       <Row label={t("settings.appearance.mode")} hint={t("settings.appearance.modeHint")}>
         <Segmented value={mode} options={options} onChange={setMode} />
       </Row>
-
-      <div className="pt-20px">
-        <ThemePicker />
-      </div>
     </div>
   );
 }

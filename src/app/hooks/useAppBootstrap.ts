@@ -51,11 +51,19 @@ export function useAppBootstrap(): { homeDirPath: string | null } {
   // default factor (visual no-op) and again once the persisted value hydrates
   // or the user changes it. Failure is non-fatal: the app stays at 1.0 but the
   // setting persists, so a binary carrying the zoom capability picks it up on
-  // the next launch.
+  // the next launch. getCurrentWebview() itself can throw synchronously when
+  // Tauri internals are not injected yet (HMR, first paint), so the try wraps
+  // the call, not only the Promise.
   useEffect(() => {
-    getCurrentWebview()
-      .setZoom(UI_SCALE_FACTOR[uiScale])
-      .catch((err) => console.warn("[accessibility] setZoom failed", err));
+    const factor = UI_SCALE_FACTOR[uiScale];
+    if (factor == null) return;
+    try {
+      void getCurrentWebview()
+        .setZoom(factor)
+        .catch((err) => console.warn("[accessibility] setZoom failed", err));
+    } catch (err) {
+      console.warn("[accessibility] setZoom failed", err);
+    }
   }, [uiScale]);
 
   useEffect(() => {

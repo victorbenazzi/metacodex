@@ -16,7 +16,8 @@ export type CommandId =
   | "palette.files"
   | "file.save"
   | "tab.jumpToNextAttention"
-  | "diagnostics.toggle";
+  | "diagnostics.toggle"
+  | "agent.new";
 
 export type CommandCategory = "general" | "navigation" | "view" | "editing";
 

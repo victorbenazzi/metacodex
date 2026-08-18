@@ -97,22 +97,22 @@ export function WorktreesSection({
           }
         }}
       >
-        <span className="flex items-center gap-6px">
+        <span className="flex min-w-0 items-center gap-6px">
           <Icon
             icon={expanded ? ChevronDown : ChevronRight}
             size={12}
-            className="text-muted"
+            className="shrink-0 text-muted"
           />
-          <span className="editorial-caps text-muted">
+          <span className="editorial-caps truncate text-muted">
             {t("sourceControl.worktrees.title")}
           </span>
           {visible.length > 0 ? (
-            <span className="font-mono text-micro text-muted-soft">
+            <span className="shrink-0 font-mono text-micro text-muted-soft">
               {visible.length}
             </span>
           ) : null}
         </span>
-        <span className="flex items-center gap-[3px]">
+        <span className="flex shrink-0 items-center gap-[3px]">
           <IconButton
             label={t("sourceControl.worktrees.refresh")}
             onClick={(e) => {

@@ -63,9 +63,11 @@ export function useXterm(): UseXtermResult {
   const firstTypoRun = useRef(true);
   const firstCursorRun = useRef(true);
   const firstScrollbackRun = useRef(true);
-  // Reapply on any theme switch (light↔dark *and* swaps within the same kind,
-  // e.g. Tokyo Night → One Dark — both dark, different ANSI palettes).
+  // Reapply when the resolved kind changes (System following the OS, or the
+  // user locking Light / Dark). Porcelain and Graphite have different ids, so
+  // themeId is a precise signal for the ANSI palette as well as chrome.
   const themeId = useThemeStore((s) => s.theme.id);
+  const themeKind = useThemeStore((s) => s.effective);
   const termFontFamily = useSettingsDataStore((s) => s.settings.terminal.fontFamily);
   const termFontSize = useSettingsDataStore((s) => s.settings.terminal.fontSize);
   const termCursorStyle = useSettingsDataStore((s) => s.settings.terminal.cursorStyle);
@@ -151,11 +153,11 @@ export function useXterm(): UseXtermResult {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Theme reactivity: re-apply when the active palette changes
+  // Theme reactivity: re-apply when the active palette or resolved kind changes
   useEffect(() => {
     if (!termRef.current) return;
     termRef.current.options.theme = buildTerminalTheme();
-  }, [themeId]);
+  }, [themeId, themeKind]);
 
   // Live-apply terminal typography. Font size/family change cell metrics, so we
   // refit — and load the family first so the canvas renderer measures the right

@@ -113,6 +113,12 @@ export const COMMANDS: CommandDef[] = [
     descriptionKey: "settings.shortcuts.cmd.diagnosticsToggle",
     category: "view",
   },
+  {
+    id: "agent.new",
+    defaultBinding: ["mod+n"],
+    descriptionKey: "settings.shortcuts.cmd.agentNew",
+    category: "general",
+  },
 ];
 
 export const COMMANDS_BY_ID: Record<CommandId, CommandDef> = Object.fromEntries(

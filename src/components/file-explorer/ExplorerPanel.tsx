@@ -12,6 +12,8 @@ export interface ExplorerPanelProps extends TreeNodeActions {
   projectName?: string;
   projectPath?: string;
   onOpenFolder: () => void;
+  /** When false, drop the floating card chrome so the panel can sit inside another frame. */
+  framed?: boolean;
 }
 
 export function ExplorerPanel({
@@ -23,11 +25,15 @@ export function ExplorerPanel({
   onOpenFile,
   onOpenInTerminal,
   onLaunchCliInPath,
+  framed = true,
 }: ExplorerPanelProps) {
   const { t } = useTranslation();
   return (
     <nav
-      className="flex h-full w-full flex-col overflow-hidden rounded-lg border border-hairline bg-surface-card"
+      className={cn(
+        "flex h-full w-full flex-col overflow-hidden",
+        framed && "rounded-lg border border-hairline bg-surface-card",
+      )}
       aria-label={t("explorer.ariaLabel")}
     >
       {hasProject && projectId && projectPath ? (

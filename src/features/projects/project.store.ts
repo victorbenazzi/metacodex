@@ -6,6 +6,7 @@ import { useTabsStore } from "@/components/tabs/tabsStore";
 import { sessionController } from "@/features/terminal/sessionController";
 import { useExplorerStore } from "@/features/explorer/explorer.store";
 import { useGitStore } from "@/features/git/git.store";
+import { useChangesUiStore } from "@/features/git/changes.store";
 import { watcherApi } from "@/features/filesystem/watcher.service";
 
 interface ProjectsState {
@@ -87,6 +88,7 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
     // Drop any per-project caches/refs the rest of the app keeps.
     useExplorerStore.getState().clearProject(id);
     useGitStore.getState().clearProject(id);
+    useChangesUiStore.getState().clearProject(id);
     void watcherApi.unwatch(id).catch(() => undefined);
 
     await projectsApi.remove(id);

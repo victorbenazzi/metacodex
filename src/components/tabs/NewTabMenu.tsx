@@ -6,6 +6,7 @@ import {
   Settings2,
   GitBranch,
   SquareTerminal,
+  File,
 } from "@/components/ui/icons";
 import { useTranslation } from "react-i18next";
 
@@ -34,6 +35,7 @@ import {
   type CliTool,
 } from "@/features/terminal/cli-registry";
 import { useSettingsDataStore } from "@/features/settings/settings.data.store";
+import { useCommandPaletteStore } from "@/features/command-palette/command-palette.store";
 import { cn } from "@/lib/cn";
 
 interface NewTabActions {
@@ -104,6 +106,14 @@ export function NewTabBody({ actions, C }: { actions: NewTabActions; C: MenuComp
       >
         <Icon icon={SquareTerminal} size={12} className="text-muted" />
         <span className="font-medium">{t("tabs.newTerminal")}</span>
+      </C.Item>
+      <C.Item
+        onSelect={() => useCommandPaletteStore.getState().openFiles()}
+        trailing={<Kbd keys={["Mod", "P"]} />}
+        className={itemClass}
+      >
+        <Icon icon={File} size={12} className="text-muted" />
+        <span className="font-medium">{t("tabs.openFile")}</span>
       </C.Item>
 
       {actions.onNewWorktree ? (

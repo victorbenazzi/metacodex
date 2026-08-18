@@ -1,0 +1,157 @@
+/* Chrome-like tab strip.
+ *
+ * Visual body is a ::before so each corner radius can be driven independently
+ * (Kevin Grajeda: packed tabs flatten facing corners; a dragged tab rounds
+ * as it leaves the strip). Layout is flex-shrink: tabs share the row, grow
+ * up to --tab-max-w, shrink to --tab-min-w, then the strip scrolls and the
+ * + cluster sticks to the trailing edge. */
+
+.tab-scroll {
+  --tab-min-w: 48px;
+  --tab-max-w: 200px;
+  --tab-rl: var(--radius-md);
+  --tab-rr: var(--radius-md);
+}
+
+.chrome-tab-slot {
+  display: flex;
+  height: 100%;
+  min-width: var(--tab-min-w);
+  max-width: var(--tab-max-w);
+  flex: 1 1 0%;
+}
+
+.chrome-tab-slot.is-active {
+  flex: 1.12 1 0%;
+}
+
+.chrome-tab-slot.is-editing {
+  flex: none;
+  min-width: 120px;
+}
+
+.chrome-tab-slot > * {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  height: 100%;
+}
+
+.chrome-tab {
+  position: relative;
+  isolation: isolate;
+  z-index: 1;
+  width: 100%;
+  min-width: 0;
+  container-type: inline-size;
+}
+
+.chrome-tab[aria-current="page"] {
+  z-index: 2;
+}
+
+.chrome-tab::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--tab-rl) var(--tab-rr) var(--tab-rr) var(--tab-rl);
+  transition:
+    border-radius var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out);
+}
+
+.chrome-tab:hover::before {
+  background: var(--canvas-soft);
+}
+
+.chrome-tab[aria-current="page"]::before {
+  background: var(--tab-active-bg);
+  border-color: var(--tab-active-border);
+}
+
+.chrome-tab:focus-visible::before {
+  border-color: var(--ink);
+}
+
+.chrome-tab.is-dragging::before {
+  opacity: 0.35;
+}
+
+.chrome-tab .tab-title {
+  overflow: hidden;
+  white-space: nowrap;
+  mask-image: linear-gradient(to right, #000 calc(100% - 10px), transparent);
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 10px), transparent);
+}
+
+.chrome-tab .tab-worktree:empty {
+  display: none;
+}
+
+@container (max-width: 88px) {
+  .chrome-tab .tab-title,
+  .chrome-tab .tab-worktree {
+    display: none;
+  }
+}
+
+@container (max-width: 56px) {
+  .chrome-tab:not([aria-current="page"]) .tab-close {
+    display: none;
+  }
+}
+
+/* + and overflow stay on screen when the strip scrolls. The fade only
+   paints while tabs are actually clipped, so two-tab layouts stay clean. */
+.chrome-tab-actions {
+  position: sticky;
+  right: 0;
+  z-index: 6;
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 2px;
+  align-self: center;
+  padding: 0 4px 0 2px;
+  background: var(--canvas);
+}
+
+.chrome-tab-actions::before {
+  content: "";
+  position: absolute;
+  right: 100%;
+  top: 0;
+  bottom: 0;
+  width: 16px;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(to right, transparent, var(--canvas));
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+
+.tab-scroll.is-overflowing .chrome-tab-actions::before {
+  opacity: 1;
+}
+
+.chrome-tab-ghost {
+  flex: none;
+  max-width: none;
+}
+
+.chrome-tab-ghost::before {
+  background: var(--tab-active-bg);
+  border-color: var(--tab-active-border);
+  box-shadow: var(--shadow-drag);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chrome-tab::before,
+  .chrome-tab-actions::before {
+    transition: none;
+  }
+}

@@ -46,7 +46,7 @@ export function WhatsNewDialog() {
       <RD.Portal>
         <RD.Overlay
           className={cn(
-            "fixed inset-0 z-[100] bg-scrim",
+            "fixed inset-0 z-[100] overlay-scrim",
             "data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out",
           )}
         />
@@ -55,7 +55,7 @@ export function WhatsNewDialog() {
           className={cn(
             "fixed left-1/2 top-1/2 z-[101] flex max-h-[85dvh] w-[520px] max-w-[calc(100vw-48px)]",
             "-translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden",
-            "rounded-lg border border-hairline bg-surface-card shadow-elevated",
+            "rounded-lg border border-hairline surface-raised",
             "data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out",
           )}
         >

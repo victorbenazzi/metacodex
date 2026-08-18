@@ -75,15 +75,10 @@ export const useSettingsDataStore = create<SettingsDataState>((set, get) => ({
 
       set({ settings: merged, hydrated: true });
 
-      // settings.json is now authoritative — reconcile the live stores to it once.
-      // Prefer themeId (more specific) over mode when both diverge from the
-      // live store: the user picked a palette, honor that. If the persisted
-      // themeId matches the current store we still call setThemeId so the
-      // CSS variables are guaranteed to reflect that exact palette (the
-      // module-init paint cache may have used a different one).
-      if (useThemeStore.getState().theme.id !== merged.themeId) {
-        useThemeStore.getState().setThemeId(merged.themeId);
-      } else if (useThemeStore.getState().mode !== merged.theme) {
+      // settings.json is now authoritative for Mode (system / light / dark).
+      // The palette (Porcelain vs Graphite) is derived from that mode; leftover
+      // gallery ids are collapsed in mergeSettings and ignored here.
+      if (useThemeStore.getState().mode !== merged.theme) {
         useThemeStore.getState().setMode(merged.theme);
       }
       if (i18n.language !== merged.language) {

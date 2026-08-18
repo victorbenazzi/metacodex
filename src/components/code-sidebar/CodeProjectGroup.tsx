@@ -1,6 +1,6 @@
 import { useMemo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Bot, FolderOpen, MoreHorizontal, Pencil, Plus, SquareTerminal, Trash2, X } from "@/components/ui/icons";
+import { Bot, FolderOpen, GitCompare, MoreHorizontal, Pencil, Plus, SquareTerminal, Trash2, X } from "@/components/ui/icons";
 
 import { Icon } from "@/components/ui/Icon";
 import { IconButton } from "@/components/ui/IconButton";
@@ -477,9 +477,7 @@ function TabRow({
   );
 }
 
-/** A single open file tab (editor/markdown/image/pdf/diff). In vertical
- *  layout this is the only surface where file tabs can be switched or closed,
- *  since the top tab bar is hidden there. Shows the unsaved-changes dot. */
+/** A single open file tab (editor/markdown/image/pdf/diff/changes). */
 function FileRow({
   tab,
   onFocus,
@@ -490,10 +488,17 @@ function FileRow({
   onClose: (tabId: string) => void;
 }) {
   const { t } = useTranslation();
+  const label = tab.kind === "changes" ? t("v3.workbench.changes") : tab.title;
   return (
     <RowShell
-      leading={<FileIcon isDir={false} filename={tab.title} size={12} />}
-      label={tab.title}
+      leading={
+        tab.kind === "changes" ? (
+          <Icon icon={GitCompare} size={12} className="text-muted" />
+        ) : (
+          <FileIcon isDir={false} filename={tab.title} size={12} />
+        )
+      }
+      label={label}
       trailing={
         tab.dirty ? (
           <span

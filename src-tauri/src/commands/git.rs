@@ -46,6 +46,7 @@ use crate::directory_grants::{DirectoryGrant, DirectoryGrants};
 use crate::events::{GitCloneProgressPayload, EV_GIT_CLONE_PROGRESS};
 use crate::git::{file_head_content, git_info, GitInfo};
 use crate::projects::ProjectsCache;
+use crate::util::paths;
 use crate::util::process::silent_command;
 
 fn dialog_path_to_string(path: FilePath) -> AppResult<String> {
@@ -632,6 +633,152 @@ pub async fn git_clone_cancel(app: AppHandle, op_id: String) -> AppResult<()> {
         // missing registry entry and removes the dest), same as before.
     }
     Ok(())
+}
+
+fn rel_to_root(root: &str, abs: &str) -> AppResult<String> {
+    paths::require_within_project(root, abs)?;
+    let rel = Path::new(abs)
+        .strip_prefix(Path::new(root))
+        .map_err(|_| AppError::PathNotAllowed(abs.to_string()))?;
+    if rel.as_os_str().is_empty() {
+        return Err(AppError::PathNotAllowed(abs.to_string()));
+    }
+    Ok(rel.to_string_lossy().replace('\\', "/"))
+}
+
+fn git_fail(out: &std::process::Output, verb: &str) -> AppResult<()> {
+    if out.status.success() {
+        return Ok(());
+    }
+    let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
+    let stdout = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    let detail = if !stderr.is_empty() { stderr } else { stdout };
+    Err(AppError::Other(if detail.is_empty() {
+        format!("git {verb} failed")
+    } else {
+        format!("git {verb} failed: {detail}")
+    }))
+}
+
+fn require_commit_message(message: &str) -> AppResult<String> {
+    let message = message.trim();
+    if message.is_empty() {
+        return Err(AppError::Other("empty commit message".into()));
+    }
+    if message.starts_with('-') {
+        return Err(AppError::Other("commit message cannot start with '-'".into()));
+    }
+    Ok(message.to_string())
+}
+
+fn validate_paths(app: &AppHandle, root: &str, paths: &[String]) -> AppResult<()> {
+    let cache = app.state::<Arc<ProjectsCache>>();
+    cache.require_within_project_roots(root)?;
+    if paths.is_empty() {
+        return Err(AppError::Other("no files selected".into()));
+    }
+    for p in paths {
+        cache.require_within_project_roots(p)?;
+        paths::require_within_project(root, p)?;
+    }
+    Ok(())
+}
+
+/// Stage `paths` and create a commit with `message`. Only the given paths are
+/// included; the rest of the worktree stays unstaged.
+#[tauri::command]
+pub async fn git_commit(
+    app: AppHandle,
+    root: String,
+    message: String,
+    paths: Vec<String>,
+) -> AppResult<()> {
+    validate_paths(&app, &root, &paths)?;
+    let message = require_commit_message(&message)?;
+    tokio::task::spawn_blocking(move || {
+        let rels: Vec<String> = paths
+            .iter()
+            .map(|p| rel_to_root(&root, p))
+            .collect::<AppResult<_>>()?;
+        let mut add = vec!["add".to_string(), "--".into()];
+        add.extend(rels.iter().cloned());
+        let add_ref: Vec<&str> = add.iter().map(String::as_str).collect();
+        let out = run_git(&root, &add_ref)?;
+        git_fail(&out, "add")?;
+        let mut commit = vec!["commit".to_string(), "-m".into(), message, "--".into()];
+        commit.extend(rels);
+        let commit_ref: Vec<&str> = commit.iter().map(String::as_str).collect();
+        let out = run_git(&root, &commit_ref)?;
+        git_fail(&out, "commit")
+    })
+    .await
+    .map_err(|e| AppError::Other(format!("join: {e}")))?
+}
+
+/// Restore tracked files to HEAD and delete untracked / newly-added paths.
+#[tauri::command]
+pub async fn git_discard(app: AppHandle, root: String, paths: Vec<String>) -> AppResult<()> {
+    validate_paths(&app, &root, &paths)?;
+    tokio::task::spawn_blocking(move || {
+        let info = git_info(&root, false)?;
+        let statuses = info.map(|i| i.statuses).unwrap_or_default();
+        for abs in &paths {
+            let rel = rel_to_root(&root, abs)?;
+            let code = statuses.get(abs).map(String::as_str).unwrap_or("");
+            if code == "?" || code == "A" {
+                let rm = run_git(&root, &["rm", "-f", "--ignore-unmatch", "--", &rel])?;
+                git_fail(&rm, "rm")?;
+                let p = Path::new(abs);
+                if p.is_dir() {
+                    std::fs::remove_dir_all(p)?;
+                } else if p.exists() {
+                    std::fs::remove_file(p)?;
+                }
+            } else {
+                let out = run_git(
+                    &root,
+                    &["restore", "--source=HEAD", "--staged", "--worktree", "--", &rel],
+                )?;
+                git_fail(&out, "restore")?;
+            }
+        }
+        Ok(())
+    })
+    .await
+    .map_err(|e| AppError::Other(format!("join: {e}")))?
+}
+
+/// Create `name` from HEAD and check it out.
+#[tauri::command]
+pub async fn git_create_branch(app: AppHandle, root: String, name: String) -> AppResult<()> {
+    app.state::<Arc<ProjectsCache>>()
+        .require_within_project_roots(&root)?;
+    if !valid_branch_name(&name) {
+        return Err(AppError::Other(format!("invalid branch name: {name}")));
+    }
+    tokio::task::spawn_blocking(move || {
+        let out = run_git(&root, &["switch", "-c", &name])?;
+        if out.status.success() {
+            return Ok(());
+        }
+        let out = run_git(&root, &["checkout", "-b", &name])?;
+        git_fail(&out, "checkout")
+    })
+    .await
+    .map_err(|e| AppError::Other(format!("join: {e}")))?
+}
+
+/// Push the current HEAD to origin, setting upstream on first push.
+#[tauri::command]
+pub async fn git_push(app: AppHandle, root: String) -> AppResult<()> {
+    app.state::<Arc<ProjectsCache>>()
+        .require_within_project_roots(&root)?;
+    tokio::task::spawn_blocking(move || {
+        let out = run_git(&root, &["push", "-u", "origin", "HEAD"])?;
+        git_fail(&out, "push")
+    })
+    .await
+    .map_err(|e| AppError::Other(format!("join: {e}")))?
 }
 
 #[tauri::command]

@@ -2,7 +2,7 @@ import { create } from "zustand";
 
 /**
  * Left-sidebar UI state:
- *  - `collapsed` maps to the projects sidebar, rail vs expanded.
+ *  - `collapsed` hides the agent sidebar entirely (Cursor-style; no icon rail).
  *  - `explorerCollapsed` folds the file-explorer column to zero width.
  *  - `expandedProjects` stores per-project expansion in the expanded sidebar.
  * Persisted to localStorage, same first-paint pattern as `theme.store`.

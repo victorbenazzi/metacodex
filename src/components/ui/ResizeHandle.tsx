@@ -102,12 +102,21 @@ export function ResizeHandle({
   const onPointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
       if (!enabled || e.button !== 0) return;
+      // Double-click restores the default width. Handle it on pointerdown
+      // (`detail`) because preventDefault on the first click can swallow the
+      // subsequent `dblclick` in WKWebView.
+      if (e.detail >= 2) {
+        e.preventDefault();
+        e.stopPropagation();
+        onReset?.();
+        return;
+      }
       e.preventDefault();
       e.stopPropagation();
       startRef.current = { pointerPx: e.clientX, value };
       setDragging(true);
     },
-    [enabled, value],
+    [enabled, onReset, value],
   );
 
   // Global pointer tracking while dragging — listening on `window` (capture)

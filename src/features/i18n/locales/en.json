@@ -7,6 +7,11 @@
     "remove": "Remove",
     "retry": "Retry",
     "loading": "loading…",
+    "loadingState": {
+      "working": "Working",
+      "elapsedShort": "{{time}}s",
+      "elapsedLong": "{{minutes}}m {{time}}s"
+    },
     "searching": "searching…",
     "couldNotRead": "could not read",
     "copy": "copy",
@@ -35,24 +40,17 @@
     "moving": "Moving…"
   },
   "welcome": {
-    "eyebrow": "Welcome",
-    "tagline": "A quiet, local-first workspace for code, with a real native terminal and your favourite AI coding CLIs one keystroke away.",
     "openProject": "Open project",
     "openProjectMenu": {
       "local": "Open folder…",
       "github": "Clone from GitHub…"
     },
+    "cloneGithub": "Clone from GitHub",
     "openTerminal": "Open terminal",
-    "openFile": "Open a file",
-    "localFirstLabel": "Local first",
-    "localFirstBody": "Projects stay on disk. metacodex only stores workspace metadata.",
-    "realPtyLabel": "Real PTY",
-    "realPtyBody": "Same shell as Terminal.app, Claude Code, Codex, OpenCode, Antigravity."
+    "openFile": "Open a file"
   },
   "projectEmpty": {
     "openTerminal": "Open terminal",
-    "terminalHint": "project login shell",
-    "agentsLead": "Or hand it to an agent",
     "hintCommands": "commands",
     "hintFiles": "files",
     "hintTerminal": "terminal"
@@ -88,13 +86,10 @@
       "title": "Appearance",
       "description": "Theme and visual settings.",
       "mode": "Mode",
-      "modeHint": "Light / dark preference. Picking a theme below syncs this automatically.",
+      "modeHint": "Follow the system, or lock the app to light or dark. New agent terminals pick up the same kind.",
       "system": "System",
       "light": "Light",
-      "dark": "Dark",
-      "themeGallery": "Theme",
-      "themeCount": "{{count}} themes",
-      "applyTheme": "Apply {{name}} theme"
+      "dark": "Dark"
     },
     "interface": {
       "title": "Interface",
@@ -186,7 +181,8 @@
         "fileSave": "Save active file",
         "tabJumpToNextAttention": "Jump to next agent waiting",
         "diagnosticsToggle": "Show diagnostic log",
-        "folderClone": "Clone from GitHub"
+        "folderClone": "Clone from GitHub",
+        "agentNew": "New agent"
       }
     },
     "advanced": {
@@ -226,6 +222,63 @@
   "cli": {
     "dangerous": "dangerous",
     "needsConfig": "Needs config"
+  },
+  "v3": {
+    "sidebar": {
+      "aria": "Agents and repositories",
+      "plan": "Local workspace"
+    },
+    "nav": {
+      "search": "Search",
+      "loops": "Loops"
+    },
+    "newAgent": {
+      "button": "New Agent",
+      "title": "New agent",
+      "search": "Search agents…",
+      "section": "Agents",
+      "terminalHint": "Open a native shell in this project"
+    },
+    "openProject": {
+      "title": "Open project",
+      "search": "Search…",
+      "projects": "Projects",
+      "sources": "Sources",
+      "local": "Local folder",
+      "localHint": "Browse a folder on disk",
+      "github": "GitHub",
+      "githubHint": "Clone from a GitHub repository"
+    },
+    "repos": {
+      "title": "Repositories",
+      "filter": "Filter repositories",
+      "open": "Open project",
+      "empty": "Open a folder or clone from GitHub to start a repository here.",
+      "noAgents": "No agents yet"
+    },
+    "loops": {
+      "emptyTitle": "No loops yet",
+      "emptyBody": "Loops orchestrate a maker and a verifier against a project, the same model as metacodex v2. The runtime wires in next."
+    },
+    "workbench": {
+      "aria": "Changes, files and browser",
+      "changes": "Changes",
+      "files": "Files",
+      "browser": "Browser",
+      "uncommitted": "Uncommitted",
+      "reopen": "Open side panel",
+      "browserSoonTitle": "Browser",
+      "browserSoonBody": "Embedded browser is coming soon.",
+      "newTab": "New tab"
+    },
+    "palette": {
+      "navigate": "Navigate",
+      "select": "Select",
+      "back": "Back",
+      "close": "Close",
+      "selectHint": "Select",
+      "nothingFound": "Nothing matches that search."
+    }
   },
   "codeSidebar": {
     "projects": "Projects",
@@ -344,10 +397,12 @@
   },
   "tabs": {
     "newTerminal": "New Terminal",
+    "openFile": "File",
     "codingAgents": "Coding agents",
     "autonomousAgents": "Autonomous agents",
     "editRegistry": "Edit CLI registry…",
     "newTab": "New tab",
+    "overflowTabs": "Open tabs",
     "unsavedChanges": "Unsaved changes",
     "closeTab": "Close tab",
     "close": "Close",
@@ -478,8 +533,39 @@
     "deletions_one": "{{count}} deletion",
     "deletions_other": "{{count}} deletions",
     "openDiff": "Open diff",
-    "empty": "No changes",
+    "empty": "No uncommitted changes on your local branch",
     "noProject": "Open a project to see its changes.",
+    "commit": "Commit",
+    "commitMenu": "More commit actions",
+    "commitPush": "Commit & Push",
+    "createBranch": "Create Branch",
+    "createBranchCommit": "Create Branch & Commit",
+    "createBranchCommitPush": "Create Branch, Commit & Push",
+    "messagePlaceholder": "Commit message",
+    "messageRequired": "Add a commit message first",
+    "selectAll": "Select all",
+    "selectNone": "Select none",
+    "selectFile": "Select {{name}}",
+    "discardSelected": "Discard selected",
+    "discardFile": "Discard changes",
+    "discardTitle": "Discard changes?",
+    "discardOne": "{{name}} will be restored to HEAD, or deleted if it is new.",
+    "discardMany": "{{count}} files will be restored to HEAD, or deleted if they are new.",
+    "discardConfirm": "Discard",
+    "openFile": "Open file",
+    "badgeNew": "New",
+    "badgeModified": "Modified",
+    "badgeDeleted": "Deleted",
+    "badgeRenamed": "Renamed",
+    "badgeConflict": "Conflict",
+    "largeDiffHidden": "Large diffs are hidden by default.",
+    "loadDiff": "Load Diff",
+    "showMore": "Show {{count}} more files",
+    "branchName": "Branch name",
+    "commitFailed": "Commit failed",
+    "discardFailed": "Discard failed",
+    "branchFailed": "Could not create branch",
+    "pushFailed": "Push failed",
     "worktrees": {
       "title": "Worktrees",
       "empty": "No worktrees yet. Use the + to spin one up for an agent.",

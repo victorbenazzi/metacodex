@@ -1,6 +1,11 @@
 import { isLanguageId, type LanguageId } from "@/features/i18n/config";
 import type { ThemeMode } from "@/features/theme/theme.store";
-import { DEFAULT_LIGHT_THEME_ID, isThemeId } from "@/features/theme/themes";
+import {
+  DEFAULT_DARK_THEME_ID,
+  DEFAULT_LIGHT_THEME_ID,
+  isThemeId,
+  kindForStoredThemeId,
+} from "@/features/theme/themes";
 
 export type TerminalCursorStyle = "bar" | "block" | "underline";
 
@@ -53,8 +58,8 @@ export type LayoutMode = "horizontal" | "vertical";
  */
 export interface AppSettings {
   theme: ThemeMode;
-  /** Active palette id (resolved against the theme registry). When absent the
-   *  app derives a default from `theme` (light to solar-cream, dark to mono-slate). */
+  /** Active palette id. Always porcelain (light) or graphite (dark), derived
+   *  from `theme` (and the OS when mode is system). */
   themeId: string;
   language: LanguageId;
   editor: {
@@ -127,18 +132,25 @@ export type SettingsSliceKey =
   | "accessibility";
 
 /** Resize bounds for the shell panels. Conventions:
+ *  - Projects (left): nav + names. Floor keeps icon, label and shortcut on one
+ *    row; the ceiling stops it from competing with the editor.
+ *  - Source control (right): denser chrome (Uncommitted + counts + branch +
+ *    Commit). Floor is the one-row header; users may widen for longer paths.
  *  - Explorer: VS Code uses ~170px floor; we sit slightly above so the path
  *    column stays legible. The ceiling keeps the editor area dominant.
- *  - Source Control: similar reasoning but wider floor since the file list
- *    needs room for badges + relative path.
  *  - Diff split: 0.2 / 0.8 mirrors common merge-tool limits so one side never
  *    collapses to unusable. */
 export const PANEL_LIMITS = {
-  projects: { min: 220, max: 420, default: 264 },
+  projects: { min: 260, max: 420, default: 324 },
   explorer: { min: 180, max: 480, default: 248 },
-  sourceControl: { min: 240, max: 560, default: 340 },
+  sourceControl: { min: 400, max: 560, default: 400 },
   diff: { min: 0.2, max: 0.8, default: 0.5 },
 } as const;
+
+/** Previous factory widths. Settings that still hold one of these never left
+ *  the default, so merge remaps them onto the current per-panel default. */
+const LEGACY_PROJECTS_DEFAULTS = new Set([220, 264, 340]);
+const LEGACY_SOURCE_CONTROL_DEFAULTS = new Set([220, 264, 324, 340]);
 
 /** Default monospace stack for the terminal, verbatim from `useXterm.ts`. */
 export const DEFAULT_TERMINAL_FONT_FAMILY =
@@ -222,6 +234,15 @@ function asBoolMap(value: unknown): Record<string, boolean> {
 }
 
 const THEME_VALUES: ThemeMode[] = ["system", "light", "dark"];
+
+function resolveThemeId(id: unknown, mode: ThemeMode): string {
+  if (isThemeId(id)) return id;
+  const kind = kindForStoredThemeId(id);
+  if (kind === "dark") return DEFAULT_DARK_THEME_ID;
+  if (kind === "light") return DEFAULT_LIGHT_THEME_ID;
+  return mode === "dark" ? DEFAULT_DARK_THEME_ID : DEFAULT_LIGHT_THEME_ID;
+}
+
 const CURSOR_VALUES: TerminalCursorStyle[] = ["bar", "block", "underline"];
 const ICON_STYLE_VALUES: ExplorerIconStyle[] = ["mono", "color"];
 const DENSITY_VALUES: UiDensity[] = ["compact", "comfortable", "spacious"];
@@ -244,9 +265,10 @@ export function mergeSettings(raw: unknown): AppSettings {
   const notif = asObject(r.notifications);
   const a11y = asObject(r.accessibility);
   const D = DEFAULT_SETTINGS;
+  const theme = oneOf(r.theme, THEME_VALUES, D.theme);
   return {
-    theme: oneOf(r.theme, THEME_VALUES, D.theme),
-    themeId: isThemeId(r.themeId) ? r.themeId : D.themeId,
+    theme,
+    themeId: resolveThemeId(r.themeId, theme),
     language: isLanguageId(r.language) ? r.language : D.language,
     editor: {
       fontSize: clampNum(editor.fontSize, D.editor.fontSize, 8, 32),
@@ -286,7 +308,10 @@ export function mergeSettings(raw: unknown): AppSettings {
     panels: {
       projectsWidth: Math.round(
         clampNum(
-          panels.projectsWidth,
+          typeof panels.projectsWidth === "number" &&
+            LEGACY_PROJECTS_DEFAULTS.has(panels.projectsWidth)
+            ? PANEL_LIMITS.projects.default
+            : panels.projectsWidth,
           D.panels.projectsWidth,
           PANEL_LIMITS.projects.min,
           PANEL_LIMITS.projects.max,
@@ -302,7 +327,10 @@ export function mergeSettings(raw: unknown): AppSettings {
       ),
       sourceControlWidth: Math.round(
         clampNum(
-          panels.sourceControlWidth,
+          typeof panels.sourceControlWidth === "number" &&
+            LEGACY_SOURCE_CONTROL_DEFAULTS.has(panels.sourceControlWidth)
+            ? PANEL_LIMITS.sourceControl.default
+            : panels.sourceControlWidth,
           D.panels.sourceControlWidth,
           PANEL_LIMITS.sourceControl.min,
           PANEL_LIMITS.sourceControl.max,

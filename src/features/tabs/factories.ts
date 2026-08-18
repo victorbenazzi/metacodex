@@ -112,6 +112,29 @@ export function makeDiffTab(args: {
   };
 }
 
+export function makeChangesTab(args: {
+  projectId: string;
+  title: string;
+}): Extract<Tab, { kind: "changes" }> {
+  return {
+    id: `changes-${args.projectId}`,
+    kind: "changes",
+    title: args.title,
+    projectId: args.projectId,
+  };
+}
+
 export function isProcessTab(tab: Tab): boolean {
   return tab.kind === "terminal" || tab.kind === "cli";
+}
+
+/** File, diff and preview tabs that belong in the right workbench strip. */
+export function isWorkbenchDocTab(tab: Tab): boolean {
+  return (
+    tab.kind === "editor" ||
+    tab.kind === "markdown" ||
+    tab.kind === "image" ||
+    tab.kind === "pdf" ||
+    tab.kind === "diff"
+  );
 }

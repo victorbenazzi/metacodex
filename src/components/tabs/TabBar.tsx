@@ -5,23 +5,23 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { X, TerminalSquare, GitCompare } from "@/components/ui/icons";
+import { X } from "@/components/ui/icons";
 import { useTranslation } from "react-i18next";
 
 import { Icon } from "@/components/ui/Icon";
-import { FileIcon } from "@/components/file-explorer/FileIcon";
-import { CLI_BRAND_ICONS } from "@/components/icons/brand";
 import { cn } from "@/lib/cn";
 import type { CliTool } from "@/features/terminal/cli-registry";
 import { isRenamableTab, resolveTabTitle, type Tab } from "./types";
 import { TabContextMenu } from "./TabContextMenu";
 import { NewTabContextMenu, NewTabMenu } from "./NewTabMenu";
+import { TabOverflowMenu } from "./TabOverflowMenu";
 import { TabStatusDot } from "./TabStatusDot";
 import { TabTooltip } from "./TabTooltip";
 import { TabWorktreePill } from "./TabWorktreePill";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { useListReorder } from "@/components/ui/useListReorder";
 import { useTabsStore } from "./tabsStore";
+import { renderTabIcon, syncGhostRadii } from "./tabChrome";
 
 interface TabBarProps {
   tabs: Tab[];
@@ -40,37 +40,6 @@ interface TabBarProps {
   /** Move tab `id` to absolute `toIndex` within the bucket. */
   onMoveTab: (id: string, toIndex: number) => void;
   trailing?: React.ReactNode;
-}
-
-// Tab icons mirror the source of the tab:
-//   - CLI tabs → brand mark (Claude / Codex / OpenCode / …) so the active agent
-//     is recognizable at a glance.
-//   - File tabs → same FileIcon the explorer uses, keyed on the file extension,
-//     so the tab bar visually matches the sidebar entry.
-//   - Terminal tabs → generic terminal mark.
-function renderTabIcon(tab: Tab, active: boolean): ReactNode {
-  const tone = active ? "text-tab-active-text" : "text-muted-soft";
-
-  if (tab.kind === "terminal") {
-    return <Icon icon={TerminalSquare} size={12} className={tone} />;
-  }
-  if (tab.kind === "cli") {
-    const BrandIcon = CLI_BRAND_ICONS[tab.cliId];
-    if (BrandIcon) {
-      return (
-        <span className="inline-flex h-[12px] w-[12px] shrink-0 items-center justify-center">
-          <BrandIcon size={12} />
-        </span>
-      );
-    }
-    return <Icon icon={TerminalSquare} size={12} className={tone} />;
-  }
-  if (tab.kind === "diff") {
-    return <Icon icon={GitCompare} size={12} className={tone} />;
-  }
-  return (
-    <FileIcon isDir={false} filename={tab.path} size={12} className={tone} />
-  );
 }
 
 /* Initial estimate for the trailing strip's width, replaced on first paint by
@@ -110,16 +79,15 @@ export function TabBar({
   const thumbRef = useRef<HTMLDivElement | null>(null);
   const trailingRef = useRef<HTMLDivElement | null>(null);
   const dragGhostRef = useRef<HTMLDivElement | null>(null);
-  // Real width of the trailing strip; observed so the scroll padding and fade
-  // line up exactly even as the pill expands (e.g. when the SC change count
-  // grows to "99+").
+  const tabsRef = useRef(tabs);
+  tabsRef.current = tabs;
+  const getItemElRef = useRef<(id: string) => HTMLElement | null>(() => null);
+  const draggingIdRef = useRef<string | null>(null);
+  const [overflowing, setOverflowing] = useState(false);
   const [trailingWidth, setTrailingWidth] = useState(
     trailing ? TRAILING_PX_FALLBACK : 0,
   );
 
-  // Inline rename: at most one tab can be in edit mode across the whole app,
-  // so the bit lives in the global store. We read it as a selector so unrelated
-  // tab updates don't re-render the bar.
   const editingTabId = useTabsStore((s) => s.editingTabId);
   const setEditingTabId = useTabsStore((s) => s.setEditingTabId);
 
@@ -140,8 +108,16 @@ export function TabBar({
       const ghost = dragGhostRef.current;
       if (!ghost) return;
       ghost.style.transform = `translate3d(${x + 10}px, ${y - 10}px, 0)`;
+      syncGhostRadii(
+        ghost,
+        getItemElRef.current,
+        tabsRef.current.map((tab) => tab.id),
+        draggingIdRef.current,
+      );
     },
   });
+  getItemElRef.current = drag.getItemEl;
+  draggingIdRef.current = drag.draggingId;
 
   useEffect(() => {
     const el = trailingRef.current;
@@ -156,17 +132,12 @@ export function TabBar({
     return () => ro.disconnect();
   }, [trailing]);
 
-  // VS Code-style wheel → horizontal scroll. React's onWheel is passive, so
-  // preventDefault() is silently ignored, so we attach a native listener with
-  // { passive: false } and consume the event ourselves.
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
     const handler = (e: WheelEvent) => {
       const hasOverflow = el.scrollWidth > el.clientWidth + 1;
       if (!hasOverflow) return;
-      // Prefer the dominant axis: mouse wheels report deltaY only; trackpad
-      // horizontal swipes report deltaX. Either way, scroll horizontally.
       const delta = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
       if (delta === 0) return;
       e.preventDefault();
@@ -176,12 +147,6 @@ export function TabBar({
     return () => el.removeEventListener("wheel", handler);
   }, []);
 
-  // Custom 1px scroll thumb. Native scrollbar is hidden in CSS, so we draw our
-  // own line so the indicator is persistent (macOS overlay scrollbars would
-  // otherwise vanish when idle) and uses a guaranteed high-contrast color.
-  // The thumb sits flush against the bottom border, overlapping it where the
-  // scroll is positioned. Visually this reads as the border lighting up
-  // where you are in the scroll range.
   useEffect(() => {
     const el = scrollRef.current;
     const thumb = thumbRef.current;
@@ -193,6 +158,8 @@ export function TabBar({
       const { scrollLeft, scrollWidth, clientWidth } = el;
       const trackWidth = clientWidth - trailingPad;
       const hasOverflow = scrollWidth > clientWidth + 1;
+      setOverflowing(hasOverflow);
+      el.classList.toggle("is-overflowing", hasOverflow);
       if (!hasOverflow || trackWidth <= 0) {
         thumb.style.opacity = "0";
         thumb.style.width = "0px";
@@ -227,15 +194,12 @@ export function TabBar({
       ro.disconnect();
       mo.disconnect();
     };
-  }, [trailing, trailingWidth]);
+  }, [trailing, trailingWidth, tabs.length]);
 
-  // After a layout change (tabs added/removed/active changes), keep the active
-  // tab visible: scroll it into view if it's offscreen, accounting for the
-  // reserved trailing-menu strip on the right.
   useEffect(() => {
     const el = scrollRef.current;
     if (!el || !activeTabId) return;
-    const node = el.querySelector<HTMLButtonElement>(
+    const node = el.querySelector<HTMLElement>(
       `[data-tab-id="${CSS.escape(activeTabId)}"]`,
     );
     if (!node) return;
@@ -253,11 +217,9 @@ export function TabBar({
     }
   }, [activeTabId, tabs.length, trailing, trailingWidth]);
 
-  // Drop indicator X: center of the gap between two tabs.
   const indicatorLeft = (() => {
     if (drag.draggingId === null || drag.dropIndex === null) return null;
     const sourceIdx = tabs.findIndex((tt) => tt.id === drag.draggingId);
-    // Hide on the two slots adjacent to the source. Dropping there is a no-op.
     if (drag.dropIndex === sourceIdx || drag.dropIndex === sourceIdx + 1) return null;
     const el = scrollRef.current;
     if (!el) return null;
@@ -279,19 +241,11 @@ export function TabBar({
       className="relative z-20 h-[var(--panel-header-h)]"
       data-tauri-drag-region
     >
-      {/* The scroll container fills the row exactly. The native scrollbar is
-          forced to 1px and sits flush against the bottom border. When there's
-          overflow, it reads as a slightly brighter 1px segment along the
-          existing hairline, never as a separate visual band. */}
       <div
         ref={scrollRef}
         className={cn(
-          "tab-scroll absolute inset-x-0 top-0 bottom-0 flex min-w-0 items-center gap-4px overflow-x-auto overflow-y-hidden px-6px",
+          "tab-scroll absolute inset-x-0 top-0 bottom-0 flex min-w-0 items-end overflow-x-auto overflow-y-hidden px-6px pt-4px",
         )}
-        // Reserve room on the right so tabs don't slide under the
-        // absolutely-positioned trailing strip. Width is measured dynamically
-        // so the pill can grow (e.g. when the SC change count goes to "99+")
-        // without overlapping the last tab.
         style={trailing ? { paddingRight: trailingWidth } : undefined}
       >
         {tabs.map((tab) => {
@@ -305,11 +259,22 @@ export function TabBar({
           const renamable = isRenamableTab(tab);
           const editing = editingTabId === tab.id;
           const beingDragged = drag.draggingId === tab.id;
-          const displayedTitle = resolveTabTitle(tab);
+          const displayedTitle =
+            tab.kind === "changes" ? t("v3.workbench.changes") : resolveTabTitle(tab);
 
           return (
-            <TabContextMenu
+            <div
               key={tab.id}
+              ref={drag.itemRef(tab.id)}
+              {...drag.getItemProps(tab.id)}
+              className={cn(
+                "chrome-tab-slot touch-none",
+                active && "is-active",
+                editing && "is-editing",
+              )}
+              data-tab-id={tab.id}
+            >
+            <TabContextMenu
               tab={tab}
               totalTabs={tabs.length}
               isActive={active}
@@ -320,10 +285,6 @@ export function TabBar({
               onRename={
                 renamable
                   ? () => {
-                      // TabContextMenu's onOpenChange already promotes to
-                      // active. Defer one frame so the active-state update
-                      // commits before the edit input mounts and tries to
-                      // focus.
                       requestAnimationFrame(() => setEditingTabId(tab.id));
                     }
                   : undefined
@@ -346,14 +307,9 @@ export function TabBar({
               >
               <button
                 type="button"
-                ref={drag.itemRef(tab.id)}
-                {...drag.getItemProps(tab.id)}
-                data-tab-id={tab.id}
                 onClick={() => onSelect(tab.id)}
                 onDoubleClick={(e) => {
                   if (!renamable) return;
-                  // Don't escalate to a select after a double-click on the
-                  // title. Entering edit mode is the whole point.
                   e.preventDefault();
                   e.stopPropagation();
                   setEditingTabId(tab.id);
@@ -362,23 +318,16 @@ export function TabBar({
                   if (e.button === 1) onClose(tab.id);
                 }}
                 onContextMenu={(e) => {
-                  // Stop the right-click from bubbling to the outer bar menu so
-                  // only the per-tab TabContextMenu opens here.
                   e.stopPropagation();
                 }}
                 className={cn(
-                  "group relative flex h-[26px] min-w-[120px] max-w-[220px] shrink-0 items-center gap-7px rounded-md px-10px",
-                  "touch-none border",
-                  active
-                    ? "border-tab-active-border bg-tab-active text-tab-active-text"
-                    : "border-transparent text-muted hover:bg-canvas-soft hover:text-body",
-                  beingDragged && "opacity-40",
+                  "chrome-tab group flex h-full items-center gap-7px px-10px",
+                  "touch-none border-0 bg-transparent text-left outline-none",
+                  active ? "text-tab-active-text" : "text-muted hover:text-body",
+                  beingDragged && "is-dragging",
                 )}
                 aria-current={active ? "page" : undefined}
               >
-                {/* Dirty marker sits left of the icon, matching VS Code,
-                    Cursor and JetBrains. Reading order: state, identity,
-                    name, controls. */}
                 {tab.dirty ? (
                   <span
                     className={cn(
@@ -402,19 +351,18 @@ export function TabBar({
                     onCancel={() => setEditingTabId(null)}
                   />
                 ) : (
-                  <span className="flex-1 truncate text-left text-caption">
+                  <span className="tab-title min-w-0 flex-1 text-left text-caption">
                     {displayedTitle}
                   </span>
                 )}
-                {/* Worktree pill sits at the trailing edge, just before close.
-                    Branch identity is metadata, not part of the title scan. */}
-                <TabWorktreePill tab={tab} />
+                <span className="tab-worktree">
+                  <TabWorktreePill tab={tab} />
+                </span>
                 <span
                   data-no-drag
                   role="button"
                   tabIndex={-1}
                   onPointerDown={(e) => {
-                    // Don't let the close X start a tab drag.
                     e.stopPropagation();
                   }}
                   onClick={(e) => {
@@ -422,10 +370,10 @@ export function TabBar({
                     onClose(tab.id);
                   }}
                   className={cn(
-                    "inline-flex h-[18px] w-[18px] items-center justify-center rounded-xs opacity-0 transition-[opacity,background-color,color] duration-fast group-hover:opacity-100",
+                    "tab-close inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-xs transition-[opacity,background-color,color] duration-fast",
                     active
-                      ? "text-tab-active-text opacity-60 hover:opacity-100"
-                      : "text-muted hover:bg-surface-strong hover:text-ink",
+                      ? "text-tab-active-text opacity-70 hover:opacity-100"
+                      : "text-muted opacity-0 group-hover:opacity-100 hover:bg-surface-strong hover:text-ink",
                   )}
                   aria-label={t("tabs.closeTab")}
                 >
@@ -434,18 +382,26 @@ export function TabBar({
               </button>
               </Tooltip>
             </TabContextMenu>
+            </div>
           );
         })}
-        {/* New-tab button rides right after the last pill, Codex-style. Same
-            dropdown body as the bar's right-click menu. */}
-        <div className="ml-[2px] flex shrink-0 items-center">
+        <div
+          className="chrome-tab-actions"
+          data-no-drag
+          style={trailing ? { right: trailingWidth } : undefined}
+        >
           <NewTabMenu onNewTerminal={onNewTerminal} onLaunchCli={onLaunchCli} />
+          {overflowing ? (
+            <TabOverflowMenu
+              tabs={tabs}
+              activeTabId={activeTabId}
+              onSelect={onSelect}
+              onClose={onClose}
+            />
+          ) : null}
         </div>
       </div>
 
-      {/* Drop indicator is absolutely positioned in the bar (not inside the
-          scroll container) so the indicator stays put while we recompute it
-          from scrollLeft. Vertical line at the gap between two tabs. */}
       {indicatorLeft !== null ? (
         <span
           aria-hidden
@@ -456,8 +412,6 @@ export function TabBar({
 
       {trailing ? (
         <>
-          {/* Subtle fade so a tab being scrolled in/out doesn't crash into the
-              hard edge of the trailing strip. */}
           <div
             className="pointer-events-none absolute top-0 bottom-0 w-[18px] bg-gradient-to-r from-transparent to-canvas"
             style={{ right: trailingWidth }}
@@ -471,10 +425,6 @@ export function TabBar({
           </div>
         </>
       ) : null}
-      {/* Custom 1px scroll thumb. Sits flush with the bottom border. When
-          tabs overflow, a high-contrast segment of the border lights up to
-          show scroll position. Width/transform driven by JS in the effect
-          above. */}
       <div
         ref={thumbRef}
         aria-hidden="true"
@@ -482,23 +432,28 @@ export function TabBar({
         style={{ width: 0, backgroundColor: "var(--scrollbar-tab-thumb)", opacity: 0 }}
       />
 
-      {/* Floating drag ghost: viewport-fixed, pointer-events:none so the
-          underlying tabs can still receive pointermove. */}
       {drag.draggingId && drag.pointerPos
         ? (() => {
             const dragged = tabs.find((tt) => tt.id === drag.draggingId);
             if (!dragged) return null;
+            const sourceEl = drag.getItemEl(dragged.id);
+            const ghostWidth = sourceEl?.offsetWidth ?? 160;
             return (
               <div
                 ref={dragGhostRef}
                 aria-hidden
-                className="pointer-events-none fixed left-0 top-0 z-[60] flex h-[26px] min-w-[120px] max-w-[220px] items-center gap-7px rounded-md border border-hairline bg-canvas px-10px text-caption text-ink shadow-drag will-change-transform"
+                className="chrome-tab chrome-tab-ghost pointer-events-none fixed left-0 top-0 z-[60] flex h-[26px] items-center gap-7px px-10px text-caption text-ink will-change-transform"
                 style={{
+                  width: ghostWidth,
+                  maxWidth: ghostWidth,
+                  flex: "none",
                   transform: `translate3d(${drag.pointerPos.x + 10}px, ${drag.pointerPos.y - 10}px, 0)`,
                 }}
               >
                 {renderTabIcon(dragged, false)}
-                <span className="truncate">{resolveTabTitle(dragged)}</span>
+                <span className="tab-title min-w-0 flex-1 truncate">
+                  {resolveTabTitle(dragged)}
+                </span>
               </div>
             );
           })()
@@ -516,16 +471,9 @@ interface TabRenameInputProps {
   onCancel: () => void;
 }
 
-/**
- * Inline text input that replaces the tab's title span while in edit mode.
- * Matches the surrounding font/size so the swap is layout-neutral. Stops
- * pointer/click bubbling so the parent button doesn't fire onSelect or start
- * a drag when the user clicks inside the field.
- */
 function TabRenameInput({ initial, onCommit, onCancel }: TabRenameInputProps) {
   const { t } = useTranslation();
   const ref = useRef<HTMLInputElement | null>(null);
-  // Track whether the input is mid-commit so blur doesn't double-fire.
   const settledRef = useRef(false);
 
   useLayoutEffect(() => {
@@ -567,13 +515,11 @@ function TabRenameInput({ initial, onCommit, onCancel }: TabRenameInputProps) {
           e.stopPropagation();
           cancel();
         } else {
-          // Don't let editor / global shortcuts intercept while typing.
           e.stopPropagation();
         }
       }}
       onBlur={commit}
       className={cn(
-        // Solid canvas keeps the input distinct from the active tab surface.
         "flex-1 min-w-0 truncate rounded-xs border border-accent/60 bg-canvas px-4px",
         "text-left text-caption text-ink",
         "outline-none focus:border-accent focus:outline-none",

@@ -120,11 +120,11 @@ One `notify_debouncer_mini::Debouncer` per project root, owned by `WatcherManage
 ### Theming
 
 - **Tokens drive everything.** Never hardcode colors in components. Tailwind `colors: { canvas, ink, hairline, ... }` map to CSS variables in `src/styles/tokens.css`. Light/dark switches via `data-theme` on `<html>`.
-- **11 selectable themes** live in `src/features/theme/themes/*.ts`, all typed by `Theme` (`theme/types.ts`) so every theme is forced to define the full `chrome`/`syntax`/`terminal` key set. `applyTheme.ts` writes those vars; accents, atmosphere, shadows and `--update-blue*` stay per-kind (light|dark) in `tokens.css`.
+- **Two themes.** Porcelain (light, cream `#f7f7f4`) and Graphite (dark, warm near-black `#141412`) live in `src/features/theme/themes/*.ts`, typed by `Theme` (`theme/types.ts`) so each defines the full `chrome`/`syntax`/`terminal` key set. Settings exposes System (default, follows the OS), Light, and Dark. `applyTheme.ts` writes those vars; `--accent`, `--atmosphere`, shadows, `--ink-hover` and `--update-blue*` stay per-kind in `tokens.css`. Brand voltage is Cursor Orange (`#f54e00`) as `--primary`/`--accent`, scarce (selection, identity bar, rare CTAs). Chrome filled buttons use `--ink` + `--canvas` text, never orange. Source spec: `DESIGN.md` (marketing) plus the in-app appendix. Do not resurrect the old gallery palettes (Tokyo Night, Solar Cream, …). New PTY sessions get `COLORFGBG` + `CLITHEME` from the resolved kind so agent TUIs start light or dark with the app.
 - **Type scale is enforced:** `text-label` (11) / `text-caption` (12) / `text-ui` (13) / `text-content` (14) / `text-title` (15) / `text-display-*`. Never `text-[Npx]`, with two sanctioned exceptions: the 10px mono micro-label pattern and one-off display sizes on hero surfaces. Uppercase eyebrows = `text-label tracking-label` or `editorial-caps`. **If you add a fontSize tier to `tailwind.config.js`, register it in `src/lib/cn.ts`** (tailwind-merge classGroups) or twMerge will treat it as a text COLOR and drop it silently.
 - **Radius:** token classes only (`rounded-xs|sm|md|lg|xl|pill`). Never `rounded-full` / `rounded-2xl` / `rounded-[var(...)]`.
 - **Motion:** bare `transition-*` defaults to `--dur-fast`; use `duration-fast|base|slow` when explicit. Never `duration-100/150/200/300`.
-- **Buttons:** use `Button` / `IconButton` from `components/ui/` instead of ad-hoc `<button>` styling; hand-styled primary CTAs must include `press-feedback` + a focus-visible treatment.
+- **Buttons:** use `Button` / `IconButton` from `components/ui/` instead of ad-hoc `<button>` styling; hand-styled primary CTAs must include `press-feedback` + a focus-visible treatment. Filled chrome uses `bg-ink text-canvas hover:bg-ink-hover`. `text-on-primary` is for orange / danger / warn fills only.
 - Text over update-blue surfaces uses `text-on-update`.
 - The xterm theme is built from the same CSS vars (`--term-*`) and re-applied on theme change. Theme choice persists to `settings.json`; `localStorage` is only a first-paint cache.
 
@@ -170,6 +170,6 @@ One `notify_debouncer_mini::Debouncer` per project root, owned by `WatcherManage
 | UI density | `settings.types.ts::UI_DENSITY_MULTIPLIER` → `--density-multiplier` → `--space-*` tokens |
 | Empty / loading / missing state | `components/ui/EmptyState.tsx` |
 | Where config + state persist | `~/.metacodex/` via `src-tauri/src/config_paths.rs` (honors `METACODEX_HOME`) |
-| Tweak design tokens / add a theme | `src/styles/tokens.css` + `src/features/theme/themes/*` (+ `tailwind.config.js` for new token classes) |
+| Tweak design tokens / light-dark palettes | `src/styles/tokens.css` + `src/features/theme/themes/{porcelain,graphite}.ts` (+ `tailwind.config.js` for new token classes) |
 | Tauri app config / capability grants | `src-tauri/tauri.conf.json` / `src-tauri/capabilities/default.json` |
 | Shell redesign rationale (v0.0.12) | `REDESIGN_PLAN.md` (root) + `MENU_UX_PLAN.md` |

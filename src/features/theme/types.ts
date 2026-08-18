@@ -119,9 +119,9 @@ export interface ThemeTerminal {
 }
 
 export interface Theme {
-  /** Stable id stored in settings (`solar-cream`, `tokyo-night`, …). */
+  /** Stable id stored in settings (`porcelain`, `graphite`). */
   id: string;
-  /** Display name. Surfaced as-is in the picker; not translated. */
+  /** Display name. Kept on the type for diagnostics; not shown in Settings. */
   name: string;
   kind: ThemeKind;
   chrome: ThemeChrome;

@@ -7,6 +7,11 @@
     "remove": "Remover",
     "retry": "Tentar de novo",
     "loading": "carregando…",
+    "loadingState": {
+      "working": "Trabalhando",
+      "elapsedShort": "{{time}}s",
+      "elapsedLong": "{{minutes}}m {{time}}s"
+    },
     "searching": "buscando…",
     "couldNotRead": "não foi possível ler",
     "copy": "copiar",
@@ -35,24 +40,17 @@
     "moving": "Movendo…"
   },
   "welcome": {
-    "eyebrow": "Bem-vindo",
-    "tagline": "Um espaço de trabalho silencioso e local-first para código, com um terminal nativo de verdade e suas CLIs de IA favoritas a um atalho de distância.",
     "openProject": "Abrir projeto",
     "openProjectMenu": {
       "local": "Abrir pasta…",
       "github": "Clonar do GitHub…"
     },
+    "cloneGithub": "Clonar do GitHub",
     "openTerminal": "Abrir terminal",
-    "openFile": "Abrir um arquivo",
-    "localFirstLabel": "Local first",
-    "localFirstBody": "Os projetos ficam no disco. O metacodex só guarda metadados do workspace.",
-    "realPtyLabel": "PTY de verdade",
-    "realPtyBody": "O mesmo shell do Terminal.app, Claude Code, Codex, OpenCode, Antigravity."
+    "openFile": "Abrir um arquivo"
   },
   "projectEmpty": {
     "openTerminal": "Abrir terminal",
-    "terminalHint": "shell de login do projeto",
-    "agentsLead": "Ou entregue para um agente",
     "hintCommands": "comandos",
     "hintFiles": "arquivos",
     "hintTerminal": "terminal"
@@ -88,13 +86,10 @@
       "title": "Aparência",
       "description": "Tema e ajustes visuais.",
       "mode": "Modo",
-      "modeHint": "Preferência claro / escuro. Escolher um tema abaixo sincroniza automaticamente.",
+      "modeHint": "Segue o sistema, ou trava o app em claro ou escuro. Terminais novos dos agentes entram no mesmo modo.",
       "system": "Sistema",
       "light": "Claro",
-      "dark": "Escuro",
-      "themeGallery": "Tema",
-      "themeCount": "{{count}} temas",
-      "applyTheme": "Aplicar tema {{name}}"
+      "dark": "Escuro"
     },
     "interface": {
       "title": "Interface",
@@ -186,7 +181,8 @@
         "fileSave": "Salvar arquivo ativo",
         "tabJumpToNextAttention": "Pular para o próximo agente aguardando",
         "diagnosticsToggle": "Abrir log de diagnóstico",
-        "folderClone": "Clonar do GitHub"
+        "folderClone": "Clonar do GitHub",
+        "agentNew": "Novo agente"
       }
     },
     "advanced": {
@@ -226,6 +222,63 @@
   "cli": {
     "dangerous": "perigoso",
     "needsConfig": "Requer config"
+  },
+  "v3": {
+    "sidebar": {
+      "aria": "Agentes e repositórios",
+      "plan": "Workspace local"
+    },
+    "nav": {
+      "search": "Buscar",
+      "loops": "Loops"
+    },
+    "newAgent": {
+      "button": "Novo Agent",
+      "title": "Novo agente",
+      "search": "Buscar agents…",
+      "section": "Agents",
+      "terminalHint": "Abrir um shell nativo neste projeto"
+    },
+    "openProject": {
+      "title": "Abrir projeto",
+      "search": "Buscar…",
+      "projects": "Projetos",
+      "sources": "Fontes",
+      "local": "Pasta local",
+      "localHint": "Escolher uma pasta no disco",
+      "github": "GitHub",
+      "githubHint": "Clonar um repositório do GitHub"
+    },
+    "repos": {
+      "title": "Repositórios",
+      "filter": "Filtrar repositórios",
+      "open": "Abrir projeto",
+      "empty": "Abra uma pasta ou clone do GitHub para começar um repositório aqui.",
+      "noAgents": "Nenhum agent ainda"
+    },
+    "loops": {
+      "emptyTitle": "Nenhum loop ainda",
+      "emptyBody": "Loops orquestram um maker e um verifier contra um projeto, o mesmo modelo do metacodex v2. O runtime entra no próximo passo."
+    },
+    "workbench": {
+      "aria": "Changes, arquivos e browser",
+      "changes": "Changes",
+      "files": "Files",
+      "browser": "Browser",
+      "uncommitted": "Uncommitted",
+      "reopen": "Abrir painel lateral",
+      "browserSoonTitle": "Browser",
+      "browserSoonBody": "O browser embutido chega em breve.",
+      "newTab": "Nova aba"
+    },
+    "palette": {
+      "navigate": "Navegar",
+      "select": "Selecionar",
+      "back": "Voltar",
+      "close": "Fechar",
+      "selectHint": "Selecionar",
+      "nothingFound": "Nada corresponde a essa busca."
+    }
   },
   "codeSidebar": {
     "projects": "Projetos",
@@ -344,10 +397,12 @@
   },
   "tabs": {
     "newTerminal": "Novo terminal",
+    "openFile": "Arquivo",
     "codingAgents": "Agentes de programação",
     "autonomousAgents": "Agentes autônomos",
     "editRegistry": "Editar registro de CLIs…",
     "newTab": "Nova aba",
+    "overflowTabs": "Abas abertas",
     "unsavedChanges": "Alterações não salvas",
     "closeTab": "Fechar aba",
     "close": "Fechar",
@@ -478,8 +533,39 @@
     "deletions_one": "{{count}} remoção",
     "deletions_other": "{{count}} remoções",
     "openDiff": "Abrir diff",
-    "empty": "Nenhuma alteração",
+    "empty": "Nenhuma alteração não commitada na branch local",
     "noProject": "Abra um projeto para ver as alterações.",
+    "commit": "Commit",
+    "commitMenu": "Mais ações de commit",
+    "commitPush": "Commit & Push",
+    "createBranch": "Criar branch",
+    "createBranchCommit": "Criar branch e fazer commit",
+    "createBranchCommitPush": "Criar branch, commit e push",
+    "messagePlaceholder": "Mensagem do commit",
+    "messageRequired": "Escreva uma mensagem de commit primeiro",
+    "selectAll": "Selecionar todos",
+    "selectNone": "Selecionar nenhum",
+    "selectFile": "Selecionar {{name}}",
+    "discardSelected": "Descartar selecionados",
+    "discardFile": "Descartar alterações",
+    "discardTitle": "Descartar alterações?",
+    "discardOne": "{{name}} volta para o HEAD, ou é apagado se for arquivo novo.",
+    "discardMany": "{{count}} arquivos voltam para o HEAD, ou são apagados se forem novos.",
+    "discardConfirm": "Descartar",
+    "openFile": "Abrir arquivo",
+    "badgeNew": "Novo",
+    "badgeModified": "Modificado",
+    "badgeDeleted": "Removido",
+    "badgeRenamed": "Renomeado",
+    "badgeConflict": "Conflito",
+    "largeDiffHidden": "Diffs grandes ficam ocultos por padrão.",
+    "loadDiff": "Carregar diff",
+    "showMore": "Mostrar mais {{count}} arquivos",
+    "branchName": "Nome da branch",
+    "commitFailed": "Falha no commit",
+    "discardFailed": "Falha ao descartar",
+    "branchFailed": "Não foi possível criar a branch",
+    "pushFailed": "Falha no push",
     "worktrees": {
       "title": "Worktrees",
       "empty": "Nenhuma worktree ainda. Use o + para criar uma para um agente.",

@@ -142,13 +142,15 @@ impl PtyManager {
         for (k, v) in shell::build_env(Path::new(&spec.cwd)) {
             cmd.env(k, v);
         }
-        // rxvt convention read by background-detecting TUIs: "fg;bg" in ANSI
-        // indices. Light terminal = dark text (0) on white (15); dark = the
-        // inverse. xterm.js also answers OSC 11 queries with the real theme
-        // background; this covers tools that only look at the env var.
+        // Signal light/dark to background-detecting TUIs (Claude Code, Codex,
+        // vim, …) at spawn. COLORFGBG is the rxvt "fg;bg" ANSI-index convention
+        // (light = 0;15, dark = 15;0). CLITHEME is the newer explicit hint.
+        // Detection is startup-only: a running session keeps the palette it
+        // picked; xterm.js still swaps the emulator colors live.
         if let Some(kind) = spec.theme_kind.as_deref() {
-            let colorfgbg = if kind == "light" { "0;15" } else { "15;0" };
-            cmd.env("COLORFGBG", colorfgbg);
+            let light = kind == "light";
+            cmd.env("COLORFGBG", if light { "0;15" } else { "15;0" });
+            cmd.env("CLITHEME", if light { "light" } else { "dark" });
         }
 
         let child = pair

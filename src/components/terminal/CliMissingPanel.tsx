@@ -90,7 +90,7 @@ export function CliMissingPanel({ cli, onRetry, onOpenInTerminal }: CliMissingPa
               size="md"
               onClick={() => onOpenInTerminal(installCmd)}
             >
-              <Icon icon={Terminal} size={14} className="text-on-primary" />
+              <Icon icon={Terminal} size={14} className="text-canvas" />
               {t("terminal.openInTerminal")}
             </Button>
           ) : null}

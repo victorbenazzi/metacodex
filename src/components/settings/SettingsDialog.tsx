@@ -79,14 +79,14 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
       <RD.Portal>
         <RD.Overlay
           className={cn(
-            "fixed inset-0 z-[100] bg-scrim",
+            "fixed inset-0 z-[100] overlay-scrim",
             "data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out",
           )}
         />
         <RD.Content
           className={cn(
             "fixed left-1/2 top-1/2 z-[101] -translate-x-1/2 -translate-y-1/2",
-            "h-[min(640px,90vh)] w-[min(880px,92vw)] overflow-hidden rounded-lg border border-hairline bg-surface-card shadow-elevated",
+            "h-[min(640px,90vh)] w-[min(880px,92vw)] overflow-hidden rounded-lg border border-hairline surface-raised",
             "data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out",
           )}
           aria-describedby={undefined}

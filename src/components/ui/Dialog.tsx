@@ -31,7 +31,7 @@ export function DialogContent({
     <RD.Portal>
       <RD.Overlay
         className={cn(
-          "fixed inset-0 z-[100] bg-scrim",
+          "fixed inset-0 z-[100] overlay-scrim",
           "data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out",
         )}
       />
@@ -42,7 +42,7 @@ export function DialogContent({
           // max-h + column layout: the BODY scrolls while header/footer stay
           // pinned, so the action buttons never fall off a short viewport.
           "fixed left-1/2 top-1/2 z-[101] flex max-h-[85dvh] -translate-x-1/2 -translate-y-1/2 flex-col",
-          "rounded-md border border-hairline bg-surface-card",
+          "rounded-md border border-hairline surface-raised",
           "data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out",
         )}
       >
