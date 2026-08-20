@@ -1,8 +1,8 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "metacodex main-window capability",
-  "windows": ["main"],
+  "description": "metacodex main webview capability. Child webviews (preview-browser) must not inherit this: Tauri enables a window-scoped capability on every webview of that window.",
+  "webviews": ["main"],
   "permissions": [
     "core:default",
     "core:window:default",

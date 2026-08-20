@@ -88,18 +88,6 @@
 }
 
 @layer components {
-  /* Atmosphere, a faint warm-ink whisper from the left corners, layered
-     UNDER the surface color (backgrounds always paint behind content, so this
-     never touches text contrast). The gradient itself is theme-defined via
-     --atmosphere in tokens.css. `-soft` sits on the projects sidebar's
-     floating card (surface-card + glow), `-canvas` on the main work surface. */
-  .atmosphere-soft {
-    background: var(--atmosphere), var(--surface-card);
-  }
-  .atmosphere-canvas {
-    background: var(--atmosphere), var(--canvas);
-  }
-
   /* Dialog/modal surfaces. Painted from tokens directly so a broken Tailwind
      color function cannot leave a hollow overlay or an ink-colored outline. */
   .overlay-scrim {
@@ -120,6 +108,75 @@
     -webkit-mask-image: radial-gradient(68% 60% at 50% 38%, black 0%, transparent 70%);
     mask-image: radial-gradient(68% 60% at 50% 38%, black 0%, transparent 70%);
     opacity: 0.45;
+  }
+
+  /* The center work area can become much narrower than the app window when
+     both side columns are open. Adapt its launch stage from a wide hero into a
+     compact vertical action list based on the work area's own width. */
+  .launch-stage {
+    container-type: inline-size;
+  }
+
+  @container (max-width: 440px) {
+    .launch-stage-content {
+      padding-inline: var(--space-md);
+    }
+
+    .launch-stage-stack {
+      max-width: 240px;
+      padding-block: var(--space-xl);
+    }
+
+    .launch-stage-glyph {
+      width: calc(56px * var(--density-multiplier));
+      height: calc(56px * var(--density-multiplier));
+      margin-bottom: var(--space-sm);
+    }
+
+    .launch-stage-title {
+      font-size: var(--fs-display-s);
+      line-height: 1.2;
+      letter-spacing: -0.012em;
+    }
+
+    .launch-stage-meta {
+      width: 100%;
+    }
+
+    .launch-stage-actions {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .launch-stage-chip {
+      width: 100%;
+      height: calc(30px * var(--density-multiplier));
+      gap: var(--space-xs);
+      font-size: var(--fs-caption);
+      justify-content: flex-start;
+    }
+
+    .launch-stage-shortcuts {
+      margin-top: var(--space-xl);
+      flex-direction: column;
+      align-items: flex-start;
+      gap: var(--space-xs);
+    }
+  }
+
+  @container (max-width: 320px) {
+    .launch-stage-content {
+      padding-inline: var(--space-base);
+    }
+
+    .launch-stage-stack {
+      max-width: 100%;
+    }
+
+    .launch-stage-glyph {
+      width: calc(52px * var(--density-multiplier));
+      height: calc(52px * var(--density-multiplier));
+    }
   }
 
   /* Editorial section label, used for section labels and titles. Historical

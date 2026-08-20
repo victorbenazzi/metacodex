@@ -29,7 +29,8 @@ import {
   gitColorForName,
   gitStatusLabelKey,
 } from "@/features/git/gitStatus";
-import { DEFAULT_CLI_REGISTRY, type CliTool } from "@/features/terminal/cli-registry";
+import type { CliTool } from "@/features/terminal/cli-registry";
+import { useEnabledCliTools } from "@/features/terminal/useEnabledCliTools";
 import { cn } from "@/lib/cn";
 import { CMD, invoke } from "@/lib/ipc";
 import { basename } from "@/lib/path";
@@ -79,6 +80,7 @@ export const TreeNode = memo(function TreeNode({
   const toggle = useExplorerStore((s) => s.toggleExpand);
   const setSelected = useExplorerStore((s) => s.setSelected);
   const gitStatus = useGitStore((s) => s.byProject[projectId]?.statuses?.[entry.path]);
+  const enabledCliTools = useEnabledCliTools();
 
   const indentPx = depth * 12 + 8;
 
@@ -177,7 +179,7 @@ export const TreeNode = memo(function TreeNode({
                 </>
               }
             >
-              {DEFAULT_CLI_REGISTRY.map((cli) => (
+              {enabledCliTools.map((cli) => (
                 <ContextMenuItem
                   key={cli.id}
                   onSelect={() => onLaunchCliInPath(cli, entry.path, entry.name)}

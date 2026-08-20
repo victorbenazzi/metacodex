@@ -7,18 +7,26 @@ import {
   MoreHorizontal,
   Plus,
   RefreshCw,
+  Sparkles,
+  SquareTerminal,
 } from "@/components/ui/icons";
 
 import { Icon } from "@/components/ui/Icon";
+import { CLI_BRAND_ICONS } from "@/components/icons/brand";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
   DropdownContent,
   DropdownItem,
   DropdownRoot,
   DropdownSeparator,
+  DropdownSub,
+  DropdownSubContent,
+  DropdownSubTrigger,
   DropdownTrigger,
 } from "@/components/ui/DropdownMenu";
 import { useWorktreesStore } from "@/features/git/worktrees.store";
+import type { CliTool } from "@/features/terminal/cli-registry";
+import { useEnabledCliTools } from "@/features/terminal/useEnabledCliTools";
 import { toast } from "@/features/ui/toast.store";
 import type { WorktreeInfo, MergeStrategy } from "@/features/git/worktrees.service";
 import { CMD, invoke } from "@/lib/ipc";
@@ -31,14 +39,17 @@ interface WorktreesSectionProps {
   projectId: string;
   projectPath: string;
   onOpenInTerminal: (cwd: string, name: string) => void;
+  onLaunchCliInPath: (cli: CliTool, path: string, name: string) => void;
 }
 
 export function WorktreesSection({
   projectId,
   projectPath,
   onOpenInTerminal,
+  onLaunchCliInPath,
 }: WorktreesSectionProps) {
   const { t } = useTranslation();
+  const enabledCliTools = useEnabledCliTools();
   const bucket = useWorktreesStore((s) => s.byProject[projectId]);
   const occupancy = useWorktreesStore((s) => s.occupancyByPath);
   const refresh = useWorktreesStore((s) => s.refresh);
@@ -185,9 +196,46 @@ export function WorktreesSection({
                       </button>
                     </DropdownTrigger>
                     <DropdownContent align="end" sideOffset={6}>
+                      <DropdownSub>
+                        <DropdownSubTrigger>
+                          <Icon icon={Sparkles} size={12} className="text-muted" />
+                          {t("sourceControl.worktrees.launchAgent")}
+                        </DropdownSubTrigger>
+                        <DropdownSubContent>
+                          {enabledCliTools.length > 0 ? (
+                            enabledCliTools.map((cli) => {
+                              const BrandIcon = CLI_BRAND_ICONS[cli.id];
+                              return (
+                                <DropdownItem
+                                  key={cli.id}
+                                  onSelect={() =>
+                                    onLaunchCliInPath(
+                                      cli,
+                                      w.path,
+                                      w.branch ?? basename(w.path),
+                                    )
+                                  }
+                                >
+                                  {BrandIcon ? (
+                                    <BrandIcon size={13} />
+                                  ) : (
+                                    <Icon icon={SquareTerminal} size={12} className="text-muted" />
+                                  )}
+                                  <span>{cli.label}</span>
+                                </DropdownItem>
+                              );
+                            })
+                          ) : (
+                            <DropdownItem disabled>
+                              {t("sourceControl.worktrees.noAgentsEnabled")}
+                            </DropdownItem>
+                          )}
+                        </DropdownSubContent>
+                      </DropdownSub>
                       <DropdownItem
                         onSelect={() => onOpenInTerminal(w.path, w.branch ?? basename(w.path))}
                       >
+                        <Icon icon={SquareTerminal} size={12} className="text-muted" />
                         {t("sourceControl.worktrees.openTerminalHere")}
                       </DropdownItem>
                       <DropdownItem

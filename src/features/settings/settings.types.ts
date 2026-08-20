@@ -44,12 +44,6 @@ export const UI_SCALE_FACTOR: Record<UiScale, number> = {
   large: 1.15,
 };
 
-/** Workspace layout. `horizontal` keeps open items in the top tab bar (the
- *  sidebar then carries only projects + history). `vertical` hides the tab bar
- *  and drives the single center pane from the sidebar's per-project sections
- *  (Codex-style, except the center is the agent's terminal, not a chat). */
-export type LayoutMode = "horizontal" | "vertical";
-
 /**
  * The full set of user preferences persisted to `~/.metacodex/settings.json`.
  * `theme` and `language` mirror the existing theme/i18n stores (which still own
@@ -77,26 +71,20 @@ export interface AppSettings {
     workspaceSaveDebounceMs: number;
     searchDebounceMs: number;
   };
-  /** Launcher visibility and other interface-level toggles. The new-tab menu
-   *  reads these on every render. Toggling immediately reflects in the UI. */
+  /** Launcher visibility and other interface-level toggles. */
   interface: {
-    /** Whether the "Autonomous Agents" sub-section starts expanded. Persists across sessions. */
-    autonomousAgentsExpanded: boolean;
-    /** Per-CLI visibility in the launcher menu. Missing keys default to true. */
+    /** Per-CLI visibility in the New Agent modal. Missing keys default to true. */
     enabledAgents: Record<string, boolean>;
     /** File/folder icon style in the explorer tree. */
     explorerIconStyle: ExplorerIconStyle;
     /** Global spacing density (compact / comfortable / spacious). */
     uiDensity: UiDensity;
-    /** Horizontal (tab bar) vs vertical (sidebar-driven single pane) workspace. */
-    layoutMode: LayoutMode;
   };
   /** Persisted horizontal dimensions of the resizable shell panels. Survives
    *  project switches and app restarts. Widths are integers in px; the diff
    *  split is the fraction of the diff viewport occupied by the HEAD side. */
   panels: {
     projectsWidth: number;
-    explorerWidth: number;
     sourceControlWidth: number;
     diffSplitRatio: number;
   };
@@ -118,6 +106,7 @@ export interface AppSettings {
    *  only multiplies spacing tokens). */
   accessibility: {
     uiScale: UiScale;
+    screenReaderMode: boolean;
   };
 }
 
@@ -135,15 +124,13 @@ export type SettingsSliceKey =
  *  - Projects (left): nav + names. Floor keeps icon, label and shortcut on one
  *    row; the ceiling stops it from competing with the editor.
  *  - Source control (right): denser chrome (Uncommitted + counts + branch +
- *    Commit). Floor is the one-row header; users may widen for longer paths.
- *  - Explorer: VS Code uses ~170px floor; we sit slightly above so the path
- *    column stays legible. The ceiling keeps the editor area dominant.
+ *    Commit) and the in-app browser. Floor is the one-row header. The ceiling
+ *    is a hard cap; AppShell also clamps against the remaining window width.
  *  - Diff split: 0.2 / 0.8 mirrors common merge-tool limits so one side never
  *    collapses to unusable. */
 export const PANEL_LIMITS = {
   projects: { min: 260, max: 420, default: 324 },
-  explorer: { min: 180, max: 480, default: 248 },
-  sourceControl: { min: 400, max: 560, default: 400 },
+  sourceControl: { min: 400, max: 2400, default: 400 },
   diff: { min: 0.2, max: 0.8, default: 0.5 },
 } as const;
 
@@ -152,7 +139,8 @@ export const PANEL_LIMITS = {
 const LEGACY_PROJECTS_DEFAULTS = new Set([220, 264, 340]);
 const LEGACY_SOURCE_CONTROL_DEFAULTS = new Set([220, 264, 324, 340]);
 
-/** Default monospace stack for the terminal, verbatim from `useXterm.ts`. */
+/** PTY face only. Literal stack for xterm (canvas does not resolve CSS vars).
+ *  Nerd Font carries TUI glyphs. Chrome and editor stay on SF Pro. */
 export const DEFAULT_TERMINAL_FONT_FAMILY =
   '"JetBrainsMono Nerd Font Mono", "JetBrainsMono NFM", "SF Mono", ui-monospace, Menlo, monospace';
 
@@ -167,7 +155,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   language: "en",
   editor: {
     fontSize: 13,
-    fontFamily: "var(--font-mono)",
+    fontFamily: "var(--font-sans)",
     stickyScrollMaxHeaders: 5,
   },
   terminal: {
@@ -181,15 +169,12 @@ export const DEFAULT_SETTINGS: AppSettings = {
     searchDebounceMs: 150,
   },
   interface: {
-    autonomousAgentsExpanded: true,
     enabledAgents: {},
     explorerIconStyle: "mono",
     uiDensity: "comfortable",
-    layoutMode: "horizontal",
   },
   panels: {
     projectsWidth: PANEL_LIMITS.projects.default,
-    explorerWidth: PANEL_LIMITS.explorer.default,
     sourceControlWidth: PANEL_LIMITS.sourceControl.default,
     diffSplitRatio: PANEL_LIMITS.diff.default,
   },
@@ -200,6 +185,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   },
   accessibility: {
     uiScale: "default",
+    screenReaderMode: false,
   },
 };
 
@@ -210,6 +196,18 @@ function clampNum(value: unknown, def: number, min: number, max: number): number
 
 function str(value: unknown, def: string): string {
   return typeof value === "string" && value.length > 0 ? value : def;
+}
+
+function remapEditorFontFamily(value: unknown, def: string): string {
+  const s = str(value, def);
+  if (/JetBrains/i.test(s) || s === "var(--font-mono)") return def;
+  return s;
+}
+
+function remapTerminalFontFamily(value: unknown, def: string): string {
+  const s = str(value, def);
+  if (s === "var(--font-sans)" || s === "var(--font-term)") return def;
+  return s;
 }
 
 function oneOf<T extends string>(value: unknown, allowed: readonly T[], def: T): T {
@@ -246,7 +244,6 @@ function resolveThemeId(id: unknown, mode: ThemeMode): string {
 const CURSOR_VALUES: TerminalCursorStyle[] = ["bar", "block", "underline"];
 const ICON_STYLE_VALUES: ExplorerIconStyle[] = ["mono", "color"];
 const DENSITY_VALUES: UiDensity[] = ["compact", "comfortable", "spacious"];
-const LAYOUT_MODE_VALUES: LayoutMode[] = ["horizontal", "vertical"];
 const UI_SCALE_VALUES: UiScale[] = ["small", "default", "large"];
 
 /**
@@ -272,14 +269,14 @@ export function mergeSettings(raw: unknown): AppSettings {
     language: isLanguageId(r.language) ? r.language : D.language,
     editor: {
       fontSize: clampNum(editor.fontSize, D.editor.fontSize, 8, 32),
-      fontFamily: str(editor.fontFamily, D.editor.fontFamily),
+      fontFamily: remapEditorFontFamily(editor.fontFamily, D.editor.fontFamily),
       stickyScrollMaxHeaders: Math.round(
         clampNum(editor.stickyScrollMaxHeaders, D.editor.stickyScrollMaxHeaders, 0, 20),
       ),
     },
     terminal: {
       fontSize: clampNum(terminal.fontSize, D.terminal.fontSize, 8, 32),
-      fontFamily: str(terminal.fontFamily, D.terminal.fontFamily),
+      fontFamily: remapTerminalFontFamily(terminal.fontFamily, D.terminal.fontFamily),
       scrollback: Math.round(clampNum(terminal.scrollback, D.terminal.scrollback, 0, 500_000)),
       cursorStyle: oneOf(terminal.cursorStyle, CURSOR_VALUES, D.terminal.cursorStyle),
     },
@@ -292,10 +289,6 @@ export function mergeSettings(raw: unknown): AppSettings {
       ),
     },
     interface: {
-      autonomousAgentsExpanded:
-        typeof iface.autonomousAgentsExpanded === "boolean"
-          ? iface.autonomousAgentsExpanded
-          : D.interface.autonomousAgentsExpanded,
       enabledAgents: asBoolMap(iface.enabledAgents),
       explorerIconStyle: oneOf(
         iface.explorerIconStyle,
@@ -303,7 +296,6 @@ export function mergeSettings(raw: unknown): AppSettings {
         D.interface.explorerIconStyle,
       ),
       uiDensity: oneOf(iface.uiDensity, DENSITY_VALUES, D.interface.uiDensity),
-      layoutMode: oneOf(iface.layoutMode, LAYOUT_MODE_VALUES, D.interface.layoutMode),
     },
     panels: {
       projectsWidth: Math.round(
@@ -315,14 +307,6 @@ export function mergeSettings(raw: unknown): AppSettings {
           D.panels.projectsWidth,
           PANEL_LIMITS.projects.min,
           PANEL_LIMITS.projects.max,
-        ),
-      ),
-      explorerWidth: Math.round(
-        clampNum(
-          panels.explorerWidth,
-          D.panels.explorerWidth,
-          PANEL_LIMITS.explorer.min,
-          PANEL_LIMITS.explorer.max,
         ),
       ),
       sourceControlWidth: Math.round(
@@ -359,6 +343,10 @@ export function mergeSettings(raw: unknown): AppSettings {
     },
     accessibility: {
       uiScale: oneOf(a11y.uiScale, UI_SCALE_VALUES, D.accessibility.uiScale),
+      screenReaderMode:
+        typeof a11y.screenReaderMode === "boolean"
+          ? a11y.screenReaderMode
+          : D.accessibility.screenReaderMode,
     },
   };
 }

@@ -62,7 +62,11 @@ export function WorkbenchNewMenu({ onOpen }: WorkbenchNewMenuProps) {
         </DropdownItem>
         <DropdownSeparator />
         {SURFACES.map((item) => (
-          <DropdownItem key={item.id} onSelect={() => onOpen(item.id)}>
+          <DropdownItem
+            key={item.id}
+            onSelect={() => onOpen(item.id)}
+            trailing={item.id === "browser" ? <Kbd keys={["Mod", "Shift", "B"]} /> : undefined}
+          >
             <Icon icon={item.icon} size={12} className="text-muted" />
             <span>{t(item.labelKey)}</span>
           </DropdownItem>

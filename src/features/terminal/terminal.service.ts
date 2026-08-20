@@ -1,19 +1,29 @@
 import { CMD, invoke } from "@/lib/ipc";
 import { useThemeStore } from "@/features/theme/theme.store";
-import type { PtySpawnSpec } from "./terminal.types";
+import type {
+  PtyAttachResponse,
+  PtyPrepareResponse,
+  PtySpawnSpec,
+} from "./terminal.types";
 
 export const ptyApi = {
   // `theme_kind` is injected here, not accepted from callers: the Omit makes
   // that a compile error, and spreading it LAST means the injection always wins.
-  spawn(spec: Omit<PtySpawnSpec, "theme_kind">): Promise<string> {
+  prepare(spec: Omit<PtySpawnSpec, "theme_kind">): Promise<PtyPrepareResponse> {
     // Stamp the current theme kind so the backend can export COLORFGBG and
     // background-detecting TUIs start with matching colors. One injection
-    // point here keeps every spawn path (new tab, resume, CLI) covered.
+    // point here keeps every preparation path (new tab, resume, CLI) covered.
     const themed: PtySpawnSpec = {
       ...spec,
       theme_kind: useThemeStore.getState().effective,
     };
-    return invoke<string>(CMD.ptySpawn, { spec: themed });
+    return invoke<PtyPrepareResponse>(CMD.ptyPrepare, { spec: themed });
+  },
+  attach(sessionId: string, afterSeq: number): Promise<PtyAttachResponse> {
+    return invoke<PtyAttachResponse>(CMD.ptyAttach, { sessionId, afterSeq });
+  },
+  start(sessionId: string): Promise<void> {
+    return invoke<void>(CMD.ptyStart, { sessionId });
   },
   write(sessionId: string, dataB64: string): Promise<void> {
     return invoke<void>(CMD.ptyWrite, { sessionId, dataB64 });

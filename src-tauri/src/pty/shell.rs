@@ -46,14 +46,16 @@ pub fn detect_login_shell() -> (String, Vec<String>) {
 ///   `--dangerously-skip-permissions`.
 /// - **Windows (cmd fallback)**: `/K <cmd>` — keeps the prompt open after
 ///   the CLI exits; acceptable since cmd is a tertiary fallback.
-pub fn cli_launch_args(command: &str) -> (String, Vec<String>) {
+pub fn cli_launch_args(executable: &str, args: &[String]) -> (String, Vec<String>) {
+    let command = std::iter::once(executable)
+        .chain(args.iter().map(String::as_str))
+        .map(shell_quote_token)
+        .collect::<Vec<_>>()
+        .join(" ");
     #[cfg(unix)]
     {
         let (shell, _) = detect_login_shell();
-        (
-            shell,
-            vec!["-l".into(), "-i".into(), "-c".into(), command.into()],
-        )
+        (shell, vec!["-l".into(), "-i".into(), "-c".into(), command])
     }
     #[cfg(windows)]
     {
@@ -63,8 +65,7 @@ pub fn cli_launch_args(command: &str) -> (String, Vec<String>) {
             // Pin UTF-8 so emoji / box-drawing chars from agents render
             // correctly on Windows PowerShell 5.1 (codepage default).
             // Native pwsh 7+ already defaults to UTF-8 — the preamble is a no-op there.
-            const UTF8_PREAMBLE: &str =
-                "[Console]::OutputEncoding=[Text.UTF8Encoding]::new();\
+            const UTF8_PREAMBLE: &str = "[Console]::OutputEncoding=[Text.UTF8Encoding]::new();\
                  $OutputEncoding=[Text.UTF8Encoding]::new();";
             (
                 shell,
@@ -78,8 +79,19 @@ pub fn cli_launch_args(command: &str) -> (String, Vec<String>) {
         } else {
             // cmd.exe — last resort. /K keeps the prompt open after the cmd
             // exits so the user can keep working.
-            (shell, vec!["/K".into(), command.into()])
+            (shell, vec!["/K".into(), command])
         }
+    }
+}
+
+fn shell_quote_token(value: &str) -> String {
+    #[cfg(unix)]
+    {
+        format!("'{}'", value.replace('\'', "'\\''"))
+    }
+    #[cfg(windows)]
+    {
+        format!("'{}'", value.replace('\'', "''"))
     }
 }
 
@@ -192,4 +204,22 @@ fn windows_env(project_path: &Path) -> Vec<(String, String)> {
     // PowerShell would otherwise log a usage telemetry record per session start.
     env.push(("POWERSHELL_TELEMETRY_OPTOUT".into(), "1".into()));
     env
+}
+
+#[cfg(test)]
+mod tests {
+    use super::cli_launch_args;
+
+    #[cfg(unix)]
+    #[test]
+    fn cli_launch_escapes_executable_and_each_argument() {
+        let (shell, args) = cli_launch_args(
+            "/tmp/my agent",
+            &["--session".into(), "value'with quote".into()],
+        );
+        assert!(!shell.is_empty());
+        let command = args.last().unwrap();
+        assert!(command.contains("'/tmp/my agent'"));
+        assert!(command.contains("'value'\\''with quote'"));
+    }
 }

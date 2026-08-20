@@ -4,6 +4,7 @@ import type { Terminal } from "@xterm/xterm";
 import { useResumeStore } from "./resume.store";
 import { detectorFor } from "./sessionDetectors";
 import { useTabMetadataStore } from "@/features/terminal/tabMetadata.store";
+import { useTabsStore, WORKSPACE_NULL } from "@/components/tabs/tabsStore";
 
 interface UseSessionCaptureOpts {
   enabled: boolean;
@@ -13,6 +14,7 @@ interface UseSessionCaptureOpts {
   cwd: string;
   /** PTY session id — used to look up the live cwd/branch in the metadata store. */
   sessionId: string | null;
+  tabId: string;
 }
 
 const TAIL_LINES = 200;
@@ -43,7 +45,7 @@ function readTail(term: Terminal): string {
  *     use that — keeps resume entries pointing at the right thing.
  */
 export function useSessionCapture(opts: UseSessionCaptureOpts) {
-  const { enabled, term, cliId, projectId, cwd, sessionId } = opts;
+  const { enabled, term, cliId, projectId, cwd, sessionId, tabId } = opts;
 
   useEffect(() => {
     if (!enabled || !term) return;
@@ -59,6 +61,9 @@ export function useSessionCapture(opts: UseSessionCaptureOpts) {
       const result = detector(readTail(term));
       if (!result) return;
       captured = result.sessionId;
+      useTabsStore.getState().updateTab(projectId ?? WORKSPACE_NULL, tabId, {
+        providerSessionId: captured,
+      });
       // Prefer fresh metadata if available; fallback to spawn-time values.
       const meta = sessionId
         ? useTabMetadataStore.getState().bySessionId[sessionId]
@@ -85,5 +90,5 @@ export function useSessionCapture(opts: UseSessionCaptureOpts) {
       if (timer != null) window.clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, term, cliId, projectId, sessionId]);
+  }, [enabled, term, cliId, projectId, sessionId, tabId]);
 }

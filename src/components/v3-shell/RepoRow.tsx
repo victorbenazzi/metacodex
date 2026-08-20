@@ -12,10 +12,10 @@ import { TabStatusDot } from "@/components/tabs/TabStatusDot";
 import { statusTone } from "@/components/tabs/statusTone";
 import { resolveTabTitle } from "@/components/tabs/types";
 import { useTabsStore } from "@/components/tabs/tabsStore";
-import { requestCloseTab } from "@/features/tabs";
+import { requestCloseTab, focusProcessTab, openResume } from "@/features/tabs";
 import { useProjectsStore } from "@/features/projects/project.store";
 import { useResumeStore } from "@/features/resume/resume.store";
-import { buildResumeTab } from "@/features/resume/resumeLaunch";
+import { isLiveResumeSession } from "@/features/resume/resumeLaunch";
 import { resumeFlagFor } from "@/features/resume/sessionDetectors";
 import type { ResumeEntry } from "@/features/resume/resume.service";
 import { cliById } from "@/features/terminal/cli-registry";
@@ -58,8 +58,6 @@ export function RepoRow({
 
   const resumeEntries = useResumeStore((s) => s.entries);
   const bucket = useTabsStore((s) => s.byProject[project.id]);
-  const openTab = useTabsStore((s) => s.openTab);
-  const setActiveTab = useTabsStore((s) => s.setActiveTab);
 
   const live = useMemo(
     () => (bucket?.tabs ?? []).filter((tab) => tab.kind === "cli" || tab.kind === "terminal"),
@@ -78,7 +76,7 @@ export function RepoRow({
   );
   const aggTone = aggStatus ? statusTone(aggStatus, aggUrgency) : null;
 
-  const historyOnly = history.filter((e) => !live.some((tab) => tab.kind === "cli" && tab.cliId === e.cliId));
+  const historyOnly = history.filter((e) => !live.some((tab) => isLiveResumeSession(tab, e)));
   const totalThreads = live.length + historyOnly.length;
   const visibleLive = showAll ? live : live.slice(0, THREAD_CAP);
   const remaining = THREAD_CAP - visibleLive.length;
@@ -91,12 +89,11 @@ export function RepoRow({
 
   const focusTab = (tabId: string) => {
     void setActive(project.id);
-    setActiveTab(project.id, tabId);
+    focusProcessTab(project.id, tabId);
   };
   const resume = (entry: ResumeEntry) => {
     void setActive(project.id);
-    const tab = buildResumeTab(entry);
-    if (tab) openTab(project.id, tab);
+    openResume(entry);
   };
 
   const empty = totalThreads === 0;

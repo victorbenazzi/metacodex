@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useShallow } from "zustand/react/shallow";
 
 import { useTabsStore } from "@/components/tabs/tabsStore";
 import {
@@ -57,6 +58,19 @@ export function aggregateProjectStatus(
  */
 export function useProjectAgentStatus(projectId: string): ProjectAgentStatus {
   const bucket = useTabsStore((s) => s.byProject[projectId]);
-  const byTab = useAgentStatusStore((s) => s.byTab);
-  return useMemo(() => aggregateProjectStatus(bucket?.tabs ?? [], byTab), [bucket, byTab]);
+  const processTabs = useMemo(
+    () => (bucket?.tabs ?? []).filter((tab) => tab.kind === "terminal" || tab.kind === "cli"),
+    [bucket],
+  );
+  const relevantEntries = useAgentStatusStore(
+    useShallow((state) => processTabs.map((tab) => state.byTab[tab.id])),
+  );
+  return useMemo(() => {
+    const byTab: Record<string, AgentStatusEntry> = {};
+    processTabs.forEach((tab, index) => {
+      const entry = relevantEntries[index];
+      if (entry) byTab[tab.id] = entry;
+    });
+    return aggregateProjectStatus(processTabs, byTab);
+  }, [processTabs, relevantEntries]);
 }

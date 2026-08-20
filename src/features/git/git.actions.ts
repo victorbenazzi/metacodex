@@ -4,6 +4,7 @@ import { toast } from "@/features/ui/toast.store";
 import { gitApi } from "./git.service";
 import { useGitStore } from "./git.store";
 import { useChangesUiStore } from "./changes.store";
+import { flushAllEditors } from "@/features/editor/editorSavers";
 
 function errMsg(err: unknown): string {
   if (err && typeof err === "object" && "message" in err) {
@@ -22,6 +23,7 @@ export const gitActions = {
     if (ui.busy) return false;
     ui.setBusy(true);
     try {
+      await flushAllEditors();
       await gitApi.commit(root, message, paths);
       ui.setMessage(projectId, "");
       await afterMutation(projectId, root);
@@ -60,6 +62,23 @@ export const gitActions = {
       return true;
     } catch (err) {
       toast.error(i18n.t("sourceControl.branchFailed"), errMsg(err));
+      return false;
+    } finally {
+      useChangesUiStore.getState().setBusy(false);
+    }
+  },
+
+  async switchBranch(projectId: string, root: string, branch: string): Promise<boolean> {
+    const ui = useChangesUiStore.getState();
+    if (ui.busy) return false;
+    ui.setBusy(true);
+    try {
+      await flushAllEditors();
+      await gitApi.switchBranch(root, branch);
+      await afterMutation(projectId, root);
+      return true;
+    } catch (err) {
+      toast.error(i18n.t("sourceControl.branchSwitchFailed"), errMsg(err));
       return false;
     } finally {
       useChangesUiStore.getState().setBusy(false);

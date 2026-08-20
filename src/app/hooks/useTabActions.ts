@@ -17,18 +17,17 @@ import { fsApi } from "@/features/filesystem/filesystem.service";
 import { CMD, invoke } from "@/lib/ipc";
 import { EV, listenTo, type OpenFilePayload, type PreviewGrant } from "@/lib/events";
 import type { CliTool } from "@/features/terminal/cli-registry";
+import { isAppBootstrapReady } from "@/app/hooks/useAppBootstrap";
+import { nextAttentionTarget } from "@/features/terminal/attentionCoordinator";
 import { useTerminalStore } from "@/features/terminal/terminal.store";
 import { ptyApi } from "@/features/terminal/terminal.service";
 import { utf8ToBase64 } from "@/lib/base64";
-import {
-  attentionOrder,
-  useAgentStatusStore,
-} from "@/features/terminal/agent-status.store";
+import { useAgentStatusStore } from "@/features/terminal/agent-status.store";
 import type { SentToProject } from "@/components/previews/SendToProjectDialog";
 import type { AppCommands } from "@/app/appCommands";
 import { looksLikeFile } from "@/app/appShell.helpers";
 import { basename } from "@/lib/path";
-import { useSidePanelStore } from "@/features/side-panel/sidePanel.store";
+import { useSidePanelStore, workbenchOwnsKeyboard, type RightWorkbenchTab } from "@/features/side-panel/sidePanel.store";
 import { useChangesUiStore } from "@/features/git/changes.store";
 import {
   cancelPendingClose,
@@ -44,7 +43,6 @@ import {
   requestCloseTab,
   requestCloseTabs,
 } from "@/features/tabs";
-import type { RightWorkbenchTab } from "@/features/side-panel/sidePanel.store";
 
 interface UseTabActionsParams {
   project: Project | null;
@@ -59,7 +57,7 @@ interface UseTabActionsParams {
 }
 
 export interface TabActions extends AppCommands {
-  launchCli: (cli: CliTool) => void;
+  launchCli: (cli: CliTool, options?: { elevated?: boolean }) => void;
   openWorktreeDialog: () => void;
   afterWorktreeCreate: (result: { branch: string; path: string }) => void;
   closeTab: (tabId: string) => void;
@@ -100,7 +98,6 @@ export function useTabActions({
   const setActiveTab = useTabsStore((s) => s.setActiveTab);
   const moveTabStore = useTabsStore((s) => s.moveTab);
   const setTabTitles = useTabsStore((s) => s.setTabTitles);
-  const setEditingTabId = useTabsStore((s) => s.setEditingTabId);
 
   const openFolder = useCallback(async () => {
     try {
@@ -122,6 +119,7 @@ export function useTabActions({
   }, [setCloneDialogOpen]);
 
   const newTerminal = useCallback(() => {
+    if (!isAppBootstrapReady() || !activeCwd) return;
     openTerminal({
       projectKey,
       projectId: project?.id ?? null,
@@ -161,12 +159,14 @@ export function useTabActions({
   );
 
   const launchCli = useCallback(
-    (cli: CliTool) => {
+    (cli: CliTool, options?: { elevated?: boolean }) => {
+      if (!isAppBootstrapReady() || !activeCwd) return;
       openCli({
         projectKey,
         projectId: project?.id ?? null,
         cwd: activeCwd,
         cli,
+        elevated: options?.elevated,
       });
     },
     [projectKey, project, activeCwd],
@@ -265,23 +265,17 @@ export function useTabActions({
   );
 
   const renameActiveTab = useCallback(() => {
-    const processes = bucket.tabs.filter(isProcessTab);
-    const id =
-      processes.find((tab) => tab.id === bucket.activeTabId)?.id ??
-      processes[0]?.id;
-    if (!id) return;
-    setEditingTabId(id);
-  }, [bucket.activeTabId, bucket.tabs, setEditingTabId]);
+    // Inline rename lived on the v2 tab strip. Process titles still change via
+    // OSC / renameTab; F2 has no chrome until a v3 rename surface exists.
+  }, []);
 
   const moveActiveTab = useCallback(
     (delta: -1 | 1) => {
       const panel = useSidePanelStore.getState();
-      if (panel.view !== "closed") {
+      if (workbenchOwnsKeyboard(panel)) {
         if (panel.focus === "doc") {
           const docs = bucket.tabs.filter(isWorkbenchDocTab);
-          const id =
-            docs.find((tab) => tab.id === panel.activeDocId)?.id ??
-            docs.find((tab) => tab.id === bucket.activeTabId)?.id;
+          const id = docs.find((tab) => tab.id === panel.activeDocId)?.id;
           if (!id) return;
           const idx = docs.findIndex((tab) => tab.id === id);
           const next = idx + delta;
@@ -290,11 +284,13 @@ export function useTabActions({
           if (target >= 0) moveTabStore(projectKey, id, target);
           return;
         }
-        const from = panel.openTabs.indexOf(panel.view);
+        const view = panel.view;
+        if (view === "closed") return;
+        const from = panel.openTabs.indexOf(view);
         if (from < 0) return;
         const next = from + delta;
         if (next < 0 || next >= panel.openTabs.length) return;
-        panel.moveTab(panel.view, next);
+        panel.moveTab(view, next);
         return;
       }
       const processes = bucket.tabs.filter(isProcessTab);
@@ -314,7 +310,7 @@ export function useTabActions({
   const activateAdjacentTab = useCallback(
     (delta: -1 | 1) => {
       const panel = useSidePanelStore.getState();
-      if (panel.view !== "closed") {
+      if (workbenchOwnsKeyboard(panel)) {
         type Item =
           | { type: "surface"; id: RightWorkbenchTab }
           | { type: "doc"; id: string };
@@ -339,7 +335,6 @@ export function useTabActions({
           panel.show(item.id);
         } else {
           panel.focusDoc(item.id);
-          setActiveTab(projectKey, item.id);
         }
         return;
       }
@@ -384,8 +379,7 @@ export function useTabActions({
   const openFile = useCallback(
     (path: string, name: string, openInEditMode?: boolean) => {
       if (!project) return;
-      const id = openFileInProject(project, path, name, openInEditMode);
-      useSidePanelStore.getState().focusDoc(id);
+      openFileInProject(project, path, name, openInEditMode);
     },
     [project],
   );
@@ -394,8 +388,7 @@ export function useTabActions({
     try {
       const selected = await fsApi.pickPreviewFile(t("preview.openTitle"));
       if (selected) {
-        const id = openPreview(projectKey, selected);
-        useSidePanelStore.getState().focusDoc(id);
+        openPreview(projectKey, selected);
       }
     } catch (err) {
       console.error("preview openDialog failed", err);
@@ -411,8 +404,7 @@ export function useTabActions({
   );
 
   const sentToProject = useCallback(({ project: dest, oldPath, newPath, toDir }: SentToProject) => {
-    const id = openAfterSentToProject({ dest, oldPath, newPath, toDir });
-    useSidePanelStore.getState().focusDoc(id);
+    openAfterSentToProject({ dest, oldPath, newPath, toDir });
   }, []);
 
   useEffect(() => {
@@ -421,8 +413,7 @@ export function useTabActions({
     (async () => {
       off = await listenTo<OpenFilePayload>(EV.openFile, (e) => {
         for (const file of e.payload.files) {
-          const id = openPreview(projectKey, file);
-          useSidePanelStore.getState().focusDoc(id);
+          openPreview(projectKey, file);
         }
       });
       if (cancelled) {
@@ -432,8 +423,7 @@ export function useTabActions({
       try {
         const pending = await invoke<PreviewGrant[]>(CMD.takePendingOpenFiles);
         for (const file of pending) {
-          const id = openPreview(projectKey, file);
-          useSidePanelStore.getState().focusDoc(id);
+          openPreview(projectKey, file);
         }
       } catch {
         // nothing queued
@@ -479,16 +469,6 @@ export function useTabActions({
   }, [addProject, setDropActive]);
 
   useEffect(() => {
-    const leftover = bucket.tabs.filter((tab) => tab.kind === "changes");
-    if (leftover.length > 0) {
-      useTabsStore.getState().closeMany(
-        projectKey,
-        leftover.map((tab) => tab.id),
-      );
-    }
-  }, [bucket.tabs, projectKey]);
-
-  useEffect(() => {
     const docs = bucket.tabs.filter(isWorkbenchDocTab);
     const { activeDocId, focus } = useSidePanelStore.getState();
     if (activeDocId && docs.some((tab) => tab.id === activeDocId)) return;
@@ -508,8 +488,7 @@ export function useTabActions({
   const openDiff = useCallback(
     (path: string, status: string) => {
       if (!project) return;
-      const id = openDiffInProject({ project, path, status });
-      useSidePanelStore.getState().focusDoc(id);
+      openDiffInProject({ project, path, status });
     },
     [project],
   );
@@ -527,16 +506,16 @@ export function useTabActions({
 
   const closeActiveTab = useCallback(() => {
     const panel = useSidePanelStore.getState();
-    if (panel.view !== "closed") {
+    if (workbenchOwnsKeyboard(panel)) {
       if (panel.focus === "doc") {
         const docs = bucket.tabs.filter(isWorkbenchDocTab);
         const id =
           docs.find((tab) => tab.id === panel.activeDocId)?.id ??
-          docs.find((tab) => tab.id === bucket.activeTabId)?.id ??
           docs[0]?.id;
         if (id) closeTab(id);
         return;
       }
+      if (panel.view === "closed") return;
       panel.closeTab(panel.view);
       return;
     }
@@ -557,15 +536,17 @@ export function useTabActions({
 
   const jumpToNextAttention = useCallback(() => {
     const byTab = useAgentStatusStore.getState().byTab;
-    const localIds = new Set(bucket.tabs.map((tab) => tab.id));
-    const ordered = attentionOrder(byTab).filter((id) => localIds.has(id));
-    if (ordered.length === 0) return;
-    const activeIdx = bucket.activeTabId
-      ? ordered.indexOf(bucket.activeTabId)
-      : -1;
-    const next = ordered[(activeIdx + 1) % ordered.length];
-    if (next) setActiveTab(projectKey, next);
-  }, [bucket.tabs, bucket.activeTabId, projectKey, setActiveTab]);
+    const buckets = useTabsStore.getState().byProject;
+    const target = nextAttentionTarget(
+      byTab,
+      buckets,
+      useProjectsStore.getState().activeProjectId,
+    );
+    if (!target) return;
+    if (target.projectKey !== WORKSPACE_NULL) void setActive(target.projectKey);
+    setActiveTab(target.projectKey, target.tabId);
+    useSidePanelStore.getState().setShellFocus("center");
+  }, [setActive, setActiveTab]);
 
   const confirmPendingClose = useCallback(() => {
     void lifecycleConfirmPendingClose();

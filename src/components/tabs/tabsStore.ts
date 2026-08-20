@@ -5,6 +5,9 @@ import { basename } from "@/lib/path";
 /**
  * Tabs are keyed by project. Use `WORKSPACE_NULL` as the bucket for "no project
  * yet" , Day 1 the user can open terminal tabs before adding any project.
+ *
+ * `activeTabId` is the center-column process (terminal/cli). File tabs live in
+ * the same bucket but are selected via the workbench `activeDocId`.
  */
 export const WORKSPACE_NULL = "__no_project__";
 
@@ -13,11 +16,18 @@ export interface TabsBucket {
   activeTabId: string | null;
 }
 
+function isProcessKind(kind: Tab["kind"]): boolean {
+  return kind === "terminal" || kind === "cli";
+}
+
+function processActiveId(tabs: Tab[], preferred: string | null): string | null {
+  const processes = tabs.filter((t) => isProcessKind(t.kind));
+  if (preferred && processes.some((t) => t.id === preferred)) return preferred;
+  return processes[0]?.id ?? null;
+}
+
 interface TabsState {
   byProject: Record<string, TabsBucket>;
-  /** Id of the tab currently in inline-rename edit mode (across all projects ,
-   *  only one input can be active at a time). Null when no edit is in progress. */
-  editingTabId: string | null;
   openTab: (projectKey: string, tab: Tab, setActive?: boolean) => void;
   closeTab: (projectKey: string, tabId: string) => void;
   closeMany: (projectKey: string, tabIds: string[]) => void;
@@ -34,8 +44,6 @@ interface TabsState {
     tabId: string,
     patch: { agentTitle?: string | null; userTitle?: string | null },
   ) => void;
-  /** Enter / exit inline rename mode for a tab. Pass null to exit. */
-  setEditingTabId: (tabId: string | null) => void;
   /** Close any file-backed tab whose path === removedPath or sits inside it. */
   closeForRemovedPath: (projectKey: string, removedPath: string) => void;
   /** Rewrite path/title of any file-backed tab affected by a rename. Tab ids
@@ -58,7 +66,6 @@ const emptyBucket: TabsBucket = { tabs: [], activeTabId: null };
 
 export const useTabsStore = create<TabsState>((set, get) => ({
   byProject: {},
-  editingTabId: null,
   openTab: (projectKey, tab, setActive = true) =>
     set((state) => {
       const cur = state.byProject[projectKey] ?? emptyBucket;
@@ -86,12 +93,16 @@ export const useTabsStore = create<TabsState>((set, get) => ({
       const existing = existingIdx >= 0 ? cur.tabs[existingIdx] : null;
       const nextTabs = existing ? cur.tabs : [...cur.tabs, tab];
       const focusId = existing ? existing.id : tab.id;
+      const openedProcess = isProcessKind(tab.kind);
       return {
         byProject: {
           ...state.byProject,
           [projectKey]: {
             tabs: nextTabs,
-            activeTabId: setActive ? focusId : cur.activeTabId ?? focusId,
+            activeTabId:
+              openedProcess && setActive
+                ? focusId
+                : processActiveId(nextTabs, cur.activeTabId),
           },
         },
       };
@@ -101,19 +112,17 @@ export const useTabsStore = create<TabsState>((set, get) => ({
       const cur = state.byProject[projectKey];
       if (!cur) return state;
       const nextTabs = cur.tabs.filter((t) => t.id !== tabId);
-      let activeTabId = cur.activeTabId;
-      if (activeTabId === tabId) {
-        const idx = cur.tabs.findIndex((t) => t.id === tabId);
-        const fallback = nextTabs[idx] ?? nextTabs[idx - 1] ?? nextTabs[nextTabs.length - 1] ?? null;
-        activeTabId = fallback?.id ?? null;
-      }
       return {
         byProject: {
           ...state.byProject,
-          [projectKey]: { tabs: nextTabs, activeTabId },
+          [projectKey]: {
+            tabs: nextTabs,
+            activeTabId: processActiveId(
+              nextTabs,
+              cur.activeTabId === tabId ? null : cur.activeTabId,
+            ),
+          },
         },
-        // Clear inline-edit if the tab being closed was the one in edit mode.
-        editingTabId: state.editingTabId === tabId ? null : state.editingTabId,
       };
     }),
   closeMany: (projectKey, tabIds) =>
@@ -122,35 +131,26 @@ export const useTabsStore = create<TabsState>((set, get) => ({
       if (!cur || tabIds.length === 0) return state;
       const killSet = new Set(tabIds);
       const nextTabs = cur.tabs.filter((t) => !killSet.has(t.id));
-      let activeTabId = cur.activeTabId;
-      if (activeTabId && killSet.has(activeTabId)) {
-        // Pick the nearest surviving tab , search forward from the dead tab's
-        // original position, then backward; fallback to last remaining.
-        const oldIdx = cur.tabs.findIndex((t) => t.id === activeTabId);
-        const forward = cur.tabs
-          .slice(oldIdx + 1)
-          .find((t) => !killSet.has(t.id));
-        const backward = cur.tabs
-          .slice(0, oldIdx)
-          .reverse()
-          .find((t) => !killSet.has(t.id));
-        activeTabId = forward?.id ?? backward?.id ?? nextTabs[0]?.id ?? null;
-      }
       return {
         byProject: {
           ...state.byProject,
-          [projectKey]: { tabs: nextTabs, activeTabId },
+          [projectKey]: {
+            tabs: nextTabs,
+            activeTabId: processActiveId(
+              nextTabs,
+              cur.activeTabId && killSet.has(cur.activeTabId) ? null : cur.activeTabId,
+            ),
+          },
         },
-        editingTabId:
-          state.editingTabId && killSet.has(state.editingTabId)
-            ? null
-            : state.editingTabId,
       };
     }),
   setActiveTab: (projectKey, tabId) =>
     set((state) => {
       const cur = state.byProject[projectKey];
       if (!cur) return state;
+      const tab = cur.tabs.find((t) => t.id === tabId);
+      if (!tab || !isProcessKind(tab.kind)) return state;
+      if (cur.activeTabId === tabId) return state;
       return {
         byProject: {
           ...state.byProject,
@@ -244,9 +244,6 @@ export const useTabsStore = create<TabsState>((set, get) => ({
       };
     }),
 
-  setEditingTabId: (tabId) =>
-    set((state) => (state.editingTabId === tabId ? state : { editingTabId: tabId })),
-
   closeForRemovedPath: (projectKey, removedPath) =>
     set((state) => {
       const cur = state.byProject[projectKey];
@@ -260,25 +257,17 @@ export const useTabsStore = create<TabsState>((set, get) => ({
       }
       if (kill.size === 0) return state;
       const nextTabs = cur.tabs.filter((t) => !kill.has(t.id));
-      let activeTabId = cur.activeTabId;
-      if (activeTabId && kill.has(activeTabId)) {
-        const oldIdx = cur.tabs.findIndex((t) => t.id === activeTabId);
-        const forward = cur.tabs.slice(oldIdx + 1).find((t) => !kill.has(t.id));
-        const backward = cur.tabs
-          .slice(0, oldIdx)
-          .reverse()
-          .find((t) => !kill.has(t.id));
-        activeTabId = forward?.id ?? backward?.id ?? nextTabs[0]?.id ?? null;
-      }
       return {
         byProject: {
           ...state.byProject,
-          [projectKey]: { tabs: nextTabs, activeTabId },
+          [projectKey]: {
+            tabs: nextTabs,
+            activeTabId: processActiveId(
+              nextTabs,
+              cur.activeTabId && kill.has(cur.activeTabId) ? null : cur.activeTabId,
+            ),
+          },
         },
-        editingTabId:
-          state.editingTabId && kill.has(state.editingTabId)
-            ? null
-            : state.editingTabId,
       };
     }),
 
@@ -311,14 +300,9 @@ export const useTabsStore = create<TabsState>((set, get) => ({
   dropBucket: (projectKey) =>
     set((state) => {
       if (!(projectKey in state.byProject)) return state;
-      const { [projectKey]: removed, ...rest } = state.byProject;
-      const editingDied =
-        state.editingTabId != null &&
-        removed.tabs.some((t) => t.id === state.editingTabId);
-      return {
-        byProject: rest,
-        editingTabId: editingDied ? null : state.editingTabId,
-      };
+      const next = { ...state.byProject };
+      delete next[projectKey];
+      return { byProject: next };
     }),
 
   getBucket: (projectKey) => get().byProject[projectKey] ?? emptyBucket,

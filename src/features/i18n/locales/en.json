@@ -98,17 +98,13 @@
       "iconStyleHint": "Monochrome follows the theme. Colored paints brand-known files with their canonical color.",
       "iconStyleMono": "Mono",
       "iconStyleColor": "Colored",
-      "layout": "Layout",
-      "layoutHint": "Horizontal keeps open items in the top tab bar. Vertical hides it and drives the center pane from the sidebar (Codex-style).",
-      "layoutHorizontal": "Horizontal",
-      "layoutVertical": "Vertical",
       "density": "Density",
       "densityHint": "Flexes spacing globally. Compact for dense data, spacious for breathing room.",
       "densityCompact": "Compact",
       "densityComfortable": "Comfortable",
       "densitySpacious": "Spacious",
       "launcherVisibilityTitle": "Launcher visibility",
-      "launcherVisibilityHint": "Choose which agents appear in the + menu. Hidden agents stay installed and can still be launched from a terminal.",
+      "launcherVisibilityHint": "Choose which agents appear in the New Agent menu. Hidden agents stay installed and can still be launched from a terminal.",
       "autonomousTag": "autonomous",
       "toggleAria": "Toggle {{name}} in the launcher"
     },
@@ -119,13 +115,15 @@
       "uiScaleHint": "Zooms the entire window: fonts, icons and layout scale together, like the window zoom in VS Code. Editor and terminal text scale too.",
       "uiScaleSmall": "Small",
       "uiScaleDefault": "Default",
-      "uiScaleLarge": "Large"
+      "uiScaleLarge": "Large",
+      "screenReaderMode": "Terminal screen reader mode",
+      "screenReaderModeHint": "Enables xterm accessibility output for assistive technologies. This can reduce terminal performance."
     },
     "editor": {
       "title": "Editor",
       "description": "Code editor preferences.",
       "fontFamily": "Font family",
-      "fontFamilyHint": "Monospace font for the code editor.",
+      "fontFamilyHint": "SF Pro, the system UI font. Same face as the rest of the app.",
       "fontSize": "Font size",
       "fontSizeHint": "Editor text size, in pixels.",
       "stickyScroll": "Sticky scroll headers",
@@ -135,7 +133,7 @@
       "title": "Terminal",
       "description": "Terminal preferences.",
       "fontFamily": "Font family",
-      "fontFamilyHint": "Monospace font for the terminal. Nerd Fonts render TUI icons.",
+      "fontFamilyHint": "Nerd Font for TUI icons (starship, Claude Code, Codex). The rest of the app stays on SF Pro.",
       "fontSize": "Font size",
       "fontSizeHint": "Terminal text size, in pixels.",
       "cursorStyle": "Cursor style",
@@ -182,7 +180,9 @@
         "tabJumpToNextAttention": "Jump to next agent waiting",
         "diagnosticsToggle": "Show diagnostic log",
         "folderClone": "Clone from GitHub",
-        "agentNew": "New agent"
+        "agentNew": "New agent",
+        "browserOpen": "Open browser",
+        "browserToggleExpand": "Toggle browser expanded"
       }
     },
     "advanced": {
@@ -221,7 +221,12 @@
   },
   "cli": {
     "dangerous": "dangerous",
-    "needsConfig": "Needs config"
+    "needsConfig": "Needs config",
+    "elevatedTitle": "Launch {{label}} with elevated approval",
+    "elevatedDescription": "These flags bypass normal approval inside {{project}}.",
+    "elevatedConfirm": "Launch elevated",
+    "elevatedAction": "{{label}} with elevated approval",
+    "elevatedActionHint": "Review and confirm permission bypass flags for this launch only."
   },
   "v3": {
     "sidebar": {
@@ -229,8 +234,7 @@
       "plan": "Local workspace"
     },
     "nav": {
-      "search": "Search",
-      "loops": "Loops"
+      "search": "Search"
     },
     "newAgent": {
       "button": "New Agent",
@@ -256,10 +260,6 @@
       "empty": "Open a folder or clone from GitHub to start a repository here.",
       "noAgents": "No agents yet"
     },
-    "loops": {
-      "emptyTitle": "No loops yet",
-      "emptyBody": "Loops orchestrate a maker and a verifier against a project, the same model as metacodex v2. The runtime wires in next."
-    },
     "workbench": {
       "aria": "Changes, files and browser",
       "changes": "Changes",
@@ -267,8 +267,6 @@
       "browser": "Browser",
       "uncommitted": "Uncommitted",
       "reopen": "Open side panel",
-      "browserSoonTitle": "Browser",
-      "browserSoonBody": "Embedded browser is coming soon.",
       "newTab": "New tab"
     },
     "palette": {
@@ -374,20 +372,11 @@
     "removeDescription": "This only removes the project from your workspace. The folder on disk is not affected.",
     "removeBodySuffix": " will be removed from the rail.",
     "menu": {
-      "rename": "Rename in metacodex…",
+      "rename": "Rename project name",
       "revealInFinder": "Reveal in Finder",
       "moveUp": "Move up",
       "moveDown": "Move down",
-      "icon": "Icon",
-      "changeImage": "Change image…",
-      "chooseFromComputer": "Choose from computer…",
-      "imageHint": "Use the project favicon or another image.",
-      "removeImage": "Remove image",
-      "removeFromApp": "Remove from metacodex",
-      "useIcon": "Use icon {{name}}",
-      "changeProjectImage": "Change project image",
-      "chooseImage": "Choose image from computer",
-      "pickIconTitle": "Choose project icon"
+      "removeFromApp": "Remove from metacodex"
     },
     "rename": {
       "title": "Rename project",
@@ -425,7 +414,8 @@
     "newWorktree": "New worktree…"
   },
   "notifications": {
-    "agentDone": "Agent finished"
+    "agentDone": "Agent finished",
+    "agentMessage": "Agent message"
   },
   "resume": {
     "titleProject": "Pick up where you left off in {{name}}",
@@ -473,6 +463,8 @@
     "orViaNpm": "Or via npm",
     "openInTerminal": "Open in terminal",
     "retryDetection": "Retry detection",
+    "detectionFailed": "Detection failed",
+    "detectionFailedBody": "metacodex could not check {{label}}. The CLI may still be installed.",
     "copyInstall": "Copy install command",
     "lookup": "metacodex asks your login shell for <0>{{command}}</0> via <1>{{detect}}</1>.",
     "unknownCli": "Unknown CLI id: <0>{{id}}</0>",
@@ -481,6 +473,20 @@
     "startingNamed": "Starting {{label}}…",
     "sessionFallback": "session",
     "processExited": "[process exited]",
+    "failure": {
+      "title": "Terminal could not start",
+      "step": "Failed during {{step}}.",
+      "copyDiagnostics": "Copy diagnostics",
+      "steps": {
+        "listeners": "event listener setup",
+        "prepare": "session preparation",
+        "attach": "frontend attachment",
+        "child": "process startup",
+        "write": "terminal input",
+        "resize": "terminal resize",
+        "kill": "session cleanup"
+      }
+    },
     "exitBanner": {
       "nonzero": "Process exited with code {{code}}.",
       "readerError": "Terminal I/O failed: output above may be truncated.",
@@ -534,6 +540,10 @@
     "deletions_other": "{{count}} deletions",
     "openDiff": "Open diff",
     "empty": "No uncommitted changes on your local branch",
+    "staged": "Staged",
+    "unstaged": "Unstaged",
+    "emptyStaged": "No staged changes",
+    "emptyUnstaged": "No unstaged changes",
     "noProject": "Open a project to see its changes.",
     "commit": "Commit",
     "commitMenu": "More commit actions",
@@ -562,9 +572,14 @@
     "loadDiff": "Load Diff",
     "showMore": "Show {{count}} more files",
     "branchName": "Branch name",
+    "changeScope": "Change scope",
+    "switchBranch": "Switch branch",
+    "branchLoading": "Loading branches…",
+    "branchEmpty": "No local branches found",
     "commitFailed": "Commit failed",
     "discardFailed": "Discard failed",
     "branchFailed": "Could not create branch",
+    "branchSwitchFailed": "Could not switch branch",
     "pushFailed": "Push failed",
     "worktrees": {
       "title": "Worktrees",
@@ -580,6 +595,8 @@
       "abandonBody": "The worktree directory and its checkout will be removed. Unpushed commits on this branch will be lost.",
       "abandonForce": "Force (discard unmerged work)",
       "revealInFinder": "Reveal in Finder",
+      "launchAgent": "Launch agent",
+      "noAgentsEnabled": "No agents enabled",
       "openTerminalHere": "New terminal here",
       "removeFailed": "Could not remove worktree:\n\n{{error}}",
       "mergeFailed": "Merge failed:\n\n{{error}}",
@@ -703,5 +720,70 @@
       "notesTitle": "Release notes, right here",
       "notesBody": "This summary appears once after each update, with a link to the full notes on GitHub."
     }
+  },
+  "quitBlocked": {
+    "title": "Could not quit safely",
+    "description": "Some data or background work could not be finalized.",
+    "warning": "Force Quit can discard unsaved work. Retry is the safer option.",
+    "forceQuit": "Force Quit",
+    "area": {
+      "editors": "Open editors",
+      "settings": "Settings",
+      "workspaces": "Workspaces",
+      "resume": "Session history",
+      "diagnostics": "Diagnostics",
+      "clones": "Git clones",
+      "terminals": "Terminals",
+      "watchers": "File watchers",
+      "quit": "Safe quit",
+      "unknown": "Background work"
+    },
+    "reason": {
+      "flushTimeout": "Saving did not finish within five seconds.",
+      "flushFailed": "The latest changes could not be saved.",
+      "saveFailed": "The latest changes could not be saved.",
+      "cleanupFailed": "A background resource could not be stopped safely.",
+      "unknown": "This work could not be finalized safely."
+    }
+  },
+  "bootstrap": {
+    "loadingTitle": "Preparing your workspace",
+    "loadingBody": "Loading projects, settings, and the local environment.",
+    "failedTitle": "Could not open the workspace",
+    "failedBody": "The local workspace could not be loaded."
+  },
+  "browser": {
+    "aria": "In-app browser",
+    "back": "Back",
+    "forward": "Forward",
+    "reload": "Reload",
+    "addressPlaceholder": "Search, URL, or port",
+    "addressLabel": "Address",
+    "pick": "Select component",
+    "draw": "Draw on page",
+    "sendViewport": "Send screenshot to agent",
+    "openExternal": "Open in system browser",
+    "home": "Start page",
+    "clearRecents": "Clear recents",
+    "startTitle": "Browser",
+    "startBody": "Open a running dev server or a recent page. Select a component or draw on the page to send visual context to the coding agent.",
+    "servers": "Dev servers",
+    "serversEmpty": "No local servers detected. Start a dev process in a terminal tab.",
+    "recents": "Recents",
+    "recentsEmpty": "Pages you open will show up here.",
+    "navigateFailed": "Could not open that URL",
+    "captureFailed": "Could not capture the page",
+    "needAgent": "Open a coding agent in this project first",
+    "sentToAgent": "Sent to the coding agent",
+    "sendFailed": "Could not send context to the coding agent",
+    "expand": "Expand browser",
+    "restore": "Restore browser",
+    "external": "External",
+    "openWhere": "Open",
+    "openInApp": "Open in Browser",
+    "drawDock": "Drawing tools",
+    "drawSend": "Send screenshot",
+    "drawClear": "Clear",
+    "drawCancel": "Cancel"
   }
 }

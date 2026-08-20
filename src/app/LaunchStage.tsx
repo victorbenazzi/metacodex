@@ -7,7 +7,7 @@ import { Kbd } from "@/components/ui/Kbd";
 import { cn } from "@/lib/cn";
 
 const chipClass =
-  "inline-flex h-[32px] items-center gap-8px rounded-md border border-hairline bg-canvas-soft pl-10px pr-12px text-ui font-medium leading-none text-ink transition-colors duration-fast hover:bg-surface-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[2px]";
+  "launch-stage-chip inline-flex h-[32px] items-center gap-8px rounded-md border border-hairline bg-canvas-soft pl-10px pr-12px text-ui font-medium leading-none text-ink transition-colors duration-fast hover:bg-surface-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[2px]";
 
 function Rise({ delay, className, children }: { delay: number; className?: string; children: ReactNode }) {
   const style: CSSProperties = { animationDelay: `${delay}ms` };
@@ -49,26 +49,26 @@ export function LaunchStage({ glyph, title, meta, resume, chips }: LaunchStagePr
   const { t } = useTranslation();
 
   return (
-    <div className="relative h-full w-full overflow-y-auto bg-canvas">
+    <div className="launch-stage relative h-full w-full overflow-y-auto bg-canvas">
       <div aria-hidden className="dot-grid pointer-events-none absolute inset-0" />
 
-      <div className="relative z-10 flex min-h-full w-full flex-col items-center px-40px">
-        <div className="my-auto flex w-full max-w-[640px] flex-col items-center py-40px">
-          <Rise delay={40} className="flex flex-col items-center text-center">
+      <div className="launch-stage-content relative z-10 flex min-h-full w-full flex-col items-center px-40px">
+        <div className="launch-stage-stack my-auto flex w-full max-w-[640px] flex-col items-center py-40px">
+          <Rise delay={40} className="launch-stage-identity flex flex-col items-center text-center">
             <span
               aria-hidden
-              className="mb-18px flex h-[64px] w-[64px] items-center justify-center rounded-xl border border-hairline bg-canvas-soft"
+              className="launch-stage-glyph mb-18px flex h-[64px] w-[64px] items-center justify-center rounded-xl border border-hairline bg-canvas-soft"
             >
               {glyph}
             </span>
 
-            <h1 className="max-w-full break-words font-display text-display font-medium leading-[1.1] text-ink">
+            <h1 className="launch-stage-title max-w-full break-words font-display text-display font-medium leading-[1.1] text-ink">
               {title}
             </h1>
 
             {meta ? (
               <span
-                className="mt-12px inline-flex max-w-full items-center rounded-md border border-hairline bg-canvas-soft px-10px py-4px font-mono text-label text-muted"
+                className="launch-stage-meta mt-12px inline-flex max-w-full items-center rounded-md border border-hairline bg-canvas-soft px-10px py-4px font-mono text-label text-muted"
                 title={meta}
               >
                 <span className="truncate">{meta}</span>
@@ -82,13 +82,13 @@ export function LaunchStage({ glyph, title, meta, resume, chips }: LaunchStagePr
             </Rise>
           ) : null}
 
-          <Rise delay={160} className="mt-32px flex w-full flex-wrap justify-center gap-8px">
+          <Rise delay={160} className="launch-stage-actions mt-32px flex w-full flex-wrap justify-center gap-8px">
             {chips}
           </Rise>
 
           <Rise
             delay={220}
-            className="mt-56px flex flex-wrap items-center justify-center gap-x-22px gap-y-8px font-mono text-label text-muted-soft"
+            className="launch-stage-shortcuts mt-56px flex flex-wrap items-center justify-center gap-x-22px gap-y-8px font-mono text-label text-muted-soft"
           >
             <span className="inline-flex items-center gap-7px">
               <Kbd keys={["Mod", "Shift", "P"]} />

@@ -24,28 +24,51 @@ pub struct CloneEntry {
 #[derive(Default)]
 pub struct CloneRegistry(Mutex<HashMap<String, CloneEntry>>);
 
+pub struct CloneAbortReport {
+    pub requested: usize,
+    pub failed: usize,
+}
+
 impl CloneRegistry {
     /// Kill and reap every in-flight clone and remove its partial destination.
     /// Called from the quit handler; kill/wait/cleanup happen outside the lock
     /// (kill+wait on a SIGKILLed child returns immediately).
-    pub fn abort_all(&self) {
+    pub fn abort_all(&self) -> CloneAbortReport {
         let entries: Vec<(String, CloneEntry)> = {
             let mut map = self.0.lock();
             map.drain().collect()
         };
+        let requested = entries.len();
+        let mut failed = 0;
         for (_op_id, mut entry) in entries {
             let _ = entry.child.kill();
-            let _ = entry.child.wait();
-            let _ = std::fs::remove_dir_all(&entry.dest);
+            if entry.child.wait().is_err() {
+                failed += 1;
+            }
+            if let Err(error) = std::fs::remove_dir_all(&entry.dest) {
+                if error.kind() != std::io::ErrorKind::NotFound {
+                    failed += 1;
+                }
+            }
         }
+        CloneAbortReport { requested, failed }
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.lock().len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.lock().is_empty()
     }
 }
 
-use crate::error::{AppError, AppResult};
 use crate::directory_grants::{DirectoryGrant, DirectoryGrants};
+use crate::error::{AppError, AppResult};
 use crate::events::{GitCloneProgressPayload, EV_GIT_CLONE_PROGRESS};
 use crate::git::{file_head_content, git_info, GitInfo};
 use crate::projects::ProjectsCache;
+use crate::runtime_supervisor::RuntimeSupervisor;
 use crate::util::paths;
 use crate::util::process::silent_command;
 
@@ -177,9 +200,9 @@ fn valid_branch_name(name: &str) -> bool {
     if name.is_empty() || name.starts_with('-') || name.ends_with(".lock") {
         return false;
     }
-    name.chars().all(|c| {
-        c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '/' | '.')
-    }) && !name.contains("..")
+    name.chars()
+        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '/' | '.'))
+        && !name.contains("..")
 }
 
 fn default_worktree_path(root: &str, branch_name: &str) -> PathBuf {
@@ -445,6 +468,7 @@ pub async fn git_clone(
     parent_grant_id: String,
     folder_name: String,
 ) -> AppResult<String> {
+    app.state::<Arc<RuntimeSupervisor>>().ensure_running()?;
     // Destination lives outside any registered root, so the parent directory
     // must come from a backend-issued directory grant.
     let url_trimmed = url.trim().to_string();
@@ -666,7 +690,9 @@ fn require_commit_message(message: &str) -> AppResult<String> {
         return Err(AppError::Other("empty commit message".into()));
     }
     if message.starts_with('-') {
-        return Err(AppError::Other("commit message cannot start with '-'".into()));
+        return Err(AppError::Other(
+            "commit message cannot start with '-'".into(),
+        ));
     }
     Ok(message.to_string())
 }
@@ -737,7 +763,14 @@ pub async fn git_discard(app: AppHandle, root: String, paths: Vec<String>) -> Ap
             } else {
                 let out = run_git(
                     &root,
-                    &["restore", "--source=HEAD", "--staged", "--worktree", "--", &rel],
+                    &[
+                        "restore",
+                        "--source=HEAD",
+                        "--staged",
+                        "--worktree",
+                        "--",
+                        &rel,
+                    ],
                 )?;
                 git_fail(&out, "restore")?;
             }
@@ -763,6 +796,46 @@ pub async fn git_create_branch(app: AppHandle, root: String, name: String) -> Ap
         }
         let out = run_git(&root, &["checkout", "-b", &name])?;
         git_fail(&out, "checkout")
+    })
+    .await
+    .map_err(|e| AppError::Other(format!("join: {e}")))?
+}
+
+/// List local branches available to check out in the project's primary worktree.
+#[tauri::command]
+pub async fn git_branches(app: AppHandle, root: String) -> AppResult<Vec<String>> {
+    app.state::<Arc<ProjectsCache>>()
+        .require_within_project_roots(&root)?;
+    tokio::task::spawn_blocking(move || {
+        let out = run_git(&root, &["for-each-ref", "--format=%(refname:short)", "refs/heads"])?;
+        git_fail(&out, "list branches")?;
+        Ok(String::from_utf8_lossy(&out.stdout)
+            .lines()
+            .map(str::trim)
+            .filter(|name| valid_branch_name(name))
+            .map(str::to_owned)
+            .collect())
+    })
+    .await
+    .map_err(|e| AppError::Other(format!("join: {e}")))?
+}
+
+/// Check out an existing local branch. Git preserves safe local changes and
+/// rejects the checkout when a changed file would be overwritten.
+#[tauri::command]
+pub async fn git_switch_branch(app: AppHandle, root: String, branch: String) -> AppResult<()> {
+    app.state::<Arc<ProjectsCache>>()
+        .require_within_project_roots(&root)?;
+    if !valid_branch_name(&branch) {
+        return Err(AppError::Other(format!("invalid branch name: {branch}")));
+    }
+    tokio::task::spawn_blocking(move || {
+        let out = run_git(&root, &["switch", &branch])?;
+        if out.status.success() {
+            return Ok(());
+        }
+        let out = run_git(&root, &["checkout", &branch])?;
+        git_fail(&out, "switch branch")
     })
     .await
     .map_err(|e| AppError::Other(format!("join: {e}")))?

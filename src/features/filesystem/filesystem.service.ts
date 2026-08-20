@@ -5,9 +5,6 @@ export const fsApi = {
   pickPreviewFile(title: string): Promise<PreviewGrant | null> {
     return invoke<PreviewGrant | null>(CMD.pickPreviewFile, { title });
   },
-  pickProjectIcon(title: string, defaultPath: string): Promise<BytesFile | null> {
-    return invoke<BytesFile | null>(CMD.pickProjectIcon, { title, defaultPath });
-  },
   readDir(path: string): Promise<DirEntry[]> {
     return invoke<DirEntry[]>(CMD.readDir, { path });
   },

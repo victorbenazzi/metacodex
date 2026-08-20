@@ -4,7 +4,6 @@ import { TerminalTab } from "@/components/terminal/TerminalTab";
 import { CliTabComponent } from "@/components/terminal/CliTabComponent";
 import { EditorTab } from "@/components/editor/EditorTab";
 import { DiffTab } from "@/components/editor/DiffTab";
-import { ChangesTab } from "@/components/source-control/ChangesTab";
 import { MarkdownPreview } from "@/components/previews/MarkdownPreview";
 import { ImagePreview } from "@/components/previews/ImagePreview";
 import { PdfPreview } from "@/components/previews/PdfPreview";
@@ -56,6 +55,7 @@ function renderTab(tab: Tab, isVisible: boolean, projectKey: string) {
           label={tab.title}
           cliId={tab.cliId}
           launchCommand={tab.launchCommand}
+          launchArgs={tab.launchArgs}
           isVisible={isVisible}
         />
       );
@@ -78,8 +78,6 @@ function renderTab(tab: Tab, isVisible: boolean, projectKey: string) {
           status={tab.status}
         />
       );
-    case "changes":
-      return tab.projectId ? <ChangesTab projectId={tab.projectId} /> : null;
     case "markdown":
       return (
         <MarkdownPreview

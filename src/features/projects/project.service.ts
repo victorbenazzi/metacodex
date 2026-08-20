@@ -8,18 +8,11 @@ export const projectsApi = {
   create(directory: string, name: string): Promise<Project> {
     return invoke<Project>(CMD.createProject, { directory, name });
   },
-  remove(id: string): Promise<void> {
-    return invoke<void>(CMD.removeProject, { id });
+  remove(id: string): Promise<{ cleanupWarnings: string[] }> {
+    return invoke<{ cleanupWarnings: string[] }>(CMD.removeProject, { id });
   },
   rename(id: string, name: string): Promise<Project> {
     return invoke<Project>(CMD.renameProject, { id, name });
-  },
-  updateMeta(id: string, patch: { color?: string; icon?: string }): Promise<Project> {
-    return invoke<Project>(CMD.updateProjectMeta, {
-      id,
-      color: patch.color ?? null,
-      icon: patch.icon ?? null,
-    });
   },
   list(): Promise<Project[]> {
     return invoke<Project[]>(CMD.listProjects);

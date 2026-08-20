@@ -4,7 +4,9 @@ import {
   ArrowUpRight,
   Check,
   ChevronDown,
+  FileDown,
   FileLock2,
+  FilePlus,
   GitBranch,
   MoreHorizontal,
   RotateCcw,
@@ -19,6 +21,7 @@ import {
 import {
   DropdownContent,
   DropdownItem,
+  DropdownLabel,
   DropdownRoot,
   DropdownSeparator,
   DropdownTrigger,
@@ -32,6 +35,7 @@ import { WorktreesSection } from "./WorktreesSection";
 import { InlineDiffPreview } from "./InlineDiffPreview";
 import { isPathSelected, useChangesUiStore } from "@/features/git/changes.store";
 import { gitActions } from "@/features/git/git.actions";
+import { gitApi } from "@/features/git/git.service";
 import { useGitStore } from "@/features/git/git.store";
 import {
   compactCount,
@@ -39,12 +43,21 @@ import {
 } from "@/features/git/gitStatus";
 import { basename, dirname } from "@/lib/path";
 import { cn } from "@/lib/cn";
+import type { CliTool } from "@/features/terminal/cli-registry";
 
 const LIST_PAGE = 250;
 
 export interface ChangesEntry {
   absPath: string;
   code: string;
+}
+
+type ChangeScope = "uncommitted" | "staged" | "unstaged";
+
+function changeScopeIcon(scope: ChangeScope) {
+  if (scope === "staged") return FilePlus;
+  if (scope === "unstaged") return FileDown;
+  return FileLock2;
 }
 
 interface ChangesViewProps {
@@ -54,6 +67,7 @@ interface ChangesViewProps {
   onOpenFile?: (path: string, name: string) => void;
   onOpenChanges?: (expandPath?: string) => void;
   onOpenInTerminal?: (cwd: string, name: string) => void;
+  onLaunchCliInPath?: (cli: CliTool, path: string, name: string) => void;
 }
 
 function relativeTo(root: string, abs: string): string {
@@ -86,6 +100,7 @@ export function ChangesView({
   onOpenFile,
   onOpenChanges,
   onOpenInTerminal,
+  onLaunchCliInPath,
 }: ChangesViewProps) {
   const { t } = useTranslation();
   const git = useGitStore((s) => s.byProject[projectId]);
@@ -105,18 +120,34 @@ export function ChangesView({
   const [branchOpen, setBranchOpen] = useState(false);
   const [branchName, setBranchName] = useState("");
   const [branchIntent, setBranchIntent] = useState<"branch" | "commit" | "commit-push">("branch");
+  const [changeScope, setChangeScope] = useState<ChangeScope>("uncommitted");
+  const [branches, setBranches] = useState<string[] | null>(null);
+  const [branchesLoading, setBranchesLoading] = useState(false);
   const [nudgeMessage, setNudgeMessage] = useState(false);
   const messageRef = useRef<HTMLTextAreaElement>(null);
 
+  const scopeStatuses = changeScope === "staged"
+    ? git?.stagedStatuses ?? {}
+    : changeScope === "unstaged"
+      ? git?.unstagedStatuses ?? {}
+      : git?.statuses ?? {};
+  const scopeLabel = changeScope === "staged"
+    ? t("sourceControl.staged")
+    : changeScope === "unstaged"
+      ? t("sourceControl.unstaged")
+      : t("v3.workbench.uncommitted");
+  const supportsMutations = changeScope === "uncommitted";
+  const ChangeScopeIcon = changeScopeIcon(changeScope);
+
   const entries = useMemo<ChangesEntry[]>(() => {
-    const statuses = git?.statuses ?? {};
+    const statuses = scopeStatuses;
     return Object.entries(statuses)
       .map(([absPath, code]) => ({ absPath, code }))
       .sort((a, b) => {
         const r = gitStatusRank(a.code) - gitStatusRank(b.code);
         return r !== 0 ? r : a.absPath.localeCompare(b.absPath);
       });
-  }, [git]);
+  }, [scopeStatuses]);
 
   const statusKey = useMemo(
     () => entries.map((e) => `${e.absPath}:${e.code}`).join("\n"),
@@ -132,7 +163,7 @@ export function ChangesView({
   const hasSelection = selectedPaths.length > 0;
   const hasMessage = message.trim().length > 0;
   const canCommit = hasSelection && hasMessage && !busy;
-  const commitArmed = hasSelection && !busy;
+  const commitArmed = supportsMutations && hasSelection && !busy;
 
   useEffect(() => {
     void useGitStore.getState().refresh(projectId, projectPath, true);
@@ -178,6 +209,23 @@ export function ChangesView({
     }
   };
 
+  const loadBranches = async () => {
+    if (branchesLoading) return;
+    setBranchesLoading(true);
+    try {
+      setBranches(await gitApi.branches(projectPath));
+    } catch {
+      setBranches([]);
+    } finally {
+      setBranchesLoading(false);
+    }
+  };
+
+  const switchBranch = (branch: string) => {
+    if (branch === git?.branch) return;
+    void gitActions.switchBranch(projectId, projectPath, branch);
+  };
+
   const onRowActivate = (path: string) => {
     if (variant === "panel") {
       onOpenChanges?.(path);
@@ -191,23 +239,85 @@ export function ChangesView({
     <section className="flex h-full min-h-0 flex-col" aria-label={t("v3.workbench.changes")}>
       <header className="flex shrink-0 items-center gap-8px border-b border-hairline-soft px-12px py-6px">
         <div className="flex min-w-0 flex-1 items-center gap-8px">
-          <Icon icon={FileLock2} size={12} className="shrink-0 text-muted-soft" />
-          <span className="shrink-0 text-caption text-body">{t("v3.workbench.uncommitted")}</span>
-          {totalAdditions > 0 || totalDeletions > 0 ? (
+          <DropdownRoot>
+            <DropdownTrigger asChild>
+              <button
+                type="button"
+                aria-label={t("sourceControl.changeScope")}
+                className="inline-flex shrink-0 items-center gap-6px rounded-xs px-4px py-[2px] text-caption text-body transition-colors hover:bg-surface-strong/50"
+              >
+                <Icon icon={ChangeScopeIcon} size={12} className="text-muted-soft" />
+                {scopeLabel}
+                <Icon icon={ChevronDown} size={10} className="text-muted" />
+              </button>
+            </DropdownTrigger>
+            <DropdownContent>
+              <DropdownLabel>{t("sourceControl.changeScope")}</DropdownLabel>
+              {(["uncommitted", "staged", "unstaged"] as const).map((scope) => {
+                const ScopeIcon = changeScopeIcon(scope);
+                const label = scope === "staged"
+                  ? t("sourceControl.staged")
+                  : scope === "unstaged"
+                    ? t("sourceControl.unstaged")
+                    : t("v3.workbench.uncommitted");
+                return (
+                  <DropdownItem
+                    key={scope}
+                    onSelect={() => setChangeScope(scope)}
+                    trailing={scope === changeScope ? <Icon icon={Check} size={12} /> : undefined}
+                  >
+                    <Icon icon={ScopeIcon} size={12} className="text-muted" />
+                    {label}
+                  </DropdownItem>
+                );
+              })}
+            </DropdownContent>
+          </DropdownRoot>
+          {supportsMutations && (totalAdditions > 0 || totalDeletions > 0) ? (
             <span className="inline-flex shrink-0 items-center gap-6px font-mono text-label tabular-nums">
               <span className="text-success">+{compactCount(totalAdditions)}</span>
               <span className="text-danger">-{compactCount(totalDeletions)}</span>
             </span>
           ) : null}
           {git?.branch ? (
-            <span className="inline-flex min-w-0 items-center gap-4px font-mono text-label text-muted">
-              <Icon icon={GitBranch} size={10} className="shrink-0" />
-              <span className="truncate text-ink">{git.branch}</span>
-            </span>
+            <DropdownRoot onOpenChange={(open) => open && void loadBranches()}>
+              <DropdownTrigger asChild>
+                <button
+                  type="button"
+                  disabled={busy}
+                  aria-label={t("sourceControl.switchBranch")}
+                  className="inline-flex min-w-0 items-center gap-4px rounded-xs px-4px py-[2px] font-mono text-label text-muted transition-colors hover:bg-surface-strong/50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <Icon icon={GitBranch} size={10} className="shrink-0" />
+                  <span className="truncate text-ink">{git.branch}</span>
+                  <Icon icon={ChevronDown} size={10} className="shrink-0" />
+                </button>
+              </DropdownTrigger>
+              <DropdownContent className="max-h-[280px] overflow-y-auto">
+                <DropdownLabel>{t("sourceControl.switchBranch")}</DropdownLabel>
+                {branchesLoading ? (
+                  <DropdownItem disabled>{t("sourceControl.branchLoading")}</DropdownItem>
+                ) : branches?.length ? (
+                  branches.map((branch) => (
+                    <DropdownItem
+                      key={branch}
+                      disabled={branch === git.branch}
+                      onSelect={() => switchBranch(branch)}
+                      trailing={branch === git.branch ? <Icon icon={Check} size={12} /> : undefined}
+                    >
+                      <Icon icon={GitBranch} size={12} className="text-muted" />
+                      {branch}
+                    </DropdownItem>
+                  ))
+                ) : (
+                  <DropdownItem disabled>{t("sourceControl.branchEmpty")}</DropdownItem>
+                )}
+              </DropdownContent>
+            </DropdownRoot>
           ) : null}
         </div>
 
-        <span className="ml-auto inline-flex shrink-0 items-center gap-4px">
+        {supportsMutations ? <span className="ml-auto inline-flex shrink-0 items-center gap-4px">
           <DropdownRoot>
             <DropdownTrigger asChild>
               <IconButton size="md" aria-label={t("common.more")}>
@@ -289,7 +399,7 @@ export function ChangesView({
               </DropdownContent>
             </DropdownRoot>
           </div>
-        </span>
+        </span> : null}
       </header>
 
       {variant === "page" ? (
@@ -322,12 +432,16 @@ export function ChangesView({
           projectId={projectId}
           projectPath={projectPath}
           onOpenInTerminal={onOpenInTerminal ?? (() => undefined)}
+          onLaunchCliInPath={onLaunchCliInPath ?? (() => undefined)}
         />
       ) : null}
 
       {entries.length === 0 ? (
         <div className="min-h-0 flex-1">
-          <EmptyState icon={Check} body={t("sourceControl.empty")} />
+          <EmptyState
+            icon={Check}
+            body={changeScope === "staged" ? t("sourceControl.emptyStaged") : changeScope === "unstaged" ? t("sourceControl.emptyUnstaged") : t("sourceControl.empty")}
+          />
         </div>
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto py-4px">
@@ -380,14 +494,14 @@ export function ChangesView({
                     expanded && "bg-surface-strong/25",
                   )}
                 >
-                  <input
+                  {supportsMutations ? <input
                     type="checkbox"
                     checked={selected}
                     onChange={() => toggleSelected(projectId, entry.absPath, selected)}
                     aria-label={t("sourceControl.selectFile", { name })}
                     className="h-[13px] w-[13px] shrink-0 accent-[var(--accent)]"
                     onClick={(e) => e.stopPropagation()}
-                  />
+                  /> : null}
                   <button
                     type="button"
                     title={rel}
@@ -411,7 +525,7 @@ export function ChangesView({
                     ) : null}
                     <span className={cn("shrink-0 text-label", badge.className)}>{badge.label}</span>
                   </button>
-                  <span className="hidden shrink-0 items-center group-hover:inline-flex">
+                  {supportsMutations ? <span className="hidden shrink-0 items-center group-hover:inline-flex">
                     {onOpenFile ? (
                       <Tooltip content={t("sourceControl.openFile")} side="left">
                         <IconButton
@@ -432,9 +546,9 @@ export function ChangesView({
                         <Icon icon={RotateCcw} size={12} />
                       </IconButton>
                     </Tooltip>
-                  </span>
+                  </span> : null}
                 </div>
-                {expanded ? (
+                {expanded && supportsMutations ? (
                   <InlineDiffPreview
                     projectId={projectId}
                     path={entry.absPath}

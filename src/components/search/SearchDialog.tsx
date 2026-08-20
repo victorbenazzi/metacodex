@@ -10,10 +10,9 @@ import { searchApi } from "@/features/search/search.service";
 import type { SearchResults } from "@/features/search/search.types";
 import { useProjectsStore } from "@/features/projects/project.store";
 import { useSettingsDataStore } from "@/features/settings/settings.data.store";
-import { useTabsStore } from "@/components/tabs/tabsStore";
+import { openFileInProject } from "@/features/tabs";
 import { basename } from "@/lib/path";
 import { ext } from "@/lib/path";
-import type { Tab } from "@/components/tabs/types";
 
 export function SearchDialog() {
   const { t } = useTranslation();
@@ -64,34 +63,15 @@ export function SearchDialog() {
     };
   }, [open, query, caseSensitive, wholeWord, regex, project]);
 
-  const openTab = useTabsStore((s) => s.openTab);
   const setPendingGoto = usePendingGotoStore((s) => s.set);
 
   const onResultClick = (path: string, line: number) => {
     if (!project) return;
     const name = basename(path);
     const id = `f-${path}`;
-    const e = ext(name);
-    let tab: Tab;
-    if (["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(e)) {
-      tab = { id, kind: "image", title: name, projectId: project.id, path };
-    } else if (e === "pdf") {
-      tab = { id, kind: "pdf", title: name, projectId: project.id, path };
-    } else if (["md", "mdx", "markdown"].includes(e)) {
-      // open in source mode so the line jump makes sense
-      tab = {
-        id,
-        kind: "markdown",
-        title: name,
-        projectId: project.id,
-        path,
-        mode: "source",
-      };
-    } else {
-      tab = { id, kind: "editor", title: name, projectId: project.id, path };
-    }
+    const markdown = ["md", "mdx", "markdown"].includes(ext(name));
     setPendingGoto(id, line);
-    openTab(project.id, tab);
+    openFileInProject(project, path, name, markdown);
     setOpen(false);
   };
 

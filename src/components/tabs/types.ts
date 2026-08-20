@@ -1,4 +1,4 @@
-export type TabKind = "editor" | "markdown" | "image" | "pdf" | "diff" | "changes" | "terminal" | "cli";
+export type TabKind = "editor" | "markdown" | "image" | "pdf" | "diff" | "terminal" | "cli";
 
 export interface TabBase {
   id: string;
@@ -40,9 +40,6 @@ export interface DiffTabT extends TabBase {
   /** git status code (M | A | ? | D | R | T) , frames how the diff is shown. */
   status: string;
 }
-export interface ChangesTabT extends TabBase {
-  kind: "changes";
-}
 export interface TerminalTabT extends TabBase {
   kind: "terminal";
   cwd: string;
@@ -55,6 +52,9 @@ export interface CliTabT extends TabBase {
   cwd: string;
   cliId: string;
   launchCommand: string;
+  launchExecutable?: string;
+  launchArgs?: string[];
+  providerSessionId?: string;
 }
 
 export type Tab =
@@ -63,7 +63,6 @@ export type Tab =
   | ImageTab
   | PdfTab
   | DiffTabT
-  | ChangesTabT
   | TerminalTabT
   | CliTabT;
 

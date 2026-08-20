@@ -13,7 +13,6 @@ import {
 import { useSettingsDataStore } from "@/features/settings/settings.data.store";
 import type {
   ExplorerIconStyle,
-  LayoutMode,
   UiDensity,
 } from "@/features/settings/settings.types";
 
@@ -22,7 +21,6 @@ export function InterfacePane() {
   const enabledAgents = useSettingsDataStore((s) => s.settings.interface.enabledAgents);
   const iconStyle = useSettingsDataStore((s) => s.settings.interface.explorerIconStyle);
   const density = useSettingsDataStore((s) => s.settings.interface.uiDensity);
-  const layoutMode = useSettingsDataStore((s) => s.settings.interface.layoutMode);
   const update = useSettingsDataStore((s) => s.update);
 
   // Stable order: coding agents first (same order as the registry), then autonomous.
@@ -46,28 +44,12 @@ export function InterfacePane() {
     { id: "spacious", label: t("settings.interface.densitySpacious") },
   ];
 
-  const layoutOptions: { id: LayoutMode; label: string }[] = [
-    { id: "horizontal", label: t("settings.interface.layoutHorizontal") },
-    { id: "vertical", label: t("settings.interface.layoutVertical") },
-  ];
-
   return (
     <div>
       <PaneHeader
         title={t("settings.interface.title")}
         description={t("settings.interface.description")}
       />
-
-      <Row
-        label={t("settings.interface.layout")}
-        hint={t("settings.interface.layoutHint")}
-      >
-        <Segmented
-          value={layoutMode}
-          options={layoutOptions}
-          onChange={(v) => update("interface", { layoutMode: v })}
-        />
-      </Row>
 
       <Row
         label={t("settings.interface.density")}

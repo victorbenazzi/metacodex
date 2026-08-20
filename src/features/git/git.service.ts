@@ -18,6 +18,12 @@ export const gitApi = {
   createBranch(root: string, name: string): Promise<void> {
     return invoke<void>(CMD.gitCreateBranch, { root, name });
   },
+  branches(root: string): Promise<string[]> {
+    return invoke<string[]>(CMD.gitBranches, { root });
+  },
+  switchBranch(root: string, branch: string): Promise<void> {
+    return invoke<void>(CMD.gitSwitchBranch, { root, branch });
+  },
   push(root: string): Promise<void> {
     return invoke<void>(CMD.gitPush, { root });
   },

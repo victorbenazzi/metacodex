@@ -1,9 +1,9 @@
-import { Globe } from "@/components/ui/icons";
 import { useTranslation } from "react-i18next";
 
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ExplorerPanel } from "@/components/file-explorer/ExplorerPanel";
-import { SourceControlPanel } from "@/components/source-control/SourceControlPanel";
+import { BrowserPanel } from "@/components/browser/BrowserPanel";
+import { ChangesView } from "@/components/source-control/ChangesView";
 import { WorkbenchTabBar } from "@/components/v3-shell/WorkbenchTabBar";
 import {
   useSidePanelStore,
@@ -14,13 +14,13 @@ import type { Tab } from "@/components/tabs/types";
 import type { Project } from "@/features/projects/project.types";
 import type { CliTool } from "@/features/terminal/cli-registry";
 import { cn } from "@/lib/cn";
-import { isWindows } from "@/lib/platform";
+import { isMac, isWindows } from "@/lib/platform";
+import { useBrowserUiStore } from "@/features/browser/browser.store";
 
 interface RightWorkbenchProps {
   project: Project | null;
   tabs: Tab[];
   activeDocTabId: string | null;
-  docHostRef: (el: HTMLDivElement | null) => void;
   onSelectDoc: (id: string) => void;
   onCloseDoc: (id: string) => void;
   onMoveDoc: (id: string, toIndex: number) => void;
@@ -35,7 +35,6 @@ export function RightWorkbench({
   project,
   tabs,
   activeDocTabId,
-  docHostRef,
   onSelectDoc,
   onCloseDoc,
   onMoveDoc,
@@ -51,22 +50,28 @@ export function RightWorkbench({
   const show = useSidePanelStore((s) => s.show);
   const closeTab = useSidePanelStore((s) => s.closeTab);
   const moveTab = useSidePanelStore((s) => s.moveTab);
+  const wantsExpand = useBrowserUiStore((s) => s.expanded);
   const surface: RightWorkbenchTab = view === "closed" ? "changes" : view;
   const docs = tabs.filter(isWorkbenchDocTab);
   const showingDoc = activeDocTabId != null;
+  const expanded = wantsExpand && surface === "browser" && !showingDoc;
   const stripActive = showingDoc
     ? `doc:${activeDocTabId}`
     : `surface:${surface}`;
 
   return (
     <aside
-      className="flex h-full min-h-0 flex-col border-l border-hairline-soft bg-canvas"
+      className={cn(
+        "flex h-full min-h-0 flex-col bg-canvas",
+        !expanded && "border-l border-hairline-soft",
+      )}
       aria-label={t("v3.workbench.aria")}
     >
       <header
         data-tauri-drag-region
         className={cn(
           "flex h-[var(--title-bar-h)] shrink-0 items-center border-b border-hairline-soft",
+          isMac && expanded ? "pl-[94px]" : null,
           isWindows ? "pr-[176px]" : "pr-42px",
         )}
       >
@@ -98,12 +103,14 @@ export function RightWorkbench({
           style={{ display: showingDoc || surface !== "changes" ? "none" : "block" }}
         >
           {project ? (
-            <SourceControlPanel
+            <ChangesView
               projectId={project.id}
               projectPath={project.path}
+              variant="panel"
               onOpenFile={onOpenFile}
               onOpenChanges={onOpenChanges}
               onOpenInTerminal={onOpenInTerminal}
+              onLaunchCliInPath={onLaunchCliInPath}
             />
           ) : (
             <EmptyState body={t("sourceControl.noProject")} />
@@ -128,23 +135,11 @@ export function RightWorkbench({
         </div>
 
         <div
-          className="h-full w-full p-8px"
+          className="h-full w-full"
           style={{ display: showingDoc || surface !== "browser" ? "none" : "block" }}
         >
-          <div className="flex h-full items-center justify-center rounded-md border border-hairline-soft bg-canvas-soft">
-            <EmptyState
-              icon={Globe}
-              title={t("v3.workbench.browserSoonTitle")}
-              body={t("v3.workbench.browserSoonBody")}
-            />
-          </div>
+          <BrowserPanel active={!showingDoc && surface === "browser"} />
         </div>
-
-        <div
-          ref={docHostRef}
-          className="absolute inset-0"
-          style={{ display: showingDoc ? "block" : "none" }}
-        />
       </div>
     </aside>
   );

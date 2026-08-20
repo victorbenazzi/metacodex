@@ -13,7 +13,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["unstable"] }
 tauri-plugin-single-instance = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-clipboard-manager = "2"
@@ -47,6 +47,34 @@ rustls = { version = "0.23", default-features = false, features = ["ring"] }
 
 # SIGKILL escalation for stuck PTY children (portable-pty's killer only sends
 # SIGHUP). Unix-only; on Windows portable-pty already does a forceful kill.
+# Isolated in-app browser: WKWebView.takeSnapshot (no Screen Recording prompt).
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+block2 = "0.6"
+objc2-foundation = { version = "0.3", default-features = false, features = [
+  "NSObject",
+  "NSData",
+  "NSError",
+  "NSDictionary",
+  "NSGeometry",
+  "NSString",
+] }
+objc2-core-foundation = { version = "0.3", default-features = false, features = ["CFCGTypes"] }
+objc2-app-kit = { version = "0.3", default-features = false, features = [
+  "NSImage",
+  "NSImageRep",
+  "NSBitmapImageRep",
+] }
+objc2-web-kit = { version = "0.3", default-features = false, features = [
+  "objc2-app-kit",
+  "objc2-core-foundation",
+  "block2",
+  "WKWebView",
+  "WKSnapshotConfiguration",
+] }
+
+# SIGKILL escalation for stuck PTY children (portable-pty's killer only sends
+# SIGHUP). Unix-only; on Windows portable-pty already does a forceful kill.
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
 
@@ -61,6 +89,7 @@ windows = { version = "0.61", features = [
   "Win32_Foundation",
   "Win32_Security",
   "Win32_System_JobObjects",
+  "Win32_System_Diagnostics_ToolHelp",
   "Win32_System_Threading",
 ] }
 

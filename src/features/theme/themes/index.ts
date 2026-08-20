@@ -49,7 +49,3 @@ export function getTheme(id: string | null | undefined): Theme {
 export function defaultThemeForKind(kind: ThemeKind): Theme {
   return kind === "dark" ? BY_ID[DEFAULT_DARK_THEME_ID]! : BY_ID[DEFAULT_LIGHT_THEME_ID]!;
 }
-
-export function themesByKind(kind: ThemeKind): Theme[] {
-  return THEMES.filter((t) => t.kind === kind);
-}

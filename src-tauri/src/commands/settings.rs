@@ -21,7 +21,11 @@ fn empty_object() -> Value {
 pub async fn read_settings() -> AppResult<Value> {
     let path = config_paths::settings_file()?;
     let value = config_paths::read_json::<Value>(&path)?;
-    Ok(if value.is_null() { empty_object() } else { value })
+    Ok(if value.is_null() {
+        empty_object()
+    } else {
+        value
+    })
 }
 
 #[tauri::command]
@@ -34,7 +38,11 @@ pub async fn write_settings(settings: Value) -> AppResult<()> {
 pub async fn read_keybindings() -> AppResult<Value> {
     let path = config_paths::keybindings_file()?;
     let value = config_paths::read_json::<Value>(&path)?;
-    Ok(if value.is_null() { empty_object() } else { value })
+    Ok(if value.is_null() {
+        empty_object()
+    } else {
+        value
+    })
 }
 
 #[tauri::command]

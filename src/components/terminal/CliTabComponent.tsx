@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
-import { Trans } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 
 import { TerminalTab } from "./TerminalTab";
 import { CliMissingPanel } from "./CliMissingPanel";
 import { TerminalSessionLoading } from "./TerminalSessionLoading";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { cliApi } from "@/features/terminal/cli.service";
-import { cliById, type CliTool } from "@/features/terminal/cli-registry";
-import { useTabsStore, WORKSPACE_NULL } from "@/components/tabs/tabsStore";
-import { newId } from "@/lib/idGen";
+import { detectCli } from "@/features/terminal/cli-detection";
+import { cliById, cliLaunchString, type CliTool } from "@/features/terminal/cli-registry";
+import { WORKSPACE_NULL } from "@/components/tabs/tabsStore";
+import { openTerminal } from "@/features/tabs";
+import { Button } from "@/components/ui/Button";
 
 interface CliTabComponentProps {
   tabId: string;
@@ -16,11 +17,12 @@ interface CliTabComponentProps {
   projectId: string | null;
   cliId: string;
   launchCommand: string;
+  launchArgs?: string[];
   label: string;
   isVisible?: boolean;
 }
 
-type Status = "detecting" | "missing" | "ready";
+type Status = "detecting" | "missing" | "failed" | "ready";
 
 export function CliTabComponent({
   tabId,
@@ -28,11 +30,15 @@ export function CliTabComponent({
   projectId,
   cliId,
   launchCommand,
+  launchArgs,
   label,
   isVisible,
 }: CliTabComponentProps) {
+  const { t } = useTranslation();
   const [status, setStatus] = useState<Status>("detecting");
-  const openTab = useTabsStore((s) => s.openTab);
+  const [resolvedLaunchCommand, setResolvedLaunchCommand] = useState(launchCommand);
+  const [resolvedExecutable, setResolvedExecutable] = useState<string | null>(null);
+  const [resolvedEnvironment, setResolvedEnvironment] = useState<Record<string, string>>({});
   const cli: CliTool | undefined = cliById(cliId);
 
   const detect = useCallback(async () => {
@@ -42,11 +48,24 @@ export function CliTabComponent({
     }
     try {
       setStatus("detecting");
-      const result = await cliApi.detect(cli.command);
+      const result = await detectCli(cli);
+      if (result.status === "failed") {
+        setStatus("failed");
+        return;
+      }
+      if (result.installed && result.path) {
+        setResolvedExecutable(result.path);
+        setResolvedEnvironment(result.environment);
+        const base = cliLaunchString(cli, { executable: result.path });
+        const suffix = launchCommand.startsWith(cli.command)
+          ? launchCommand.slice(cli.command.length)
+          : "";
+        setResolvedLaunchCommand(`${base}${suffix}`);
+      }
       setStatus(result.installed ? "ready" : "missing");
     } catch (err) {
       console.warn("[cli] detect failed", err);
-      setStatus("missing");
+      setStatus("failed");
     }
   }, [cli]);
 
@@ -56,17 +75,15 @@ export function CliTabComponent({
 
   const openInstallInTerminal = useCallback(
     (installCommand: string) => {
-      const projectKey = projectId ?? WORKSPACE_NULL;
-      openTab(projectKey, {
-        id: `t-${newId(10)}`,
-        kind: "terminal",
-        title: `install ${cli?.label ?? "cli"}`.slice(0, 30),
+      openTerminal({
+        projectKey: projectId ?? WORKSPACE_NULL,
         projectId,
         cwd,
+        title: `install ${cli?.label ?? "cli"}`.slice(0, 30),
         prefillCommand: installCommand,
       });
     },
-    [cwd, openTab, projectId, cli],
+    [cwd, projectId, cli],
   );
 
   if (!cli || status === "missing") {
@@ -96,6 +113,23 @@ export function CliTabComponent({
     );
   }
 
+  if (status === "failed") {
+    return (
+      <div className="h-full bg-canvas">
+        <EmptyState
+          variant="panel"
+          title={t("terminal.detectionFailed")}
+          body={t("terminal.detectionFailedBody", { label: cli.label })}
+          action={(
+            <Button variant="outline" size="sm" onClick={() => void detect()}>
+              {t("terminal.retryDetection")}
+            </Button>
+          )}
+        />
+      </div>
+    );
+  }
+
   if (status === "detecting") {
     return (
       <div className="relative h-full bg-canvas">
@@ -111,7 +145,12 @@ export function CliTabComponent({
       cwd={cwd}
       projectId={projectId}
       label={label}
-      cliLaunchCommand={launchCommand}
+      cliLaunchCommand={resolvedLaunchCommand}
+      cliLaunch={cli && resolvedExecutable ? {
+        executable: resolvedExecutable,
+        args: launchArgs ?? cli.args,
+        environment: resolvedEnvironment,
+      } : undefined}
       cliToolId={cliId}
       isVisible={isVisible}
     />

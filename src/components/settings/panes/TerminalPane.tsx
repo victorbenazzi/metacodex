@@ -11,12 +11,10 @@ import {
 } from "@/features/settings/settings.types";
 
 const TERMINAL_FONT_OPTIONS: SelectOption[] = [
-  { value: DEFAULT_TERMINAL_FONT_FAMILY, label: "JetBrains Mono Nerd Font" },
-  { value: '"SF Mono", ui-monospace, monospace', label: "SF Mono" },
+  { value: DEFAULT_TERMINAL_FONT_FAMILY, label: "Nerd Font" },
+  { value: '"SF Mono", ui-monospace, Menlo, monospace', label: "SF Mono" },
   { value: "Menlo, monospace", label: "Menlo" },
   { value: "Monaco, monospace", label: "Monaco" },
-  { value: '"Hack Nerd Font Mono", monospace', label: "Hack Nerd Font" },
-  { value: '"FiraCode Nerd Font Mono", monospace', label: "Fira Code Nerd Font" },
 ];
 
 export function TerminalPane() {

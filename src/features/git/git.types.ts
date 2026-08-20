@@ -4,6 +4,8 @@ export interface GitInfo {
   behind: number;
   /** Absolute file path → single-char status code: M | A | D | R | ? | C | T | ! */
   statuses: Record<string, string>;
+  stagedStatuses: Record<string, string>;
+  unstagedStatuses: Record<string, string>;
   stats?: GitStats;
 }
 

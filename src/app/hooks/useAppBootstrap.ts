@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { homeDir } from "@tauri-apps/api/path";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import { useEditorReconcile } from "@/features/editor/useEditorReconcile";
 import { preloadCliDetections } from "@/features/terminal/cli-detection";
@@ -19,12 +20,27 @@ import { recordDiag } from "@/features/diagnostics/diagnostics.store";
 import { checkSilent as checkUpdatesSilent } from "@/features/updates/updates.service";
 import { useTabMetadataPolling } from "@/features/terminal/useTabMetadataPolling";
 import { useWorktreeOccupancySync } from "@/features/git/useWorktreeOccupancySync";
+import { setNativeWindowFocused } from "@/features/terminal/notificationDispatch";
 
-export function useAppBootstrap(): { homeDirPath: string | null } {
+export type BootstrapStatus = "loading" | "ready" | "failed";
+let appReady = false;
+export function isAppBootstrapReady(): boolean {
+  return appReady;
+}
+
+export function useAppBootstrap(): {
+  homeDirPath: string | null;
+  status: BootstrapStatus;
+  error: string | null;
+  retry: () => void;
+} {
   const [homeDirPath, setHomeDirPath] = useState<string | null>(null);
+  const [homeError, setHomeError] = useState<string | null>(null);
+  const [retryRevision, setRetryRevision] = useState(0);
 
   const projectsHydrated = useProjectsStore((s) => s.hydrated);
   const hydrateProjects = useProjectsStore((s) => s.hydrate);
+  const projectsError = useProjectsStore((s) => s.hydrateError);
   const settingsHydrated = useSettingsDataStore((s) => s.hydrated);
   const hydrateSettings = useSettingsDataStore((s) => s.hydrate);
   const keybindingsHydrated = useKeybindingsStore((s) => s.hydrated);
@@ -79,6 +95,22 @@ export function useAppBootstrap(): { homeDirPath: string | null } {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    let unlisten: (() => void) | undefined;
+    void getCurrentWindow().isFocused().then(setNativeWindowFocused).catch(() => undefined);
+    void getCurrentWindow().onFocusChanged(({ payload }) => {
+      if (!cancelled) setNativeWindowFocused(payload);
+    }).then((off) => {
+      if (cancelled) off();
+      else unlisten = off;
+    });
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  }, []);
+
+  useEffect(() => {
     const handle = window.setTimeout(() => {
       void checkUpdatesSilent();
     }, 3000);
@@ -94,11 +126,13 @@ export function useAppBootstrap(): { homeDirPath: string | null } {
       try {
         const h = await homeDir();
         setHomeDirPath(h.replace(/\/+$/, ""));
-      } catch {
+        setHomeError(null);
+      } catch (error) {
         setHomeDirPath(null);
+        setHomeError(error instanceof Error ? error.message : String(error));
       }
     })();
-  }, []);
+  }, [retryRevision]);
 
   useEffect(() => {
     let offBp: (() => void) | undefined;
@@ -125,5 +159,21 @@ export function useAppBootstrap(): { homeDirPath: string | null } {
     };
   }, []);
 
-  return { homeDirPath };
+  const error = projectsError ?? homeError;
+  const status: BootstrapStatus = error
+    ? "failed"
+    : projectsHydrated && settingsHydrated && keybindingsHydrated && homeDirPath
+      ? "ready"
+      : "loading";
+  appReady = status === "ready";
+  return {
+    homeDirPath,
+    status,
+    error,
+    retry: () => {
+      useProjectsStore.setState({ hydrated: false, hydrateError: null });
+      setHomeError(null);
+      setRetryRevision((value) => value + 1);
+    },
+  };
 }

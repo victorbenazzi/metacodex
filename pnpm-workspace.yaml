@@ -3,3 +3,12 @@ packages:
 
 allowBuilds:
   esbuild: true
+
+# @lobehub/icons lists antd + @lobehub/ui as peers. We only import Color/Mono
+# SVGs, so those libraries must not auto-install (they dragged in 250+ packages).
+autoInstallPeers: false
+
+peerDependencyRules:
+  ignoreMissing:
+    - antd
+    - "@lobehub/ui"

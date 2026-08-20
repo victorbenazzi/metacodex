@@ -1,11 +1,10 @@
 import { useTranslation } from "react-i18next";
 
-import { Folder, SquareTerminal } from "@/components/ui/icons";
+import { SquareTerminal } from "@/components/ui/icons";
 import { Icon } from "@/components/ui/Icon";
-import { CLI_BRAND_ICONS } from "@/components/icons/brand";
-import { lookupProjectGlyph } from "@/components/project-rail/projectIdentity";
-import { DEFAULT_CLI_REGISTRY, type CliTool } from "@/features/terminal/cli-registry";
-import { isCustomIcon } from "@/features/projects/customIcon.service";
+import { CLI_BRAND_ICONS, MetacodexMark } from "@/components/icons/brand";
+import type { CliTool } from "@/features/terminal/cli-registry";
+import { useEnabledCliTools } from "@/features/terminal/useEnabledCliTools";
 import type { Project } from "@/features/projects/project.types";
 import { ResumeCards } from "@/components/resume/ResumeCards";
 import { LaunchChip, LaunchStage } from "@/app/LaunchStage";
@@ -19,24 +18,11 @@ interface ProjectEmptyStateProps {
 /** Empty work area with a project open. Same stage as WelcomeScreen; chips launch a session. */
 export function ProjectEmptyState({ project, onNewTerminal, onLaunchCli }: ProjectEmptyStateProps) {
   const { t } = useTranslation();
-
-  const usesCustom = isCustomIcon(project.icon);
-  const FallbackIcon = usesCustom ? Folder : (lookupProjectGlyph(project.icon) ?? Folder);
+  const enabledCliTools = useEnabledCliTools();
 
   return (
     <LaunchStage
-      glyph={
-        usesCustom ? (
-          <img
-            src={project.icon}
-            alt=""
-            draggable={false}
-            className="h-[28px] w-[28px] object-contain"
-          />
-        ) : (
-          <FallbackIcon size={26} strokeWidth={1.5} className="text-ink" />
-        )
-      }
+      glyph={<MetacodexMark size={26} className="text-ink" />}
       title={project.name}
       meta={project.path}
       resume={
@@ -53,7 +39,7 @@ export function ProjectEmptyState({ project, onNewTerminal, onLaunchCli }: Proje
             label={t("projectEmpty.openTerminal")}
             onClick={onNewTerminal}
           />
-          {DEFAULT_CLI_REGISTRY.map((cli) => {
+          {enabledCliTools.map((cli) => {
             const BrandIcon = CLI_BRAND_ICONS[cli.id];
             return (
               <LaunchChip

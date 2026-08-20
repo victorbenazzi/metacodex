@@ -1,5 +1,7 @@
 # Redesign metacodex: plano e handoff
 
+> **SUPERSEDED.** Este documento descreve o shell v0.0.12 (TitleBar, rail de projetos, `layoutMode` horizontal/vertical, TabBar no topo). O shell atual é o v3 em `src/components/v3-shell/` (`AgentSidebar` | `CenterChrome`+`WorkArea` | `RightWorkbench`). Consulte `CLAUDE.md` / `AGENTS.md`. Mantido só como histórico.
+
 Documento vivo para o redesign visual premium do metacodex. Escrito para retomar o trabalho em outra sessão sem perder contexto. Atualize conforme avançar.
 
 > Regra de escrita deste repo: nunca usar travessão (`—`/`–`). Vírgula, dois-pontos, parênteses ou reescrita. Hífen só em palavras compostas e intervalos.

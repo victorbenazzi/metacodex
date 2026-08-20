@@ -7,6 +7,7 @@
  */
 
 :root {
+  --brand-black: #000000;
   /* Surfaces — light (default). Warm cream, not cool white. */
   --canvas: #f7f7f4;
   --canvas-soft: #fafaf7;
@@ -136,14 +137,14 @@
   --tracking-label: 0.06em;
 
   /* Fonts */
-  /* Default UI face is SF Pro (the macOS system font, via -apple-system),
-     falling back to Inter, then Menlo, then the platform system face. Display
-     reuses the same stack: at display sizes macOS automatically applies the
-     SF Pro Display optical variant. Tailwind's font-sans/mono/display read
-     these vars, so this block is the single source of truth. */
-  --font-sans: -apple-system, BlinkMacSystemFont, "Inter", "Menlo", system-ui, sans-serif;
-  --font-mono: "JetBrainsMono Nerd Font Mono", "JetBrainsMono NFM", "SF Mono", ui-monospace, Menlo, monospace;
-  --font-display: -apple-system, BlinkMacSystemFont, "Inter", "Menlo", system-ui, sans-serif;
+  /* Chrome + editor: SF Pro on macOS (`-apple-system` / BlinkMacSystemFont),
+     Inter then the platform UI font elsewhere. `--font-mono` aliases the same
+     stack so paths, diffs and worktrees match the rest of the UI.
+     `--font-term` is the PTY face only: Nerd Font for TUI glyphs. */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif;
+  --font-mono: var(--font-sans);
+  --font-display: var(--font-sans);
+  --font-term: "JetBrainsMono Nerd Font Mono", "SF Mono", ui-monospace, Menlo, monospace;
 
   /* Motion */
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
@@ -172,8 +173,6 @@
   --density-multiplier: 1;
 
   /* Layout */
-  --rail-w: 48px;
-  --explorer-w: 248px;
   /* Taller than a bare macOS title bar so the traffic lights (repositioned
      via `trafficLightPosition` in tauri.conf.json) and the window controls
      sit vertically centered with breathing room above, matching the floating
@@ -194,7 +193,6 @@
      for the grid template, the handle offsets and the vertical insets.
      Density-scaled like the spacing tokens. */
   --panel-gap-x: calc(8px * var(--density-multiplier));
-  --panel-gap-y: calc(4px * var(--density-multiplier));
 
   /* Terminal palette (warm, neutral ANSI) */
   --term-bg: var(--canvas);
@@ -383,26 +381,6 @@
   }
 }
 
-/* Explorer toggle feedback stays small and only stretches on devices with a
-   precise hover pointer. The component owns color feedback independently. */
-.explorer-toggle-indicator {
-  transition:
-    transform var(--dur-fast) var(--ease-out),
-    background-color var(--dur-fast) var(--ease-out);
-}
-
-@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
-  .explorer-toggle-pill:hover .explorer-toggle-indicator {
-    transform: scaleY(1.04);
-  }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .explorer-toggle-pill:active .explorer-toggle-indicator {
-    transform: scaleY(0.97);
-  }
-}
-
 /* A generated layer carries the recent-file tint so only opacity animates. */
 @keyframes explorer-recent-tint {
   0%,
@@ -506,11 +484,6 @@
     background-image: none;
     animation: none;
     -webkit-text-fill-color: var(--ink);
-  }
-
-  .explorer-toggle-indicator {
-    transform: none;
-    transition-property: background-color;
   }
 
   .explorer-recent::before {

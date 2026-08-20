@@ -12,7 +12,11 @@ on:
         type: string
 
 jobs:
+  quality:
+    uses: ./.github/workflows/quality.yml
+
   publish-tauri:
+    needs: quality
     permissions:
       contents: write
     # Signing turns on automatically once the APPLE_CERTIFICATE secret exists.
@@ -54,7 +58,7 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: 11.17.0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4

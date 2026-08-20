@@ -14,8 +14,8 @@ use crate::preview_grants::PreviewGrant;
 /// else (`file://`, `javascript:`, …) is refused defensively.
 #[tauri::command]
 pub async fn open_external_url(url: String) -> AppResult<()> {
-    let parsed = tauri::Url::parse(url.trim())
-        .map_err(|e| AppError::Other(format!("invalid URL: {e}")))?;
+    let parsed =
+        tauri::Url::parse(url.trim()).map_err(|e| AppError::Other(format!("invalid URL: {e}")))?;
     if parsed.scheme() != "https" && parsed.scheme() != "http" {
         return Err(AppError::Other(format!(
             "refusing to open non-http(s) URL: {url}"

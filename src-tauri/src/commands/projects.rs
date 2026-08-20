@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use serde::Serialize;
 use tauri::{AppHandle, Manager};
 
 use crate::error::{AppError, AppResult};
@@ -14,17 +15,24 @@ pub async fn add_project(path: String, app: AppHandle) -> AppResult<Project> {
 
 /// Create a new project folder (`directory/name`) and register it.
 #[tauri::command]
-pub async fn create_project(
-    directory: String,
-    name: String,
-    app: AppHandle,
-) -> AppResult<Project> {
+pub async fn create_project(directory: String, name: String, app: AppHandle) -> AppResult<Project> {
     projects::create(&app, directory, name)
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectRemovalResult {
+    pub cleanup_warnings: Vec<String>,
+}
+
 #[tauri::command]
-pub async fn remove_project(id: String, app: AppHandle) -> AppResult<()> {
-    projects::remove(&app, &id)
+pub async fn remove_project(id: String, app: AppHandle) -> AppResult<ProjectRemovalResult> {
+    projects::remove(&app, &id)?;
+    let cleanup_warnings = app
+        .state::<crate::pty::PtyManager>()
+        .kill_project(&id)
+        .await;
+    Ok(ProjectRemovalResult { cleanup_warnings })
 }
 
 #[tauri::command]
@@ -33,25 +41,12 @@ pub async fn rename_project(id: String, name: String, app: AppHandle) -> AppResu
 }
 
 #[tauri::command]
-pub async fn update_project_meta(
-    id: String,
-    color: Option<String>,
-    icon: Option<String>,
-    app: AppHandle,
-) -> AppResult<Project> {
-    projects::update_meta(&app, &id, color, icon)
-}
-
-#[tauri::command]
 pub async fn list_projects() -> AppResult<Vec<Project>> {
     projects::list()
 }
 
 #[tauri::command]
-pub async fn reorder_projects(
-    ordered_ids: Vec<String>,
-    app: AppHandle,
-) -> AppResult<Vec<Project>> {
+pub async fn reorder_projects(ordered_ids: Vec<String>, app: AppHandle) -> AppResult<Vec<Project>> {
     projects::reorder(&app, ordered_ids)
 }
 

@@ -21,6 +21,8 @@ import { WindowsControls } from "@/components/v3-shell/WindowsControls";
 import { NewAgentModal } from "@/components/v3-shell/NewAgentModal";
 import { OpenProjectModal } from "@/components/v3-shell/OpenProjectModal";
 import { useSidePanelStore } from "@/features/side-panel/sidePanel.store";
+import { useBrowserUiStore } from "@/features/browser/browser.store";
+import { useOverlayLockStore } from "@/features/ui/overlayLock.store";
 import { useCodeSidebarStore } from "@/features/ui/codeSidebar.store";
 import { WorktreeCreateDialog } from "@/components/source-control/WorktreeCreateDialog";
 import { CloneFromGithubDialog } from "@/components/project-rail/CloneFromGithubDialog";
@@ -33,6 +35,8 @@ import { registerAppCommands } from "@/app/appCommands";
 import { useAppBootstrap } from "@/app/hooks/useAppBootstrap";
 import { useFilesystemSync } from "@/app/hooks/useFilesystemSync";
 import { useWorkspacePersistence } from "@/app/hooks/useWorkspacePersistence";
+import { useQuitCoordinator } from "@/app/hooks/useQuitCoordinator";
+import { QuitBlockedDialog } from "@/components/quit/QuitBlockedDialog";
 import { useTabActions } from "@/app/hooks/useTabActions";
 import { useDelayedFlag } from "@/app/hooks/useDelayedFlag";
 import { useActiveProcessTab } from "@/features/tabs/useActiveProcessTab";
@@ -43,12 +47,28 @@ import {
   usePendingCloseStore,
 } from "@/features/tabs";
 import { cn } from "@/lib/cn";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Button } from "@/components/ui/Button";
 
 const DRAWER_ANIMATION_MS = 240;
+const CENTER_FLOOR = 280;
+const CENTER_FLOOR_BROWSER = 72;
+
+function useViewportWidth(): number {
+  const [width, setWidth] = useState(() => window.innerWidth);
+  useEffect(() => {
+    const onResize = () => setWidth(window.innerWidth);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  return width;
+}
 
 export function AppShell() {
   const { t } = useTranslation();
-  const { homeDirPath } = useAppBootstrap();
+  const bootstrap = useAppBootstrap();
+  const { homeDirPath } = bootstrap;
+  const quit = useQuitCoordinator();
 
   const projects = useProjectsStore((s) => s.projects);
   const activeProjectId = useProjectsStore((s) => s.activeProjectId);
@@ -70,9 +90,17 @@ export function AppShell() {
   const [sendToProjectFile, setSendToProjectFile] = useState<PreviewGrant | null>(null);
   const [dropActive, setDropActive] = useState(false);
   const [docHost, setDocHost] = useState<HTMLElement | null>(null);
+  const setShellFocus = useSidePanelStore((s) => s.setShellFocus);
+
+  useEffect(() => {
+    useOverlayLockStore.getState().setLocal(
+      worktreeDialogOpen || cloneDialogOpen || sendToProjectFile != null || pendingClose != null || quit.blocked != null,
+    );
+    return () => useOverlayLockStore.getState().setLocal(false);
+  }, [worktreeDialogOpen, cloneDialogOpen, sendToProjectFile, pendingClose, quit.blocked]);
 
   const activeCwd = useMemo(
-    () => project?.path ?? homeDirPath ?? "/",
+    () => project?.path ?? homeDirPath ?? "",
     [project, homeDirPath],
   );
 
@@ -84,11 +112,16 @@ export function AppShell() {
     bucket.tabs.some((tab) => tab.id === storedDocId && isWorkbenchDocTab(tab))
       ? storedDocId
       : null;
-  const panelOpen = useSidePanelStore((s) => s.view !== "closed");
+  const panelView = useSidePanelStore((s) => s.view);
+  const panelOpen = panelView !== "closed";
   const sidebarOpen = !useCodeSidebarStore((s) => s.collapsed);
+  const browserWantsExpand = useBrowserUiStore((s) => s.expanded);
+  const browserExpanded =
+    browserWantsExpand && panelView === "browser" && panelOpen && !activeDocTabId;
   const sidePanelMounted = useDelayedFlag(panelOpen, DRAWER_ANIMATION_MS);
   const sidebarMounted = useDelayedFlag(sidebarOpen, DRAWER_ANIMATION_MS);
   const [resizing, setResizing] = useState(false);
+  const viewportWidth = useViewportWidth();
 
   const projectsWidth = useSettingsDataStore((s) => s.settings.panels.projectsWidth);
   const sourceControlWidth = useSettingsDataStore(
@@ -128,10 +161,33 @@ export function AppShell() {
 
   useEffect(() => registerAppCommands(actions), [actions]);
 
+  const centerFloor = panelView === "browser" ? CENTER_FLOOR_BROWSER : CENTER_FLOOR;
+  const workbenchMax = Math.max(
+    PANEL_LIMITS.sourceControl.min,
+    Math.min(
+      PANEL_LIMITS.sourceControl.max,
+      viewportWidth - (sidebarOpen ? projectsWidth : 0) - centerFloor,
+    ),
+  );
+  const workbenchWidth = Math.min(sourceControlWidth, workbenchMax);
   const sidebarColWidth = sidebarOpen ? projectsWidth : 0;
-  const sidePanelColWidth = panelOpen ? sourceControlWidth : 0;
+  const sidePanelColWidth = panelOpen ? workbenchWidth : 0;
   const gridTemplateColumns =
     `${sidebarColWidth}px minmax(0,1fr) ${sidePanelColWidth}px`;
+
+  if (bootstrap.status !== "ready") {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-canvas text-ink">
+        <EmptyState
+          title={bootstrap.status === "failed" ? t("bootstrap.failedTitle") : t("bootstrap.loadingTitle")}
+          body={bootstrap.status === "failed" ? bootstrap.error ?? t("bootstrap.failedBody") : t("bootstrap.loadingBody")}
+          action={bootstrap.status === "failed" ? (
+            <Button variant="outline" size="sm" onClick={bootstrap.retry}>{t("common.retry")}</Button>
+          ) : undefined}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="relative h-screen w-screen bg-canvas text-ink">
@@ -176,7 +232,10 @@ export function AppShell() {
         ) : null}
       </div>
 
-      <div className="flex min-h-0 min-w-0 flex-col">
+      <div
+        className="flex min-h-0 min-w-0 flex-col"
+        onPointerDownCapture={() => setShellFocus("center")}
+      >
         <CenterChrome />
         <div className="min-h-0 flex-1">
           <WorkArea
@@ -196,7 +255,21 @@ export function AppShell() {
         </div>
       </div>
 
-      <div className="relative min-w-0">
+      <div
+        className={cn(
+          "relative min-w-0",
+          browserExpanded && "fixed inset-0 z-30 bg-canvas",
+        )}
+        onPointerDownCapture={() => setShellFocus("workbench")}
+      >
+        <div
+          ref={setDocHost}
+          className="absolute bottom-0 right-0 left-px z-[1] overflow-hidden bg-canvas"
+          style={{
+            top: "var(--title-bar-h)",
+            display: activeDocTabId && panelOpen ? "block" : "none",
+          }}
+        />
         {panelOpen || sidePanelMounted ? (
           <>
             <div
@@ -206,18 +279,17 @@ export function AppShell() {
               <div
                 className={cn(
                   "absolute inset-y-0 right-0 h-full transition-opacity duration-drawer ease-drawer",
+                  browserExpanded && "inset-0",
                   panelOpen ? "opacity-100" : "pointer-events-none opacity-0",
                 )}
-                style={{ width: sourceControlWidth }}
+                style={{ width: browserExpanded ? undefined : workbenchWidth }}
               >
                 <RightWorkbench
                   project={project}
                   tabs={bucket.tabs}
                   activeDocTabId={activeDocTabId}
-                  docHostRef={setDocHost}
                   onSelectDoc={(id) => {
                     useSidePanelStore.getState().focusDoc(id);
-                    actions.selectTab(id);
                   }}
                   onCloseDoc={actions.closeTab}
                   onMoveDoc={actions.moveTab}
@@ -231,14 +303,14 @@ export function AppShell() {
             </div>
             <ResizeHandle
               side="left"
-              value={sourceControlWidth}
+              value={workbenchWidth}
               min={PANEL_LIMITS.sourceControl.min}
-              max={PANEL_LIMITS.sourceControl.max}
+              max={workbenchMax}
               toDelta={(dx) => -dx}
               onChange={handleSourceControlWidthChange}
               onReset={resetSourceControlWidth}
               ariaLabel={t("appShell.resizeSidePanel")}
-              enabled={panelOpen}
+              enabled={panelOpen && !browserExpanded}
               onDraggingChange={setResizing}
             />
           </>
@@ -254,6 +326,12 @@ export function AppShell() {
         onConfirm={() => {
           void confirmPendingClose();
         }}
+      />
+
+      <QuitBlockedDialog
+        blocked={quit.blocked}
+        onRetry={quit.retry}
+        onForceQuit={quit.forceQuit}
       />
 
       {project ? (
@@ -276,6 +354,7 @@ export function AppShell() {
       <NewAgentModal
         onNewTerminal={actions.newTerminal}
         onLaunchCli={actions.launchCli}
+        projectPath={project?.path ?? activeCwd}
       />
       <OpenProjectModal
         onOpenFolder={actions.openFolder}

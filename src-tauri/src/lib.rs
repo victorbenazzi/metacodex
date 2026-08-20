@@ -9,19 +9,21 @@ pub mod open_files;
 pub mod preview_grants;
 pub mod projects;
 pub mod pty;
+pub mod runtime_supervisor;
 pub mod search;
 pub mod util;
 pub mod watcher;
 
 use std::sync::Arc;
 
+use commands::search::SearchRegistry;
 use directory_grants::DirectoryGrants;
 use open_files::PendingOpenFiles;
 use preview_grants::PreviewGrants;
 use projects::ProjectsCache;
 use pty::PtyManager;
-use commands::search::SearchRegistry;
-use tauri::{Emitter, Manager};
+use runtime_supervisor::RuntimeSupervisor;
+use tauri::Manager;
 use watcher::WatcherManager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -59,35 +61,15 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
-        // Cmd+Q / window-close handshake. We intercept the close, fire the
-        // before-quit event for the frontend to flush pending workspace saves,
-        // wait a short window, then reap all PTY children before exit. Without
-        // this, debounced saves are dropped AND `claude` / `codex` subprocesses
-        // outlive the app as orphans.
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 api.prevent_close();
                 let app = window.app_handle().clone();
-                let win = window.clone();
-                tauri::async_runtime::spawn(async move {
-                    let _ = win.emit(events::EV_BEFORE_QUIT, ());
-                    // Frontend flush budget. If the listener takes longer the
-                    // app still exits, we don't risk hanging the user on quit.
-                    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
-                    // Clones first: their disk cleanup (partial dest removal)
-                    // is the potentially slow part, start it earliest. Without
-                    // this, an in-flight `git clone` outlives the app as an
-                    // orphan and leaves a half-written destination behind.
-                    if let Some(clones) =
-                        app.try_state::<std::sync::Arc<commands::git::CloneRegistry>>()
-                    {
-                        clones.abort_all();
+                if let Some(runtime) = app.try_state::<Arc<RuntimeSupervisor>>() {
+                    if let Some(prepare) = runtime.begin_quit() {
+                        commands::app_lifecycle::emit_prepare_and_schedule(app, prepare);
                     }
-                    if let Some(mgr) = app.try_state::<pty::PtyManager>() {
-                        mgr.kill_all().await;
-                    }
-                    app.exit(0);
-                });
+                }
             }
         })
         .setup(|app| {
@@ -105,13 +87,19 @@ pub fn run() {
             app.manage(Arc::new(PendingOpenFiles::default()));
             app.manage(Arc::new(SearchRegistry::default()));
             app.manage(Arc::new(commands::git::CloneRegistry::default()));
+            app.manage(Arc::new(RuntimeSupervisor::default()));
+            let resume_store = Arc::new(commands::resume::ResumeStore::hydrate()?);
+            if let Err(error) = resume_store.prune(30) {
+                eprintln!("[metacodex] resume prune failed: {error}");
+            }
+            app.manage(resume_store);
+            app.manage(Arc::new(commands::workspace::WorkspaceStore::default()));
+            app.manage(Arc::new(commands::browser::BrowserState::default()));
             // Hydrate the in-memory project cache from the persisted state.
             if let Err(e) = projects::hydrate(app.handle()) {
                 eprintln!("[metacodex] projects::hydrate failed: {e}");
             }
-            // Trim resume entries older than 30 days. Best-effort: corrupt
-            // files are ignored so this never blocks startup.
-            commands::resume::prune_blocking(30);
+            commands::browser_capture::prune_now();
             // Cold-start "Open With" on Windows/Linux: macOS delivers these as
             // RunEvent::Opened (Apple Events, handled below). Other platforms
             // pass file paths via argv on the FIRST launch; the single_instance
@@ -130,7 +118,9 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            commands::terminal::pty_spawn,
+            commands::terminal::pty_prepare,
+            commands::terminal::pty_attach,
+            commands::terminal::pty_start,
             commands::terminal::pty_write,
             commands::terminal::pty_resize,
             commands::terminal::pty_kill,
@@ -142,7 +132,6 @@ pub fn run() {
             commands::projects::create_project,
             commands::projects::remove_project,
             commands::projects::rename_project,
-            commands::projects::update_project_meta,
             commands::projects::list_projects,
             commands::projects::reorder_projects,
             commands::projects::set_active_project,
@@ -150,9 +139,11 @@ pub fn run() {
             commands::projects::reveal_in_finder,
             commands::system::open_external_url,
             commands::system::take_pending_open_files,
+            commands::app_lifecycle::app_quit_ready,
+            commands::app_lifecycle::app_retry_quit,
+            commands::app_lifecycle::app_force_quit,
             commands::filesystem::read_dir,
             commands::filesystem::pick_preview_file,
-            commands::filesystem::pick_project_icon,
             commands::filesystem::stat,
             commands::filesystem::read_file_text,
             commands::filesystem::read_file_bytes,
@@ -180,6 +171,8 @@ pub fn run() {
             commands::git::git_commit,
             commands::git::git_discard,
             commands::git::git_create_branch,
+            commands::git::git_branches,
+            commands::git::git_switch_branch,
             commands::git::git_push,
             commands::git::git_worktree_list,
             commands::git::git_worktree_add,
@@ -194,6 +187,19 @@ pub fn run() {
             commands::resume::resume_discard,
             commands::diagnostics::write_session_log,
             commands::diagnostics::write_crash,
+            commands::browser::browser_set_bounds,
+            commands::browser::browser_hide,
+            commands::browser::browser_navigate,
+            commands::browser::browser_reload,
+            commands::browser::browser_go_back,
+            commands::browser::browser_go_forward,
+            commands::browser::browser_set_mode,
+            commands::browser::browser_clear_draw,
+            commands::browser::browser_take_pick,
+            commands::browser::browser_url,
+            commands::browser::browser_history_list,
+            commands::browser::browser_history_clear,
+            commands::browser::browser_capture,
         ])
         .build(tauri::generate_context!())
         .expect("metacodex failed to start")

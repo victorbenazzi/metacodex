@@ -27,6 +27,11 @@ export interface AgentNotificationPayload {
 // bundle slim and lets us tune the timbre by tweaking constants below. The
 // envelope is a soft two-tone (E5 → B5) under a quick attack-release.
 let audioCtx: AudioContext | null = null;
+let nativeWindowFocused = true;
+
+export function setNativeWindowFocused(focused: boolean): void {
+  nativeWindowFocused = focused;
+}
 function getCtx(): AudioContext | null {
   if (audioCtx) return audioCtx;
   try {
@@ -65,7 +70,7 @@ function playChime() {
 }
 
 function tabIsCurrentlyVisible(tabId: string): boolean {
-  if (document.hidden) return false;
+  if (document.hidden || !document.hasFocus() || !nativeWindowFocused) return false;
   // Only the ACTIVE project's active tab is actually on screen. A tab that's
   // the active one of a backgrounded project is NOT visible, so a banner for it
   // must still fire (the old "assume visible" answer suppressed legitimate

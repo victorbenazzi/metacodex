@@ -12,7 +12,6 @@ use crate::projects::ProjectsCache;
 
 const DEFAULT_TEXT_LIMIT: u64 = 25 * 1024 * 1024; // 25 MiB
 const DEFAULT_BYTES_LIMIT: u64 = 50 * 1024 * 1024; // 50 MiB
-const ICON_IMAGE_LIMIT: u64 = 16 * 1024 * 1024; // 16 MiB, user-picked project icon
 
 /// Extensions the preview mode may open from OUTSIDE any registered project root.
 /// Read side: text/code/markdown. Kept broad because preview is a viewer, but every
@@ -21,8 +20,8 @@ pub(crate) const PREVIEW_TEXT_EXTS: &[&str] = &[
     "md", "markdown", "mdx", "txt", "text", "log", "rst", "adoc", "json", "jsonc", "toml", "yaml",
     "yml", "ini", "conf", "env", "csv", "tsv", "xml", "html", "htm", "css", "scss", "sass", "less",
     "js", "mjs", "cjs", "jsx", "ts", "tsx", "vue", "svelte", "py", "rs", "go", "rb", "php", "java",
-    "kt", "swift", "c", "h", "cpp", "hpp", "cc", "cs", "sh", "bash", "zsh", "fish", "sql", "graphql",
-    "gql", "lua", "r", "dart", "scala", "clj", "ex", "exs", "erl", "hs", "ml",
+    "kt", "swift", "c", "h", "cpp", "hpp", "cc", "cs", "sh", "bash", "zsh", "fish", "sql",
+    "graphql", "gql", "lua", "r", "dart", "scala", "clj", "ex", "exs", "erl", "hs", "ml",
 ];
 
 /// Read side for binary previews (image/pdf). These are never writable.
@@ -58,7 +57,6 @@ pub(crate) fn preview_extensions() -> Vec<&'static str> {
     out
 }
 
-pub(crate) const ICON_EXTS: &[&str] = &["png", "jpg", "jpeg", "gif", "webp", "svg", "ico", "bmp"];
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -172,7 +170,9 @@ pub fn read_dir(app: &AppHandle, path: &str) -> AppResult<Vec<DirEntry>> {
         // shows these rows as non-expandable instead of erroring on expand.
         // A broken link falls back to file-shaped.
         let is_dir = if is_symlink {
-            fs::metadata(entry.path()).map(|m| m.is_dir()).unwrap_or(false)
+            fs::metadata(entry.path())
+                .map(|m| m.is_dir())
+                .unwrap_or(false)
         } else {
             meta.is_dir()
         };
@@ -283,8 +283,7 @@ pub fn read_file_bytes(
 
 /// Read a user-opened preview file as text.
 ///
-/// SECURITY: like `read_project_icon_image`, this deliberately does NOT call
-/// `require_within_roots`. A previewed file is, by definition, opened from outside
+/// SECURITY: this deliberately does NOT call `require_within_roots`. A previewed file is, by definition, opened from outside
 /// any registered project root, and the backend-issued grant is the user's consent boundary.
 /// The exception stays narrow: a text/code/markdown extension allowlist + the same
 /// 25 MiB cap as `read_file_text`.
@@ -315,43 +314,6 @@ pub fn read_preview_bytes(path: &str, max_bytes: Option<u64>) -> AppResult<Bytes
         mime: guess_mime(path),
         truncated,
         size,
-    })
-}
-
-/// Read an image the user explicitly picked through the native file dialog to use
-/// as a project icon, returning it base64-encoded for the frontend to downscale.
-///
-/// SECURITY: unlike every other fs command here, this deliberately does NOT call
-/// `require_within_roots`. A chosen icon almost always lives outside the
-/// registered project roots, and the native OS file dialog is the user's consent
-/// boundary. The exception is kept narrow: extension allowlist + size cap.
-pub fn read_project_icon_image(path: &str) -> AppResult<BytesFile> {
-    let ext_ok = Path::new(path)
-        .extension()
-        .and_then(|s| s.to_str())
-        .map(|s| s.to_lowercase())
-        .map(|e| ICON_EXTS.contains(&e.as_str()))
-        .unwrap_or(false);
-    if !ext_ok {
-        return Err(AppError::Other(format!(
-            "unsupported icon image type: {path:?}"
-        )));
-    }
-    let meta = Path::new(path)
-        .metadata()
-        .map_err(|e| io_error("read_project_icon_image", e))?;
-    if meta.len() > ICON_IMAGE_LIMIT {
-        return Err(AppError::Other(format!(
-            "icon image too large: {} bytes (max {ICON_IMAGE_LIMIT})",
-            meta.len()
-        )));
-    }
-    let bytes = fs::read(path).map_err(|e| io_error("read_project_icon_image", e))?;
-    Ok(BytesFile {
-        b64: STANDARD.encode(&bytes),
-        mime: guess_mime(path),
-        truncated: false,
-        size: meta.len(),
     })
 }
 
@@ -393,9 +355,7 @@ pub fn create_file(app: &AppHandle, parent: &str, name: &str) -> AppResult<Strin
     require_within_roots(app, &target_str)?;
 
     if target.symlink_metadata().is_ok() {
-        return Err(AppError::Other(format!(
-            "already exists: {target_str}"
-        )));
+        return Err(AppError::Other(format!("already exists: {target_str}")));
     }
     if let Some(dir) = target.parent() {
         fs::create_dir_all(dir).map_err(|e| io_error("create_file: mkdir parents", e))?;
@@ -421,9 +381,7 @@ pub fn create_dir(app: &AppHandle, parent: &str, name: &str) -> AppResult<String
     require_within_roots(app, &target_str)?;
 
     if target.symlink_metadata().is_ok() {
-        return Err(AppError::Other(format!(
-            "already exists: {target_str}"
-        )));
+        return Err(AppError::Other(format!("already exists: {target_str}")));
     }
     fs::create_dir_all(&target).map_err(|e| io_error("create_dir", e))?;
     Ok(target_str)
@@ -483,7 +441,9 @@ fn ensure_is_dir(path: &Path, ctx: &str) -> AppResult<()> {
 /// inside a registered project. Refuse-on-conflict; cross-volume safe.
 pub fn move_into_project(app: &AppHandle, from: &str, to_dir: &str) -> AppResult<String> {
     if !preview_ext_allowed_any(from) {
-        return Err(AppError::Other(format!("unsupported preview type: {from:?}")));
+        return Err(AppError::Other(format!(
+            "unsupported preview type: {from:?}"
+        )));
     }
     require_within_roots(app, to_dir)?;
 

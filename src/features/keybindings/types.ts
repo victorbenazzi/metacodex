@@ -4,7 +4,6 @@ export type CommandId =
   | "folder.open"
   | "folder.clone"
   | "tab.close"
-  | "tab.rename"
   | "tab.next"
   | "tab.previous"
   | "tab.moveLeft"
@@ -17,7 +16,9 @@ export type CommandId =
   | "file.save"
   | "tab.jumpToNextAttention"
   | "diagnostics.toggle"
-  | "agent.new";
+  | "agent.new"
+  | "browser.open"
+  | "browser.toggleExpand";
 
 export type CommandCategory = "general" | "navigation" | "view" | "editing";
 

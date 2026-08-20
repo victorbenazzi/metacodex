@@ -1,5 +1,5 @@
 import type { Tab } from "@/components/tabs/types";
-import { useTabsStore } from "@/components/tabs/tabsStore";
+import { useTabsStore, WORKSPACE_NULL } from "@/components/tabs/tabsStore";
 import type { Project } from "@/features/projects/project.types";
 import { useProjectsStore } from "@/features/projects/project.store";
 import { useExplorerStore } from "@/features/explorer/explorer.store";
@@ -7,10 +7,12 @@ import type { CliTool } from "@/features/terminal/cli-registry";
 import { sessionController } from "@/features/terminal/sessionController";
 import type { PreviewGrant } from "@/lib/events";
 import { basename } from "@/lib/path";
+import { useSidePanelStore } from "@/features/side-panel/sidePanel.store";
+import type { ResumeEntry } from "@/features/resume/resume.service";
+import { buildResumeTab, isLiveResumeSession } from "@/features/resume/resumeLaunch";
 import {
   makeCliTab,
   makeDiffTab,
-  makeChangesTab,
   makeFileTab,
   makePreviewTab,
   makeTerminalTab,
@@ -18,7 +20,6 @@ import {
 } from "./factories";
 import { planClose, planCloseTab, type ClosePlan, type PendingClose } from "./closePolicy";
 import { usePendingCloseStore } from "./pendingClose.store";
-import { useChangesUiStore } from "@/features/git/changes.store";
 
 function openTabInProject(projectKey: string, tab: Tab, setActive = true): void {
   useTabsStore.getState().openTab(projectKey, tab, setActive);
@@ -26,6 +27,10 @@ function openTabInProject(projectKey: string, tab: Tab, setActive = true): void 
 
 function tabsFor(projectKey: string): Tab[] {
   return useTabsStore.getState().byProject[projectKey]?.tabs ?? [];
+}
+
+function focusWorkbenchDoc(id: string): void {
+  useSidePanelStore.getState().focusDoc(id);
 }
 
 /** Apply a Close plan: either execute immediately or raise the shared confirm. */
@@ -79,6 +84,11 @@ export function cancelPendingClose(): void {
   usePendingCloseStore.getState().clear();
 }
 
+export function focusProcessTab(projectKey: string, tabId: string): void {
+  useTabsStore.getState().setActiveTab(projectKey, tabId);
+  useSidePanelStore.getState().setShellFocus("center");
+}
+
 // --- Open helpers (factory + store; call sites stay one-liners) --------------
 
 export function openTerminal(args: {
@@ -89,6 +99,7 @@ export function openTerminal(args: {
   prefillCommand?: string;
 }): void {
   openTabInProject(args.projectKey, makeTerminalTab(args));
+  useSidePanelStore.getState().setShellFocus("center");
 }
 
 export function openCli(args: {
@@ -97,8 +108,29 @@ export function openCli(args: {
   cwd: string;
   cli: CliTool;
   title?: string;
+  elevated?: boolean;
 }): void {
   openTabInProject(args.projectKey, makeCliTab(args));
+  useSidePanelStore.getState().setShellFocus("center");
+}
+
+export function openResume(entry: ResumeEntry): void {
+  const tabs = useTabsStore.getState();
+  for (const [projectKey, bucket] of Object.entries(tabs.byProject)) {
+    const live = bucket.tabs.find((candidate) => isLiveResumeSession(candidate, entry));
+    if (!live) continue;
+    if (projectKey !== WORKSPACE_NULL) {
+      void useProjectsStore.getState().setActive(projectKey);
+    }
+    tabs.setActiveTab(projectKey, live.id);
+    useSidePanelStore.getState().setShellFocus("center");
+    return;
+  }
+  const tab = buildResumeTab(entry);
+  if (!tab) return;
+  const key = entry.projectId ?? WORKSPACE_NULL;
+  openTabInProject(key, tab);
+  useSidePanelStore.getState().setShellFocus("center");
 }
 
 export function openFileInProject(
@@ -108,13 +140,15 @@ export function openFileInProject(
   openInEditMode?: boolean,
 ): string {
   const tab = makeFileTab({ projectId: project.id, path, name, openInEditMode });
-  openTabInProject(project.id, tab);
+  openTabInProject(project.id, tab, false);
+  focusWorkbenchDoc(tab.id);
   return tab.id;
 }
 
 export function openPreview(projectKey: string, grant: PreviewGrant): string {
   const tab = makePreviewTab({ path: grant.path, grantId: grant.grantId });
-  openTabInProject(projectKey, tab);
+  openTabInProject(projectKey, tab, false);
+  focusWorkbenchDoc(tab.id);
   return tab.id;
 }
 
@@ -128,22 +162,9 @@ export function openDiffInProject(args: {
     path: args.path,
     status: args.status,
   });
-  openTabInProject(args.project.id, tab);
+  openTabInProject(args.project.id, tab, false);
+  focusWorkbenchDoc(tab.id);
   return tab.id;
-}
-
-export function openChangesInProject(args: {
-  project: Project;
-  title: string;
-  expandPath?: string;
-}): void {
-  openTabInProject(
-    args.project.id,
-    makeChangesTab({ projectId: args.project.id, title: args.title }),
-  );
-  if (args.expandPath) {
-    useChangesUiStore.getState().setExpanded(args.project.id, args.expandPath);
-  }
 }
 
 export function openAfterSentToProject(args: {
@@ -164,8 +185,9 @@ export function openAfterSentToProject(args: {
     path: args.newPath,
     name: basename(args.newPath),
   });
-  openTabInProject(args.dest.id, tab);
+  openTabInProject(args.dest.id, tab, false);
   void useProjectsStore.getState().setActive(args.dest.id);
   void useExplorerStore.getState().refresh(args.dest.id, args.toDir);
+  focusWorkbenchDoc(tab.id);
   return tab.id;
 }

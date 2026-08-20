@@ -1,11 +1,11 @@
 use std::io::Write;
-use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use parking_lot::Mutex;
 use portable_pty::{ChildKiller, MasterPty, PtySize};
-use tokio::sync::Notify;
+
+use super::supervisor::{PtyStopReason, PtySupervisor};
 
 /// A single PTY session — one shell or CLI subprocess attached to a pty pair.
 /// The reader and waiter live in their own tasks; this struct only owns the
@@ -26,17 +26,7 @@ pub struct PtySession {
     pub(crate) writer: Mutex<Box<dyn Write + Send>>,
     pub(crate) master: Mutex<Box<dyn MasterPty + Send>>,
     pub(crate) killer: Mutex<Box<dyn ChildKiller + Send + Sync>>,
-    pub(crate) cancel: Arc<Notify>,
-    /// Set by the reader thread when its blocking read returns an error.
-    /// The waiter task observes this on the cancel path and emits exit with
-    /// reason "reader_error" instead of "killed" so the frontend banner can
-    /// distinguish "I aborted this" from "the PTY broke under us".
-    pub(crate) reader_failed: AtomicBool,
-    /// Set by `kill()` so the waiter task observes the cancel even if the
-    /// `Notify` wakeup is lost (e.g. a kill that lands before the waiter first
-    /// polls `notified()`, as in the StrictMode immediate-unmount race).
-    /// Level-triggered: the waiter checks this every loop iteration.
-    pub(crate) killed: AtomicBool,
+    pub(crate) supervisor: Arc<PtySupervisor>,
     /// Latest cwd hint pushed by the frontend via OSC 7. When `None`, fall
     /// back to `cwd` (the spawn-time directory).
     pub cwd_override: Mutex<Option<String>>,
@@ -68,8 +58,7 @@ impl PtySession {
     }
 
     pub fn kill(&self) {
-        self.killed.store(true, std::sync::atomic::Ordering::SeqCst);
-        self.cancel.notify_waiters();
+        self.supervisor.request_stop(PtyStopReason::Killed);
         let mut k = self.killer.lock();
         let _ = k.kill();
     }

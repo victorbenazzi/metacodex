@@ -6,11 +6,10 @@ import { create } from "zustand";
  *
  * Modeled on what cmux exposes to the user:
  *   - `idle`            → no halo, no badge. Default.
- *   - `working`         → soft pulse (opacity 0.4↔0.7) cinza. Set by the
- *                          heuristic when the user presses Enter and the PTY
- *                          starts producing output.
- *   - `needs-attention` → static yellow dot. Set by OSC 99/777 or by the
- *                          confirm-prompt regex in `agentHeuristic.ts`.
+ *   - `working`         → soft pulse (opacity 0.4↔0.7) cinza. Set when a CLI
+ *                          tab emits output, or when the user presses Enter.
+ *   - `needs-attention` → static yellow dot. OSC 99/777, a confirm prompt, or
+ *                          (CLI tabs) silence after working: your turn.
  *   - `done`            → green dot for ~4s, then auto-clears. Set by OSC 9
  *                          or by the PTY exit event.
  *
@@ -41,17 +40,22 @@ export const useAgentStatusStore = create<AgentStatusState>((set, get) => ({
   byTab: {},
 
   setStatus: (tabId, status, hint, urgency) =>
-    set((state) => ({
-      byTab: {
-        ...state.byTab,
-        [tabId]: {
-          status,
-          changedAt: Date.now(),
-          hint,
-          urgency,
+    set((state) => {
+      const current = state.byTab[tabId];
+      if (
+        current?.status === status &&
+        current.hint === hint &&
+        current.urgency === urgency
+      ) {
+        return state;
+      }
+      return {
+        byTab: {
+          ...state.byTab,
+          [tabId]: { status, changedAt: Date.now(), hint, urgency },
         },
-      },
-    })),
+      };
+    }),
 
   clear: (tabId) =>
     set((state) => {
@@ -84,8 +88,8 @@ export function attentionOrder(byTab: Record<string, AgentStatusEntry>): string[
     const ua = a[1].urgency ?? 0;
     const ub = b[1].urgency ?? 0;
     if (ua !== ub) return ub - ua;
-    return b[1].changedAt - a[1].changedAt;
+    return a[1].changedAt - b[1].changedAt;
   });
-  done.sort((a, b) => b[1].changedAt - a[1].changedAt);
+  done.sort((a, b) => a[1].changedAt - b[1].changedAt);
   return [...needs.map(([id]) => id), ...done.map(([id]) => id)];
 }

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   readText as readClipboardText,
   writeText as writeClipboardText,
@@ -18,6 +19,11 @@ import { TerminalExitBanner } from "./TerminalExitBanner";
 import { TerminalSessionLoading } from "./TerminalSessionLoading";
 import { isMac } from "@/lib/platform";
 import { cn } from "@/lib/cn";
+import { Button } from "@/components/ui/Button";
+import { AlertTriangle } from "@/components/ui/icons";
+import { useDiagnosticsStore } from "@/features/diagnostics/diagnostics.store";
+import { requestCloseTab } from "@/features/tabs/tabLifecycle";
+import type { TerminalRuntimeState } from "@/features/terminal/terminal.types";
 
 interface TerminalTabProps {
   tabId: string;
@@ -25,6 +31,11 @@ interface TerminalTabProps {
   projectId: string | null;
   /** If set, launch this CLI via login shell; otherwise plain shell. */
   cliLaunchCommand?: string;
+  cliLaunch?: {
+    executable: string;
+    args: string[];
+    environment: Record<string, string>;
+  };
   cliToolId?: string;
   label: string;
   /** Text written to the PTY after the shell prints its first byte (no
@@ -47,17 +58,23 @@ export function TerminalTab({
   cwd,
   projectId,
   cliLaunchCommand,
+  cliLaunch,
   cliToolId,
   label,
   prefillCommand,
   isVisible = true,
 }: TerminalTabProps) {
+  const { t } = useTranslation();
   const { containerRef, termRef, fitRef, disposedRef } = useXterm();
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [exitInfo, setExitInfo] = useState<{ code: number; reason: PtyExitReason } | null>(null);
-  /** True until spawn settles (session id or failed start). Avoids blank first paint. */
-  const [booting, setBooting] = useState(true);
+  const [runtimeState, setRuntimeState] = useState<TerminalRuntimeState>({
+    phase: "starting",
+    step: "listeners",
+  });
+  const [retryRevision, setRetryRevision] = useState(0);
   useSessionCapture({
+    tabId,
     enabled: !!cliToolId,
     term: termRef.current,
     cliId: cliToolId,
@@ -86,16 +103,19 @@ export function TerminalTab({
 
     let cancelled = false;
     setExitInfo(null);
-    setBooting(true);
+    setRuntimeState({ phase: "starting", step: "listeners" });
     setActiveSessionId(null);
+    const unsubscribeState = sessionController.subscribe(tabId, (state) => {
+      if (!cancelled) setRuntimeState(state);
+    });
 
-    void sessionController
-      .start({
+    void sessionController.start({
         tabId,
         projectId,
         cwd,
         label,
         cliLaunchCommand,
+        cliLaunch,
         cliToolId,
         prefillCommand,
         term,
@@ -105,27 +125,23 @@ export function TerminalTab({
         onSession: (id) => {
           if (cancelled) return;
           setActiveSessionId(id);
-          if (id) setBooting(false);
         },
         onExit: (info) => {
           if (cancelled) return;
           setExitInfo(info);
-          setBooting(false);
         },
-      })
-      .finally(() => {
-        if (!cancelled) setBooting(false);
       });
 
     return () => {
       cancelled = true;
+      unsubscribeState();
       // Chain stop on the controller; do not fire-and-forget a parallel kill.
       void sessionController.stop(tabId).then(() => {
         setActiveSessionId(null);
       });
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tabId]);
+  }, [tabId, retryRevision]);
 
   // Fit-on-visible is pure DOM policy: uses term/fit refs, not the session map.
   useEffect(() => {
@@ -240,7 +256,25 @@ export function TerminalTab({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabId, cwd]);
 
-  const showLoader = booting && !activeSessionId && !exitInfo;
+  const showLoader = runtimeState.phase === "starting";
+  const failure = runtimeState.phase === "failed" ? runtimeState : null;
+  const projectKey = projectId ?? WORKSPACE_NULL;
+
+  const copyDiagnostics = () => {
+    const payload = JSON.stringify(
+      {
+        tabId,
+        projectId,
+        cwd,
+        label,
+        runtimeState,
+        log: useDiagnosticsStore.getState().entries,
+      },
+      null,
+      2,
+    );
+    void writeClipboardText(payload);
+  };
 
   return (
     <div className="relative flex h-full w-full flex-col bg-canvas">
@@ -256,12 +290,58 @@ export function TerminalTab({
         {showLoader ? (
           <TerminalSessionLoading label={label} phase="starting" />
         ) : null}
+        {failure ? (
+          <div
+            role="alert"
+            className="absolute inset-0 z-10 flex items-center justify-center bg-canvas px-[var(--space-xl)]"
+          >
+            <div className="w-full max-w-[520px] rounded-md border border-hairline bg-surface p-[var(--space-lg)] shadow-elevated">
+              <div className="flex items-start gap-[var(--space-sm)]">
+                <AlertTriangle size={18} className="mt-[2px] flex-none text-danger" />
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-title font-semibold text-ink">
+                    {t("terminal.failure.title")}
+                  </h2>
+                  <p className="mt-[var(--space-xs)] text-caption text-ink-muted">
+                    {t("terminal.failure.step", {
+                      step: t(`terminal.failure.steps.${failure.step}`),
+                    })}
+                  </p>
+                  <pre className="mt-[var(--space-base)] max-h-[160px] overflow-auto whitespace-pre-wrap break-words rounded-sm bg-surface-strong/50 p-[var(--space-sm)] text-caption text-ink">
+                    {failure.error.code}: {failure.error.message}
+                  </pre>
+                  <div className="mt-[var(--space-base)] flex flex-wrap gap-[var(--space-xs)]">
+                    {failure.retryable ? (
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => setRetryRevision((value) => value + 1)}
+                      >
+                        {t("common.retry")}
+                      </Button>
+                    ) : null}
+                    <Button variant="outline" size="sm" onClick={copyDiagnostics}>
+                      {t("terminal.failure.copyDiagnostics")}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => requestCloseTab(projectKey, tabId)}
+                    >
+                      {t("tabs.closeTab")}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
         {/* xterm must stay mounted under the loader so spawn can fit and attach. */}
         <div
           ref={containerRef}
-          className={cn("h-full w-full", showLoader && "opacity-0")}
+          className={cn("h-full w-full", (showLoader || failure) && "opacity-0")}
           data-tab-id={tabId}
-          aria-hidden={showLoader || undefined}
+          aria-hidden={showLoader || failure ? true : undefined}
         />
       </div>
     </div>

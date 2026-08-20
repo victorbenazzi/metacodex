@@ -98,17 +98,13 @@
       "iconStyleHint": "Monocromático segue o tema. Colorido pinta arquivos com marca conhecida na cor original.",
       "iconStyleMono": "Mono",
       "iconStyleColor": "Colorido",
-      "layout": "Layout",
-      "layoutHint": "Horizontal mantém as coisas abertas na barra de guias do topo. Vertical esconde a barra e controla o painel central pela sidebar (estilo Codex).",
-      "layoutHorizontal": "Horizontal",
-      "layoutVertical": "Vertical",
       "density": "Densidade",
       "densityHint": "Ajusta o espaçamento globalmente. Compacta para dados densos, espaçosa para mais respiro.",
       "densityCompact": "Compacta",
       "densityComfortable": "Confortável",
       "densitySpacious": "Espaçosa",
       "launcherVisibilityTitle": "Visibilidade no launcher",
-      "launcherVisibilityHint": "Escolha quais agentes aparecem no menu +. Os ocultos continuam instalados e podem ser abertos a partir de um terminal.",
+      "launcherVisibilityHint": "Escolha quais agentes aparecem no menu Novo agente. Os ocultos continuam instalados e podem ser abertos a partir de um terminal.",
       "autonomousTag": "autônomo",
       "toggleAria": "Alternar {{name}} no launcher"
     },
@@ -119,13 +115,15 @@
       "uiScaleHint": "Aplica zoom na janela inteira: fontes, ícones e layout escalam juntos, como o zoom de janela do VS Code. O texto do editor e do terminal também escala.",
       "uiScaleSmall": "Pequena",
       "uiScaleDefault": "Padrão",
-      "uiScaleLarge": "Grande"
+      "uiScaleLarge": "Grande",
+      "screenReaderMode": "Modo de leitor de tela no terminal",
+      "screenReaderModeHint": "Ativa a saída acessível do xterm para tecnologias assistivas. Isso pode reduzir o desempenho do terminal."
     },
     "editor": {
       "title": "Editor",
       "description": "Preferências do editor de código.",
       "fontFamily": "Família da fonte",
-      "fontFamilyHint": "Fonte monoespaçada do editor de código.",
+      "fontFamilyHint": "SF Pro, a fonte de interface do sistema. A mesma do resto do app.",
       "fontSize": "Tamanho da fonte",
       "fontSizeHint": "Tamanho do texto do editor, em pixels.",
       "stickyScroll": "Cabeçalhos fixos (sticky)",
@@ -135,7 +133,7 @@
       "title": "Terminal",
       "description": "Preferências do terminal.",
       "fontFamily": "Família da fonte",
-      "fontFamilyHint": "Fonte monoespaçada do terminal. Nerd Fonts exibem ícones de TUI.",
+      "fontFamilyHint": "Nerd Font para os ícones das TUIs (starship, Claude Code, Codex). O resto do app continua em SF Pro.",
       "fontSize": "Tamanho da fonte",
       "fontSizeHint": "Tamanho do texto do terminal, em pixels.",
       "cursorStyle": "Estilo do cursor",
@@ -182,7 +180,9 @@
         "tabJumpToNextAttention": "Pular para o próximo agente aguardando",
         "diagnosticsToggle": "Abrir log de diagnóstico",
         "folderClone": "Clonar do GitHub",
-        "agentNew": "Novo agente"
+        "agentNew": "Novo agente",
+        "browserOpen": "Abrir browser",
+        "browserToggleExpand": "Alternar browser expandido"
       }
     },
     "advanced": {
@@ -221,7 +221,12 @@
   },
   "cli": {
     "dangerous": "perigoso",
-    "needsConfig": "Requer config"
+    "needsConfig": "Requer config",
+    "elevatedTitle": "Abrir {{label}} com aprovação elevada",
+    "elevatedDescription": "Estas opções ignoram a aprovação normal em {{project}}.",
+    "elevatedConfirm": "Abrir com elevação",
+    "elevatedAction": "{{label}} com aprovação elevada",
+    "elevatedActionHint": "Revise e confirme as opções que ignoram permissões somente neste lançamento."
   },
   "v3": {
     "sidebar": {
@@ -229,8 +234,7 @@
       "plan": "Workspace local"
     },
     "nav": {
-      "search": "Buscar",
-      "loops": "Loops"
+      "search": "Buscar"
     },
     "newAgent": {
       "button": "Novo Agent",
@@ -256,10 +260,6 @@
       "empty": "Abra uma pasta ou clone do GitHub para começar um repositório aqui.",
       "noAgents": "Nenhum agent ainda"
     },
-    "loops": {
-      "emptyTitle": "Nenhum loop ainda",
-      "emptyBody": "Loops orquestram um maker e um verifier contra um projeto, o mesmo modelo do metacodex v2. O runtime entra no próximo passo."
-    },
     "workbench": {
       "aria": "Changes, arquivos e browser",
       "changes": "Changes",
@@ -267,8 +267,6 @@
       "browser": "Browser",
       "uncommitted": "Uncommitted",
       "reopen": "Abrir painel lateral",
-      "browserSoonTitle": "Browser",
-      "browserSoonBody": "O browser embutido chega em breve.",
       "newTab": "Nova aba"
     },
     "palette": {
@@ -374,20 +372,11 @@
     "removeDescription": "Isto só remove o projeto do seu workspace. A pasta no disco não é afetada.",
     "removeBodySuffix": " será removido da trilha.",
     "menu": {
-      "rename": "Renomear no metacodex…",
+      "rename": "Renomear nome do projeto",
       "revealInFinder": "Revelar no Finder",
       "moveUp": "Mover para cima",
       "moveDown": "Mover para baixo",
-      "icon": "Ícone",
-      "changeImage": "Trocar imagem…",
-      "chooseFromComputer": "Escolher do computador…",
-      "imageHint": "Use o favicon do projeto ou outra imagem.",
-      "removeImage": "Remover imagem",
-      "removeFromApp": "Remover do metacodex",
-      "useIcon": "Usar o ícone {{name}}",
-      "changeProjectImage": "Trocar imagem do projeto",
-      "chooseImage": "Escolher imagem do computador",
-      "pickIconTitle": "Escolher ícone do projeto"
+      "removeFromApp": "Remover do metacodex"
     },
     "rename": {
       "title": "Renomear projeto",
@@ -425,7 +414,8 @@
     "newWorktree": "Nova worktree…"
   },
   "notifications": {
-    "agentDone": "Agente concluído"
+    "agentDone": "Agente concluído",
+    "agentMessage": "Mensagem do agente"
   },
   "resume": {
     "titleProject": "Retome de onde parou em {{name}}",
@@ -473,6 +463,8 @@
     "orViaNpm": "Ou via npm",
     "openInTerminal": "Abrir no terminal",
     "retryDetection": "Detectar de novo",
+    "detectionFailed": "Falha na detecção",
+    "detectionFailedBody": "O metacodex não conseguiu verificar {{label}}. A CLI ainda pode estar instalada.",
     "copyInstall": "Copiar comando de instalação",
     "lookup": "O metacodex pergunta ao seu shell de login por <0>{{command}}</0> via <1>{{detect}}</1>.",
     "unknownCli": "CLI desconhecida: <0>{{id}}</0>",
@@ -481,6 +473,20 @@
     "startingNamed": "Abrindo {{label}}…",
     "sessionFallback": "sessão",
     "processExited": "[processo encerrado]",
+    "failure": {
+      "title": "Não foi possível abrir o terminal",
+      "step": "Falha durante {{step}}.",
+      "copyDiagnostics": "Copiar diagnóstico",
+      "steps": {
+        "listeners": "configuração dos eventos",
+        "prepare": "preparação da sessão",
+        "attach": "conexão com a interface",
+        "child": "inicialização do processo",
+        "write": "entrada do terminal",
+        "resize": "redimensionamento do terminal",
+        "kill": "encerramento da sessão"
+      }
+    },
     "exitBanner": {
       "nonzero": "O processo saiu com código {{code}}.",
       "readerError": "Falha de I/O no terminal: a saída acima pode estar truncada.",
@@ -534,6 +540,10 @@
     "deletions_other": "{{count}} remoções",
     "openDiff": "Abrir diff",
     "empty": "Nenhuma alteração não commitada na branch local",
+    "staged": "Em staging",
+    "unstaged": "Não adicionadas",
+    "emptyStaged": "Nenhuma alteração em staging",
+    "emptyUnstaged": "Nenhuma alteração não adicionada",
     "noProject": "Abra um projeto para ver as alterações.",
     "commit": "Commit",
     "commitMenu": "Mais ações de commit",
@@ -562,9 +572,14 @@
     "loadDiff": "Carregar diff",
     "showMore": "Mostrar mais {{count}} arquivos",
     "branchName": "Nome da branch",
+    "changeScope": "Escopo das alterações",
+    "switchBranch": "Alternar branch",
+    "branchLoading": "Carregando branches…",
+    "branchEmpty": "Nenhuma branch local encontrada",
     "commitFailed": "Falha no commit",
     "discardFailed": "Falha ao descartar",
     "branchFailed": "Não foi possível criar a branch",
+    "branchSwitchFailed": "Não foi possível alternar a branch",
     "pushFailed": "Falha no push",
     "worktrees": {
       "title": "Worktrees",
@@ -580,6 +595,8 @@
       "abandonBody": "O diretório e o checkout da worktree serão removidos. Commits não-pushados desta branch serão perdidos.",
       "abandonForce": "Forçar (descartar trabalho não mesclado)",
       "revealInFinder": "Revelar no Finder",
+      "launchAgent": "Iniciar agente",
+      "noAgentsEnabled": "Nenhum agente habilitado",
       "openTerminalHere": "Novo terminal aqui",
       "removeFailed": "Não foi possível remover a worktree:\n\n{{error}}",
       "mergeFailed": "Falha ao mesclar:\n\n{{error}}",
@@ -703,5 +720,70 @@
       "notesTitle": "Novidades a cada atualização",
       "notesBody": "Este resumo aparece uma vez após cada update, com o link para as notas completas no GitHub."
     }
+  },
+  "quitBlocked": {
+    "title": "Não foi possível encerrar com segurança",
+    "description": "Alguns dados ou trabalhos em segundo plano não foram finalizados.",
+    "warning": "Forçar saída pode descartar trabalho não salvo. Tentar novamente é a opção mais segura.",
+    "forceQuit": "Forçar saída",
+    "area": {
+      "editors": "Editores abertos",
+      "settings": "Configurações",
+      "workspaces": "Workspaces",
+      "resume": "Histórico de sessões",
+      "diagnostics": "Diagnósticos",
+      "clones": "Clones do Git",
+      "terminals": "Terminais",
+      "watchers": "Monitoramento de arquivos",
+      "quit": "Encerramento seguro",
+      "unknown": "Trabalho em segundo plano"
+    },
+    "reason": {
+      "flushTimeout": "O salvamento não terminou em cinco segundos.",
+      "flushFailed": "Não foi possível salvar as alterações mais recentes.",
+      "saveFailed": "Não foi possível salvar as alterações mais recentes.",
+      "cleanupFailed": "Um recurso em segundo plano não pôde ser encerrado com segurança.",
+      "unknown": "Este trabalho não pôde ser finalizado com segurança."
+    }
+  },
+  "bootstrap": {
+    "loadingTitle": "Preparando seu workspace",
+    "loadingBody": "Carregando projetos, configurações e o ambiente local.",
+    "failedTitle": "Não foi possível abrir o workspace",
+    "failedBody": "O workspace local não pôde ser carregado."
+  },
+  "browser": {
+    "aria": "Browser embutido",
+    "back": "Voltar",
+    "forward": "Avançar",
+    "reload": "Recarregar",
+    "addressPlaceholder": "Busca, URL ou porta",
+    "addressLabel": "Endereço",
+    "pick": "Selecionar componente",
+    "draw": "Desenhar na página",
+    "sendViewport": "Enviar screenshot ao agente",
+    "openExternal": "Abrir no navegador do sistema",
+    "home": "Página inicial",
+    "clearRecents": "Limpar recentes",
+    "startTitle": "Browser",
+    "startBody": "Abra um servidor de desenvolvimento ou uma página recente. Selecione um componente ou desenhe na página para mandar contexto visual ao agente.",
+    "servers": "Servidores",
+    "serversEmpty": "Nenhum servidor local detectado. Suba um processo de dev numa aba de terminal.",
+    "recents": "Recentes",
+    "recentsEmpty": "As páginas que você abrir aparecem aqui.",
+    "navigateFailed": "Não foi possível abrir essa URL",
+    "captureFailed": "Não foi possível capturar a página",
+    "needAgent": "Abra um agente de código neste projeto primeiro",
+    "sentToAgent": "Enviado ao agente",
+    "sendFailed": "Não foi possível enviar o contexto ao agente",
+    "expand": "Expandir browser",
+    "restore": "Restaurar browser",
+    "external": "Externo",
+    "openWhere": "Abrir",
+    "openInApp": "Abrir no browser",
+    "drawDock": "Ferramentas de desenho",
+    "drawSend": "Enviar screenshot",
+    "drawClear": "Limpar",
+    "drawCancel": "Cancelar"
   }
 }

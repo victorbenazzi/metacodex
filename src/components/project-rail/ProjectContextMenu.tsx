@@ -6,9 +6,6 @@ import {
   Pencil,
   Trash2,
   FolderOpen,
-  Shapes,
-  ImagePlus,
-  ImageOff,
 } from "@/components/ui/icons";
 import { useTranslation } from "react-i18next";
 
@@ -19,17 +16,10 @@ import {
   ContextMenuLabel,
   ContextMenuRoot,
   ContextMenuSeparator,
-  ContextMenuSub,
 } from "@/components/ui/ContextMenu";
 import { Icon } from "@/components/ui/Icon";
-import { lookupProjectGlyph } from "./projectIdentity";
 import { useProjectsStore } from "@/features/projects/project.store";
-import {
-  PROJECT_ICONS,
-  type Project,
-} from "@/features/projects/project.types";
-import { isCustomIcon, pickProjectIcon } from "@/features/projects/customIcon.service";
-import { cn } from "@/lib/cn";
+import type { Project } from "@/features/projects/project.types";
 
 interface ProjectContextMenuProps {
   project: Project;
@@ -45,10 +35,8 @@ export function ProjectContextMenu({
   onRequestRemove,
 }: ProjectContextMenuProps) {
   const { t } = useTranslation();
-  const updateMeta = useProjectsStore((s) => s.updateMeta);
   const projects = useProjectsStore((s) => s.projects);
   const reorder = useProjectsStore((s) => s.reorder);
-  const hasCustomIcon = isCustomIcon(project.icon);
 
   // Keyboard-friendly alternative to drag-reorder: swap with the neighbor.
   const index = projects.findIndex((p) => p.id === project.id);
@@ -58,15 +46,6 @@ export function ProjectContextMenu({
     const ids = projects.map((p) => p.id);
     [ids[index], ids[to]] = [ids[to], ids[index]];
     void reorder(ids);
-  };
-
-  const handlePickIcon = async () => {
-    try {
-      const uri = await pickProjectIcon(project.path);
-      if (uri) await updateMeta(project.id, { icon: uri });
-    } catch (e) {
-      console.warn("pick project icon failed", e);
-    }
   };
 
   const revealInFinder = async () => {
@@ -80,7 +59,7 @@ export function ProjectContextMenu({
   return (
     <ContextMenuRoot>
       <RCM.Trigger asChild>{children}</RCM.Trigger>
-      <ContextMenuContent>
+      <ContextMenuContent className="min-w-[224px]">
         <ContextMenuLabel>{project.name}</ContextMenuLabel>
         <ContextMenuItem onSelect={onRequestRename}>
           <Icon icon={Pencil} size={12} className="text-muted" />
@@ -107,135 +86,11 @@ export function ProjectContextMenu({
 
         <ContextMenuSeparator />
 
-        <ContextMenuSub
-          trigger={
-            <>
-              <Icon icon={Shapes} size={12} className="text-muted" />
-              <span>{t("projectRail.menu.icon")}</span>
-            </>
-          }
-        >
-          <div className="max-h-[320px] w-[236px] overflow-y-auto p-8px">
-            <div className="grid grid-cols-5 gap-6px">
-              {PROJECT_ICONS.map((name) => (
-                <IconChoice
-                  key={name}
-                  name={name}
-                  selected={!hasCustomIcon && project.icon === name}
-                  onClick={() => updateMeta(project.id, { icon: name })}
-                />
-              ))}
-            </div>
-
-            <div className="my-8px h-px bg-hairline-soft" />
-
-            <div className="flex items-center gap-8px px-[2px]">
-              <CustomImageButton
-                imageUri={hasCustomIcon ? project.icon : null}
-                onClick={handlePickIcon}
-              />
-              <div className="min-w-0 flex-1 leading-tight">
-                <div className="text-label font-medium text-body">
-                  {hasCustomIcon ? t("projectRail.menu.changeImage") : t("projectRail.menu.chooseFromComputer")}
-                </div>
-                <div className="text-micro text-muted">
-                  {t("projectRail.menu.imageHint")}
-                </div>
-              </div>
-            </div>
-
-            {hasCustomIcon ? (
-              <button
-                type="button"
-                onClick={() => updateMeta(project.id, { icon: "Folder" })}
-                className="mt-8px flex w-full items-center gap-6px rounded-sm px-6px py-5px text-label text-muted transition-colors hover:bg-surface-strong/40 hover:text-body focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[-1px]"
-              >
-                <Icon icon={ImageOff} size={12} />
-                {t("projectRail.menu.removeImage")}
-              </button>
-            ) : null}
-          </div>
-        </ContextMenuSub>
-
-        <ContextMenuSeparator />
-
         <ContextMenuItem destructive onSelect={onRequestRemove}>
           <Icon icon={Trash2} size={12} />
           {t("projectRail.menu.removeFromApp")}
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenuRoot>
-  );
-}
-
-function IconChoice({
-  name,
-  selected,
-  onClick,
-}: {
-  name: string;
-  selected: boolean;
-  onClick: () => void;
-}) {
-  const { t } = useTranslation();
-  const Comp = lookupProjectGlyph(name);
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={t("projectRail.menu.useIcon", { name })}
-      aria-pressed={selected}
-      className={cn(
-        "flex h-[30px] w-[30px] items-center justify-center rounded-sm transition-colors",
-        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[2px]",
-        selected ? "bg-surface-strong/55" : "hover:bg-surface-strong/40",
-      )}
-      style={selected ? { boxShadow: "0 0 0 1.5px var(--accent)" } : undefined}
-    >
-      {Comp ? (
-        <Comp
-          size={14}
-          strokeWidth={1.5}
-          color={selected ? "var(--ink)" : "var(--body)"}
-        />
-      ) : (
-        <span className="h-[14px] w-[14px]" />
-      )}
-    </button>
-  );
-}
-
-/**
- * The 1:1 "choose an image" button. Empty state: a dashed tile with an
- * ImagePlus glyph. Active state: the chosen image thumbnail (object-cover) with
- * an accent ring. This uses the same selection language as the preset icon
- * tiles.
- */
-function CustomImageButton({
-  imageUri,
-  onClick,
-}: {
-  imageUri: string | null;
-  onClick: () => void;
-}) {
-  const { t } = useTranslation();
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={imageUri ? t("projectRail.menu.changeProjectImage") : t("projectRail.menu.chooseImage")}
-      className={cn(
-        "flex h-[30px] w-[30px] shrink-0 items-center justify-center overflow-hidden rounded-sm transition-colors",
-        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-[2px]",
-        !imageUri && "border border-dashed border-hairline-strong hover:bg-surface-strong/40",
-      )}
-      style={imageUri ? { boxShadow: "0 0 0 1.5px var(--accent)" } : undefined}
-    >
-      {imageUri ? (
-        <img src={imageUri} alt="" draggable={false} className="h-full w-full object-contain p-[3px]" />
-      ) : (
-        <Icon icon={ImagePlus} size={14} className="text-muted" />
-      )}
-    </button>
   );
 }

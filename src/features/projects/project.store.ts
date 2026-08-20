@@ -8,18 +8,19 @@ import { useExplorerStore } from "@/features/explorer/explorer.store";
 import { useGitStore } from "@/features/git/git.store";
 import { useChangesUiStore } from "@/features/git/changes.store";
 import { watcherApi } from "@/features/filesystem/watcher.service";
+import { recordDiag } from "@/features/diagnostics/diagnostics.store";
 
 interface ProjectsState {
   projects: Project[];
   activeProjectId: string | null;
   hydrated: boolean;
+  hydrateError: string | null;
 
   hydrate: () => Promise<void>;
   add: (path: string) => Promise<Project>;
   create: (directory: string, name: string) => Promise<Project>;
   remove: (id: string) => Promise<void>;
   rename: (id: string, name: string) => Promise<Project>;
-  updateMeta: (id: string, patch: { color?: string; icon?: string }) => Promise<Project>;
   reorder: (orderedIds: string[]) => Promise<void>;
   setActive: (id: string) => Promise<void>;
   clearActive: () => void;
@@ -50,6 +51,7 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
   projects: [],
   activeProjectId: null,
   hydrated: false,
+  hydrateError: null,
 
   hydrate: async () => {
     try {
@@ -59,10 +61,10 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
       ]);
       const stillExists =
         activeId && projects.some((p) => p.id === activeId) ? activeId : null;
-      set({ projects, activeProjectId: stillExists, hydrated: true });
+      set({ projects, activeProjectId: stillExists, hydrated: true, hydrateError: null });
     } catch (err) {
       console.error("[projects] hydrate failed", err);
-      set({ hydrated: true });
+      set({ hydrated: true, hydrateError: err instanceof Error ? err.message : String(err) });
     }
   },
 
@@ -71,11 +73,7 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
     projectsApi.create(directory, name).then((p) => absorbProject(get, set, p)),
 
   remove: async (id) => {
-    // Tear down every live resource attached to this Project BEFORE the Rust
-    // registry forgets it. Otherwise leaked PTYs keep emitting pty://data
-    // for a Project the UI no longer knows about, and the next click on a
-    // sibling Project lands on stale tab/terminal state (the "stuck after
-    // remove" bug). Kill goes through Session controller (idempotent stop).
+    const result = await projectsApi.remove(id);
     const tabs = useTabsStore.getState();
     const bucket = tabs.byProject[id];
     if (bucket) {
@@ -91,7 +89,12 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
     useChangesUiStore.getState().clearProject(id);
     void watcherApi.unwatch(id).catch(() => undefined);
 
-    await projectsApi.remove(id);
+    if (result.cleanupWarnings.length > 0) {
+      recordDiag("ipc.command.fail", {
+        projectId: id,
+        detail: { command: "remove_project", cleanupWarnings: result.cleanupWarnings },
+      });
+    }
     const next = get().projects.filter((p) => p.id !== id);
     const activeProjectId = get().activeProjectId === id ? null : get().activeProjectId;
     set({ projects: next, activeProjectId });
@@ -99,12 +102,6 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
 
   rename: async (id, name) => {
     const updated = await projectsApi.rename(id, name);
-    set({ projects: get().projects.map((p) => (p.id === id ? updated : p)) });
-    return updated;
-  },
-
-  updateMeta: async (id, patch) => {
-    const updated = await projectsApi.updateMeta(id, patch);
     set({ projects: get().projects.map((p) => (p.id === id ? updated : p)) });
     return updated;
   },

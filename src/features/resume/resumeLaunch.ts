@@ -29,7 +29,19 @@ export function buildResumeTab(entry: ResumeEntry): Tab | null {
     cwd: entry.cwd,
     cliId: entry.cliId,
     launchCommand,
+    launchExecutable: cli.command,
+    launchArgs: [...cli.args, flag, entry.sessionId],
   };
+}
+
+/** True when a live CLI tab is already that captured session (not merely the same tool). */
+export function isLiveResumeSession(tab: Tab, entry: ResumeEntry): boolean {
+  if (tab.kind !== "cli" || tab.cliId !== entry.cliId) return false;
+  if (tab.providerSessionId) return tab.providerSessionId === entry.sessionId;
+  if (entry.sessionId.length > 0 && tab.launchCommand.includes(entry.sessionId)) {
+    return true;
+  }
+  return entry.sessionId.length === 0 && tab.cwd === entry.cwd;
 }
 
 function shellEscape(value: string): string {

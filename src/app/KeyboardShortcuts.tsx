@@ -8,6 +8,8 @@ import { useCommandPaletteStore } from "@/features/command-palette/command-palet
 import { useDiagnosticsStore } from "@/features/diagnostics/diagnostics.store";
 import { getAppCommands } from "@/app/appCommands";
 import { useV3ShellStore } from "@/features/v3-shell/v3Shell.store";
+import { useBrowserUiStore } from "@/features/browser/browser.store";
+import { useSidePanelStore } from "@/features/side-panel/sidePanel.store";
 
 /**
  * Route a resolved command to its side effect. Implementations stay on
@@ -28,9 +30,6 @@ function dispatchCommand(cmd: ResolvedCommand) {
       break;
     case "tab.close":
       api?.closeActiveTab();
-      break;
-    case "tab.rename":
-      api?.renameActiveTab();
       break;
     case "tab.moveLeft":
       api?.moveActiveTab(-1);
@@ -71,6 +70,20 @@ function dispatchCommand(cmd: ResolvedCommand) {
     case "agent.new":
       useV3ShellStore.getState().setNewAgentOpen(true);
       break;
+    case "browser.open":
+      useSidePanelStore.getState().show("browser");
+      break;
+    case "browser.toggleExpand": {
+      const panel = useSidePanelStore.getState();
+      const ui = useBrowserUiStore.getState();
+      if (panel.view !== "browser") {
+        panel.show("browser");
+        ui.setExpanded(true);
+      } else {
+        ui.toggleExpanded();
+      }
+      break;
+    }
   }
 }
 

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
 import i18n, { isLanguageId, type LanguageId } from "@/features/i18n/config";
+import { recordDiag } from "@/features/diagnostics/diagnostics.store";
 import { useThemeStore, type ThemeMode } from "@/features/theme/theme.store";
 
 import { settingsApi } from "./settings.service";
@@ -28,12 +29,37 @@ interface SettingsDataState {
 
 const PERSIST_DEBOUNCE_MS = 400;
 let persistTimer: ReturnType<typeof setTimeout> | null = null;
+let settingsRevision = 0;
+let persistedRevision = 0;
+let persistInFlight: Promise<void> = Promise.resolve();
+
+function errorDetail(err: unknown): Record<string, unknown> {
+  return { error: err instanceof Error ? err.message : String(err) };
+}
+
+function persistSnapshot(settings: AppSettings, revision: number): Promise<void> {
+  const operation = persistInFlight.catch(() => undefined).then(async () => {
+    try {
+      await settingsApi.write(settings);
+      persistedRevision = Math.max(persistedRevision, revision);
+    } catch (err) {
+      recordDiag("settings.save.fail", { detail: { area: "settings", ...errorDetail(err) } });
+      throw err;
+    }
+  });
+  persistInFlight = operation;
+  return operation;
+}
 
 function schedulePersist(read: () => AppSettings) {
+  settingsRevision += 1;
   if (persistTimer) clearTimeout(persistTimer);
   persistTimer = setTimeout(() => {
     persistTimer = null;
-    settingsApi.write(read()).catch((err) => console.error("[settings] persist failed", err));
+    const revision = settingsRevision;
+    void persistSnapshot(read(), revision).catch((err) => {
+      console.error("[settings] persist failed", err);
+    });
   }, PERSIST_DEBOUNCE_MS);
 }
 
@@ -48,11 +74,14 @@ export async function flushSettings(): Promise<void> {
     clearTimeout(persistTimer);
     persistTimer = null;
   }
-  try {
-    await settingsApi.write(useSettingsDataStore.getState().settings);
-  } catch (err) {
+  await persistInFlight.catch(() => undefined);
+  if (persistedRevision >= settingsRevision && settingsRevision > 0) return;
+
+  const revision = settingsRevision;
+  await persistSnapshot(useSettingsDataStore.getState().settings, revision).catch((err) => {
     console.error("[settings] flush failed", err);
-  }
+    throw err;
+  });
 }
 
 export const useSettingsDataStore = create<SettingsDataState>((set, get) => ({

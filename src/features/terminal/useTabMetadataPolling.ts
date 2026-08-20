@@ -2,60 +2,115 @@ import { useEffect } from "react";
 
 import { CMD, invoke } from "@/lib/ipc";
 import { useTerminalStore } from "@/features/terminal/terminal.store";
-import { useProjectsStore } from "@/features/projects/project.store";
 import {
   useTabMetadataStore,
   type PtyMetadata,
 } from "@/features/terminal/tabMetadata.store";
 
-/**
- * Single polling loop that refreshes branch/cwd/ports for every running PTY
- * session in one batch IPC call. Mount once in AppShell.
- *
- * - Tick every `intervalMs` (default 3000).
- * - Pause while `document.hidden` — saves cycles + macOS battery when the user
- *   is in another app.
- * - Re-arms when the visible PTY set changes (sessions added/removed).
- *
- * Only polls sessions in the ACTIVE project: the TabTooltip only ever consumes
- * those, and background-project sessions would otherwise each cost an lsof/git
- * probe every tick for data nothing reads.
- */
-export function useTabMetadataPolling(intervalMs = 3000) {
-  const activeProjectId = useProjectsStore((s) => s.activeProjectId);
-  const sessionIdsKey = useTerminalStore((s) =>
-    Object.values(s.sessions)
-      .filter((sess) => sess.status === "running" && sess.projectId === activeProjectId)
-      .map((sess) => sess.id)
-      .sort()
-      .join(","),
-  );
+interface MetadataPollerOptions {
+  intervalMs: number;
+  getSessionIds: () => string[];
+  isPaused: () => boolean;
+  fetchBatch: (sessionIds: string[]) => Promise<PtyMetadata[]>;
+  applyBatch: (batch: PtyMetadata[]) => void;
+  onError: (error: unknown) => void;
+}
 
-  useEffect(() => {
-    const ids = sessionIdsKey ? sessionIdsKey.split(",") : [];
-    if (ids.length === 0) return;
+export interface MetadataPoller {
+  start: () => void;
+  requestNow: () => void;
+  stop: () => void;
+}
 
-    const tick = async () => {
-      if (document.hidden) return;
-      try {
-        const batch = await invoke<PtyMetadata[]>(CMD.ptyMetadataBatch, {
-          sessionIds: ids,
-        });
-        useTabMetadataStore.getState().setBatch(batch);
-      } catch (err) {
-        console.warn("[pty_metadata_batch] failed", err);
+export function createMetadataPoller(options: MetadataPollerOptions): MetadataPoller {
+  let stopped = false;
+  let running = false;
+  let rerunRequested = false;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+
+  const clearTimer = () => {
+    if (timer !== null) clearTimeout(timer);
+    timer = null;
+  };
+
+  const schedule = () => {
+    clearTimer();
+    if (!stopped) timer = setTimeout(run, options.intervalMs);
+  };
+
+  const run = async () => {
+    clearTimer();
+    if (stopped) return;
+    if (running) {
+      rerunRequested = true;
+      return;
+    }
+    if (options.isPaused()) {
+      schedule();
+      return;
+    }
+    const ids = options.getSessionIds();
+    if (ids.length === 0) {
+      schedule();
+      return;
+    }
+    running = true;
+    try {
+      options.applyBatch(await options.fetchBatch(ids));
+    } catch (error) {
+      options.onError(error);
+    } finally {
+      running = false;
+      if (stopped) return;
+      if (rerunRequested) {
+        rerunRequested = false;
+        void run();
+      } else {
+        schedule();
       }
-    };
+    }
+  };
 
-    void tick();
-    const handle = window.setInterval(tick, intervalMs);
+  return {
+    start() {
+      stopped = false;
+      void run();
+    },
+    requestNow() {
+      clearTimer();
+      void run();
+    },
+    stop() {
+      stopped = true;
+      rerunRequested = false;
+      clearTimer();
+    },
+  };
+}
+
+export function useTabMetadataPolling(intervalMs = 3000) {
+  useEffect(() => {
+    const poller = createMetadataPoller({
+      intervalMs,
+      getSessionIds: () =>
+        Object.values(useTerminalStore.getState().sessions)
+          .filter((session) => session.status === "running")
+          .map((session) => session.id)
+          .sort(),
+      isPaused: () => document.hidden,
+      fetchBatch: (sessionIds) =>
+        invoke<PtyMetadata[]>(CMD.ptyMetadataBatch, { sessionIds }),
+      applyBatch: (batch) => useTabMetadataStore.getState().setBatch(batch),
+      onError: (error) => console.warn("[pty_metadata_batch] failed", error),
+    });
     const onVisible = () => {
-      if (!document.hidden) void tick();
+      if (!document.hidden) poller.requestNow();
     };
     document.addEventListener("visibilitychange", onVisible);
+    poller.start();
     return () => {
-      window.clearInterval(handle);
       document.removeEventListener("visibilitychange", onVisible);
+      poller.stop();
     };
-  }, [sessionIdsKey, intervalMs]);
+  }, [intervalMs]);
 }

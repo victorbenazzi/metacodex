@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { FolderPlus, Plus, RefreshCw, Search, Settings, Sliders } from "@/components/ui/icons";
+import { FolderPlus, Plus, Search, Settings, Sliders } from "@/components/ui/icons";
 import { useTranslation } from "react-i18next";
 
 import { Icon } from "@/components/ui/Icon";
@@ -8,7 +8,6 @@ import { ReorderDropLine, useListReorder } from "@/components/ui/useListReorder"
 import { ProjectGlyph } from "@/components/project-rail/ProjectGlyph";
 import { RenameProjectDialog } from "@/components/project-rail/RenameProjectDialog";
 import { RemoveProjectDialog } from "@/components/project-rail/RemoveProjectDialog";
-import { LoopsList } from "@/components/v3-shell/LoopsList";
 import { RepoRow } from "@/components/v3-shell/RepoRow";
 import { useProjectsStore } from "@/features/projects/project.store";
 import { useResumeStore } from "@/features/resume/resume.store";
@@ -25,8 +24,6 @@ export function AgentSidebar() {
   const activeProjectId = useProjectsStore((s) => s.activeProjectId);
   const reorder = useProjectsStore((s) => s.reorder);
   const setSettingsOpen = useSettingsStore((s) => s.setOpen);
-  const leftNav = useV3ShellStore((s) => s.leftNav);
-  const setLeftNav = useV3ShellStore((s) => s.setLeftNav);
   const setNewAgentOpen = useV3ShellStore((s) => s.setNewAgentOpen);
   const setOpenProjectOpen = useV3ShellStore((s) => s.setOpenProjectOpen);
   const setSearchOpen = useSearchUiStore((s) => s.setOpen);
@@ -82,30 +79,13 @@ export function AgentSidebar() {
             label={t("v3.nav.search")}
             onClick={() => setSearchOpen(true)}
           />
-          <NavRow
-            icon={RefreshCw}
-            label={t("v3.nav.loops")}
-            active={leftNav === "loops"}
-            onClick={() => setLeftNav(leftNav === "loops" ? "repos" : "loops")}
-          />
         </div>
 
         <div className="mt-12px flex min-h-0 flex-1 flex-col">
-          {leftNav === "loops" ? (
-            <>
-              <div className="flex h-[28px] shrink-0 items-center px-16px">
-                <span className="text-caption text-muted">{t("v3.nav.loops")}</span>
-              </div>
-              <div className="min-h-0 flex-1 overflow-y-auto pb-8px">
-                <LoopsList />
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="flex h-[28px] shrink-0 items-center px-12px">
-                <span className="min-w-0 flex-1 text-caption text-body">
-                  {t("v3.repos.title")}
-                </span>
+          <div className="flex h-[28px] shrink-0 items-center px-12px">
+            <span className="min-w-0 flex-1 text-caption text-body">
+              {t("v3.repos.title")}
+            </span>
                 <Tooltip content={t("v3.repos.filter")} side="bottom">
                   <button
                     type="button"
@@ -162,8 +142,6 @@ export function AgentSidebar() {
                   </div>
                 )}
               </div>
-            </>
-          )}
         </div>
 
         <footer className="flex shrink-0 items-center border-t border-hairline-soft px-8px py-8px">
@@ -187,7 +165,7 @@ export function AgentSidebar() {
           }}
         >
           <div className="flex h-[28px] max-w-[220px] items-center gap-8px rounded-md border border-hairline bg-surface-card px-10px shadow-drag">
-            <ProjectGlyph project={draggingProject} size={14} />
+            <ProjectGlyph size={14} />
             <span className="truncate text-ui text-ink">{draggingProject.name}</span>
           </div>
         </div>
@@ -254,4 +232,3 @@ function NavRow({
     </button>
   );
 }
-
