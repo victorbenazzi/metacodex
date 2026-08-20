@@ -3,7 +3,6 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use chrono::Utc;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use tauri::{
@@ -12,25 +11,21 @@ use tauri::{
 };
 use uuid::Uuid;
 
-use crate::config_paths::{
-    browser_captures_dir, browser_history_file, browser_profile_dir, read_json, write_json_atomic,
-};
+use crate::config_paths::{browser_captures_dir, browser_profile_dir};
 use crate::error::{AppError, AppResult};
 use crate::events::{
-    BrowserNavigatedPayload, EV_BROWSER_ESCAPE, EV_BROWSER_NAVIGATED, EV_BROWSER_PICKED,
+    BrowserNavigatedPayload, EV_BROWSER_CAPTURE_SELECTED, EV_BROWSER_ESCAPE, EV_BROWSER_NAVIGATED,
+    EV_BROWSER_PICKED,
 };
 
 use super::browser_capture;
 
 pub const WEBVIEW_LABEL: &str = "preview-browser";
 
-const HISTORY_CAP: usize = 40;
 const BRIDGE_HOST: &str = "mcx.invalid";
 const INIT_SCRIPT: &str = include_str!("browser_init.js");
 const BRIDGE_TOKEN_MARKER: &str = "__MCX_BRIDGE_TOKEN__";
 const MAX_BRIDGE_URL_BYTES: usize = 8 * 1024;
-
-static HISTORY_LOCK: Mutex<()> = Mutex::new(());
 
 pub struct BrowserState {
     pub mode: Mutex<String>,
@@ -58,19 +53,6 @@ impl BrowserState {
         *self.bridge_token.lock() = token.clone();
         token
     }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct BrowserHistoryEntry {
-    pub url: String,
-    pub title: String,
-    pub visited_at: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-struct HistoryFile {
-    entries: Vec<BrowserHistoryEntry>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -101,17 +83,29 @@ pub struct BrowserCapture {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BrowserPick {
+    pub kind: String,
     pub url: String,
     pub selector: String,
     pub tag: String,
     pub id: Option<String>,
-    pub text: String,
-    pub html: String,
+    pub classes: Vec<String>,
+    pub text: Option<String>,
     pub rect: BrowserCrop,
-    pub styles: serde_json::Value,
     pub component: Option<String>,
     pub file: Option<String>,
     pub line: Option<i64>,
+    pub full_path: String,
+    pub accessibility: Option<String>,
+    pub styles: Option<String>,
+    pub viewport: BrowserViewport,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserViewport {
+    pub width: f64,
+    pub height: f64,
+    pub dpr: f64,
 }
 
 fn preview(app: &AppHandle) -> AppResult<Webview<tauri::Wry>> {
@@ -134,35 +128,6 @@ fn is_blank_href(url: &str) -> bool {
     url.is_empty() || url == "about:blank" || url.starts_with("about:")
 }
 
-fn record_history(url: &str, title: &str) {
-    if is_blank_href(url) {
-        return;
-    }
-    let _guard = HISTORY_LOCK.lock();
-    let Ok(path) = browser_history_file() else {
-        return;
-    };
-    let mut file: HistoryFile = read_json(&path).unwrap_or_default();
-    file.entries.retain(|e| e.url != url);
-    file.entries.insert(
-        0,
-        BrowserHistoryEntry {
-            url: url.to_string(),
-            title: {
-                let t = title.trim();
-                if t.is_empty() {
-                    url.to_string()
-                } else {
-                    t.to_string()
-                }
-            },
-            visited_at: Utc::now().to_rfc3339(),
-        },
-    );
-    file.entries.truncate(HISTORY_CAP);
-    let _ = write_json_atomic(&path, &file);
-}
-
 fn emit_nav(app: &AppHandle, url: &str, title: &str, loading: bool) {
     let _ = app.emit(
         EV_BROWSER_NAVIGATED,
@@ -177,6 +142,7 @@ fn emit_nav(app: &AppHandle, url: &str, title: &str, loading: bool) {
 #[derive(Debug, PartialEq, Eq)]
 enum BridgeMessage {
     Selection,
+    Capture,
     Escape,
     Location {
         url: String,
@@ -210,6 +176,9 @@ fn validate_bridge(state: &BrowserState, url: &Url) -> AppResult<BridgeMessage> 
     match url.path().trim_matches('/') {
         "selection" if pairs.is_empty() && *state.mode.lock() == "pick" => {
             Ok(BridgeMessage::Selection)
+        }
+        "capture" if pairs.is_empty() && *state.mode.lock() == "capture" => {
+            Ok(BridgeMessage::Capture)
         }
         "escape" if pairs.is_empty() && *state.mode.lock() != "browse" => Ok(BridgeMessage::Escape),
         "location" => {
@@ -261,6 +230,9 @@ fn handle_bridge(app: &AppHandle, url: &Url) {
         BridgeMessage::Selection => {
             let _ = app.emit(EV_BROWSER_PICKED, ());
         }
+        BridgeMessage::Capture => {
+            let _ = app.emit(EV_BROWSER_CAPTURE_SELECTED, ());
+        }
         BridgeMessage::Escape => {
             let _ = app.emit(EV_BROWSER_ESCAPE, ());
         }
@@ -270,7 +242,6 @@ fn handle_bridge(app: &AppHandle, url: &Url) {
             loading,
         } => {
             if !loading {
-                record_history(&url, &title);
                 if let Some(wv) = app.get_webview(WEBVIEW_LABEL) {
                     let _ = wv.eval(apply_mode_js(&stored_mode(app)));
                 }
@@ -477,7 +448,7 @@ pub async fn browser_set_mode(
     mode: String,
 ) -> AppResult<()> {
     let safe = match mode.as_str() {
-        "pick" | "draw" | "browse" => mode,
+        "pick" | "draw" | "capture" | "browse" => mode,
         _ => "browse".into(),
     };
     *state.mode.lock() = safe.clone();
@@ -519,6 +490,25 @@ pub async fn browser_take_pick(app: AppHandle) -> AppResult<Option<BrowserPick>>
 }
 
 #[tauri::command]
+pub async fn browser_take_capture_region(app: AppHandle) -> AppResult<Option<BrowserCrop>> {
+    if app.get_webview(WEBVIEW_LABEL).is_none() {
+        return Ok(None);
+    }
+    let webview = preview(&app)?;
+    let raw = eval_now(
+        &webview,
+        "(window.__mcx && window.__mcx.takeCaptureRegion()) || null",
+    )
+    .await?;
+    let value: serde_json::Value = serde_json::from_str(&raw).unwrap_or(serde_json::Value::Null);
+    if value.is_null() {
+        Ok(None)
+    } else {
+        Ok(serde_json::from_value(value).ok())
+    }
+}
+
+#[tauri::command]
 pub async fn browser_url(app: AppHandle) -> AppResult<String> {
     let Some(wv) = app.get_webview(WEBVIEW_LABEL) else {
         return Ok("about:blank".into());
@@ -535,21 +525,6 @@ pub async fn browser_url(app: AppHandle) -> AppResult<String> {
         }
         Err(_) => Ok("about:blank".into()),
     }
-}
-
-#[tauri::command]
-pub async fn browser_history_list() -> AppResult<Vec<BrowserHistoryEntry>> {
-    let path = browser_history_file()?;
-    let _guard = HISTORY_LOCK.lock();
-    let file: HistoryFile = read_json(&path)?;
-    Ok(file.entries)
-}
-
-#[tauri::command]
-pub async fn browser_history_clear() -> AppResult<()> {
-    let path = browser_history_file()?;
-    let _guard = HISTORY_LOCK.lock();
-    write_json_atomic(&path, &HistoryFile { entries: vec![] })
 }
 
 #[tauri::command]
@@ -640,6 +615,19 @@ mod tests {
         assert_eq!(first.len(), 32);
         assert!(first.chars().all(|ch| ch.is_ascii_hexdigit()));
         assert_ne!(first, second);
+    }
+
+    #[test]
+    fn capture_bridge_requires_capture_mode() {
+        let state = BrowserState::default();
+        let token = state.bridge_token.lock().clone();
+        let capture = bridge_url(&token, "capture");
+        assert!(validate_bridge(&state, &capture).is_err());
+        *state.mode.lock() = "capture".into();
+        assert!(matches!(
+            validate_bridge(&state, &capture),
+            Ok(BridgeMessage::Capture)
+        ));
     }
 
     #[test]

@@ -8,6 +8,7 @@ pub const EV_GIT_CLONE_PROGRESS: &str = "git://clone-progress";
 pub const EV_OPEN_FILE: &str = "app://open-file";
 pub const EV_BROWSER_NAVIGATED: &str = "browser://navigated";
 pub const EV_BROWSER_PICKED: &str = "browser://picked";
+pub const EV_BROWSER_CAPTURE_SELECTED: &str = "browser://capture-selected";
 pub const EV_BROWSER_ESCAPE: &str = "browser://escape";
 
 use serde::Serialize;

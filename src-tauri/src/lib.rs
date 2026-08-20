@@ -124,6 +124,7 @@ pub fn run() {
             commands::terminal::pty_write,
             commands::terminal::pty_resize,
             commands::terminal::pty_kill,
+            commands::terminal::pty_kill_process,
             commands::terminal::pty_list,
             commands::terminal::pty_metadata_batch,
             commands::terminal::pty_update_cwd,
@@ -196,9 +197,8 @@ pub fn run() {
             commands::browser::browser_set_mode,
             commands::browser::browser_clear_draw,
             commands::browser::browser_take_pick,
+            commands::browser::browser_take_capture_region,
             commands::browser::browser_url,
-            commands::browser::browser_history_list,
-            commands::browser::browser_history_clear,
             commands::browser::browser_capture,
         ])
         .build(tauri::generate_context!())

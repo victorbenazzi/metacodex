@@ -83,7 +83,6 @@ Plain, pretty-printed, hand-editable JSON written atomically (tmp then rename) v
     ├── resume.json       # recent CLI sessions (pruned to last 30 days at boot, prune_blocking)
     ├── last-session.log  # diagnostics ring-buffer dump on quit
     ├── last-crash.json   # last ErrorBoundary catch
-    ├── browser-history.json # in-app browser recents
     ├── browser-profile/  # isolated webview cookies/cache
     ├── browser-captures/ # short-lived PNGs sent to the coding agent
     ├── legacy-agent/     # archived state from the removed Agent view (startup migration)

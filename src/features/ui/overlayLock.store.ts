@@ -4,7 +4,6 @@ import { useCommandPaletteStore } from "@/features/command-palette/command-palet
 import { useDiagnosticsStore } from "@/features/diagnostics/diagnostics.store";
 import { useSearchUiStore } from "@/features/search/search.store";
 import { useSettingsStore } from "@/features/settings/settings.store";
-import { useToastStore } from "@/features/ui/toast.store";
 import { useV3ShellStore } from "@/features/v3-shell/v3Shell.store";
 import { useWhatsNewStore } from "@/features/whats-new/whatsNew.store";
 
@@ -28,7 +27,6 @@ export function useChromeOverlayOpen(): boolean {
   const openProject = useV3ShellStore((s) => s.openProjectOpen);
   const whatsNew = useWhatsNewStore((s) => s.open);
   const local = useOverlayLockStore((s) => s.local);
-  const toastOpen = useToastStore((s) => s.toasts.length > 0);
   return (
     settings ||
     palette ||
@@ -37,7 +35,6 @@ export function useChromeOverlayOpen(): boolean {
     newAgent ||
     openProject ||
     whatsNew ||
-    local ||
-    toastOpen
+    local
   );
 }

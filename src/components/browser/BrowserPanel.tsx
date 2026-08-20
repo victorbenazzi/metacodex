@@ -9,6 +9,7 @@ import { BROWSER_DRAW_DOCK_H, BrowserDrawDock } from "@/components/browser/Brows
 import {
   ChevronLeft,
   ChevronRight,
+  Check,
   ExternalLink,
   FullScreen,
   Globe,
@@ -18,12 +19,14 @@ import {
   MoreHorizontal,
   PenTool,
   RefreshCw,
+  Square,
   Target,
 } from "@/components/ui/icons";
 import { Kbd } from "@/components/ui/Kbd";
 import {
   DropdownContent,
   DropdownItem,
+  DropdownLabel,
   DropdownRoot,
   DropdownSeparator,
   DropdownTrigger,
@@ -31,16 +34,19 @@ import {
 import { useBrowserUiStore } from "@/features/browser/browser.store";
 import {
   browserApi,
-  type BrowserHistoryEntry,
+  type DevServer,
+  type BrowserContextDetail,
   type BrowserMode,
   type BrowserPick,
 } from "@/features/browser/browser.service";
+import { formatPickContext } from "@/features/browser/context";
 import { formatVisualContext, sendVisualToCli } from "@/features/browser/sendToAgent";
 import { useBrowserRuntimeContext } from "@/features/browser/useBrowserRuntimeContext";
 import { isBlankBrowserUrl, normalizeBrowserUrl } from "@/features/browser/url";
 import { useChromeOverlayOpen } from "@/features/ui/overlayLock.store";
 import { useToastStore } from "@/features/ui/toast.store";
-import { CMD, invoke } from "@/lib/ipc";
+import { ptyApi } from "@/features/terminal/terminal.service";
+import { CMD, invoke, isAppError } from "@/lib/ipc";
 import {
   EV,
   listenWhileMounted,
@@ -57,18 +63,23 @@ export function BrowserPanel({ active }: BrowserPanelProps) {
   const url = useBrowserUiStore((s) => s.url);
   const address = useBrowserUiStore((s) => s.address);
   const mode = useBrowserUiStore((s) => s.mode);
+  const contextDetail = useBrowserUiStore((s) => s.contextDetail);
   const loading = useBrowserUiStore((s) => s.loading);
   const setUrl = useBrowserUiStore((s) => s.setUrl);
   const setAddress = useBrowserUiStore((s) => s.setAddress);
   const setMode = useBrowserUiStore((s) => s.setMode);
+  const setContextDetail = useBrowserUiStore((s) => s.setContextDetail);
   const setLoading = useBrowserUiStore((s) => s.setLoading);
   const expanded = useBrowserUiStore((s) => s.expanded);
   const toggleExpanded = useBrowserUiStore((s) => s.toggleExpanded);
   const hostRef = useRef<HTMLDivElement | null>(null);
   const boundsRaf = useRef(0);
+  const captureInFlight = useRef(false);
+  const pickInFlight = useRef(false);
   const overlayOpen = useChromeOverlayOpen();
   const { browserTabOpen, servers } = useBrowserRuntimeContext();
-  const [recents, setRecents] = useState<BrowserHistoryEntry[]>([]);
+  const [capturing, setCapturing] = useState(false);
+  const [stoppingServerIds, setStoppingServerIds] = useState<Set<string>>(() => new Set());
   const startPage = isBlankBrowserUrl(url);
   const pageLive = active && !startPage && !overlayOpen;
 
@@ -89,11 +100,6 @@ export function BrowserPanel({ active }: BrowserPanelProps) {
   }, [browserTabOpen]);
 
   useEffect(() => {
-    if (!active) return;
-    void browserApi.history().then(setRecents).catch(() => undefined);
-  }, [active]);
-
-  useEffect(() => {
     return listenWhileMounted<BrowserNavigatedPayload>(EV.browserNavigated, (event) => {
       const next = event.payload;
       if (isBlankBrowserUrl(next.url) || next.url.includes("mcx.invalid")) {
@@ -104,22 +110,34 @@ export function BrowserPanel({ active }: BrowserPanelProps) {
       }
       setLoading(next.loading);
       setUrl(next.url, next.title || undefined);
-      if (!next.loading) {
-        void browserApi.history().then(setRecents).catch(() => undefined);
-      }
     });
   }, [setAddress, setLoading, setUrl]);
 
   useEffect(() => {
     return listenWhileMounted(EV.browserPicked, () => {
+      if (pickInFlight.current) return;
+      pickInFlight.current = true;
       void browserApi
         .takePick()
-        .then((pick) => {
-          if (pick) void sendPickToAgent(pick, t);
+        .then(async (pick) => {
+          if (!pick) return;
+          await changeMode("browse");
+          await sendPickToAgent(pick, t, contextDetail);
         })
-        .catch(() => undefined);
+        .catch(() => undefined)
+        .finally(() => {
+          pickInFlight.current = false;
+        });
     });
-  }, [t]);
+  }, [changeMode, contextDetail, t]);
+
+  useEffect(() => {
+    const live = new Set(servers.map((server) => server.id));
+    setStoppingServerIds((current) => {
+      const next = new Set(Array.from(current).filter((id) => live.has(id)));
+      return next.size === current.size ? current : next;
+    });
+  }, [servers]);
 
   useEffect(() => {
     return listenWhileMounted(EV.browserEscape, () => {
@@ -178,7 +196,7 @@ export function BrowserPanel({ active }: BrowserPanelProps) {
   }, []);
 
   useEffect(() => {
-    if (!active || (mode !== "pick" && mode !== "draw")) return;
+    if (!active || mode === "browse") return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       e.preventDefault();
@@ -191,7 +209,13 @@ export function BrowserPanel({ active }: BrowserPanelProps) {
   const go = useCallback(
     async (raw: string, target: BrowserOpenTarget = "app") => {
       const next = normalizeBrowserUrl(raw);
-      if (!next) return;
+      if (!next) {
+        useToastStore.getState().push({
+          tone: "error",
+          title: t("browser.invalidAddress"),
+        });
+        return;
+      }
       if (target === "system") {
         void invoke(CMD.openExternalUrl, { url: next }).catch(() => undefined);
         return;
@@ -214,13 +238,20 @@ export function BrowserPanel({ active }: BrowserPanelProps) {
     [setAddress, setLoading, setUrl, t],
   );
 
-  const sendViewport = useCallback(async () => {
+  const sendScreenshot = useCallback(async (crop?: BrowserPick["rect"]) => {
+    if (captureInFlight.current) return;
+    captureInFlight.current = true;
+    setCapturing(true);
     try {
-      const shot = await browserApi.capture();
+      const shot = await browserApi.capture(crop);
       const page = useBrowserUiStore.getState().url;
       const body = formatVisualContext([
         "Visual context from in-app browser",
         page ? `url: ${page}` : null,
+        crop ? "target: region" : "target: viewport",
+        crop
+          ? `rect: ${Math.round(crop.x)},${Math.round(crop.y)} ${Math.round(crop.width)}x${Math.round(crop.height)}`
+          : null,
         `screenshot: ${shot.path}`,
       ]);
       const result = await sendVisualToCli(body);
@@ -243,15 +274,68 @@ export function BrowserPanel({ active }: BrowserPanelProps) {
         tone: "success",
         title: t("browser.sentToAgent"),
       });
-      await changeMode("browse");
+      if (mode !== "browse") await changeMode("browse");
     } catch (err) {
       useToastStore.getState().push({
         tone: "error",
         title: t("browser.captureFailed"),
         detail: err instanceof Error ? err.message : String(err),
       });
+    } finally {
+      captureInFlight.current = false;
+      setCapturing(false);
     }
-  }, [changeMode, t]);
+  }, [changeMode, mode, t]);
+
+  useEffect(() => {
+    return listenWhileMounted(EV.browserCaptureSelected, () => {
+      setMode("browse");
+      void browserApi.setMode("browse").catch(() => undefined);
+      void (async () => {
+        try {
+          const rect = await browserApi.takeCaptureRegion();
+          if (!rect) throw new Error(t("browser.captureRegionMissing"));
+          await sendScreenshot(rect);
+        } catch (error) {
+          useToastStore.getState().push({
+            tone: "error",
+            title: t("browser.captureFailed"),
+            detail: error instanceof Error ? error.message : String(error),
+          });
+        }
+      })();
+    });
+  }, [sendScreenshot, setMode, t]);
+
+  const stopServer = useCallback(
+    async (server: DevServer) => {
+      if (!server.pid || stoppingServerIds.has(server.id)) return;
+      setStoppingServerIds((current) => new Set(current).add(server.id));
+      try {
+        await ptyApi.killProcess(server.sessionId, server.pid);
+        useToastStore.getState().push({
+          tone: "success",
+          title: t("browser.serverStopped"),
+        });
+      } catch (error) {
+        setStoppingServerIds((current) => {
+          const next = new Set(current);
+          next.delete(server.id);
+          return next;
+        });
+        useToastStore.getState().push({
+          tone: "error",
+          title: t("browser.stopServerFailed"),
+          detail: isAppError(error)
+            ? error.message
+            : error instanceof Error
+              ? error.message
+              : String(error),
+        });
+      }
+    },
+    [stoppingServerIds, t],
+  );
 
   const pageTools = !startPage;
 
@@ -318,7 +402,10 @@ export function BrowserPanel({ active }: BrowserPanelProps) {
         </form>
         {pageTools ? (
           <>
-            <Tooltip content={t("browser.pick")} side="bottom">
+            <Tooltip
+              content={mode === "pick" ? t("browser.pickHint") : t("browser.pick")}
+              side="bottom"
+            >
               <IconButton
                 size="md"
                 aria-label={t("browser.pick")}
@@ -338,15 +425,34 @@ export function BrowserPanel({ active }: BrowserPanelProps) {
                 <Icon icon={PenTool} size={13} />
               </IconButton>
             </Tooltip>
-            <Tooltip content={t("browser.sendViewport")} side="bottom">
-              <IconButton
-                size="md"
-                aria-label={t("browser.sendViewport")}
-                onClick={() => void sendViewport()}
-              >
-                <Icon icon={ImagePlus} size={13} />
-              </IconButton>
-            </Tooltip>
+            <DropdownRoot>
+              <Tooltip content={t("browser.screenshot")} side="bottom">
+                <DropdownTrigger asChild>
+                  <IconButton
+                    size="md"
+                    aria-label={t("browser.screenshot")}
+                    disabled={capturing}
+                    className={mode === "capture" ? "bg-surface-strong text-ink" : undefined}
+                  >
+                    <Icon
+                      icon={capturing ? Loader2 : ImagePlus}
+                      size={13}
+                      className={capturing ? "animate-spin" : undefined}
+                    />
+                  </IconButton>
+                </DropdownTrigger>
+              </Tooltip>
+              <DropdownContent align="end" sideOffset={6} className="min-w-[190px]">
+                <DropdownItem onSelect={() => void sendScreenshot()}>
+                  <Icon icon={FullScreen} size={12} className="text-muted" />
+                  <span>{t("browser.captureViewport")}</span>
+                </DropdownItem>
+                <DropdownItem onSelect={() => void changeMode("capture")}>
+                  <Icon icon={Square} size={11} className="text-muted" />
+                  <span>{t("browser.captureRegion")}</span>
+                </DropdownItem>
+              </DropdownContent>
+            </DropdownRoot>
             <Tooltip
               content={expanded ? t("browser.restore") : t("browser.expand")}
               side="bottom"
@@ -370,6 +476,28 @@ export function BrowserPanel({ active }: BrowserPanelProps) {
             </IconButton>
           </DropdownTrigger>
           <DropdownContent align="end" sideOffset={6} className="min-w-[200px]">
+            {pageTools ? (
+              <>
+                <DropdownLabel>{t("browser.contextDetail")}</DropdownLabel>
+                <DropdownItem
+                  onSelect={() => setContextDetail("compact")}
+                  trailing={
+                    contextDetail === "compact" ? <Icon icon={Check} size={12} /> : null
+                  }
+                >
+                  <span>{t("browser.contextCompact")}</span>
+                </DropdownItem>
+                <DropdownItem
+                  onSelect={() => setContextDetail("diagnostic")}
+                  trailing={
+                    contextDetail === "diagnostic" ? <Icon icon={Check} size={12} /> : null
+                  }
+                >
+                  <span>{t("browser.contextDiagnostic")}</span>
+                </DropdownItem>
+                <DropdownSeparator />
+              </>
+            ) : null}
             <DropdownItem
               disabled={startPage}
               onSelect={() => {
@@ -393,15 +521,6 @@ export function BrowserPanel({ active }: BrowserPanelProps) {
               <Icon icon={Globe} size={12} className="text-muted" />
               <span>{t("browser.home")}</span>
             </DropdownItem>
-            <DropdownSeparator />
-            <DropdownItem
-              disabled={recents.length === 0}
-              onSelect={() => {
-                void browserApi.clearHistory().then(() => setRecents([]));
-              }}
-            >
-              <span>{t("browser.clearRecents")}</span>
-            </DropdownItem>
           </DropdownContent>
         </DropdownRoot>
       </div>
@@ -414,7 +533,8 @@ export function BrowserPanel({ active }: BrowserPanelProps) {
         />
         {!startPage && mode === "draw" ? (
           <BrowserDrawDock
-            onSend={() => void sendViewport()}
+            sending={capturing}
+            onSend={() => void sendScreenshot()}
             onClear={() => void browserApi.clearDraw().catch(() => undefined)}
             onCancel={() => void changeMode("browse")}
           />
@@ -422,8 +542,9 @@ export function BrowserPanel({ active }: BrowserPanelProps) {
         {startPage ? (
           <BrowserStartPage
             servers={servers}
-            recents={recents}
+            stoppingServerIds={stoppingServerIds}
             onOpen={(next, target) => void go(next, target)}
+            onStop={(server) => void stopServer(server)}
           />
         ) : null}
       </div>
@@ -434,26 +555,18 @@ export function BrowserPanel({ active }: BrowserPanelProps) {
 async function sendPickToAgent(
   pick: BrowserPick,
   t: (key: string) => string,
+  contextDetail: BrowserContextDetail,
 ): Promise<void> {
-  let screenshotLine: string | null = null;
+  let screenshotPath: string | null = null;
   try {
     const shot = await browserApi.capture(pick.rect);
-    screenshotLine = `screenshot: ${shot.path}`;
+    screenshotPath = shot.path;
   } catch (err) {
     console.warn("[browser] capture after pick failed", err);
   }
-  const lines = formatVisualContext([
-    "Visual context from in-app browser",
-    `url: ${pick.url}`,
-    `element: ${pick.selector}`,
-    pick.component
-      ? `component: ${pick.component}${pick.file ? ` (${pick.file}${pick.line ? `:${pick.line}` : ""})` : ""}`
-      : null,
-    pick.text ? `text: ${pick.text}` : null,
-    pick.html ? `html: ${pick.html}` : null,
-    screenshotLine,
-  ]);
-  const result = await sendVisualToCli(lines);
+  const result = await sendVisualToCli(
+    formatPickContext(pick, screenshotPath, contextDetail),
+  );
   if (result.status === "no-cli") {
     useToastStore.getState().push({
       tone: "error",
@@ -469,11 +582,5 @@ async function sendPickToAgent(
     });
     return;
   }
-  useToastStore.getState().push(
-    screenshotLine
-      ? { tone: "success", title: t("browser.sentToAgent") }
-      : { tone: "success", title: t("browser.sentToAgent") },
-  );
-  useBrowserUiStore.getState().setMode("browse");
-  await browserApi.setMode("browse").catch(() => undefined);
+  useToastStore.getState().push({ tone: "success", title: t("browser.sentToAgent") });
 }

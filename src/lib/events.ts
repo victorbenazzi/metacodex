@@ -12,6 +12,7 @@ export const EV = {
   openFile: "app://open-file",
   browserNavigated: "browser://navigated",
   browserPicked: "browser://picked",
+  browserCaptureSelected: "browser://capture-selected",
   browserEscape: "browser://escape",
 } as const;
 

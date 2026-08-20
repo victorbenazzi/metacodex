@@ -4,8 +4,10 @@ import type { DevServer } from "./browser.service";
 import { hostLabel, portOfUrl, serverForUrl, serverTitle } from "./identity";
 
 const server = (partial: Partial<DevServer> & Pick<DevServer, "port">): DevServer => ({
+  id: `session:1:${partial.port}`,
   address: "localhost",
   url: `http://localhost:${partial.port}`,
+  sessionId: "session",
   ...partial,
 });
 
@@ -38,7 +40,7 @@ describe("serverTitle", () => {
 });
 
 describe("serverForUrl", () => {
-  it("matches a recent by port", () => {
+  it("matches a URL to its server by port", () => {
     const servers = [server({ port: 1420, projectName: "metacodex" })];
     expect(serverForUrl("http://localhost:1420/", servers)?.projectName).toBe("metacodex");
   });

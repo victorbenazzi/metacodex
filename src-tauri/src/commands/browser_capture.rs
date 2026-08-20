@@ -55,7 +55,9 @@ fn capture_macos<R: Runtime>(
             };
             let view: &WKWebView = unsafe { &*platform.inner().cast() };
             let config = unsafe { WKSnapshotConfiguration::new(mtm) };
-            unsafe { config.setAfterScreenUpdates(true) };
+            // Capture the current composited frame. Forcing a screen update here
+            // makes WKWebView briefly clear its surface on some macOS versions.
+            unsafe { config.setAfterScreenUpdates(false) };
             if let Some(rect) = crop {
                 let pad = 8.0_f64;
                 let cg = CGRect {

@@ -12,9 +12,7 @@ export function normalizeBrowserUrl(raw: string): string | null {
     return `http://${s}`;
   }
   if (/^[\w.-]+:\d/.test(s)) return `http://${s}`;
-  if (s.includes(" ") || !s.includes(".")) {
-    return `https://www.google.com/search?q=${encodeURIComponent(s)}`;
-  }
+  if (s.includes(" ") || !s.includes(".")) return null;
   return `https://${s}`;
 }
 

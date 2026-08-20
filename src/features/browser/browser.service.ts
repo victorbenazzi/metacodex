@@ -9,10 +9,12 @@ export interface BrowserBounds {
 }
 
 export interface DevServer {
+  id: string;
   port: number;
   address: string;
   url: string;
   pid?: number;
+  sessionId: string;
   command?: string;
   cwd?: string;
   projectId?: string;
@@ -20,27 +22,26 @@ export interface DevServer {
   folderName?: string;
 }
 
-export interface BrowserHistoryEntry {
-  url: string;
-  title: string;
-  visitedAt: string;
-}
-
 export interface BrowserPick {
+  kind: "element" | "text";
   url: string;
   selector: string;
   tag: string;
   id: string | null;
-  text: string;
-  html: string;
+  classes: string[];
+  text: string | null;
   rect: { x: number; y: number; width: number; height: number };
-  styles: Record<string, string>;
   component: string | null;
   file: string | null;
   line: number | null;
+  fullPath: string;
+  accessibility: string | null;
+  styles: string | null;
+  viewport: { width: number; height: number; dpr: number };
 }
 
-export type BrowserMode = "browse" | "pick" | "draw";
+export type BrowserMode = "browse" | "pick" | "draw" | "capture";
+export type BrowserContextDetail = "compact" | "diagnostic";
 
 export const browserApi = {
   setBounds(bounds: BrowserBounds): Promise<void> {
@@ -70,14 +71,11 @@ export const browserApi = {
   takePick(): Promise<BrowserPick | null> {
     return invoke(CMD.browserTakePick);
   },
+  takeCaptureRegion(): Promise<BrowserPick["rect"] | null> {
+    return invoke(CMD.browserTakeCaptureRegion);
+  },
   currentUrl(): Promise<string> {
     return invoke(CMD.browserUrl);
-  },
-  history(): Promise<BrowserHistoryEntry[]> {
-    return invoke(CMD.browserHistoryList);
-  },
-  clearHistory(): Promise<void> {
-    return invoke(CMD.browserHistoryClear);
   },
   capture(crop?: BrowserPick["rect"]): Promise<{ path: string }> {
     return invoke(CMD.browserCapture, crop ? { crop } : {});

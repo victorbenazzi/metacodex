@@ -8,10 +8,12 @@ import { ImagePlus, RotateCcw, X } from "@/components/ui/icons";
 export const BROWSER_DRAW_DOCK_H = 52;
 
 export function BrowserDrawDock({
+  sending,
   onSend,
   onClear,
   onCancel,
 }: {
+  sending: boolean;
   onSend: () => void;
   onClear: () => void;
   onCancel: () => void;
@@ -35,9 +37,9 @@ export function BrowserDrawDock({
           <Icon icon={X} size={12} className="text-muted" />
           {t("browser.drawCancel")}
         </Button>
-        <Button size="sm" variant="primary" onClick={onSend}>
+        <Button size="sm" variant="primary" disabled={sending} onClick={onSend}>
           <Icon icon={ImagePlus} size={12} />
-          {t("browser.drawSend")}
+          {sending ? t("browser.sending") : t("browser.drawSend")}
         </Button>
       </div>
     </div>

@@ -6,14 +6,20 @@
   var bridgeToken = "__MCX_BRIDGE_TOKEN__";
   var nativeOpen = window.open.bind(window);
   var pendingPick = null;
+  var pendingCapture = null;
   var highlight = null;
+  var highlightLabel = null;
+  var captureBox = null;
   var canvas = null;
   var ctx = null;
   var drawing = false;
   var strokes = [];
   var currentStroke = null;
-  var PEN_CURSOR =
-    "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M4.2 19.8l1.3-4.4 10.6-10.6 3.1 3.1L8.6 18.5z' fill='%23f54e00'/%3E%3Cpath d='M14.8 5.9l3.3 3.3' stroke='%23141412' stroke-width='1.2'/%3E%3C/svg%3E\") 2 22, crosshair";
+  var captureStart = null;
+  var suppressNextClick = false;
+  var hoverBase = null;
+  var hoverTarget = null;
+  var targetDepth = 0;
 
   function bridge(path, params) {
     var url = "https://mcx.invalid/" + path;
@@ -34,6 +40,14 @@
     highlight.style.cssText =
       "position:absolute;border:1.5px solid #f54e00;background:rgba(245,78,0,0.12);pointer-events:none;display:none;";
     el.appendChild(highlight);
+    highlightLabel = document.createElement("div");
+    highlightLabel.style.cssText =
+      "position:absolute;max-width:calc(100vw - 16px);padding:3px 6px;border-radius:3px;background:#f54e00;color:white;font:11px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;display:none;";
+    el.appendChild(highlightLabel);
+    captureBox = document.createElement("div");
+    captureBox.style.cssText =
+      "position:absolute;border:1.5px solid #f54e00;background:rgba(245,78,0,0.10);pointer-events:none;display:none;";
+    el.appendChild(captureBox);
     canvas = document.createElement("canvas");
     canvas.style.cssText =
       "position:absolute;inset:0;width:100%;height:100%;pointer-events:none;touch-action:none;";
@@ -69,19 +83,71 @@
     }
   }
 
+  function classTokens(el) {
+    if (!el.classList) return [];
+    return Array.prototype.slice.call(el.classList, 0, 3)
+      .map(function (name) { return shortIdentifier(name, 48); })
+      .filter(function (name) { return Boolean(name); });
+  }
+
+  function shortIdentifier(value, max) {
+    if (!value) return "";
+    var text = String(value);
+    if (text.length > max) return "";
+    return text;
+  }
+
+  function parentAcrossShadow(el) {
+    if (!el) return null;
+    if (el.parentElement) return el.parentElement;
+    var root = el.getRootNode && el.getRootNode();
+    return root && root.host ? root.host : null;
+  }
+
+  function deepElementFromPoint(x, y) {
+    var element = document.elementFromPoint(x, y);
+    if (!element) return null;
+    while (element.shadowRoot && element.shadowRoot.elementFromPoint) {
+      var deeper = element.shadowRoot.elementFromPoint(x, y);
+      if (!deeper || deeper === element) break;
+      element = deeper;
+    }
+    if (element.id === "__mcx-overlay" || (element.closest && element.closest("#__mcx-overlay"))) {
+      return null;
+    }
+    if (element === document.documentElement || element === document.body) return null;
+    return element;
+  }
+
+  function targetAtDepth(base, depth) {
+    var target = base;
+    for (var i = 0; i < depth && target; i++) {
+      var parent = parentAcrossShadow(target);
+      if (!parent || parent === document.body || parent === document.documentElement) break;
+      target = parent;
+    }
+    return target;
+  }
+
   function cssPath(el) {
     if (!el || el.nodeType !== 1) return "";
-    if (el.id) return "#" + CSS.escape(el.id);
+    var id = shortIdentifier(el.id, 64);
+    if (id) return "#" + CSS.escape(id);
+    var testId = el.getAttribute && el.getAttribute("data-testid");
+    testId = shortIdentifier(testId, 96);
+    if (testId) return '[data-testid="' + CSS.escape(testId) + '"]';
     var parts = [];
     var node = el;
-    while (node && node.nodeType === 1 && parts.length < 6) {
+    while (node && node.nodeType === 1 && parts.length < 3) {
       var sel = node.tagName.toLowerCase();
-      if (node.id) {
-        parts.unshift("#" + CSS.escape(node.id));
+      var nodeId = shortIdentifier(node.id, 64);
+      if (nodeId) {
+        parts.unshift("#" + CSS.escape(nodeId));
         break;
       }
-      if (node.classList && node.classList.length) {
-        var cls = Array.prototype.slice.call(node.classList, 0, 2)
+      var tokens = classTokens(node);
+      if (tokens.length) {
+        var cls = tokens.slice(0, 2)
           .map(function (c) { return CSS.escape(c); })
           .join(".");
         if (cls) sel += "." + cls;
@@ -103,6 +169,79 @@
       node = parent;
     }
     return parts.join(" > ");
+  }
+
+  function fullElementPath(el) {
+    var parts = [];
+    var node = el;
+    while (node && node.nodeType === 1 && parts.length < 8) {
+      if (node === document.documentElement) {
+        parts.unshift("html");
+        break;
+      }
+      var part = node.tagName.toLowerCase();
+      var nodeId = shortIdentifier(node.id, 64);
+      if (nodeId) {
+        part += "#" + CSS.escape(nodeId);
+      } else {
+        var tokens = classTokens(node);
+        if (tokens.length) part += "." + CSS.escape(tokens[0]);
+      }
+      parts.unshift(part);
+      node = parentAcrossShadow(node);
+    }
+    return parts.join(" > ");
+  }
+
+  var TEXT_TAGS = {
+    h1: true, h2: true, h3: true, h4: true, h5: true, h6: true,
+    p: true, span: true, a: true, button: true, label: true, li: true,
+    strong: true, em: true, small: true, blockquote: true, figcaption: true,
+    caption: true, th: true, td: true, dt: true, dd: true, code: true, pre: true,
+  };
+
+  function isTextTarget(tag) {
+    return Boolean(TEXT_TAGS[tag]);
+  }
+
+  function directText(el, tag) {
+    if (!TEXT_TAGS[tag]) return null;
+    var value = (el.innerText || el.textContent || "").replace(/\s+/g, " ").trim();
+    return value ? value.slice(0, 240) : null;
+  }
+
+  function selectedTextForTarget(el, tag) {
+    if (!isTextTarget(tag)) return null;
+    var selection = window.getSelection && window.getSelection();
+    var value = selection ? selection.toString().replace(/\s+/g, " ").trim() : "";
+    if (value && selection.anchorNode && el.contains(selection.anchorNode)) {
+      return value.slice(0, 240);
+    }
+    return directText(el, tag);
+  }
+
+  function accessibilityInfo(el) {
+    var attrs = ["role", "aria-label", "aria-labelledby", "aria-describedby", "alt", "title"];
+    var parts = [];
+    for (var i = 0; i < attrs.length; i++) {
+      var value = el.getAttribute && el.getAttribute(attrs[i]);
+      if (value) parts.push(attrs[i] + "=" + value.replace(/\s+/g, " ").slice(0, 80));
+    }
+    return parts.length ? parts.join(" ") : null;
+  }
+
+  function diagnosticStyles(el, tag) {
+    var computed = window.getComputedStyle(el);
+    var props = isTextTarget(tag)
+      ? ["color", "font-size", "font-weight", "font-family", "line-height", "text-align"]
+      : ["display", "position", "width", "height", "padding", "margin", "gap", "background-color"];
+    var parts = [];
+    for (var i = 0; i < props.length; i++) {
+      var value = computed.getPropertyValue(props[i]);
+      if (!value || value === "normal" || value === "none" || value === "0px" || value === "auto") continue;
+      parts.push(props[i] + ":" + value.trim());
+    }
+    return parts.length ? parts.join("; ") : null;
   }
 
   function reactInfo(el) {
@@ -128,90 +267,130 @@
     return null;
   }
 
-  function targetFromPoint(x, y) {
-    var list = document.elementsFromPoint(x, y) || [];
-    for (var i = 0; i < list.length; i++) {
-      var el = list[i];
-      if (el.id === "__mcx-overlay" || (el.closest && el.closest("#__mcx-overlay"))) continue;
-      if (el === document.documentElement || el === document.body) continue;
-      return el;
-    }
-    return null;
-  }
-
-  function syncOverlay() {
-    if (state.mode === "browse") {
-      var existing = document.getElementById("__mcx-overlay");
-      if (existing) existing.style.display = "none";
-      return;
-    }
-    host();
-    var overlay = document.getElementById("__mcx-overlay");
-    overlay.style.display = "block";
-    overlay.style.pointerEvents = "none";
-    overlay.style.cursor =
-      state.mode === "draw" ? PEN_CURSOR : state.mode === "pick" ? "crosshair" : "auto";
-    if (canvas) {
-      canvas.style.pointerEvents = state.mode === "draw" ? "auto" : "none";
-      canvas.style.cursor = state.mode === "draw" ? PEN_CURSOR : "default";
-    }
-    if (highlight) highlight.style.display = state.mode === "pick" ? "block" : "none";
-    if (state.mode !== "pick" && highlight) highlight.style.display = "none";
-    document.documentElement.style.cursor =
-      state.mode === "draw" ? PEN_CURSOR : state.mode === "pick" ? "crosshair" : "";
-  }
-
-  function onMove(e) {
-    if (state.mode !== "pick" || !highlight) return;
-    var el = targetFromPoint(e.clientX, e.clientY);
-    if (!el) {
-      highlight.style.display = "none";
-      return;
-    }
+  function renderHighlight() {
+    if (!highlight || !highlightLabel || !hoverBase) return;
+    var el = targetAtDepth(hoverBase, targetDepth);
+    if (!el) return;
+    hoverTarget = el;
     var r = el.getBoundingClientRect();
     highlight.style.display = "block";
     highlight.style.left = r.left + "px";
     highlight.style.top = r.top + "px";
     highlight.style.width = r.width + "px";
     highlight.style.height = r.height + "px";
+    highlightLabel.textContent = cssPath(el);
+    highlightLabel.style.display = "block";
+    highlightLabel.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 220)) + "px";
+    highlightLabel.style.top = (r.top >= 26 ? r.top - 24 : Math.min(window.innerHeight - 22, r.bottom + 3)) + "px";
+  }
+
+  function syncOverlay() {
+    if (state.mode === "browse") {
+      var existing = document.getElementById("__mcx-overlay");
+      if (existing) existing.style.display = "none";
+      hoverBase = null;
+      hoverTarget = null;
+      targetDepth = 0;
+      return;
+    }
+    host();
+    var overlay = document.getElementById("__mcx-overlay");
+    overlay.style.display = "block";
+    overlay.style.pointerEvents = state.mode === "capture" ? "auto" : "none";
+    overlay.style.cursor = state.mode === "browse" ? "auto" : "crosshair";
+    if (canvas) {
+      canvas.style.pointerEvents = state.mode === "draw" ? "auto" : "none";
+      canvas.style.cursor = state.mode === "draw" ? "crosshair" : "default";
+    }
+    if (highlight) highlight.style.display = state.mode === "pick" ? "block" : "none";
+    if (highlightLabel) highlightLabel.style.display = state.mode === "pick" && hoverTarget ? "block" : "none";
+    if (state.mode !== "pick" && highlight) highlight.style.display = "none";
+    if (state.mode !== "capture" && captureBox) captureBox.style.display = "none";
+    document.documentElement.style.cursor = state.mode === "browse" ? "" : "crosshair";
+  }
+
+  function onMove(e) {
+    if (state.mode !== "pick" || !highlight) return;
+    var el = deepElementFromPoint(e.clientX, e.clientY);
+    if (!el) {
+      highlight.style.display = "none";
+      if (highlightLabel) highlightLabel.style.display = "none";
+      hoverBase = null;
+      hoverTarget = null;
+      return;
+    }
+    if (hoverBase !== el) {
+      hoverBase = el;
+      targetDepth = 0;
+    }
+    renderHighlight();
   }
 
   function collectPick(el) {
     var r = el.getBoundingClientRect();
-    var styles = window.getComputedStyle(el);
     var react = reactInfo(el);
+    var tag = el.tagName.toLowerCase();
     return {
-      url: location.href,
+      kind: isTextTarget(tag) ? "text" : "element",
+      url: location.href.slice(0, 512),
       selector: cssPath(el),
-      tag: el.tagName.toLowerCase(),
-      id: el.id || null,
-      text: (el.innerText || "").trim().slice(0, 240),
-      html: (el.outerHTML || "").slice(0, 1800),
+      tag: tag,
+      id: shortIdentifier(el.id, 64) || null,
+      classes: classTokens(el),
+      text: selectedTextForTarget(el, tag),
       rect: { x: r.x, y: r.y, width: r.width, height: r.height },
-      styles: {
-        display: styles.display,
-        color: styles.color,
-        backgroundColor: styles.backgroundColor,
-        fontSize: styles.fontSize,
-        fontFamily: styles.fontFamily,
-      },
       component: react ? react.component : null,
       file: react ? react.file : null,
       line: react ? react.line : null,
+      fullPath: fullElementPath(el),
+      accessibility: accessibilityInfo(el),
+      styles: diagnosticStyles(el, tag),
+      viewport: {
+        width: window.innerWidth,
+        height: window.innerHeight,
+        dpr: window.devicePixelRatio || 1,
+      },
     };
   }
 
   function onClick(e) {
+    if (suppressNextClick) {
+      suppressNextClick = false;
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
     if (!e.isTrusted || state.mode !== "pick") return;
     e.preventDefault();
     e.stopPropagation();
-    var el = targetFromPoint(e.clientX, e.clientY);
+    var base = deepElementFromPoint(e.clientX, e.clientY);
+    if (base && base !== hoverBase) {
+      hoverBase = base;
+      hoverTarget = null;
+      targetDepth = 0;
+    }
+    var el = hoverTarget || targetAtDepth(hoverBase, targetDepth);
     if (!el) return;
     pendingPick = collectPick(el);
     bridge("selection");
   }
 
   function onDown(e) {
+    if (state.mode === "capture") {
+      if (!e.isTrusted) return;
+      e.preventDefault();
+      e.stopPropagation();
+      suppressNextClick = true;
+      captureStart = { x: e.clientX, y: e.clientY };
+      if (captureBox) {
+        captureBox.style.display = "block";
+        captureBox.style.left = e.clientX + "px";
+        captureBox.style.top = e.clientY + "px";
+        captureBox.style.width = "0px";
+        captureBox.style.height = "0px";
+      }
+      return;
+    }
     if (state.mode !== "draw" || !ctx) return;
     e.preventDefault();
     drawing = true;
@@ -225,23 +404,74 @@
   }
 
   function onDrag(e) {
+    if (state.mode === "capture" && captureStart && captureBox) {
+      e.preventDefault();
+      var left = Math.min(captureStart.x, e.clientX);
+      var top = Math.min(captureStart.y, e.clientY);
+      var width = Math.abs(e.clientX - captureStart.x);
+      var height = Math.abs(e.clientY - captureStart.y);
+      captureBox.style.left = left + "px";
+      captureBox.style.top = top + "px";
+      captureBox.style.width = width + "px";
+      captureBox.style.height = height + "px";
+      return;
+    }
     if (!drawing || !ctx || !currentStroke) return;
     currentStroke.push({ x: e.clientX, y: e.clientY });
     ctx.lineTo(e.clientX, e.clientY);
     ctx.stroke();
   }
 
-  function onUp() {
+  function onUp(e) {
+    if (state.mode === "capture" && captureStart) {
+      if (!e.isTrusted) return;
+      e.preventDefault();
+      e.stopPropagation();
+      var rect = {
+        x: Math.min(captureStart.x, e.clientX),
+        y: Math.min(captureStart.y, e.clientY),
+        width: Math.abs(e.clientX - captureStart.x),
+        height: Math.abs(e.clientY - captureStart.y),
+      };
+      captureStart = null;
+      if (rect.width < 8 || rect.height < 8) {
+        if (captureBox) captureBox.style.display = "none";
+        return;
+      }
+      pendingCapture = rect;
+      state.mode = "browse";
+      syncOverlay();
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () { bridge("capture"); });
+      });
+      return;
+    }
     drawing = false;
     currentStroke = null;
   }
 
   function onKey(e) {
+    if (state.mode === "pick" && hoverBase &&
+        (e.code === "BracketLeft" || e.code === "BracketRight")) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.code === "BracketLeft") {
+        var current = targetAtDepth(hoverBase, targetDepth);
+        var parent = targetAtDepth(hoverBase, targetDepth + 1);
+        if (parent && parent !== current) targetDepth += 1;
+      } else if (e.code === "BracketRight" && targetDepth > 0) {
+        targetDepth -= 1;
+      }
+      renderHighlight();
+      return;
+    }
     if (e.isTrusted && e.key === "Escape" && state.mode !== "browse") {
       e.preventDefault();
       e.stopPropagation();
       state.mode = "browse";
       drawing = false;
+      captureStart = null;
+      pendingCapture = null;
       strokes = [];
       syncOverlay();
       document.documentElement.style.cursor = "";
@@ -292,11 +522,14 @@
 
   window.__mcx = {
     setMode: function (mode) {
-      state.mode = mode === "pick" || mode === "draw" ? mode : "browse";
+      state.mode = mode === "pick" || mode === "draw" || mode === "capture"
+        ? mode
+        : "browse";
       if (state.mode !== "draw") {
         drawing = false;
         strokes = [];
       }
+      if (state.mode !== "capture") captureStart = null;
       if (state.mode === "browse") document.documentElement.style.cursor = "";
       syncOverlay();
       if (state.mode === "draw") redraw();
@@ -305,6 +538,11 @@
       var pick = pendingPick;
       pendingPick = null;
       return pick;
+    },
+    takeCaptureRegion: function () {
+      var rect = pendingCapture;
+      pendingCapture = null;
+      return rect;
     },
     clearDraw: function () {
       strokes = [];

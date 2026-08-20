@@ -34,6 +34,9 @@ export const ptyApi = {
   kill(sessionId: string): Promise<void> {
     return invoke<void>(CMD.ptyKill, { sessionId });
   },
+  killProcess(sessionId: string, pid: number): Promise<void> {
+    return invoke<void>(CMD.ptyKillProcess, { sessionId, pid });
+  },
   list(): Promise<unknown[]> {
     return invoke<unknown[]>(CMD.ptyList);
   },

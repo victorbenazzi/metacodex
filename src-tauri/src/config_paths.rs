@@ -100,11 +100,6 @@ pub fn whats_new_file() -> AppResult<PathBuf> {
     Ok(state_dir()?.join("whats-new.json"))
 }
 
-/// `~/.metacodex/state/browser-history.json`, in-app browser recents.
-pub fn browser_history_file() -> AppResult<PathBuf> {
-    Ok(state_dir()?.join("browser-history.json"))
-}
-
 /// `~/.metacodex/state/browser-profile`, isolated webview data (cookies, cache).
 pub fn browser_profile_dir() -> AppResult<PathBuf> {
     Ok(state_dir()?.join("browser-profile"))

@@ -4,6 +4,7 @@ export interface ListeningPort {
   port: number;
   protocol: string;
   address: string;
+  pid: number;
 }
 
 export interface PtyMetadata {

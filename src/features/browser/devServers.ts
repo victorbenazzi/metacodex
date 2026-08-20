@@ -33,7 +33,7 @@ export function serversFromSessions(
   activeProjectId: string | null,
 ): DevServer[] {
   const projectKey = activeProjectId ?? WORKSPACE_NULL;
-  const seen = new Set<number>();
+  const seen = new Set<string>();
   const out: DevServer[] = [];
   for (const session of sessions) {
     if (session.status !== "running") continue;
@@ -42,15 +42,18 @@ export function serversFromSessions(
     if (!meta) continue;
     const project = projects.find((item) => item.id === session.projectId);
     for (const port of meta.listeningPorts ?? []) {
-      if (seen.has(port.port)) continue;
+      const listenerId = `${port.pid}:${port.port}`;
+      if (seen.has(listenerId)) continue;
       const host = localhostHost(port.address);
       if (!host) continue;
-      seen.add(port.port);
+      seen.add(listenerId);
       out.push({
+        id: `${session.id}:${port.pid}:${port.port}`,
         port: port.port,
         address: host,
         url: `http://localhost:${port.port}`,
-        pid: meta.pid > 0 ? meta.pid : undefined,
+        pid: port.pid > 0 ? port.pid : undefined,
+        sessionId: session.id,
         command: session.title,
         cwd: meta.cwd || session.cwd,
         projectId: session.projectId ?? undefined,

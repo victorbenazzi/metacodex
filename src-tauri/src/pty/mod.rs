@@ -817,6 +817,13 @@ impl PtyManager {
             .collect()
     }
 
+    pub fn session_pid(&self, session_id: &str) -> Option<u32> {
+        self.sessions
+            .lock()
+            .get(session_id)
+            .map(|session| session.pid)
+    }
+
     /// Project owning a session, if any. Used by `pty_update_cwd` to decide
     /// whether the incoming cwd needs to live inside the project sandbox.
     pub fn project_id_of(&self, session_id: &str) -> Option<String> {

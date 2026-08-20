@@ -53,8 +53,8 @@ describe("Tauri IPC parity", () => {
       ...extractRustEvents(rustWatcher),
     ]);
 
-    expect(tsEvents).toHaveLength(12);
-    expect(rust).toHaveLength(12);
+    expect(tsEvents).toHaveLength(13);
+    expect(rust).toHaveLength(13);
     expect(tsEvents).toEqual(rust);
   });
 });

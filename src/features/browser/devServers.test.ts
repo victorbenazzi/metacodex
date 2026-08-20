@@ -48,13 +48,13 @@ describe("serversFromSessions", () => {
       a: meta({
         sessionId: "a",
         listeningPorts: [
-          { port: 5173, protocol: "tcp", address: "127.0.0.1" },
-          { port: 5173, protocol: "tcp", address: "::1" },
+          { port: 5173, protocol: "tcp", address: "127.0.0.1", pid: 27 },
+          { port: 5173, protocol: "tcp", address: "::1", pid: 27 },
         ],
       }),
       b: meta({
         sessionId: "b",
-        listeningPorts: [{ port: 3000, protocol: "tcp", address: "127.0.0.1" }],
+        listeningPorts: [{ port: 3000, protocol: "tcp", address: "127.0.0.1", pid: 30 }],
       }),
     };
     const servers = serversFromSessions(sessions, metaBySession, [project], "p1");
@@ -62,6 +62,9 @@ describe("serversFromSessions", () => {
     expect(servers[0]?.port).toBe(5173);
     expect(servers[0]?.projectName).toBe("metacodex");
     expect(servers[0]?.url).toBe("http://localhost:5173");
+    expect(servers[0]?.pid).toBe(27);
+    expect(servers[0]?.sessionId).toBe("a");
+    expect(servers[0]?.id).toBe("a:27:5173");
   });
 
   it("drops non-loopback addresses", () => {
@@ -70,12 +73,31 @@ describe("serversFromSessions", () => {
       {
         a: meta({
           sessionId: "a",
-          listeningPorts: [{ port: 8080, protocol: "tcp", address: "192.168.1.9" }],
+          listeningPorts: [{ port: 8080, protocol: "tcp", address: "192.168.1.9", pid: 40 }],
         }),
       },
       [project],
       "p1",
     );
     expect(servers).toEqual([]);
+  });
+
+  it("keeps separate listener processes that share a port", () => {
+    const servers = serversFromSessions(
+      [session({ id: "a" })],
+      {
+        a: meta({
+          sessionId: "a",
+          listeningPorts: [
+            { port: 5173, protocol: "tcp", address: "127.0.0.1", pid: 27 },
+            { port: 5173, protocol: "tcp", address: "::1", pid: 31 },
+          ],
+        }),
+      },
+      [project],
+      "p1",
+    );
+
+    expect(servers.map((server) => server.pid)).toEqual([27, 31]);
   });
 });

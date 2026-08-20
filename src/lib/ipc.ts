@@ -12,6 +12,7 @@ export const CMD = {
   ptyWrite: "pty_write",
   ptyResize: "pty_resize",
   ptyKill: "pty_kill",
+  ptyKillProcess: "pty_kill_process",
   ptyList: "pty_list",
   ptyMetadataBatch: "pty_metadata_batch",
   ptyUpdateCwd: "pty_update_cwd",
@@ -114,9 +115,8 @@ export const CMD = {
   browserSetMode: "browser_set_mode",
   browserClearDraw: "browser_clear_draw",
   browserTakePick: "browser_take_pick",
+  browserTakeCaptureRegion: "browser_take_capture_region",
   browserUrl: "browser_url",
-  browserHistoryList: "browser_history_list",
-  browserHistoryClear: "browser_history_clear",
   browserCapture: "browser_capture",
 
 } as const;

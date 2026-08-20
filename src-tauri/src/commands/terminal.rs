@@ -72,6 +72,23 @@ pub async fn pty_kill(session_id: String, mgr: State<'_, PtyManager>) -> AppResu
 }
 
 #[tauri::command]
+pub async fn pty_kill_process(
+    session_id: String,
+    pid: u32,
+    mgr: State<'_, PtyManager>,
+) -> AppResult<()> {
+    let root_pid = mgr
+        .session_pid(&session_id)
+        .ok_or_else(|| AppError::NotFound(format!("pty session {session_id}")))?;
+    if pid == root_pid {
+        return mgr.kill(&session_id).await;
+    }
+    tokio::task::spawn_blocking(move || process_tree::terminate_owned_process(root_pid, pid))
+        .await
+        .map_err(|error| AppError::Other(format!("join: {error}")))?
+}
+
+#[tauri::command]
 pub async fn pty_list(mgr: State<'_, PtyManager>) -> AppResult<Vec<PtySessionInfo>> {
     Ok(mgr.list())
 }
@@ -84,6 +101,15 @@ pub struct ListeningPort {
     pub port: u16,
     pub protocol: String, // "tcp" | "udp"
     pub address: String,  // "127.0.0.1", "0.0.0.0", "*"
+    pub pid: u32,
+}
+
+fn dedupe_listening_ports(mut listeners: Vec<ListeningPort>) -> Vec<ListeningPort> {
+    listeners.sort_by_key(|listener| (listener.port, listener.protocol.clone(), listener.pid));
+    listeners.dedup_by(|a, b| {
+        a.port == b.port && a.protocol == b.protocol && a.pid == b.pid
+    });
+    listeners
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -144,13 +170,13 @@ fn macos_lsof_args(pids: &[u32]) -> Vec<String> {
         "-iTCP".into(),
         "-sTCP:LISTEN".into(),
         "-F".into(),
-        "nP".into(),
+        "pnP".into(),
     ]
 }
 
 #[cfg(target_os = "macos")]
 fn list_listening_ports(pids: &[u32]) -> Option<Vec<ListeningPort>> {
-    // `lsof -nP -p<pid> -iTCP -sTCP:LISTEN -F nP` , `-F nP` switches to the
+    // `lsof -nP -p<pid> -iTCP -sTCP:LISTEN -F pnP` switches to the
     // field output mode where each record has lines tagged `p<pid>`, `n<addr>`,
     // `P<protocol>`. We only care about the `n` lines following a `p` we've
     // already filtered with `-p<pid>`. lsof times out implicitly on a quiet
@@ -184,6 +210,12 @@ fn list_listening_ports(pids: &[u32]) -> Option<Vec<ListeningPort>> {
         }
     };
     let text = String::from_utf8_lossy(&output.stdout);
+    parse_macos_lsof_listeners(&text)
+}
+
+#[cfg(target_os = "macos")]
+fn parse_macos_lsof_listeners(text: &str) -> Option<Vec<ListeningPort>> {
+    let mut current_pid: Option<u32> = None;
     let mut current_proto: Option<String> = None;
     let mut out: Vec<ListeningPort> = Vec::new();
     for line in text.lines() {
@@ -192,15 +224,17 @@ fn list_listening_ports(pids: &[u32]) -> Option<Vec<ListeningPort>> {
         }
         let (tag, rest) = line.split_at(1);
         match tag {
+            "p" => current_pid = rest.parse::<u32>().ok(),
             "P" => current_proto = Some(rest.to_lowercase()),
             "n" => {
                 // Formats: "*:5173", "127.0.0.1:5173", "[::1]:5173".
                 if let Some((addr, port_str)) = rest.rsplit_once(':') {
-                    if let Ok(port) = port_str.parse::<u16>() {
+                    if let (Ok(port), Some(pid)) = (port_str.parse::<u16>(), current_pid) {
                         out.push(ListeningPort {
                             port,
                             protocol: current_proto.clone().unwrap_or_else(|| "tcp".into()),
                             address: addr.to_string(),
+                            pid,
                         });
                     }
                 }
@@ -210,9 +244,7 @@ fn list_listening_ports(pids: &[u32]) -> Option<Vec<ListeningPort>> {
     }
     // Dedupe identical entries , lsof prints both IPv4 and IPv6 bound on the
     // same port and the user only cares once.
-    out.sort_by_key(|p| (p.port, p.protocol.clone()));
-    out.dedup_by(|a, b| a.port == b.port && a.protocol == b.protocol);
-    Some(out)
+    Some(dedupe_listening_ports(out))
 }
 
 #[cfg(target_os = "windows")]
@@ -242,12 +274,11 @@ fn list_listening_ports(pids: &[u32]) -> Option<Vec<ListeningPort>> {
                 port: tcp.local_port,
                 protocol: "tcp".into(),
                 address: tcp.local_addr.to_string(),
+                pid: *si.associated_pids.iter().find(|pid| pids.contains(pid))?,
             });
         }
     }
-    out.sort_by_key(|p| (p.port, p.protocol.clone()));
-    out.dedup_by(|a, b| a.port == b.port && a.protocol == b.protocol);
-    Some(out)
+    Some(dedupe_listening_ports(out))
 }
 
 #[cfg(all(unix, not(target_os = "macos")))]
@@ -288,14 +319,58 @@ pub async fn pty_metadata_batch(
 
 #[cfg(test)]
 mod metadata_tests {
+    #[test]
+    fn listener_deduplication_preserves_distinct_processes() {
+        let listeners = super::dedupe_listening_ports(vec![
+            super::ListeningPort {
+                port: 5173,
+                protocol: "tcp".into(),
+                address: "127.0.0.1".into(),
+                pid: 27,
+            },
+            super::ListeningPort {
+                port: 5173,
+                protocol: "tcp".into(),
+                address: "::1".into(),
+                pid: 31,
+            },
+        ]);
+        assert_eq!(listeners.len(), 2);
+        assert_eq!(listeners[0].pid, 27);
+        assert_eq!(listeners[1].pid, 31);
+    }
+
     #[cfg(target_os = "macos")]
     #[test]
     fn macos_lsof_intersects_pid_and_listener_filters() {
         let args = super::macos_lsof_args(&[12, 14]);
         assert_eq!(
             args,
-            ["-nP", "-a", "-p12,14", "-iTCP", "-sTCP:LISTEN", "-F", "nP"]
+            ["-nP", "-a", "-p12,14", "-iTCP", "-sTCP:LISTEN", "-F", "pnP"]
         );
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_lsof_preserves_the_listener_pid() {
+        let parsed =
+            super::parse_macos_lsof_listeners("p27\nPtcp\nn127.0.0.1:5173\np31\nPtcp\nn*:3000\n")
+                .unwrap();
+        assert_eq!(parsed.len(), 2);
+        assert_eq!((parsed[0].port, parsed[0].pid), (3000, 31));
+        assert_eq!((parsed[1].port, parsed[1].pid), (5173, 27));
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_lsof_keeps_distinct_processes_on_the_same_port() {
+        let parsed = super::parse_macos_lsof_listeners(
+            "p27\nPtcp\nn127.0.0.1:5173\np31\nPtcp\nn[::1]:5173\n",
+        )
+        .unwrap();
+        assert_eq!(parsed.len(), 2);
+        assert_eq!((parsed[0].port, parsed[0].pid), (5173, 27));
+        assert_eq!((parsed[1].port, parsed[1].pid), (5173, 31));
     }
 }
 

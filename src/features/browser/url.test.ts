@@ -16,10 +16,9 @@ describe("normalizeBrowserUrl", () => {
     expect(normalizeBrowserUrl("localhost:4173")).toBe("http://localhost:4173");
   });
 
-  it("treats words without a dot as a search", () => {
-    expect(normalizeBrowserUrl("flexbox")).toBe(
-      "https://www.google.com/search?q=flexbox",
-    );
+  it("does not turn the project preview into a web search surface", () => {
+    expect(normalizeBrowserUrl("flexbox")).toBeNull();
+    expect(normalizeBrowserUrl("fix flexbox")).toBeNull();
   });
 });
 
