@@ -109,6 +109,14 @@
     el.style.cssText =
       "position:fixed;inset:0;z-index:2147483646;pointer-events:none;";
     (document.documentElement || document.body).appendChild(el);
+    var cursorStyle = document.getElementById("__mcx-cursor-style");
+    if (!cursorStyle) {
+      cursorStyle = document.createElement("style");
+      cursorStyle.id = "__mcx-cursor-style";
+      cursorStyle.textContent =
+        "html.__mcx-crosshair,html.__mcx-crosshair *{cursor:crosshair!important;}";
+      (document.head || document.documentElement).appendChild(cursorStyle);
+    }
     highlight = document.createElement("div");
     highlight.style.cssText =
       "position:absolute;border:1.5px solid #f54e00;background:rgba(245,78,0,0.12);pointer-events:none;display:none;";
@@ -364,22 +372,28 @@
       hoverBase = null;
       hoverTarget = null;
       targetDepth = 0;
+      document.documentElement.classList.remove("__mcx-crosshair");
+      document.documentElement.style.removeProperty("cursor");
       return;
     }
     host();
     var overlay = document.getElementById("__mcx-overlay");
     overlay.style.display = "block";
     overlay.style.pointerEvents = state.mode === "capture" ? "auto" : "none";
-    overlay.style.cursor = state.mode === "browse" ? "auto" : "crosshair";
+    overlay.style.setProperty("cursor", "crosshair", "important");
     if (canvas) {
       canvas.style.pointerEvents = state.mode === "draw" ? "auto" : "none";
-      canvas.style.cursor = state.mode === "draw" ? "crosshair" : "default";
+      canvas.style.setProperty(
+        "cursor",
+        state.mode === "draw" ? "crosshair" : "default",
+        "important"
+      );
     }
     if (highlight) highlight.style.display = state.mode === "pick" ? "block" : "none";
     if (highlightLabel) highlightLabel.style.display = state.mode === "pick" && hoverTarget ? "block" : "none";
     if (state.mode !== "pick" && highlight) highlight.style.display = "none";
     if (state.mode !== "capture" && captureBox) captureBox.style.display = "none";
-    document.documentElement.style.cursor = state.mode === "browse" ? "" : "crosshair";
+    document.documentElement.classList.add("__mcx-crosshair");
   }
 
   function onMove(e) {
@@ -598,7 +612,6 @@
         drawing = false;
       }
       if (state.mode !== "capture") captureStart = null;
-      if (state.mode === "browse") document.documentElement.style.cursor = "";
       syncOverlay();
       if (state.mode === "draw") redraw();
       var acknowledgedMode = state.mode;

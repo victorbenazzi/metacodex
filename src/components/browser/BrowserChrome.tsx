@@ -7,7 +7,6 @@ import {
   ChevronRight,
   ExternalLink,
   FullScreen,
-  Globe,
   ImagePlus,
   Loader2,
   MinimizeScreen,
@@ -43,7 +42,6 @@ interface BrowserChromeProps {
   onToggleExpand: () => void;
   onContextDetail: (detail: BrowserContextDetail) => void;
   onOpenExternal: () => void;
-  onHome: () => void;
 }
 
 export function BrowserChrome(props: BrowserChromeProps) {
@@ -145,6 +143,7 @@ export function BrowserChrome(props: BrowserChromeProps) {
                 : "browser.contextDiagnostic",
             )}`}
             icon={Settings2}
+            disabled={props.capturing}
             pressed={props.contextDetail === "diagnostic"}
             onClick={() => props.onContextDetail(
               props.contextDetail === "compact" ? "diagnostic" : "compact",
@@ -154,12 +153,6 @@ export function BrowserChrome(props: BrowserChromeProps) {
             label={t("browser.openExternal")}
             icon={ExternalLink}
             onClick={props.onOpenExternal}
-          />
-          <ChromeButton
-            label={t("browser.home")}
-            icon={Globe}
-            disabled={props.capturing}
-            onClick={props.onHome}
           />
           <ChromeButton
             label={props.expanded ? t("browser.restore") : t("browser.expand")}
@@ -186,6 +179,7 @@ function ChromeButton(props: {
     <IconButton
       size="md"
       aria-label={props.label}
+      title={props.label}
       aria-pressed={props.pressed}
       disabled={props.disabled}
       className={props.pressed ? "bg-surface-strong text-ink" : undefined}

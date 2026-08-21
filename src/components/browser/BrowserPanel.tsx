@@ -87,9 +87,19 @@ export function BrowserPanel({ active }: BrowserPanelProps) {
         onMode={(next) => void requestMode(next)}
         onCaptureViewport={() => void sendViewport()}
         onToggleExpand={toggleExpanded}
-        onContextDetail={setContextDetail}
+        onContextDetail={(detail) => {
+          setContextDetail(detail);
+          pushFeedback({
+            tone: "success",
+            title: t("browser.contextDetail"),
+            detail: t(
+              detail === "compact"
+                ? "browser.contextCompact"
+                : "browser.contextDiagnostic",
+            ),
+          });
+        }}
         onOpenExternal={() => void navigation.openExternal()}
-        onHome={() => void navigation.home()}
       />
 
       <div className="relative min-h-0 flex-1">

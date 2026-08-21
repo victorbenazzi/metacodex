@@ -16,6 +16,10 @@ export function useBrowserHost(input: {
   const overlayOpen = useChromeOverlayOpen();
   const visible = input.active && input.pageLoaded && !overlayOpen;
 
+  useLayoutEffect(() => {
+    if (!visible) void browserApi.hide().catch(() => undefined);
+  }, [visible]);
+
   const syncBounds = useCallback(() => {
     if (boundsRaf.current) return;
     boundsRaf.current = requestAnimationFrame(() => {
@@ -49,7 +53,10 @@ export function useBrowserHost(input: {
     return () => {
       observer.disconnect();
       window.removeEventListener("resize", syncBounds);
-      if (boundsRaf.current) cancelAnimationFrame(boundsRaf.current);
+      if (boundsRaf.current) {
+        cancelAnimationFrame(boundsRaf.current);
+        boundsRaf.current = 0;
+      }
     };
   }, [input.expanded, syncBounds]);
 

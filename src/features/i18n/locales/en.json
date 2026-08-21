@@ -770,7 +770,6 @@
     "contextCompact": "Compact",
     "contextDiagnostic": "Diagnostic",
     "openExternal": "Open in system browser",
-    "home": "Start page",
     "startTitle": "Browser",
     "startBody": "Open a running dev server, inspect a component, or capture visual context for the coding agent.",
     "servers": "Dev servers",

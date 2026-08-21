@@ -46,12 +46,30 @@ function createGuest(options: {
     stroke() {},
   };
   const makeNode = (tagName: string) => {
+    const classList = [] as unknown as string[] & {
+      add: (value: string) => void;
+      remove: (value: string) => void;
+    };
+    classList.add = (value) => {
+      if (!classList.includes(value)) classList.push(value);
+    };
+    classList.remove = (value) => {
+      const index = classList.indexOf(value);
+      if (index >= 0) classList.splice(index, 1);
+    };
+    const style: Record<string, unknown> = {};
+    style.setProperty = (name: string, value: string) => {
+      style[name] = value;
+    };
+    style.removeProperty = (name: string) => {
+      delete style[name];
+    };
     const node: Record<string, unknown> = {
       id: "",
       tagName: tagName.toUpperCase(),
       nodeType: 1,
-      style: {},
-      classList: [],
+      style,
+      classList,
       children: [],
       parentElement: null,
       textContent: "",

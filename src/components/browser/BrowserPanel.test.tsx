@@ -31,7 +31,6 @@ function props() {
     onToggleExpand: vi.fn(),
     onContextDetail: vi.fn(),
     onOpenExternal: vi.fn(),
-    onHome: vi.fn(),
   };
 }
 
@@ -53,14 +52,22 @@ describe("BrowserChrome", () => {
     fireEvent.click(screen.getByRole("button", { name: "browser.captureViewport" }));
     fireEvent.click(screen.getByRole("button", { name: /browser.contextDetail/ }));
     fireEvent.click(screen.getByRole("button", { name: "browser.openExternal" }));
-    fireEvent.click(screen.getByRole("button", { name: "browser.home" }));
 
     expect(input.onMode).toHaveBeenCalledWith("pick");
     expect(input.onCaptureViewport).toHaveBeenCalledOnce();
     expect(input.onContextDetail).toHaveBeenCalledWith("diagnostic");
     expect(input.onOpenExternal).toHaveBeenCalledOnce();
-    expect(input.onHome).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("button", { name: "browser.home" })).not.toBeInTheDocument();
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
+
+  it("explains the current agent context mode on the context button", () => {
+    render(<BrowserChrome {...props()} />);
+
+    expect(screen.getByRole("button", { name: /browser.contextDetail/ })).toHaveAttribute(
+      "title",
+      "browser.contextDetail: browser.contextCompact",
+    );
   });
 
   it("renders delivery feedback in browser chrome", () => {
@@ -87,7 +94,7 @@ describe("BrowserChrome", () => {
     expect(screen.getByRole("button", { name: "browser.back" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "browser.forward" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "browser.reload" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "browser.home" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "browser.home" })).not.toBeInTheDocument();
     const address = screen.getByRole("textbox", { name: "browser.addressLabel" });
     expect(address).toBeDisabled();
     fireEvent.submit(address.closest("form")!);

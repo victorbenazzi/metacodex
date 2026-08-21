@@ -50,17 +50,9 @@ export function useBrowserNavigation(input: {
     if (url) await invoke(CMD.openExternalUrl, { url }).catch(() => undefined);
   }, []);
 
-  const home = useCallback(async () => {
-    const store = useBrowserUiStore.getState();
-    store.setUrl(null);
-    store.setAddress("");
-    await browserApi.setMode("browse").catch(() => undefined);
-    await browserApi.hide().catch(() => undefined);
-  }, []);
-
   const goBack = useCallback(() => browserApi.goBack().catch(() => undefined), []);
   const goForward = useCallback(() => browserApi.goForward().catch(() => undefined), []);
   const reload = useCallback(() => browserApi.reload().catch(() => undefined), []);
 
-  return { go, home, openExternal, goBack, goForward, reload };
+  return { go, openExternal, goBack, goForward, reload };
 }

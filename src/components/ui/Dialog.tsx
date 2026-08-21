@@ -5,9 +5,14 @@ import { useTranslation } from "react-i18next";
 import { Icon } from "@/components/ui/Icon";
 import { IconButton } from "@/components/ui/IconButton";
 import { cn } from "@/lib/cn";
+import { useOverlayLock } from "@/features/ui/overlayLock.store";
 
-export const DialogRoot = RD.Root;
 export const DialogTrigger = RD.Trigger;
+
+export function DialogRoot(props: React.ComponentProps<typeof RD.Root>) {
+  useOverlayLock(props.open === true);
+  return <RD.Root {...props} />;
+}
 
 interface DialogContentProps {
   title?: React.ReactNode;
