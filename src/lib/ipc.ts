@@ -114,9 +114,6 @@ export const CMD = {
   browserGoForward: "browser_go_forward",
   browserSetMode: "browser_set_mode",
   browserClearDraw: "browser_clear_draw",
-  browserTakePick: "browser_take_pick",
-  browserTakeCaptureRegion: "browser_take_capture_region",
-  browserUrl: "browser_url",
   browserCapture: "browser_capture",
 
 } as const;

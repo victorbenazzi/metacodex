@@ -1,7 +1,6 @@
 import { SidePanelToggle } from "@/components/side-panel/SidePanelToggle";
 import { LeftSidebarToggle } from "@/components/v3-shell/LeftSidebarToggle";
-import { useBrowserUiStore } from "@/features/browser/browser.store";
-import { useSidePanelStore } from "@/features/side-panel/sidePanel.store";
+import type { WorkbenchLayout } from "@/features/browser/workbenchLayout";
 import { cn } from "@/lib/cn";
 import { isMac, isWindows } from "@/lib/platform";
 
@@ -9,10 +8,8 @@ import { isMac, isWindows } from "@/lib/platform";
  * Sidebar toggles sit on the window, not in the animating columns. Parking
  * them here keeps each button still while the panels slide underneath.
  */
-export function ShellToggles() {
-  const expanded = useBrowserUiStore((s) => s.expanded);
-  const browserView = useSidePanelStore((s) => s.view === "browser");
-  if (expanded && browserView) return null;
+export function ShellToggles({ layout }: { layout: WorkbenchLayout }) {
+  if (layout === "browserOverlay") return null;
 
   return (
     <div className="pointer-events-none absolute inset-x-0 top-0 z-40 flex h-[var(--title-bar-h)] items-center">

@@ -8,20 +8,6 @@ export interface BrowserBounds {
   visible: boolean;
 }
 
-export interface DevServer {
-  id: string;
-  port: number;
-  address: string;
-  url: string;
-  pid?: number;
-  sessionId: string;
-  command?: string;
-  cwd?: string;
-  projectId?: string;
-  projectName?: string;
-  folderName?: string;
-}
-
 export interface BrowserPick {
   kind: "element" | "text";
   url: string;
@@ -68,16 +54,7 @@ export const browserApi = {
   clearDraw(): Promise<void> {
     return invoke(CMD.browserClearDraw);
   },
-  takePick(): Promise<BrowserPick | null> {
-    return invoke(CMD.browserTakePick);
-  },
-  takeCaptureRegion(): Promise<BrowserPick["rect"] | null> {
-    return invoke(CMD.browserTakeCaptureRegion);
-  },
-  currentUrl(): Promise<string> {
-    return invoke(CMD.browserUrl);
-  },
-  capture(crop?: BrowserPick["rect"]): Promise<{ path: string }> {
-    return invoke(CMD.browserCapture, crop ? { crop } : {});
+  capture(crop: BrowserPick["rect"] | undefined, expectedMode: BrowserMode): Promise<{ path: string }> {
+    return invoke(CMD.browserCapture, crop ? { crop, expectedMode } : { expectedMode });
   },
 };

@@ -1,5 +1,6 @@
 import type { BrowserContextDetail, BrowserPick } from "./browser.service";
 import { formatVisualContext } from "./sendToAgent";
+import { wrapUntrustedPageData } from "./visualDelivery";
 
 function clip(value: string, max: number): string {
   const compact = value.replace(/\s+/g, " ").trim();
@@ -35,27 +36,29 @@ export function formatPickContext(
   const viewport = pick.viewport;
   return formatVisualContext([
     "Visual context from in-app browser",
-    `url: ${clip(pick.url, 512)}`,
-    `target: ${pick.kind}`,
-    `element: ${elementIdentity(pick)}`,
-    selectorAddsContext(pick) && pick.selector.length <= 240
-      ? `selector: ${pick.selector}`
-      : null,
-    pick.component
-      ? `component: ${clip(pick.component, 96)}${pick.file ? ` (${clip(pick.file, 320)}${pick.line ? `:${pick.line}` : ""})` : ""}`
-      : null,
-    pick.kind === "text" && pick.text ? `text: ${clip(pick.text, 240)}` : null,
-    diagnostic && pick.fullPath && pick.fullPath.length <= 640
-      ? `path: ${pick.fullPath}`
-      : null,
-    diagnostic
-      ? `rect: ${Math.round(rect.x)},${Math.round(rect.y)} ${Math.round(rect.width)}x${Math.round(rect.height)}`
-      : null,
-    diagnostic
-      ? `viewport: ${Math.round(viewport.width)}x${Math.round(viewport.height)} @${viewport.dpr}x`
-      : null,
-    diagnostic && pick.accessibility ? `accessibility: ${clip(pick.accessibility, 480)}` : null,
-    diagnostic && pick.styles ? `styles: ${clip(pick.styles, 640)}` : null,
+    wrapUntrustedPageData([
+      `url: ${clip(pick.url, 512)}`,
+      `target: ${pick.kind}`,
+      `element: ${elementIdentity(pick)}`,
+      selectorAddsContext(pick) && pick.selector.length <= 240
+        ? `selector: ${pick.selector}`
+        : null,
+      pick.component
+        ? `component: ${clip(pick.component, 96)}${pick.file ? ` (${clip(pick.file, 320)}${pick.line ? `:${pick.line}` : ""})` : ""}`
+        : null,
+      pick.kind === "text" && pick.text ? `text: ${clip(pick.text, 240)}` : null,
+      diagnostic && pick.fullPath && pick.fullPath.length <= 640
+        ? `path: ${pick.fullPath}`
+        : null,
+      diagnostic
+        ? `rect: ${Math.round(rect.x)},${Math.round(rect.y)} ${Math.round(rect.width)}x${Math.round(rect.height)}`
+        : null,
+      diagnostic
+        ? `viewport: ${Math.round(viewport.width)}x${Math.round(viewport.height)} @${viewport.dpr}x`
+        : null,
+      diagnostic && pick.accessibility ? `accessibility: ${clip(pick.accessibility, 480)}` : null,
+      diagnostic && pick.styles ? `styles: ${clip(pick.styles, 640)}` : null,
+    ]),
     screenshotPath ? `screenshot: ${screenshotPath}` : null,
   ]);
 }

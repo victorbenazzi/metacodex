@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { DevServer } from "./browser.service";
-import { hostLabel, portOfUrl, serverForUrl, serverTitle } from "./identity";
+import type { DevServer } from "./devServers";
+import { hostLabel, serverTitle } from "./identity";
 
 const server = (partial: Partial<DevServer> & Pick<DevServer, "port">): DevServer => ({
   id: `session:1:${partial.port}`,
@@ -39,21 +39,8 @@ describe("serverTitle", () => {
   });
 });
 
-describe("serverForUrl", () => {
-  it("matches a URL to its server by port", () => {
-    const servers = [server({ port: 1420, projectName: "metacodex" })];
-    expect(serverForUrl("http://localhost:1420/", servers)?.projectName).toBe("metacodex");
-  });
-});
-
 describe("hostLabel", () => {
   it("strips the scheme", () => {
     expect(hostLabel("http://localhost:1420")).toBe("localhost:1420");
-  });
-});
-
-describe("portOfUrl", () => {
-  it("reads an explicit port", () => {
-    expect(portOfUrl("http://127.0.0.1:4321/pricing")).toBe(4321);
   });
 });

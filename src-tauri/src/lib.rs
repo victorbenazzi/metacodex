@@ -196,9 +196,6 @@ pub fn run() {
             commands::browser::browser_go_forward,
             commands::browser::browser_set_mode,
             commands::browser::browser_clear_draw,
-            commands::browser::browser_take_pick,
-            commands::browser::browser_take_capture_region,
-            commands::browser::browser_url,
             commands::browser::browser_capture,
         ])
         .build(tauri::generate_context!())

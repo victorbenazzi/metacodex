@@ -3,7 +3,19 @@ import type { Project } from "@/features/projects/project.types";
 import type { TabMetadataEntry } from "@/features/terminal/tabMetadata.store";
 import type { TerminalSession } from "@/features/terminal/terminal.types";
 
-import type { DevServer } from "./browser.service";
+export interface DevServer {
+  id: string;
+  port: number;
+  address: string;
+  url: string;
+  pid?: number;
+  sessionId: string;
+  command?: string;
+  cwd?: string;
+  projectId?: string;
+  projectName?: string;
+  folderName?: string;
+}
 
 function localhostHost(address: string): string | null {
   const host =

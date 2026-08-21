@@ -18,11 +18,10 @@ import {
   ContextMenuRoot,
   ContextMenuTrigger,
 } from "@/components/ui/ContextMenu";
-import type { DevServer } from "@/features/browser/browser.service";
+import type { DevServer } from "@/features/browser/devServers";
+import type { BrowserOpenTarget } from "@/features/browser/useBrowserNavigation";
 import { hostLabel, serverTitle } from "@/features/browser/identity";
 import { cn } from "@/lib/cn";
-
-export type BrowserOpenTarget = "app" | "system";
 
 export function BrowserStartPage({
   servers,
@@ -117,7 +116,7 @@ function UrlRow({
             <span className="min-w-0 flex-1">
               <span className="block truncate text-caption text-ink">{title}</span>
               {same ? null : (
-                <span className="mt-2px block truncate text-micro text-muted-soft">{detail}</span>
+                <span className="mt-2px block truncate text-caption text-muted-soft">{detail}</span>
               )}
             </span>
           </Button>

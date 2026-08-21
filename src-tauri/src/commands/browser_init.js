@@ -2,11 +2,17 @@
   if (window.__mcxInstalled) return;
   window.__mcxInstalled = true;
 
-  var state = { mode: "browse" };
+  var state = { mode: "browse", readyMode: "browse", captureBarrier: null };
   var bridgeToken = "__MCX_BRIDGE_TOKEN__";
   var nativeOpen = window.open.bind(window);
-  var pendingPick = null;
-  var pendingCapture = null;
+  var nativeEncode = encodeURIComponent;
+  var nativeCharCodeAt = Function.prototype.call.bind(String.prototype.charCodeAt);
+  var nativeStringSlice = Function.prototype.call.bind(String.prototype.slice);
+  var nativeRaf = typeof window.requestAnimationFrame === "function"
+    ? window.requestAnimationFrame.bind(window)
+    : function (callback) { return setTimeout(callback, 16); };
+  var nativeSetTimeout = window.setTimeout.bind(window);
+  var nativeClearTimeout = window.clearTimeout.bind(window);
   var highlight = null;
   var highlightLabel = null;
   var captureBox = null;
@@ -23,9 +29,76 @@
 
   function bridge(path, params) {
     var url = "https://mcx.invalid/" + path;
-    url += "?token=" + encodeURIComponent(bridgeToken);
+    url += "?token=" + bridgeToken;
     if (params) url += "&" + params;
     nativeOpen(url, "_blank");
+  }
+
+  function encodeFields(fields) {
+    return Object.keys(fields)
+      .filter(function (key) { return fields[key] !== null && fields[key] !== undefined; })
+      .map(function (key) {
+        return nativeEncode(key) + "=" + nativeEncode(String(fields[key]));
+      })
+      .join("&");
+  }
+
+  function utf8Prefix(value, maxBytes) {
+    var bytes = 0;
+    var end = 0;
+    while (end < value.length) {
+      var code = nativeCharCodeAt(value, end);
+      var size = code <= 0x7f ? 1 : code <= 0x7ff ? 2 : 3;
+      var units = 1;
+      if (code >= 0xd800 && code <= 0xdbff && end + 1 < value.length) {
+        var next = nativeCharCodeAt(value, end + 1);
+        if (next >= 0xdc00 && next <= 0xdfff) {
+          size = 4;
+          units = 2;
+        }
+      }
+      if (bytes + size > maxBytes) break;
+      bytes += size;
+      end += units;
+    }
+    return nativeStringSlice(value, 0, end);
+  }
+
+  function afterVisualFrame(callback) {
+    var finished = false;
+    var timer = nativeSetTimeout(run, 50);
+    function run() {
+      if (finished) return;
+      finished = true;
+      nativeClearTimeout(timer);
+      callback();
+    }
+    nativeRaf(run);
+  }
+
+  function selectionFields(pick) {
+    return encodeFields({
+      kind: pick.kind,
+      url: pick.url,
+      selector: pick.selector,
+      tag: pick.tag,
+      id: pick.id,
+      classes: JSON.stringify(pick.classes),
+      text: pick.text,
+      x: pick.rect.x,
+      y: pick.rect.y,
+      width: pick.rect.width,
+      height: pick.rect.height,
+      component: pick.component,
+      file: pick.file,
+      line: pick.line,
+      fullPath: pick.fullPath,
+      accessibility: pick.accessibility,
+      styles: pick.styles,
+      viewportWidth: pick.viewport.width,
+      viewportHeight: pick.viewport.height,
+      dpr: pick.viewport.dpr,
+    });
   }
 
   function host() {
@@ -332,7 +405,7 @@
     var tag = el.tagName.toLowerCase();
     return {
       kind: isTextTarget(tag) ? "text" : "element",
-      url: location.href.slice(0, 512),
+      url: utf8Prefix(location.href, 8192),
       selector: cssPath(el),
       tag: tag,
       id: shortIdentifier(el.id, 64) || null,
@@ -371,8 +444,7 @@
     }
     var el = hoverTarget || targetAtDepth(hoverBase, targetDepth);
     if (!el) return;
-    pendingPick = collectPick(el);
-    bridge("selection");
+    bridge("selection", selectionFields(collectPick(el)));
   }
 
   function onDown(e) {
@@ -438,11 +510,10 @@
         if (captureBox) captureBox.style.display = "none";
         return;
       }
-      pendingCapture = rect;
-      state.mode = "browse";
-      syncOverlay();
-      requestAnimationFrame(function () {
-        requestAnimationFrame(function () { bridge("capture"); });
+      nativeRaf(function () {
+        nativeRaf(function () {
+          bridge("capture", encodeFields(rect));
+        });
       });
       return;
     }
@@ -468,13 +539,6 @@
     if (e.isTrusted && e.key === "Escape" && state.mode !== "browse") {
       e.preventDefault();
       e.stopPropagation();
-      state.mode = "browse";
-      drawing = false;
-      captureStart = null;
-      pendingCapture = null;
-      strokes = [];
-      syncOverlay();
-      document.documentElement.style.cursor = "";
       bridge("escape");
     }
   }
@@ -490,17 +554,17 @@
   var lastLocationSnapshot = "";
 
   function emitLocation(loading) {
-    var href = location.href || "";
+    var href = utf8Prefix(location.href || "", 8192);
     if (!href || href.indexOf("mcx.invalid") !== -1) return;
     if (href === "about:blank" || href.indexOf("about:") === 0) return;
-    var title = document.title || "";
+    var title = utf8Prefix(document.title || "", 1024);
     var snapshot = href + "\n" + title + "\n" + (loading ? "1" : "0");
     if (snapshot === lastLocationSnapshot) return;
     lastLocationSnapshot = snapshot;
     bridge(
       "location",
-      "url=" + encodeURIComponent(href) +
-        "&title=" + encodeURIComponent(title) +
+      "url=" + nativeEncode(href) +
+        "&title=" + nativeEncode(title) +
         "&loading=" + (loading ? "1" : "0")
     );
   }
@@ -520,33 +584,57 @@
   if (document.readyState === "complete") emitLocation(false);
   else if (document.readyState === "interactive") emitLocation(true);
 
-  window.__mcx = {
-    setMode: function (mode) {
-      state.mode = mode === "pick" || mode === "draw" || mode === "capture"
+  var hostControls = Object.freeze({
+    setMode: function (token, mode) {
+      if (token !== bridgeToken) return false;
+      var nextMode = mode === "pick" || mode === "draw" || mode === "capture"
         ? mode
         : "browse";
+      if (state.mode === nextMode) return state.readyMode === nextMode;
+      state.mode = nextMode;
+      state.readyMode = null;
+      state.captureBarrier = null;
       if (state.mode !== "draw") {
         drawing = false;
-        strokes = [];
       }
       if (state.mode !== "capture") captureStart = null;
       if (state.mode === "browse") document.documentElement.style.cursor = "";
       syncOverlay();
       if (state.mode === "draw") redraw();
+      var acknowledgedMode = state.mode;
+      afterVisualFrame(function () {
+        afterVisualFrame(function () {
+          if (state.mode === acknowledgedMode) state.readyMode = acknowledgedMode;
+        });
+      });
+      return false;
     },
-    takePick: function () {
-      var pick = pendingPick;
-      pendingPick = null;
-      return pick;
+    prepareCapture: function (token, mode, barrierId) {
+      if (token !== bridgeToken || state.mode !== mode) return false;
+      var barrier = state.captureBarrier;
+      if (!barrier || barrier.id !== barrierId || barrier.mode !== mode) {
+        barrier = { id: barrierId, mode: mode, ready: false };
+        state.captureBarrier = barrier;
+        afterVisualFrame(function () {
+          afterVisualFrame(function () {
+            if (state.captureBarrier === barrier && state.mode === mode) barrier.ready = true;
+          });
+        });
+        return false;
+      }
+      return barrier.ready === true;
     },
-    takeCaptureRegion: function () {
-      var rect = pendingCapture;
-      pendingCapture = null;
-      return rect;
-    },
-    clearDraw: function () {
+    clearDraw: function (token) {
+      if (token !== bridgeToken) return false;
       strokes = [];
       redraw();
+      return true;
     },
-  };
+  });
+  Object.defineProperty(window, "__mcx", {
+    value: hostControls,
+    configurable: false,
+    enumerable: true,
+    writable: false,
+  });
 })();

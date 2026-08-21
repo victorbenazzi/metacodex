@@ -1,46 +1,96 @@
-import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+// @vitest-environment jsdom
 
-const source = readFileSync(new URL("./BrowserPanel.tsx", import.meta.url), "utf8");
-const overlayLock = readFileSync(
-  new URL("../../features/ui/overlayLock.store.ts", import.meta.url),
-  "utf8",
-);
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-describe("BrowserPanel visual delivery", () => {
-  it("write failure shows error and preserves browser mode", () => {
-    expect(source).toContain("await sendVisualToCli");
-    expect(source).toContain('result.status === "failed"');
-    expect(source).toContain("detail: result.error.message");
+vi.mock("react-i18next", () => ({
+  useTranslation: () => ({ t: (key: string) => key }),
+}));
+
+import { BrowserChrome } from "./BrowserChrome";
+
+afterEach(cleanup);
+
+function props() {
+  return {
+    address: "https://example.com",
+    mode: "browse" as const,
+    contextDetail: "compact" as const,
+    loading: false,
+    expanded: false,
+    pageLoaded: true,
+    capturing: false,
+    notice: null,
+    onAddressChange: vi.fn(),
+    onGo: vi.fn(),
+    onBack: vi.fn(),
+    onForward: vi.fn(),
+    onReload: vi.fn(),
+    onMode: vi.fn(),
+    onCaptureViewport: vi.fn(),
+    onToggleExpand: vi.fn(),
+    onContextDetail: vi.fn(),
+    onOpenExternal: vi.fn(),
+    onHome: vi.fn(),
+  };
+}
+
+describe("BrowserChrome", () => {
+  it("submits navigation through the address interface", () => {
+    const input = props();
+    render(<BrowserChrome {...input} />);
+
+    fireEvent.submit(screen.getByRole("textbox", { name: "browser.addressLabel" }).closest("form")!);
+
+    expect(input.onGo).toHaveBeenCalledWith("https://example.com");
   });
 
-  it("offers viewport and region screenshot choices without recents", () => {
-    expect(source).toContain('t("browser.captureViewport")');
-    expect(source).toContain('t("browser.captureRegion")');
-    expect(source).not.toContain("recents");
-    expect(source).not.toContain("clearHistory");
+  it("offers direct page actions without a floating menu", () => {
+    const input = props();
+    render(<BrowserChrome {...input} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "browser.pick" }));
+    fireEvent.click(screen.getByRole("button", { name: "browser.captureViewport" }));
+    fireEvent.click(screen.getByRole("button", { name: /browser.contextDetail/ }));
+    fireEvent.click(screen.getByRole("button", { name: "browser.openExternal" }));
+    fireEvent.click(screen.getByRole("button", { name: "browser.home" }));
+
+    expect(input.onMode).toHaveBeenCalledWith("pick");
+    expect(input.onCaptureViewport).toHaveBeenCalledOnce();
+    expect(input.onContextDetail).toHaveBeenCalledWith("diagnostic");
+    expect(input.onOpenExternal).toHaveBeenCalledOnce();
+    expect(input.onHome).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
 
-  it("offers compact and diagnostic context while keeping compact as the default", () => {
-    expect(source).toContain('contextDetail = useBrowserUiStore');
-    expect(source).toContain('setContextDetail("compact")');
-    expect(source).toContain('setContextDetail("diagnostic")');
-    expect(source).toContain("formatPickContext(pick, screenshotPath, contextDetail)");
+  it("renders delivery feedback in browser chrome", () => {
+    render(
+      <BrowserChrome
+        {...props()}
+        notice={{ tone: "error", title: "browser.captureFailed", detail: "snapshot failed" }}
+      />,
+    );
+
+    expect(
+      screen.getByText("browser.captureFailed: snapshot failed"),
+    ).toBeVisible();
   });
 
-  it("identifies selected screenshot areas as regions", () => {
-    expect(source).toContain('crop ? "target: region" : "target: viewport"');
-    expect(source).toContain('`rect: ${Math.round(crop.x)},${Math.round(crop.y)}');
-  });
+  it("locks mode and internal navigation while a visual delivery is in flight", () => {
+    const input = props();
+    render(<BrowserChrome {...input} capturing />);
 
-  it("leaves capture mode and reports an error when the selected region cannot be read", () => {
-    expect(source).toContain('setMode("browse")');
-    expect(source).toContain('throw new Error(t("browser.captureRegionMissing"))');
-    expect(source).toContain('title: t("browser.captureFailed")');
-  });
-
-  it("does not hide the native webview while browser feedback toasts are visible", () => {
-    expect(overlayLock).not.toContain("useToastStore");
-    expect(overlayLock).not.toContain("toastOpen");
+    expect(screen.getByRole("button", { name: "browser.pick" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "browser.draw" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "browser.captureViewport" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "browser.captureRegion" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "browser.back" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "browser.forward" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "browser.reload" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "browser.home" })).toBeDisabled();
+    const address = screen.getByRole("textbox", { name: "browser.addressLabel" });
+    expect(address).toBeDisabled();
+    fireEvent.submit(address.closest("form")!);
+    expect(input.onGo).not.toHaveBeenCalled();
   });
 });

@@ -22,6 +22,7 @@ import { NewAgentModal } from "@/components/v3-shell/NewAgentModal";
 import { OpenProjectModal } from "@/components/v3-shell/OpenProjectModal";
 import { useSidePanelStore } from "@/features/side-panel/sidePanel.store";
 import { useBrowserUiStore } from "@/features/browser/browser.store";
+import { resolveWorkbenchLayout } from "@/features/browser/workbenchLayout";
 import { useOverlayLockStore } from "@/features/ui/overlayLock.store";
 import { useCodeSidebarStore } from "@/features/ui/codeSidebar.store";
 import { WorktreeCreateDialog } from "@/components/source-control/WorktreeCreateDialog";
@@ -116,8 +117,12 @@ export function AppShell() {
   const panelOpen = panelView !== "closed";
   const sidebarOpen = !useCodeSidebarStore((s) => s.collapsed);
   const browserWantsExpand = useBrowserUiStore((s) => s.expanded);
-  const browserExpanded =
-    browserWantsExpand && panelView === "browser" && panelOpen && !activeDocTabId;
+  const workbenchLayout = resolveWorkbenchLayout({
+    view: panelView,
+    browserExpanded: browserWantsExpand,
+    activeDocTabId,
+  });
+  const browserExpanded = workbenchLayout === "browserOverlay";
   const sidePanelMounted = useDelayedFlag(panelOpen, DRAWER_ANIMATION_MS);
   const sidebarMounted = useDelayedFlag(sidebarOpen, DRAWER_ANIMATION_MS);
   const [resizing, setResizing] = useState(false);
@@ -193,7 +198,7 @@ export function AppShell() {
     <div className="relative h-screen w-screen bg-canvas text-ink">
       <DropOverlay active={dropActive} />
       <WindowsControls />
-      <ShellToggles />
+      <ShellToggles layout={workbenchLayout} />
       <div
         className={cn(
           "grid h-full w-full grid-rows-[minmax(0,1fr)]",
@@ -288,6 +293,7 @@ export function AppShell() {
                   project={project}
                   tabs={bucket.tabs}
                   activeDocTabId={activeDocTabId}
+                  layout={workbenchLayout}
                   onSelectDoc={(id) => {
                     useSidePanelStore.getState().focusDoc(id);
                   }}

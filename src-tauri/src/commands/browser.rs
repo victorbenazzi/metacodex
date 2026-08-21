@@ -1,7 +1,6 @@
 //! In-app browser: a nested OS webview hosted in the right workbench.
 
-use std::sync::Arc;
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
@@ -14,21 +13,26 @@ use uuid::Uuid;
 use crate::config_paths::{browser_captures_dir, browser_profile_dir};
 use crate::error::{AppError, AppResult};
 use crate::events::{
-    BrowserNavigatedPayload, EV_BROWSER_CAPTURE_SELECTED, EV_BROWSER_ESCAPE, EV_BROWSER_NAVIGATED,
+    BrowserNavigatedPayload, EV_BROWSER_CAPTURE_SELECTED, EV_BROWSER_MODE, EV_BROWSER_NAVIGATED,
     EV_BROWSER_PICKED,
 };
 
-use super::browser_capture;
+use super::{
+    browser_bridge::{
+        is_allowed_url, is_blank_href, is_bridge_url, new_bridge_token, validate_bridge,
+        BridgeMessage, BrowserCrop, BrowserMode,
+    },
+    browser_capture,
+};
 
 pub const WEBVIEW_LABEL: &str = "preview-browser";
 
-const BRIDGE_HOST: &str = "mcx.invalid";
 const INIT_SCRIPT: &str = include_str!("browser_init.js");
 const BRIDGE_TOKEN_MARKER: &str = "__MCX_BRIDGE_TOKEN__";
-const MAX_BRIDGE_URL_BYTES: usize = 8 * 1024;
 
 pub struct BrowserState {
-    pub mode: Mutex<String>,
+    mode: Mutex<BrowserMode>,
+    mode_transition: tokio::sync::Mutex<()>,
     pub last_bounds: Mutex<Option<BrowserBounds>>,
     bridge_token: Mutex<String>,
 }
@@ -36,15 +40,12 @@ pub struct BrowserState {
 impl Default for BrowserState {
     fn default() -> Self {
         Self {
-            mode: Mutex::new("browse".into()),
+            mode: Mutex::new(BrowserMode::Browse),
+            mode_transition: tokio::sync::Mutex::new(()),
             last_bounds: Mutex::new(None),
             bridge_token: Mutex::new(new_bridge_token()),
         }
     }
-}
-
-fn new_bridge_token() -> String {
-    Uuid::new_v4().simple().to_string()
 }
 
 impl BrowserState {
@@ -65,67 +66,15 @@ pub struct BrowserBounds {
     pub visible: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BrowserCrop {
-    pub x: f64,
-    pub y: f64,
-    pub width: f64,
-    pub height: f64,
-}
-
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BrowserCapture {
     pub path: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BrowserPick {
-    pub kind: String,
-    pub url: String,
-    pub selector: String,
-    pub tag: String,
-    pub id: Option<String>,
-    pub classes: Vec<String>,
-    pub text: Option<String>,
-    pub rect: BrowserCrop,
-    pub component: Option<String>,
-    pub file: Option<String>,
-    pub line: Option<i64>,
-    pub full_path: String,
-    pub accessibility: Option<String>,
-    pub styles: Option<String>,
-    pub viewport: BrowserViewport,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BrowserViewport {
-    pub width: f64,
-    pub height: f64,
-    pub dpr: f64,
-}
-
 fn preview(app: &AppHandle) -> AppResult<Webview<tauri::Wry>> {
     app.get_webview(WEBVIEW_LABEL)
         .ok_or_else(|| AppError::NotFound("browser webview is not open".into()))
-}
-
-pub fn is_allowed_url(url: &Url) -> bool {
-    if is_bridge_url(url) {
-        return false;
-    }
-    matches!(url.scheme(), "http" | "https" | "about")
-}
-
-fn is_bridge_url(url: &Url) -> bool {
-    url.host_str() == Some(BRIDGE_HOST)
-}
-
-fn is_blank_href(url: &str) -> bool {
-    url.is_empty() || url == "about:blank" || url.starts_with("about:")
 }
 
 fn emit_nav(app: &AppHandle, url: &str, title: &str, loading: bool) {
@@ -139,102 +88,28 @@ fn emit_nav(app: &AppHandle, url: &str, title: &str, loading: bool) {
     );
 }
 
-#[derive(Debug, PartialEq, Eq)]
-enum BridgeMessage {
-    Selection,
-    Capture,
-    Escape,
-    Location {
-        url: String,
-        title: String,
-        loading: bool,
-    },
-}
-
-fn validate_bridge(state: &BrowserState, url: &Url) -> AppResult<BridgeMessage> {
-    if !is_bridge_url(url) || url.as_str().len() > MAX_BRIDGE_URL_BYTES {
-        return Err(AppError::PermissionDenied(
-            "invalid browser bridge url".into(),
-        ));
-    }
-    let mut pairs = std::collections::HashMap::new();
-    for (key, value) in url.query_pairs() {
-        if pairs.insert(key.into_owned(), value.into_owned()).is_some() {
-            return Err(AppError::PermissionDenied(
-                "duplicate browser bridge field".into(),
-            ));
-        }
-    }
-    let token = pairs
-        .remove("token")
-        .ok_or_else(|| AppError::PermissionDenied("missing browser bridge token".into()))?;
-    if token != *state.bridge_token.lock() {
-        return Err(AppError::PermissionDenied(
-            "invalid browser bridge token".into(),
-        ));
-    }
-    match url.path().trim_matches('/') {
-        "selection" if pairs.is_empty() && *state.mode.lock() == "pick" => {
-            Ok(BridgeMessage::Selection)
-        }
-        "capture" if pairs.is_empty() && *state.mode.lock() == "capture" => {
-            Ok(BridgeMessage::Capture)
-        }
-        "escape" if pairs.is_empty() && *state.mode.lock() != "browse" => Ok(BridgeMessage::Escape),
-        "location" => {
-            if pairs
-                .keys()
-                .any(|key| !matches!(key.as_str(), "url" | "title" | "loading"))
-            {
-                return Err(AppError::PermissionDenied(
-                    "unknown browser bridge field".into(),
-                ));
-            }
-            let href = pairs.remove("url").unwrap_or_default();
-            let title = pairs.remove("title").unwrap_or_default();
-            let loading = match pairs.remove("loading").as_deref() {
-                Some("1") => true,
-                Some("0") => false,
-                _ => return Err(AppError::PermissionDenied("invalid loading state".into())),
-            };
-            if href.len() > 4096 || title.len() > 512 {
-                return Err(AppError::PermissionDenied(
-                    "browser bridge payload too large".into(),
-                ));
-            }
-            let parsed = Url::parse(&href)
-                .map_err(|_| AppError::PermissionDenied("invalid location url".into()))?;
-            if !is_allowed_url(&parsed) || is_blank_href(&href) {
-                return Err(AppError::PermissionDenied("blocked location url".into()));
-            }
-            Ok(BridgeMessage::Location {
-                url: href,
-                title,
-                loading,
-            })
-        }
-        _ => Err(AppError::PermissionDenied(
-            "invalid browser bridge message".into(),
-        )),
-    }
-}
-
 fn handle_bridge(app: &AppHandle, url: &Url) {
     let Some(state) = app.try_state::<Arc<BrowserState>>() else {
         return;
     };
-    let Ok(message) = validate_bridge(&state, url) else {
+    let token = state.bridge_token.lock().clone();
+    let mode = *state.mode.lock();
+    let Ok(message) = validate_bridge(&token, mode, url) else {
         return;
     };
     match message {
-        BridgeMessage::Selection => {
-            let _ = app.emit(EV_BROWSER_PICKED, ());
+        BridgeMessage::Selection(pick) => {
+            let _ = app.emit(EV_BROWSER_PICKED, pick);
         }
-        BridgeMessage::Capture => {
-            let _ = app.emit(EV_BROWSER_CAPTURE_SELECTED, ());
+        BridgeMessage::Capture(rect) => {
+            let _ = app.emit(EV_BROWSER_CAPTURE_SELECTED, rect);
         }
         BridgeMessage::Escape => {
-            let _ = app.emit(EV_BROWSER_ESCAPE, ());
+            let app = app.clone();
+            let state = state.inner().clone();
+            tauri::async_runtime::spawn(async move {
+                let _ = set_mode_authoritative(&app, &state, BrowserMode::Browse).await;
+            });
         }
         BridgeMessage::Location {
             url,
@@ -243,7 +118,8 @@ fn handle_bridge(app: &AppHandle, url: &Url) {
         } => {
             if !loading {
                 if let Some(wv) = app.get_webview(WEBVIEW_LABEL) {
-                    let _ = wv.eval(apply_mode_js(&stored_mode(app)));
+                    let token = state.bridge_token.lock().clone();
+                    let _ = wv.eval(apply_mode_js(&token, stored_mode(app)));
                 }
             }
             emit_nav(app, &url, &title, loading);
@@ -251,15 +127,27 @@ fn handle_bridge(app: &AppHandle, url: &Url) {
     }
 }
 
-fn stored_mode(app: &AppHandle) -> String {
+fn stored_mode(app: &AppHandle) -> BrowserMode {
     app.try_state::<Arc<BrowserState>>()
-        .map(|s| s.mode.lock().clone())
-        .unwrap_or_else(|| "browse".into())
+        .map(|s| *s.mode.lock())
+        .unwrap_or_default()
 }
 
-fn apply_mode_js(mode: &str) -> String {
-    let encoded = serde_json::to_string(mode).unwrap_or_else(|_| "\"browse\"".into());
-    format!("(function(){{ if (window.__mcx) window.__mcx.setMode({encoded}); }})()")
+fn apply_mode_js(token: &str, mode: BrowserMode) -> String {
+    let token = serde_json::to_string(token).expect("browser token serializes");
+    let encoded = serde_json::to_string(&mode).expect("browser mode serializes");
+    format!(
+        "(function(){{ return window.__mcx ? window.__mcx.setMode({token}, {encoded}) : false; }})()"
+    )
+}
+
+fn prepare_capture_js(token: &str, mode: BrowserMode, barrier_id: &str) -> String {
+    let token = serde_json::to_string(token).expect("browser token serializes");
+    let encoded_mode = serde_json::to_string(&mode).expect("browser mode serializes");
+    let encoded_id = serde_json::to_string(barrier_id).expect("browser barrier id serializes");
+    format!(
+        "(function(){{ return window.__mcx ? window.__mcx.prepareCapture({token}, {encoded_mode}, {encoded_id}) : false; }})()"
+    )
 }
 
 async fn eval_now(webview: &Webview<tauri::Wry>, js: &str) -> AppResult<String> {
@@ -271,11 +159,113 @@ async fn eval_now(webview: &Webview<tauri::Wry>, js: &str) -> AppResult<String> 
                 let _ = tx.send(result);
             }
         })
-        .map_err(|e| AppError::Other(e.to_string()))?;
-    tokio::time::timeout(Duration::from_secs(3), rx)
-        .await
-        .map_err(|_| AppError::Other("eval timed out".into()))?
-        .map_err(|e| AppError::Other(format!("eval callback closed: {e}")))
+        .map_err(|error| AppError::Other(error.to_string()))?;
+    rx.await
+        .map_err(|error| AppError::Other(format!("browser eval callback closed: {error}")))
+}
+
+async fn wait_mode_ready(
+    webview: &Webview<tauri::Wry>,
+    token: &str,
+    mode: BrowserMode,
+) -> AppResult<()> {
+    let deadline = tokio::time::Instant::now() + Duration::from_millis(1500);
+    let script = apply_mode_js(token, mode);
+    let mut last_result = "no callback".to_string();
+    loop {
+        let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+        if remaining.is_zero() {
+            return Err(AppError::Other(format!(
+                "browser mode frame timed out, last result: {last_result}"
+            )));
+        }
+        let result = tokio::time::timeout(
+            remaining.min(Duration::from_millis(250)),
+            eval_now(webview, &script),
+        )
+        .await;
+        match result {
+            Ok(Ok(raw)) => {
+                if serde_json::from_str::<bool>(&raw).unwrap_or(false) {
+                    return Ok(());
+                }
+                last_result = raw;
+            }
+            Ok(Err(error)) => last_result = error.to_string(),
+            Err(_) => last_result = "eval callback timed out".into(),
+        }
+        tokio::time::sleep(Duration::from_millis(16)).await;
+    }
+}
+
+async fn wait_capture_ready(
+    webview: &Webview<tauri::Wry>,
+    token: &str,
+    mode: BrowserMode,
+    barrier_id: &str,
+) -> AppResult<()> {
+    let deadline = tokio::time::Instant::now() + Duration::from_millis(1500);
+    let script = prepare_capture_js(token, mode, barrier_id);
+    let mut last_result = "no callback".to_string();
+    loop {
+        let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+        if remaining.is_zero() {
+            return Err(AppError::Other(format!(
+                "browser capture frame timed out, last result: {last_result}"
+            )));
+        }
+        let result = tokio::time::timeout(
+            remaining.min(Duration::from_millis(250)),
+            eval_now(webview, &script),
+        )
+        .await;
+        match result {
+            Ok(Ok(raw)) => {
+                if serde_json::from_str::<bool>(&raw).unwrap_or(false) {
+                    return Ok(());
+                }
+                last_result = raw;
+            }
+            Ok(Err(error)) => last_result = error.to_string(),
+            Err(_) => last_result = "eval callback timed out".into(),
+        }
+        tokio::time::sleep(Duration::from_millis(16)).await;
+    }
+}
+
+async fn set_mode_authoritative(
+    app: &AppHandle,
+    state: &BrowserState,
+    mode: BrowserMode,
+) -> AppResult<()> {
+    let _transition = state.mode_transition.lock().await;
+    let previous = {
+        let mut stored = state.mode.lock();
+        let previous = *stored;
+        *stored = mode;
+        previous
+    };
+    let _ = app.emit(EV_BROWSER_MODE, mode);
+    if let Some(webview) = app.get_webview(WEBVIEW_LABEL) {
+        let token = state.bridge_token.lock().clone();
+        if let Err(error) = wait_mode_ready(&webview, &token, mode).await {
+            let rolled_back = {
+                let mut stored = state.mode.lock();
+                if *stored == mode {
+                    *stored = previous;
+                    true
+                } else {
+                    false
+                }
+            };
+            if rolled_back {
+                let _ = webview.eval(apply_mode_js(&token, previous));
+                let _ = app.emit(EV_BROWSER_MODE, previous);
+            }
+            return Err(error);
+        }
+    }
+    Ok(())
 }
 
 fn ensure_webview(
@@ -447,99 +437,68 @@ pub async fn browser_set_mode(
     state: tauri::State<'_, Arc<BrowserState>>,
     mode: String,
 ) -> AppResult<()> {
-    let safe = match mode.as_str() {
-        "pick" | "draw" | "capture" | "browse" => mode,
-        _ => "browse".into(),
-    };
-    *state.mode.lock() = safe.clone();
+    let mode = BrowserMode::parse(&mode)?;
+    set_mode_authoritative(&app, &state, mode).await
+}
+
+#[tauri::command]
+pub async fn browser_clear_draw(
+    app: AppHandle,
+    state: tauri::State<'_, Arc<BrowserState>>,
+) -> AppResult<()> {
     if app.get_webview(WEBVIEW_LABEL).is_none() {
         return Ok(());
     }
-    preview(&app)?
-        .eval(apply_mode_js(&safe))
-        .map_err(|e| AppError::Other(e.to_string()))
-}
-
-#[tauri::command]
-pub async fn browser_clear_draw(app: AppHandle) -> AppResult<()> {
-    if app.get_webview(WEBVIEW_LABEL).is_none() {
-        return Ok(());
-    }
-    preview(&app)?
-        .eval("(window.__mcx && window.__mcx.clearDraw())")
-        .map_err(|e| AppError::Other(e.to_string()))
-}
-
-#[tauri::command]
-pub async fn browser_take_pick(app: AppHandle) -> AppResult<Option<BrowserPick>> {
-    if app.get_webview(WEBVIEW_LABEL).is_none() {
-        return Ok(None);
-    }
-    let webview = preview(&app)?;
-    let raw = eval_now(
-        &webview,
-        "(window.__mcx && window.__mcx.takePick()) || null",
+    let token =
+        serde_json::to_string(&*state.bridge_token.lock()).expect("browser token serializes");
+    let result = tokio::time::timeout(
+        Duration::from_millis(1500),
+        eval_now(
+            &preview(&app)?,
+            &format!("(window.__mcx && window.__mcx.clearDraw({token}))"),
+        ),
     )
-    .await?;
-    let value: serde_json::Value = serde_json::from_str(&raw).unwrap_or(serde_json::Value::Null);
-    if value.is_null() {
-        Ok(None)
+    .await
+    .map_err(|_| AppError::Other("browser draw clear timed out".into()))??;
+    if serde_json::from_str::<bool>(&result).unwrap_or(false) {
+        Ok(())
     } else {
-        Ok(serde_json::from_value(value).ok())
-    }
-}
-
-#[tauri::command]
-pub async fn browser_take_capture_region(app: AppHandle) -> AppResult<Option<BrowserCrop>> {
-    if app.get_webview(WEBVIEW_LABEL).is_none() {
-        return Ok(None);
-    }
-    let webview = preview(&app)?;
-    let raw = eval_now(
-        &webview,
-        "(window.__mcx && window.__mcx.takeCaptureRegion()) || null",
-    )
-    .await?;
-    let value: serde_json::Value = serde_json::from_str(&raw).unwrap_or(serde_json::Value::Null);
-    if value.is_null() {
-        Ok(None)
-    } else {
-        Ok(serde_json::from_value(value).ok())
-    }
-}
-
-#[tauri::command]
-pub async fn browser_url(app: AppHandle) -> AppResult<String> {
-    let Some(wv) = app.get_webview(WEBVIEW_LABEL) else {
-        return Ok("about:blank".into());
-    };
-    // wry 0.55 panics on macOS if WKWebView.URL() is nil. Read via JS instead.
-    match eval_now(&wv, "location.href || ''").await {
-        Ok(raw) => {
-            let href: String = serde_json::from_str(&raw).unwrap_or_default();
-            if href.is_empty() {
-                Ok("about:blank".into())
-            } else {
-                Ok(href)
-            }
-        }
-        Err(_) => Ok("about:blank".into()),
+        Err(AppError::Other("browser draw clear was rejected".into()))
     }
 }
 
 #[tauri::command]
 pub async fn browser_capture(
     app: AppHandle,
+    state: tauri::State<'_, Arc<BrowserState>>,
     crop: Option<BrowserCrop>,
+    expected_mode: String,
 ) -> AppResult<BrowserCapture> {
+    let expected_mode = BrowserMode::parse(&expected_mode)?;
+    let _transition = state.mode_transition.lock().await;
+    if *state.mode.lock() != expected_mode {
+        return Err(AppError::InvalidArgument(
+            "browser mode changed before capture".into(),
+        ));
+    }
     let webview = preview(&app)?;
+    if expected_mode == BrowserMode::Draw {
+        let token = state.bridge_token.lock().clone();
+        let barrier_id = Uuid::new_v4().simple().to_string();
+        wait_capture_ready(&webview, &token, expected_mode, &barrier_id).await?;
+    }
     let dir = browser_captures_dir()?;
     std::fs::create_dir_all(&dir)?;
     let path = dir.join(format!("{}.png", Uuid::new_v4()));
     let webview = webview.clone();
     let dest = path.clone();
+    let viewport = state
+        .last_bounds
+        .lock()
+        .as_ref()
+        .map(|bounds| (bounds.width, bounds.height));
     tokio::task::spawn_blocking(move || {
-        browser_capture::capture_png(&webview, &dest, crop.as_ref())
+        browser_capture::capture_png(&webview, &dest, crop.as_ref(), viewport)
     })
     .await
     .map_err(|e| AppError::Other(format!("join: {e}")))??;
@@ -579,79 +538,29 @@ mod tests {
         }
     }
 
+    #[test]
+    fn only_http_https_and_explicit_blank_are_allowed() {
+        assert!(is_allowed_url(&"http://localhost:5173/".parse().unwrap()));
+        assert!(is_allowed_url(&"https://example.com/".parse().unwrap()));
+        assert!(is_allowed_url(&"about:blank".parse().unwrap()));
+        assert!(!is_allowed_url(&"about:srcdoc".parse().unwrap()));
+    }
+
     #[tokio::test]
-    async fn slow_evaluation_does_not_prevent_independent_async_progress() {
-        let (_tx, rx) = tokio::sync::oneshot::channel::<String>();
-        let stalled =
-            tokio::spawn(async move { tokio::time::timeout(Duration::from_millis(25), rx).await });
-        let independent = tokio::spawn(async { 42 });
-        assert_eq!(independent.await.unwrap(), 42);
-        assert!(stalled.await.unwrap().is_err());
-    }
+    async fn browser_mode_transitions_are_serialized() {
+        let state = Arc::new(BrowserState::default());
+        let first = state.mode_transition.lock().await;
+        let waiting_state = state.clone();
+        let second = tokio::spawn(async move {
+            let _guard = waiting_state.mode_transition.lock().await;
+        });
 
-    fn bridge_url(token: &str, suffix: &str) -> Url {
-        format!("https://mcx.invalid/{suffix}?token={token}")
-            .parse()
-            .unwrap()
-    }
-
-    #[test]
-    fn rejects_missing_incorrect_and_stale_bridge_tokens() {
-        let state = BrowserState::default();
-        *state.mode.lock() = "pick".into();
-        let missing: Url = "https://mcx.invalid/selection".parse().unwrap();
-        assert!(validate_bridge(&state, &missing).is_err());
-        assert!(validate_bridge(&state, &bridge_url("wrong", "selection")).is_err());
-        let stale = state.bridge_token.lock().clone();
-        state.rotate_bridge_token();
-        assert!(validate_bridge(&state, &bridge_url(&stale, "selection")).is_err());
-    }
-
-    #[test]
-    fn bridge_token_has_128_bits_and_rotates() {
-        let state = BrowserState::default();
-        let first = state.bridge_token.lock().clone();
-        let second = state.rotate_bridge_token();
-        assert_eq!(first.len(), 32);
-        assert!(first.chars().all(|ch| ch.is_ascii_hexdigit()));
-        assert_ne!(first, second);
-    }
-
-    #[test]
-    fn capture_bridge_requires_capture_mode() {
-        let state = BrowserState::default();
-        let token = state.bridge_token.lock().clone();
-        let capture = bridge_url(&token, "capture");
-        assert!(validate_bridge(&state, &capture).is_err());
-        *state.mode.lock() = "capture".into();
-        assert!(matches!(
-            validate_bridge(&state, &capture),
-            Ok(BridgeMessage::Capture)
-        ));
-    }
-
-    #[test]
-    fn rejects_invalid_scheme_unknown_fields_and_oversized_payloads() {
-        let state = BrowserState::default();
-        let token = state.bridge_token.lock().clone();
-        let invalid_url: Url = format!(
-            "https://mcx.invalid/location?token={token}&url=file%3A%2F%2F%2Fetc%2Fpasswd&title=x&loading=0"
-        )
-        .parse()
-        .unwrap();
-        assert!(validate_bridge(&state, &invalid_url).is_err());
-        let unknown: Url = format!(
-            "https://mcx.invalid/location?token={token}&url=https%3A%2F%2Fexample.com&title=x&loading=0&command=quit"
-        )
-        .parse()
-        .unwrap();
-        assert!(validate_bridge(&state, &unknown).is_err());
-        let oversized: Url = format!(
-            "https://mcx.invalid/location?token={token}&url=https%3A%2F%2Fexample.com&title={}&loading=0",
-            "x".repeat(MAX_BRIDGE_URL_BYTES)
-        )
-        .parse()
-        .unwrap();
-        assert!(validate_bridge(&state, &oversized).is_err());
+        tokio::task::yield_now().await;
+        assert!(!second.is_finished());
+        drop(first);
+        tokio::time::timeout(Duration::from_millis(100), second)
+            .await
+            .expect("second transition should continue after the first releases")
+            .expect("transition task should complete");
     }
 }

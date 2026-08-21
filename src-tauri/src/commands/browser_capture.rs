@@ -9,22 +9,24 @@ use tauri::Runtime;
 
 use crate::error::{AppError, AppResult};
 
-use super::browser::BrowserCrop;
+use super::browser_bridge::BrowserCrop;
 
 pub fn capture_png<R: Runtime>(
     webview: &Webview<R>,
     dest: &Path,
     crop: Option<&BrowserCrop>,
+    viewport: Option<(f64, f64)>,
 ) -> AppResult<()> {
     #[cfg(target_os = "macos")]
     {
-        capture_macos(webview, dest, crop)
+        capture_macos(webview, dest, crop, viewport)
     }
     #[cfg(not(target_os = "macos"))]
     {
         let _ = webview;
         let _ = dest;
         let _ = crop;
+        let _ = viewport;
         Err(AppError::Other(
             "browser screenshot is not available on this platform yet".into(),
         ))
@@ -36,6 +38,7 @@ fn capture_macos<R: Runtime>(
     webview: &Webview<R>,
     dest: &Path,
     crop: Option<&BrowserCrop>,
+    viewport: Option<(f64, f64)>,
 ) -> AppResult<()> {
     use block2::RcBlock;
     use objc2::MainThreadMarker;
@@ -45,7 +48,7 @@ fn capture_macos<R: Runtime>(
     use objc2_web_kit::{WKSnapshotConfiguration, WKWebView};
 
     let (tx, rx) = mpsc::channel::<Result<Vec<u8>, String>>();
-    let crop = crop.cloned();
+    let crop = crop.map(|rect| snapshot_rect(rect, viewport)).transpose()?;
 
     webview
         .with_webview(move |platform| {
@@ -59,15 +62,14 @@ fn capture_macos<R: Runtime>(
             // makes WKWebView briefly clear its surface on some macOS versions.
             unsafe { config.setAfterScreenUpdates(false) };
             if let Some(rect) = crop {
-                let pad = 8.0_f64;
                 let cg = CGRect {
                     origin: CGPoint {
-                        x: (rect.x - pad).max(0.0),
-                        y: (rect.y - pad).max(0.0),
+                        x: rect.x,
+                        y: rect.y,
                     },
                     size: CGSize {
-                        width: rect.width.max(1.0) + pad * 2.0,
-                        height: rect.height.max(1.0) + pad * 2.0,
+                        width: rect.width,
+                        height: rect.height,
                     },
                 };
                 unsafe { config.setRect(cg) };
@@ -104,6 +106,32 @@ fn capture_macos<R: Runtime>(
         .map_err(|_| AppError::Other("snapshot timed out".into()))?
         .map_err(AppError::Other)?;
     write_bytes_atomic(dest, &bytes)
+}
+
+fn snapshot_rect(crop: &BrowserCrop, viewport: Option<(f64, f64)>) -> AppResult<BrowserCrop> {
+    let (viewport_width, viewport_height) = viewport
+        .filter(|(width, height)| {
+            width.is_finite() && height.is_finite() && *width >= 1.0 && *height >= 1.0
+        })
+        .ok_or_else(|| AppError::InvalidArgument("browser viewport is unavailable".into()))?;
+    let pad = 8.0_f64;
+    let left = (crop.x - pad).clamp(0.0, viewport_width);
+    let top = (crop.y - pad).clamp(0.0, viewport_height);
+    let right = (crop.x + crop.width + pad).clamp(0.0, viewport_width);
+    let bottom = (crop.y + crop.height + pad).clamp(0.0, viewport_height);
+    let width = right - left;
+    let height = bottom - top;
+    if width < 1.0 || height < 1.0 {
+        return Err(AppError::InvalidArgument(
+            "browser crop is outside the viewport".into(),
+        ));
+    }
+    Ok(BrowserCrop {
+        x: left,
+        y: top,
+        width,
+        height,
+    })
 }
 
 #[cfg(target_os = "macos")]
@@ -221,5 +249,39 @@ mod tests {
             .collect();
         let _ = std::fs::remove_dir_all(&dir);
         assert_eq!(left.len(), 8);
+    }
+
+    #[test]
+    fn snapshot_crop_is_padded_and_clamped_to_the_native_viewport() {
+        let crop = snapshot_rect(
+            &BrowserCrop {
+                x: -20.0,
+                y: 90.0,
+                width: 2000.0,
+                height: 2000.0,
+            },
+            Some((320.0, 180.0)),
+        )
+        .unwrap();
+
+        assert_eq!(crop.x, 0.0);
+        assert_eq!(crop.y, 82.0);
+        assert_eq!(crop.width, 320.0);
+        assert_eq!(crop.height, 98.0);
+    }
+
+    #[test]
+    fn snapshot_crop_rejects_an_offscreen_rect() {
+        let result = snapshot_rect(
+            &BrowserCrop {
+                x: 500.0,
+                y: 500.0,
+                width: 80.0,
+                height: 60.0,
+            },
+            Some((320.0, 180.0)),
+        );
+
+        assert!(result.is_err());
     }
 }

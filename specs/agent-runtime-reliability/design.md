@@ -337,10 +337,14 @@ Allowed semantic messages are limited to:
 1. `location` with URL, title, and loading state read by the injected closure.
 2. `escape` generated only from a trusted keyboard event with `event.isTrusted`.
 3. `selection` generated only from a trusted pointer event while pick mode is active.
+4. `capture` generated only from a trusted pointer gesture while capture mode is active.
+5. `browser_set_mode` polls the authenticated guest control until the requested mode has passed two visual-frame callbacks. A 50 millisecond timer per callback prevents a throttled WKWebView from hanging the transition. For a draw snapshot, `browser_capture` validates the expected mode, creates a fresh barrier, and holds the mode-transition lock through the native snapshot.
 
 Remove raw `key`, `meta`, `ctrl`, `alt`, and `shift` forwarding. Remove `dispatchBindingFromChild`. Loaded web content must never reach the global keybinding dispatcher.
 
 Rust validates token, message type, URL scheme, payload length, and current browser mode. It rejects unknown fields. URL and title limits are 8,192 and 1,024 UTF-8 bytes respectively. Only `http`, `https`, and explicit internal blank URLs are accepted for history mutation.
+
+The encoded bridge transport has a separate 32 KiB ceiling. This leaves room for percent encoding while keeping the decoded field limits above authoritative.
 
 ### 8.3 Visual-context delivery
 

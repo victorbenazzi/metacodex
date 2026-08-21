@@ -15,12 +15,13 @@ import type { Project } from "@/features/projects/project.types";
 import type { CliTool } from "@/features/terminal/cli-registry";
 import { cn } from "@/lib/cn";
 import { isMac, isWindows } from "@/lib/platform";
-import { useBrowserUiStore } from "@/features/browser/browser.store";
+import type { WorkbenchLayout } from "@/features/browser/workbenchLayout";
 
 interface RightWorkbenchProps {
   project: Project | null;
   tabs: Tab[];
   activeDocTabId: string | null;
+  layout: WorkbenchLayout;
   onSelectDoc: (id: string) => void;
   onCloseDoc: (id: string) => void;
   onMoveDoc: (id: string, toIndex: number) => void;
@@ -35,6 +36,7 @@ export function RightWorkbench({
   project,
   tabs,
   activeDocTabId,
+  layout,
   onSelectDoc,
   onCloseDoc,
   onMoveDoc,
@@ -50,11 +52,10 @@ export function RightWorkbench({
   const show = useSidePanelStore((s) => s.show);
   const closeTab = useSidePanelStore((s) => s.closeTab);
   const moveTab = useSidePanelStore((s) => s.moveTab);
-  const wantsExpand = useBrowserUiStore((s) => s.expanded);
   const surface: RightWorkbenchTab = view === "closed" ? "changes" : view;
   const docs = tabs.filter(isWorkbenchDocTab);
   const showingDoc = activeDocTabId != null;
-  const expanded = wantsExpand && surface === "browser" && !showingDoc;
+  const expanded = layout === "browserOverlay";
   const stripActive = showingDoc
     ? `doc:${activeDocTabId}`
     : `surface:${surface}`;

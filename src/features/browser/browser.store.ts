@@ -34,7 +34,6 @@ export const useBrowserUiStore = create<BrowserUiState>((set) => ({
       url,
       title: title ?? s.title,
       address: url ?? s.address,
-      mode: url ? s.mode : "browse",
       loading: url ? s.loading : false,
     })),
   setAddress: (address) => set({ address }),

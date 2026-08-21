@@ -1,4 +1,5 @@
 import { listen, type UnlistenFn, type EventCallback } from "@tauri-apps/api/event";
+import type { BrowserMode, BrowserPick } from "@/features/browser/browser.service";
 
 export const EV = {
   ptyData: "pty://data",
@@ -13,7 +14,7 @@ export const EV = {
   browserNavigated: "browser://navigated",
   browserPicked: "browser://picked",
   browserCaptureSelected: "browser://capture-selected",
-  browserEscape: "browser://escape",
+  browserMode: "browser://mode",
 } as const;
 
 export type EventName = (typeof EV)[keyof typeof EV];
@@ -76,6 +77,10 @@ export interface BrowserNavigatedPayload {
   title: string;
   loading: boolean;
 }
+
+export type BrowserPickedPayload = BrowserPick;
+export type BrowserCaptureSelectedPayload = BrowserPick["rect"];
+export type BrowserModePayload = BrowserMode;
 
 export interface QuitFailure {
   area: string;
