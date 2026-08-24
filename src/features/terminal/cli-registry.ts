@@ -50,6 +50,17 @@ export interface CliTool {
  */
 export const DEFAULT_CLI_REGISTRY: CliTool[] = [
   {
+    id: "mcx",
+    label: "mcx",
+    command: "mcx",
+    args: [],
+    detectCommand: "command -v mcx",
+    detectCommandWindows: "Get-Command mcx",
+    installCommand: "pnpm build && pnpm link --global",
+    description:
+      "metacodex multi-provider coding agent. Build from the metacodex-cli repo, then link it on PATH.",
+  },
+  {
     id: "claude-code",
     label: "Claude Code",
     command: "claude",

@@ -44,6 +44,7 @@ function KimiIcon({ size = 16, className }: BrandIconProps) {
 }
 
 export const CLI_BRAND_ICONS: Record<string, ComponentType<BrandIconProps>> = {
+  mcx: MetacodexMark,
   "claude-code": lobe(ClaudeCodeColor),
   "codex-cli": lobe(CodexColor),
   opencode: lobe(OpenCodeMono),

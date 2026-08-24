@@ -19,6 +19,13 @@ describe("CLI launch policy", () => {
     }
   });
 
+  it("registers mcx as a safe PATH launch with no elevated flags", () => {
+    const cli = DEFAULT_CLI_REGISTRY.find((entry) => entry.id === "mcx");
+    expect(cli).toMatchObject({ command: "mcx", args: [] });
+    expect(cli?.elevatedArgs ?? []).toEqual([]);
+    expect(cliLaunchString(cli!)).toBe("mcx");
+  });
+
   it("moves legacy bypass flags into elevated arguments", () => {
     const cli = normalizeCliTool({
       ...DEFAULT_CLI_REGISTRY[0],

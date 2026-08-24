@@ -16,7 +16,7 @@ describe("ElevatedLaunchDialog", () => {
     render(
       <ElevatedLaunchDialog
         open
-        cli={DEFAULT_CLI_REGISTRY[0]}
+        cli={DEFAULT_CLI_REGISTRY.find((entry) => entry.id === "claude-code")!}
         projectName="Project"
         onOpenChange={() => undefined}
         onConfirm={confirm}
