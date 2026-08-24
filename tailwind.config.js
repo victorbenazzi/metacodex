@@ -230,7 +230,8 @@ export default {
         // Durations/easings are tokens — see --dur-enter/--dur-exit in tokens.css.
         "fade-in": "fade-in var(--dur-enter) var(--ease-out)",
         "fade-out": "fade-out var(--dur-exit) var(--ease-in) forwards",
-        "tab-status-pulse": "tab-status-pulse 1.6s ease-in-out infinite",
+        "tab-status-pulse":
+          "tab-status-pulse var(--agent-working-dur) ease-in-out infinite",
         "progress-indeterminate": "progress-indeterminate 1.4s linear infinite",
         "slide-in-left": "slide-in-left 180ms var(--ease-out) both",
         "rise-in": "rise-in 420ms var(--ease-out) both",

@@ -1,6 +1,6 @@
 import { UpdatePill } from "@/components/updates/UpdatePill";
-import { LoadingState } from "@/components/ui/LoadingState";
 import { renderTabIcon } from "@/components/tabs/tabChrome";
+import { TabStatusDot } from "@/components/tabs/TabStatusDot";
 import { resolveTabTitle } from "@/components/tabs/types";
 import { useTabsStore, WORKSPACE_NULL } from "@/components/tabs/tabsStore";
 import { useProjectsStore } from "@/features/projects/project.store";
@@ -41,7 +41,6 @@ export function CenterChrome() {
           <span className="flex h-[16px] w-[16px] shrink-0 items-center justify-center">
             {renderTabIcon(agent, true)}
           </span>
-          {agentWorking ? <LoadingState compact /> : null}
           <span
             className={cn(
               "min-w-0 truncate text-ui font-medium",
@@ -50,6 +49,7 @@ export function CenterChrome() {
           >
             {resolveTabTitle(agent)}
           </span>
+          <TabStatusDot tabId={agent.id} />
         </div>
       ) : (
         <div className="flex-1" />

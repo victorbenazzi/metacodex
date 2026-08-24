@@ -155,6 +155,7 @@
   --dur-base: 180ms;
   --dur-drawer: 240ms;
   --dur-slow: 280ms;
+  --agent-working-dur: 1.6s;
 
   /* Press feedback for primary CTAs — tiny scale-down on :active to give
      tactile confirmation. Restricted to actions (not navigation/tabs). */
@@ -470,7 +471,7 @@
   background-size: 200% 100%;
   background-clip: text;
   -webkit-background-clip: text;
-  animation: loading-shimmer-text 1.4s linear infinite;
+  animation: loading-shimmer-text var(--agent-working-dur) linear infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
