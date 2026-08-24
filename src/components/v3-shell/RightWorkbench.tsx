@@ -27,6 +27,7 @@ interface RightWorkbenchProps {
   onMoveDoc: (id: string, toIndex: number) => void;
   onOpenFolder: () => void;
   onOpenFile: (path: string, name: string, openInEditMode?: boolean) => void;
+  onOpenInBrowser: (path: string) => void;
   onOpenInTerminal: (path: string, name: string) => void;
   onLaunchCliInPath: (cli: CliTool, path: string, name: string) => void;
   onOpenChanges: (expandPath?: string) => void;
@@ -42,6 +43,7 @@ export function RightWorkbench({
   onMoveDoc,
   onOpenFolder,
   onOpenFile,
+  onOpenInBrowser,
   onOpenInTerminal,
   onLaunchCliInPath,
   onOpenChanges,
@@ -130,6 +132,7 @@ export function RightWorkbench({
             projectPath={project?.path}
             onOpenFolder={onOpenFolder}
             onOpenFile={onOpenFile}
+            onOpenInBrowser={onOpenInBrowser}
             onOpenInTerminal={onOpenInTerminal}
             onLaunchCliInPath={onLaunchCliInPath}
           />

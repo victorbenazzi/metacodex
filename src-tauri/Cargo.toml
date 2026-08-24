@@ -29,6 +29,7 @@ portable-pty = "0.8"
 parking_lot = "0.12"
 uuid = { version = "1", features = ["v4", "serde"] }
 base64 = "0.22"
+percent-encoding = "2"
 which = "6"
 chrono = { version = "0.4", features = ["serde"] }
 dirs = "5"

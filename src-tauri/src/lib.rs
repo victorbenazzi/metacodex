@@ -56,6 +56,16 @@ pub fn run() {
         }));
     }
     builder
+        .register_uri_scheme_protocol(
+            commands::browser::LOCAL_FILE_PROTOCOL,
+            |context, request| {
+                commands::browser_local_protocol::response(
+                    context.app_handle(),
+                    context.webview_label(),
+                    request,
+                )
+            },
+        )
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_notification::init())

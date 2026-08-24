@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 
-import { CMD, invoke } from "@/lib/ipc";
+import { CMD, invoke, isAppError } from "@/lib/ipc";
 
 import { browserApi } from "./browser.service";
 import { useBrowserUiStore } from "./browser.store";
@@ -32,15 +32,19 @@ export function useBrowserNavigation(input: {
     store.setAddress(next);
     store.setLoading(true);
     try {
-      await browserApi.navigate(next);
-      store.setUrl(next);
+      const result = await browserApi.navigate(next);
+      store.setUrl(result.url);
+      store.setAddress(result.address);
     } catch (error) {
       store.setLoading(false);
-      store.setUrl(useBrowserUiStore.getState().url);
       input.onFeedback({
         tone: "error",
         title: input.navigateFailed,
-        detail: error instanceof Error ? error.message : String(error),
+        detail: isAppError(error)
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : String(error),
       });
     }
   }, [input]);

@@ -70,6 +70,7 @@ pub struct OpenFilePayload {
 #[serde(rename_all = "camelCase")]
 pub struct BrowserNavigatedPayload {
     pub url: String,
+    pub address: Option<String>,
     pub title: String,
     pub loading: bool,
 }

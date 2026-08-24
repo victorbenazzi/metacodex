@@ -25,6 +25,7 @@ export function useBrowserBridge(): void {
         }
         store.setLoading(next.loading);
         store.setUrl(next.url, next.title || undefined);
+        if (next.address) store.setAddress(next.address);
       },
     );
     const stopMode = listenWhileMounted<BrowserModePayload>(EV.browserMode, (event) => {

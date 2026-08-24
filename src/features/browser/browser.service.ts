@@ -29,6 +29,11 @@ export interface BrowserPick {
 export type BrowserMode = "browse" | "pick" | "draw" | "capture";
 export type BrowserContextDetail = "compact" | "diagnostic";
 
+export interface BrowserNavigation {
+  url: string;
+  address: string;
+}
+
 export const browserApi = {
   setBounds(bounds: BrowserBounds): Promise<void> {
     return invoke(CMD.browserSetBounds, { bounds });
@@ -36,7 +41,7 @@ export const browserApi = {
   hide(): Promise<void> {
     return invoke(CMD.browserHide);
   },
-  navigate(url: string): Promise<void> {
+  navigate(url: string): Promise<BrowserNavigation> {
     return invoke(CMD.browserNavigate, { url });
   },
   reload(): Promise<void> {

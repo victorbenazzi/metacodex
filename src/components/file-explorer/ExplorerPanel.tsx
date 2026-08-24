@@ -23,6 +23,7 @@ export function ExplorerPanel({
   projectPath,
   onOpenFolder,
   onOpenFile,
+  onOpenInBrowser,
   onOpenInTerminal,
   onLaunchCliInPath,
   framed = true,
@@ -42,6 +43,7 @@ export function ExplorerPanel({
           rootPath={projectPath}
           rootName={projectName ?? ""}
           onOpenFile={onOpenFile}
+          onOpenInBrowser={onOpenInBrowser}
           onOpenInTerminal={onOpenInTerminal}
           onLaunchCliInPath={onLaunchCliInPath}
         />

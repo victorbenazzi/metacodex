@@ -14,7 +14,7 @@ import type { Project } from "@/features/projects/project.types";
 import { useProjectsStore } from "@/features/projects/project.store";
 import { flushEditor } from "@/features/editor/editorSavers";
 import { fsApi } from "@/features/filesystem/filesystem.service";
-import { CMD, invoke } from "@/lib/ipc";
+import { CMD, invoke, isAppError } from "@/lib/ipc";
 import { EV, listenTo, type OpenFilePayload, type PreviewGrant } from "@/lib/events";
 import type { CliTool } from "@/features/terminal/cli-registry";
 import { isAppBootstrapReady } from "@/app/hooks/useAppBootstrap";
@@ -29,6 +29,9 @@ import { looksLikeFile } from "@/app/appShell.helpers";
 import { basename } from "@/lib/path";
 import { useSidePanelStore, workbenchOwnsKeyboard, type RightWorkbenchTab } from "@/features/side-panel/sidePanel.store";
 import { useChangesUiStore } from "@/features/git/changes.store";
+import { browserApi } from "@/features/browser/browser.service";
+import { useBrowserUiStore } from "@/features/browser/browser.store";
+import { toast } from "@/features/ui/toast.store";
 import {
   cancelPendingClose,
   confirmPendingClose as lifecycleConfirmPendingClose,
@@ -70,6 +73,7 @@ export interface TabActions extends AppCommands {
   renameTab: (tabId: string, newTitle: string) => void;
   moveTab: (tabId: string, toIndex: number) => void;
   openInTerminal: (path: string, name: string) => void;
+  openInBrowser: (path: string) => void;
   launchCliInPath: (cli: CliTool, path: string, name: string) => void;
   openDiff: (path: string, status: string) => void;
   openChanges: (expandPath?: string) => void;
@@ -384,6 +388,34 @@ export function useTabActions({
     [project],
   );
 
+  const openInBrowser = useCallback(
+    (path: string) => {
+      useSidePanelStore.getState().show("browser");
+      const browser = useBrowserUiStore.getState();
+      browser.setAddress(path);
+      browser.setLoading(true);
+      void browserApi.navigate(path).then(
+        (result) => {
+          const current = useBrowserUiStore.getState();
+          current.setUrl(result.url);
+          current.setAddress(result.address);
+        },
+        (error: unknown) => {
+          useBrowserUiStore.getState().setLoading(false);
+          toast.error(
+            t("browser.navigateFailed"),
+            isAppError(error)
+              ? error.message
+              : error instanceof Error
+                ? error.message
+                : String(error),
+          );
+        },
+      );
+    },
+    [t],
+  );
+
   const pickPreviewFile = useCallback(async () => {
     try {
       const selected = await fsApi.pickPreviewFile(t("preview.openTitle"));
@@ -580,6 +612,7 @@ export function useTabActions({
       renameTab,
       moveTab,
       openInTerminal,
+      openInBrowser,
       launchCliInPath,
       openDiff,
       openChanges,
@@ -613,6 +646,7 @@ export function useTabActions({
       renameTab,
       moveTab,
       openInTerminal,
+      openInBrowser,
       launchCliInPath,
       openDiff,
       openChanges,

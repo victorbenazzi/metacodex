@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useRef, useState } from "react";
 import {
   Copy,
   FolderOpen,
+  Globe,
   Sparkles,
   SquareTerminal,
 } from "@/components/ui/icons";
@@ -35,9 +36,11 @@ import { cn } from "@/lib/cn";
 import { CMD, invoke } from "@/lib/ipc";
 import { basename } from "@/lib/path";
 import type { DirEntry } from "@/features/filesystem/filesystem.types";
+import { isBrowserPreviewFile } from "@/features/browser/url";
 
 export interface TreeNodeActions {
   onOpenFile: (path: string, name: string, openInEditMode?: boolean) => void;
+  onOpenInBrowser: (path: string) => void;
   onOpenInTerminal: (path: string, name: string) => void;
   onLaunchCliInPath: (cli: CliTool, path: string, name: string) => void;
 }
@@ -53,6 +56,7 @@ export const TreeNode = memo(function TreeNode({
   entry,
   depth,
   onOpenFile,
+  onOpenInBrowser,
   onOpenInTerminal,
   onLaunchCliInPath,
 }: TreeNodeProps) {
@@ -90,6 +94,8 @@ export const TreeNode = memo(function TreeNode({
   // like a file so New File/Folder land in its real parent, and the context
   // menu drops the enter/open actions the sandbox would refuse.
   const expandable = entry.isDir && !entry.isSymlink;
+  const canOpenInBrowser =
+    !entry.isDir && !entry.isSymlink && isBrowserPreviewFile(entry.name);
 
   const handleClick = useCallback(() => {
     setSelected(projectId, { path: entry.path, isDir: expandable });
@@ -206,6 +212,12 @@ export const TreeNode = memo(function TreeNode({
                   <Icon icon={FolderOpen} size={12} className="text-muted" />
                   {t("tree.open")}
                 </ContextMenuItem>
+                {canOpenInBrowser ? (
+                  <ContextMenuItem onSelect={() => onOpenInBrowser(entry.path)}>
+                    <Icon icon={Globe} size={12} className="text-muted" />
+                    {t("tree.openInBrowser")}
+                  </ContextMenuItem>
+                ) : null}
                 <ContextMenuSeparator />
               </>
             )}
@@ -233,6 +245,7 @@ export const TreeNode = memo(function TreeNode({
           depth={depth + 1}
           state={children}
           onOpenFile={onOpenFile}
+          onOpenInBrowser={onOpenInBrowser}
           onOpenInTerminal={onOpenInTerminal}
           onLaunchCliInPath={onLaunchCliInPath}
         />
@@ -352,6 +365,7 @@ function TreeChildren({
   depth,
   state,
   onOpenFile,
+  onOpenInBrowser,
   onOpenInTerminal,
   onLaunchCliInPath,
 }: TreeChildrenProps) {
@@ -410,6 +424,7 @@ function TreeChildren({
             entry={c}
             depth={depth}
             onOpenFile={onOpenFile}
+            onOpenInBrowser={onOpenInBrowser}
             onOpenInTerminal={onOpenInTerminal}
             onLaunchCliInPath={onLaunchCliInPath}
           />

@@ -7,6 +7,7 @@ use uuid::Uuid;
 use crate::error::{AppError, AppResult};
 
 pub(crate) const BRIDGE_HOST: &str = "mcx.invalid";
+pub(crate) const LOCAL_FILE_SCHEME: &str = "metacodex-file";
 pub(crate) const MAX_BRIDGE_URL_BYTES: usize = 32 * 1024;
 const MAX_PAGE_URL_BYTES: usize = 8 * 1024;
 const MAX_TITLE_BYTES: usize = 1024;
@@ -125,7 +126,21 @@ pub(crate) fn is_allowed_url(url: &Url) -> bool {
     if url.host_str() == Some(BRIDGE_HOST) {
         return false;
     }
-    matches!(url.scheme(), "http" | "https") || url.as_str() == "about:blank"
+    is_local_file_url(url)
+        || matches!(url.scheme(), "http" | "https")
+        || url.as_str() == "about:blank"
+}
+
+pub(crate) fn is_local_file_url(url: &Url) -> bool {
+    let Some(host) = url.host_str() else {
+        return false;
+    };
+    if url.scheme() == LOCAL_FILE_SCHEME {
+        return host.ends_with(".localhost");
+    }
+    matches!(url.scheme(), "http" | "https")
+        && host.starts_with(&format!("{LOCAL_FILE_SCHEME}."))
+        && host.ends_with(".localhost")
 }
 
 pub(crate) fn is_blank_href(url: &str) -> bool {

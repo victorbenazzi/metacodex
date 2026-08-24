@@ -301,6 +301,7 @@ export function AppShell() {
                   onMoveDoc={actions.moveTab}
                   onOpenFolder={actions.openFolder}
                   onOpenFile={actions.openFile}
+                  onOpenInBrowser={actions.openInBrowser}
                   onOpenInTerminal={actions.openInTerminal}
                   onLaunchCliInPath={actions.launchCliInPath}
                   onOpenChanges={actions.openChanges}

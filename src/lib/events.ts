@@ -74,6 +74,7 @@ export interface OpenFilePayload {
 
 export interface BrowserNavigatedPayload {
   url: string;
+  address: string | null;
   title: string;
   loading: boolean;
 }

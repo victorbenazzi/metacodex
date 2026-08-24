@@ -2531,6 +2531,7 @@ dependencies = [
  "objc2-foundation",
  "objc2-web-kit",
  "parking_lot",
+ "percent-encoding",
  "portable-pty",
  "rustls",
  "serde",
