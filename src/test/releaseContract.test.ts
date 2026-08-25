@@ -40,7 +40,10 @@ describe("metacodex 1.0 release contract", () => {
     const qualityWorkflow = read(".github/workflows/quality.yml");
 
     expect(workflow).toContain("Load versioned release notes");
-    expect(workflow).toContain('NOTES_PATH="docs/releases/${VERSION}.md"');
+    expect(workflow).toContain('NOTES_PATH="docs/releases/v${VERSION}.md"');
+    expect(workflow).toContain(
+      'NOTES_PATH="docs/releases/v${STABLE_VERSION}.md"',
+    );
     expect(workflow).toContain(
       "releaseBody: ${{ steps.release-notes.outputs.body }}",
     );
