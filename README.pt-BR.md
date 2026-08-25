@@ -47,13 +47,17 @@ Baixe o instalador da sua plataforma na [release mais recente](https://github.co
 | Debian / Ubuntu x64 | `metacodex_*_amd64.deb` | `sudo apt install ./metacodex_*_amd64.deb` |
 | Fedora / RPM x64 | `metacodex-*.x86_64.rpm` | `sudo dnf install ./metacodex-*.x86_64.rpm` |
 
-Sem conta e sem wizard de setup. As builds de macOS não são notarizadas, e as de Windows ainda não possuem assinatura de código. Leia os avisos da plataforma nas notas da release antes da primeira abertura.
+Sem conta e sem wizard de setup. As builds de macOS não são notarizadas, e as de Windows ainda não possuem assinatura de código.
+
+> [!WARNING]
+> O Gatekeeper do macOS bloqueia o DMG atual antes da montagem porque a build usa uma assinatura própria e não foi notarizada pela Apple. Siga as [instruções do Gatekeeper no macOS](#aviso-do-gatekeeper-no-macos) antes da primeira abertura.
 
 ## Auto-update
 
 A partir da **v0.0.3**, as builds de macOS e Windows podem se atualizar sozinhas. Logo após abrir, o app consulta o `latest.json` deste repo; quando aparece uma versão nova, surge a pill azul **Update** no chrome central. Um clique baixa o payload, verifica a assinatura contra a chave pública embutida, instala e reabre o app. Pacotes Linux `.deb` e `.rpm` são atualizados pelo fluxo de instalação do sistema.
 
-> ⚠️ Se o macOS recolocar a quarentena após um update in-place (raro, mas acontece em apps não-assinados), rode `sudo xattr -cr /Applications/metacodex.app` uma vez e abra de novo. Sim, a gente sabe — a Apple cobra $99/ano pra essa mensagem sumir. No dia que o metacodex tiver cartão de crédito próprio, a gente assina. Até lá: terminal.
+> [!NOTE]
+> Se o macOS colocar o aplicativo em quarentena novamente após um update interno, siga as mesmas [instruções do Gatekeeper](#aviso-do-gatekeeper-no-macos). Uma versão futura assinada com Apple Developer ID e notarizada pela Apple eliminará essa etapa adicional.
 
 ## Versão Legacy
 
@@ -171,30 +175,51 @@ O perfil release é otimizado pra tamanho (`opt-level = "s"`, `lto`, `panic = "a
 
 Não existe um comando separado de lint para o frontend. TypeScript, Vitest, formatação Rust, Clippy, testes Rust e rastreabilidade de especificação rodam na matriz de qualidade do GitHub Actions.
 
-## Erro de assinatura no macOS ("app está danificado" / "não pode ser aberto")
+## Aviso do Gatekeeper no macOS
 
-Se você baixar uma **build não assinada** do metacodex (por exemplo um `.dmg` de uma release que não passou pela notarização da Apple), o Gatekeeper do macOS vai colocar o app em quarentena e recusar abrir com algo como:
+A build atual do macOS usa uma assinatura própria, não foi assinada com Apple Developer ID e não foi notarizada pela Apple. Por isso, o Gatekeeper pode bloquear o DMG antes da montagem com uma mensagem como:
 
-> *"metacodex.app" está danificado e não pode ser aberto. Você deve movê-lo para o Lixo.*
->
-> *"metacodex" não pode ser aberto porque o desenvolvedor não pode ser verificado.*
+> *A Apple não pôde verificar se "metacodex_1.0.0_aarch64.dmg" está livre de malware que pode danificar o Mac ou comprometer sua privacidade.*
 
-Isso **não é** corrupção — o macOS só removeu o app por causa do flag de quarentena. Arraste o metacodex pra `/Applications` primeiro, e rode **um** desses no Terminal:
+A Apple não revisou esta build. Continue somente se você baixou o DMG na [release oficial do metacodex](https://github.com/victorbenazzi/metacodex/releases/tag/v1.0.0).
+
+### Recomendado: autorize nos Ajustes do Sistema
+
+1. Clique duas vezes no DMG uma vez e feche o aviso.
+2. Abra **menu Apple > Ajustes do Sistema > Privacidade e Segurança**.
+3. Role até **Segurança** e clique em **Abrir Mesmo Assim**. A Apple disponibiliza essa opção por aproximadamente uma hora após a tentativa bloqueada.
+4. Confirme **Abrir**, monte o DMG e arraste `metacodex.app` para `/Applications`.
+
+Esse é o procedimento de exceção documentado pelo [Suporte da Apple](https://support.apple.com/pt-br/102445).
+
+### Alternativa pelo Terminal
+
+Primeiro confira o checksum SHA-256 do arquivo baixado:
+
+| Mac | Arquivo | SHA-256 esperado |
+|---|---|---|
+| Apple Silicon | `metacodex_1.0.0_aarch64.dmg` | `859521bc39f023768c244d00cac9135a34eb42474715b7e15e328839819ff5f6` |
+| Intel | `metacodex_1.0.0_x64.dmg` | `fdbd4154754d36859f72a5f024e7b498575f1bf52747a15a4e10d90e001b0fc4` |
 
 ```bash
-# Recomendado — limpa TODOS os atributos estendidos (inclui com.apple.quarantine)
-sudo xattr -cr /Applications/metacodex.app
+shasum -a 256 "$HOME/Downloads/metacodex_1.0.0_aarch64.dmg"
 ```
 
-Se isso sozinho não bastar (raro, mas acontece em certas versões do macOS quando o binário não tem assinatura nenhuma), assine ad-hoc por cima:
+Se o checksum for igual, remova a quarentena somente desse DMG e abra o arquivo:
 
 ```bash
-sudo codesign --force --deep --sign - /Applications/metacodex.app
+xattr -d com.apple.quarantine "$HOME/Downloads/metacodex_1.0.0_aarch64.dmg"
+open "$HOME/Downloads/metacodex_1.0.0_aarch64.dmg"
 ```
 
-Depois abra o metacodex normalmente. O mesmo truque vale pra qualquer app Tauri/Electron não assinado e é seguro — você está só removendo um flag de quarentena, não desativando o Gatekeeper no sistema inteiro.
+Quem usa Mac Intel deve substituir `aarch64` por `x64`. Depois da montagem, arraste `metacodex.app` para `/Applications`. Se o Gatekeeper também bloquear o aplicativo copiado, execute:
 
-> 🛈 Se você compilou o app você mesmo com `pnpm tauri build`, o `.app` resultante já roda direto de `src-tauri/target/release/bundle/macos/` sem esse erro. O workaround só vale pra builds baixadas de outro lugar.
+```bash
+sudo xattr -dr com.apple.quarantine "/Applications/metacodex.app"
+open "/Applications/metacodex.app"
+```
+
+Esses comandos removem a quarentena somente do arquivo especificado do metacodex. Eles não desativam o Gatekeeper no sistema.
 
 ## Onde as coisas ficam no disco
 
