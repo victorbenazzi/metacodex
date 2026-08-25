@@ -45,6 +45,7 @@ git2 = { version = "0.18", default-features = false, features = ["vendored-libgi
 # reqwest::Client doesn't panic "No provider set". Pinned to the ring provider
 # that's already in the tree (no aws-lc-rs).
 rustls = { version = "0.23", default-features = false, features = ["ring"] }
+image = { version = "0.25", default-features = false, features = ["png"] }
 
 # SIGKILL escalation for stuck PTY children (portable-pty's killer only sends
 # SIGHUP). Unix-only; on Windows portable-pty already does a forceful kill.
@@ -79,16 +80,25 @@ objc2-web-kit = { version = "0.3", default-features = false, features = [
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
 
-# Windows-only.
-# - `netstat2`: fast listening-port enumeration via IP Helper API. Replaces the
-#   macOS `lsof` shell-out path inside `commands::terminal::list_listening_ports`.
-# - `windows`: Job Object bindings (see `pty::job`) so killing a PTY also kills
-#   every descendant (`claude.cmd` → `node.exe`) via `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`.
-[target.'cfg(target_os = "windows")'.dependencies]
+# Native listener discovery on Linux and Windows.
+[target.'cfg(any(target_os = "linux", target_os = "windows"))'.dependencies]
 netstat2 = "0.11"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+cairo-rs = { version = "0.18", features = ["png"] }
+webkit2gtk = "2.0.2"
+
+[target.'cfg(target_os = "linux")'.dev-dependencies]
+gtk = "0.18"
+
+# Windows-only Job Object bindings. Killing a PTY also kills every descendant.
+[target.'cfg(target_os = "windows")'.dependencies]
+webview2-com = "0.38.2"
 windows = { version = "0.61", features = [
   "Win32_Foundation",
   "Win32_Security",
+  "Win32_System_Com",
+  "Win32_System_Com_StructuredStorage",
   "Win32_System_JobObjects",
   "Win32_System_Diagnostics_ToolHelp",
   "Win32_System_Threading",

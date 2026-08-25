@@ -25,9 +25,10 @@ const MAX_CROP_COORDINATE: f64 = 32_768.0;
 const MAX_CROP_DIMENSION: f64 = 8_192.0;
 const MAX_CROP_AREA: f64 = 32.0 * 1024.0 * 1024.0;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum BrowserMode {
+    #[default]
     Browse,
     Pick,
     Draw,
@@ -45,12 +46,6 @@ impl BrowserMode {
                 "unknown browser mode: {value}"
             ))),
         }
-    }
-}
-
-impl Default for BrowserMode {
-    fn default() -> Self {
-        Self::Browse
     }
 }
 
@@ -100,7 +95,7 @@ pub(crate) struct BrowserPick {
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum BridgeMessage {
-    Selection(BrowserPick),
+    Selection(Box<BrowserPick>),
     Capture(BrowserCrop),
     Escape,
     Location {
@@ -170,9 +165,9 @@ pub(crate) fn validate_bridge(
     }
 
     match url.path() {
-        "/selection" if active_mode == BrowserMode::Pick => {
-            parse_selection(&mut fields).map(BridgeMessage::Selection)
-        }
+        "/selection" if active_mode == BrowserMode::Pick => parse_selection(&mut fields)
+            .map(Box::new)
+            .map(BridgeMessage::Selection),
         "/capture" if active_mode == BrowserMode::Capture => {
             let rect = parse_rect(&mut fields)?;
             ensure_no_fields(&fields)?;

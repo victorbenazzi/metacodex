@@ -777,6 +777,7 @@
     "servers": "Servidores",
     "serversEmpty": "Nenhum servidor local detectado. Suba um processo de dev numa aba de terminal.",
     "navigateFailed": "Não foi possível abrir essa URL",
+    "externalOpenFailed": "Não foi possível abrir no navegador do sistema",
     "invalidAddress": "Digite uma URL, porta local ou caminho absoluto de arquivo",
     "captureFailed": "Não foi possível capturar a página",
     "modeFailed": "Não foi possível mudar o modo do browser",

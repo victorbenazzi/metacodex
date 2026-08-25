@@ -149,6 +149,7 @@ pub fn run() {
             commands::projects::get_active_project_id,
             commands::projects::reveal_in_finder,
             commands::system::open_external_url,
+            commands::system::open_external_path,
             commands::system::take_pending_open_files,
             commands::app_lifecycle::app_quit_ready,
             commands::app_lifecycle::app_retry_quit,

@@ -807,7 +807,10 @@ pub async fn git_branches(app: AppHandle, root: String) -> AppResult<Vec<String>
     app.state::<Arc<ProjectsCache>>()
         .require_within_project_roots(&root)?;
     tokio::task::spawn_blocking(move || {
-        let out = run_git(&root, &["for-each-ref", "--format=%(refname:short)", "refs/heads"])?;
+        let out = run_git(
+            &root,
+            &["for-each-ref", "--format=%(refname:short)", "refs/heads"],
+        )?;
         git_fail(&out, "list branches")?;
         Ok(String::from_utf8_lossy(&out.stdout)
             .lines()

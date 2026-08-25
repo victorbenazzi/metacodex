@@ -13,6 +13,26 @@ function isAbsoluteLocalPath(value: string): boolean {
   return value.startsWith("/") || /^[a-z]:[\\/]/i.test(value) || value.startsWith("\\\\");
 }
 
+export type BrowserExternalTarget =
+  | { command: "openExternalUrl"; value: string }
+  | { command: "openExternalPath"; value: string };
+
+function fileUrlPath(parsed: URL): string | null {
+  let pathname: string;
+  try {
+    pathname = decodeURIComponent(parsed.pathname);
+  } catch {
+    return null;
+  }
+  if (parsed.hostname) {
+    return `\\\\${parsed.hostname}${pathname.replaceAll("/", "\\")}`;
+  }
+  if (/^\/[a-z]:\//i.test(pathname)) {
+    return pathname.slice(1).replaceAll("/", "\\");
+  }
+  return pathname.startsWith("/") ? pathname : null;
+}
+
 function isLocalBrowserUrl(parsed: URL): boolean {
   return (
     parsed.protocol === LOCAL_BROWSER_SCHEME ||
@@ -62,6 +82,28 @@ export function normalizeBrowserUrl(raw: string): string | null {
   if (/^[\w.-]+:\d/.test(s)) return `http://${s}`;
   if (s.includes(" ") || !s.includes(".")) return null;
   return `https://${s}`;
+}
+
+/** Resolve an address-bar value to the narrow native opener it is allowed to use. */
+export function browserExternalTarget(raw: string): BrowserExternalTarget | null {
+  const value = raw.trim();
+  if (isAbsoluteLocalPath(value)) {
+    return { command: "openExternalPath", value };
+  }
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol === "file:") {
+      const path = fileUrlPath(parsed);
+      return path ? { command: "openExternalPath", value: path } : null;
+    }
+    if (isLocalBrowserUrl(parsed)) return null;
+    if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+      return { command: "openExternalUrl", value };
+    }
+  } catch {
+    return null;
+  }
+  return null;
 }
 
 export function isBrowserPreviewFile(path: string): boolean {

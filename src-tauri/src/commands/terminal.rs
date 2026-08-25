@@ -106,9 +106,7 @@ pub struct ListeningPort {
 
 fn dedupe_listening_ports(mut listeners: Vec<ListeningPort>) -> Vec<ListeningPort> {
     listeners.sort_by_key(|listener| (listener.port, listener.protocol.clone(), listener.pid));
-    listeners.dedup_by(|a, b| {
-        a.port == b.port && a.protocol == b.protocol && a.pid == b.pid
-    });
+    listeners.dedup_by(|a, b| a.port == b.port && a.protocol == b.protocol && a.pid == b.pid);
     listeners
 }
 
@@ -247,12 +245,10 @@ fn parse_macos_lsof_listeners(text: &str) -> Option<Vec<ListeningPort>> {
     Some(dedupe_listening_ports(out))
 }
 
-#[cfg(target_os = "windows")]
+#[cfg(any(target_os = "linux", target_os = "windows"))]
 fn list_listening_ports(pids: &[u32]) -> Option<Vec<ListeningPort>> {
-    // Use the IP Helper API (`GetExtendedTcpTable`) via `netstat2` , sub-ms,
-    // pure Rust, no PowerShell round-trip. We iterate every TCP socket, keep
-    // only LISTEN sockets owned by `pid`, and dedupe identical IPv4/IPv6
-    // entries on the same port for display.
+    // netstat2 uses the native socket table for the current platform. Keep only
+    // listening TCP sockets owned by the PTY process tree.
     use netstat2::{
         get_sockets_info, AddressFamilyFlags, ProtocolFlags, ProtocolSocketInfo, TcpState,
     };
@@ -279,13 +275,6 @@ fn list_listening_ports(pids: &[u32]) -> Option<Vec<ListeningPort>> {
         }
     }
     Some(dedupe_listening_ports(out))
-}
-
-#[cfg(all(unix, not(target_os = "macos")))]
-fn list_listening_ports(_pids: &[u32]) -> Option<Vec<ListeningPort>> {
-    // Linux port discovery is out of scope for the MVP , the UI degrades
-    // gracefully (chips list stays empty).
-    None
 }
 
 #[tauri::command]
@@ -319,6 +308,27 @@ pub async fn pty_metadata_batch(
 
 #[cfg(test)]
 mod metadata_tests {
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_metadata_reports_a_listener_owned_by_the_session() {
+        let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let pid = std::process::id();
+
+        let metadata = super::metadata_for_session(
+            pid,
+            "/tmp".into(),
+            "session".into(),
+            None,
+            Some(vec![pid]),
+        );
+
+        let listeners = metadata.listening_ports.expect("listener discovery");
+        assert!(listeners
+            .iter()
+            .any(|entry| entry.pid == pid && entry.port == port));
+    }
+
     #[test]
     fn listener_deduplication_preserves_distinct_processes() {
         let listeners = super::dedupe_listening_ports(vec![

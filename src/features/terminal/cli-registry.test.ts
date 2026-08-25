@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import i18n from "@/features/i18n/config";
 
 import {
+  cliInstallCommandForPlatform,
   cliLaunchString,
   DEFAULT_CLI_REGISTRY,
   enabledAgentsByCategory,
@@ -35,6 +36,12 @@ describe("CLI launch policy", () => {
     });
     expect(cli?.elevatedArgs ?? []).toEqual([]);
     expect(cliLaunchString(cli!)).toBe("mcx");
+    expect(cliInstallCommandForPlatform(cli!, "windows")).toBe(
+      "pnpm build; if ($LASTEXITCODE -eq 0) { pnpm link --global }",
+    );
+    expect(cliInstallCommandForPlatform(cli!, "unix")).toBe(
+      "pnpm build && pnpm link --global",
+    );
   });
 
   it("moves legacy bypass flags into elevated arguments", () => {

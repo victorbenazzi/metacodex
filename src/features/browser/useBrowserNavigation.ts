@@ -4,7 +4,7 @@ import { CMD, invoke, isAppError } from "@/lib/ipc";
 
 import { browserApi } from "./browser.service";
 import { useBrowserUiStore } from "./browser.store";
-import { normalizeBrowserUrl } from "./url";
+import { browserExternalTarget, normalizeBrowserUrl } from "./url";
 
 export type BrowserOpenTarget = "app" | "system";
 export interface BrowserFeedback {
@@ -16,8 +16,34 @@ export interface BrowserFeedback {
 export function useBrowserNavigation(input: {
   invalidAddress: string;
   navigateFailed: string;
+  externalOpenFailed: string;
   onFeedback: (feedback: BrowserFeedback) => void;
 }) {
+  const openInSystem = useCallback(async (raw: string) => {
+    const target = browserExternalTarget(raw);
+    if (!target) {
+      input.onFeedback({ tone: "error", title: input.invalidAddress });
+      return;
+    }
+    try {
+      if (target.command === "openExternalPath") {
+        await invoke(CMD.openExternalPath, { path: target.value });
+      } else {
+        await invoke(CMD.openExternalUrl, { url: target.value });
+      }
+    } catch (error) {
+      input.onFeedback({
+        tone: "error",
+        title: input.externalOpenFailed,
+        detail: isAppError(error)
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : String(error),
+      });
+    }
+  }, [input]);
+
   const go = useCallback(async (raw: string, target: BrowserOpenTarget = "app") => {
     const next = normalizeBrowserUrl(raw);
     if (!next) {
@@ -25,7 +51,7 @@ export function useBrowserNavigation(input: {
       return;
     }
     if (target === "system") {
-      await invoke(CMD.openExternalUrl, { url: next }).catch(() => undefined);
+      await openInSystem(next);
       return;
     }
     const store = useBrowserUiStore.getState();
@@ -47,12 +73,13 @@ export function useBrowserNavigation(input: {
             : String(error),
       });
     }
-  }, [input]);
+  }, [input, openInSystem]);
 
   const openExternal = useCallback(async () => {
-    const url = useBrowserUiStore.getState().url;
-    if (url) await invoke(CMD.openExternalUrl, { url }).catch(() => undefined);
-  }, []);
+    const { address, url } = useBrowserUiStore.getState();
+    const target = address || url;
+    if (target) await openInSystem(target);
+  }, [openInSystem]);
 
   const goBack = useCallback(() => browserApi.goBack().catch(() => undefined), []);
   const goForward = useCallback(() => browserApi.goForward().catch(() => undefined), []);

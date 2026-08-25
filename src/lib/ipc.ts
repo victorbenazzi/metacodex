@@ -33,6 +33,7 @@ export const CMD = {
 
   // system
   openExternalUrl: "open_external_url",
+  openExternalPath: "open_external_path",
   takePendingOpenFiles: "take_pending_open_files",
   appQuitReady: "app_quit_ready",
   appRetryQuit: "app_retry_quit",

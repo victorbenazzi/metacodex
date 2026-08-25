@@ -21,7 +21,15 @@ pub fn capture_png<R: Runtime>(
     {
         capture_macos(webview, dest, crop, viewport)
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "linux")]
+    {
+        capture_linux(webview, dest, crop, viewport)
+    }
+    #[cfg(target_os = "windows")]
+    {
+        capture_windows(webview, dest, crop, viewport)
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
     {
         let _ = webview;
         let _ = dest;
@@ -31,6 +39,155 @@ pub fn capture_png<R: Runtime>(
             "browser screenshot is not available on this platform yet".into(),
         ))
     }
+}
+
+#[cfg(target_os = "windows")]
+fn capture_windows<R: Runtime>(
+    webview: &Webview<R>,
+    dest: &Path,
+    crop: Option<&BrowserCrop>,
+    viewport: Option<(f64, f64)>,
+) -> AppResult<()> {
+    use webview2_com::CapturePreviewCompletedHandler;
+    use webview2_com::Microsoft::Web::WebView2::Win32::COREWEBVIEW2_CAPTURE_PREVIEW_IMAGE_FORMAT_PNG;
+    use windows::Win32::Foundation::HGLOBAL;
+    use windows::Win32::System::Com::StructuredStorage::CreateStreamOnHGlobal;
+
+    let (tx, rx) = mpsc::channel::<Result<Vec<u8>, String>>();
+    let crop = crop.cloned();
+    webview
+        .with_webview(move |platform| {
+            let result = (|| -> Result<(), String> {
+                let controller = platform.controller();
+                let core =
+                    unsafe { controller.CoreWebView2() }.map_err(|error| error.to_string())?;
+                let stream = unsafe { CreateStreamOnHGlobal(HGLOBAL::default(), true) }
+                    .map_err(|error| error.to_string())?;
+                let stream_for_callback = stream.clone();
+                let tx_done = tx.clone();
+                let handler = CapturePreviewCompletedHandler::create(Box::new(move |status| {
+                    let result = status
+                        .map_err(|error| error.to_string())
+                        .and_then(|()| read_windows_stream(&stream_for_callback))
+                        .and_then(|png| match crop.as_ref() {
+                            Some(rect) => crop_snapshot_png(&png, rect, viewport)
+                                .map_err(|error| error.to_string()),
+                            None => Ok(png),
+                        });
+                    let _ = tx_done.send(result);
+                    Ok(())
+                }));
+                unsafe {
+                    core.CapturePreview(
+                        COREWEBVIEW2_CAPTURE_PREVIEW_IMAGE_FORMAT_PNG,
+                        &stream,
+                        &handler,
+                    )
+                }
+                .map_err(|error| error.to_string())?;
+                Ok(())
+            })();
+            if let Err(error) = result {
+                let _ = tx.send(Err(error));
+            }
+        })
+        .map_err(|error| AppError::Other(format!("webview snapshot: {error}")))?;
+
+    let bytes = rx
+        .recv_timeout(Duration::from_secs(4))
+        .map_err(|_| AppError::Other("snapshot timed out".into()))?
+        .map_err(AppError::Other)?;
+    write_bytes_atomic(dest, &bytes)
+}
+
+#[cfg(target_os = "windows")]
+fn read_windows_stream(stream: &windows::Win32::System::Com::IStream) -> Result<Vec<u8>, String> {
+    use windows::Win32::System::Com::{STATFLAG_NONAME, STATSTG, STREAM_SEEK_SET};
+
+    let mut stat = STATSTG::default();
+    unsafe { stream.Stat(&mut stat, STATFLAG_NONAME) }.map_err(|error| error.to_string())?;
+    let length = usize::try_from(stat.cbSize)
+        .map_err(|_| "browser snapshot is too large to read".to_string())?;
+    if length == 0 {
+        return Err("empty snapshot".into());
+    }
+    unsafe { stream.Seek(0, STREAM_SEEK_SET, None) }.map_err(|error| error.to_string())?;
+
+    let mut output = vec![0_u8; length];
+    let mut offset = 0_usize;
+    while offset < output.len() {
+        let chunk = (output.len() - offset).min(u32::MAX as usize) as u32;
+        let mut read = 0_u32;
+        unsafe { stream.Read(output[offset..].as_mut_ptr().cast(), chunk, Some(&mut read)) }
+            .ok()
+            .map_err(|error| error.to_string())?;
+        if read == 0 {
+            break;
+        }
+        offset += read as usize;
+    }
+    output.truncate(offset);
+    if output.is_empty() {
+        return Err("empty snapshot".into());
+    }
+    Ok(output)
+}
+
+#[cfg(target_os = "linux")]
+fn capture_linux<R: Runtime>(
+    webview: &Webview<R>,
+    dest: &Path,
+    crop: Option<&BrowserCrop>,
+    viewport: Option<(f64, f64)>,
+) -> AppResult<()> {
+    let (tx, rx) = mpsc::channel::<Result<Vec<u8>, String>>();
+    let crop = crop.cloned();
+    webview
+        .with_webview(move |platform| {
+            request_linux_snapshot(&platform.inner(), crop, viewport, tx);
+        })
+        .map_err(|error| AppError::Other(format!("webview snapshot: {error}")))?;
+
+    let bytes = rx
+        .recv_timeout(Duration::from_secs(4))
+        .map_err(|_| AppError::Other("snapshot timed out".into()))?
+        .map_err(AppError::Other)?;
+    write_bytes_atomic(dest, &bytes)
+}
+
+#[cfg(target_os = "linux")]
+fn request_linux_snapshot(
+    view: &webkit2gtk::WebView,
+    crop: Option<BrowserCrop>,
+    viewport: Option<(f64, f64)>,
+    tx: mpsc::Sender<Result<Vec<u8>, String>>,
+) {
+    use webkit2gtk::{SnapshotOptions, SnapshotRegion, WebViewExt};
+
+    view.snapshot(
+        SnapshotRegion::Visible,
+        SnapshotOptions::NONE,
+        None::<&webkit2gtk::gio::Cancellable>,
+        move |result| {
+            let result = result
+                .map_err(|error| error.to_string())
+                .and_then(|surface| {
+                    let image = surface
+                        .map_to_image(None)
+                        .map_err(|error| error.to_string())?;
+                    let mut png = Vec::new();
+                    image
+                        .write_to_png(&mut png)
+                        .map_err(|error| error.to_string())?;
+                    match crop.as_ref() {
+                        Some(rect) => crop_snapshot_png(&png, rect, viewport)
+                            .map_err(|error| error.to_string()),
+                        None => Ok(png),
+                    }
+                });
+            let _ = tx.send(result);
+        },
+    );
 }
 
 #[cfg(target_os = "macos")]
@@ -134,6 +291,44 @@ fn snapshot_rect(crop: &BrowserCrop, viewport: Option<(f64, f64)>) -> AppResult<
     })
 }
 
+#[cfg(any(test, target_os = "linux", target_os = "windows"))]
+fn crop_snapshot_png(
+    png: &[u8],
+    crop: &BrowserCrop,
+    viewport: Option<(f64, f64)>,
+) -> AppResult<Vec<u8>> {
+    use image::{GenericImageView, ImageFormat};
+    use std::io::Cursor;
+
+    let rect = snapshot_rect(crop, viewport)?;
+    let (viewport_width, viewport_height) = viewport.expect("snapshot_rect validates viewport");
+    let image = image::load_from_memory_with_format(png, ImageFormat::Png)
+        .map_err(|error| AppError::Other(format!("decode browser snapshot: {error}")))?;
+    let (image_width, image_height) = image.dimensions();
+    let scale_x = image_width as f64 / viewport_width;
+    let scale_y = image_height as f64 / viewport_height;
+    let left = (rect.x * scale_x).floor().clamp(0.0, image_width as f64) as u32;
+    let top = (rect.y * scale_y).floor().clamp(0.0, image_height as f64) as u32;
+    let right = ((rect.x + rect.width) * scale_x)
+        .ceil()
+        .clamp(0.0, image_width as f64) as u32;
+    let bottom = ((rect.y + rect.height) * scale_y)
+        .ceil()
+        .clamp(0.0, image_height as f64) as u32;
+    if right <= left || bottom <= top {
+        return Err(AppError::InvalidArgument(
+            "browser crop is outside the captured image".into(),
+        ));
+    }
+
+    let cropped = image.crop_imm(left, top, right - left, bottom - top);
+    let mut output = Cursor::new(Vec::new());
+    cropped
+        .write_to(&mut output, ImageFormat::Png)
+        .map_err(|error| AppError::Other(format!("encode browser snapshot: {error}")))?;
+    Ok(output.into_inner())
+}
+
 #[cfg(target_os = "macos")]
 fn image_to_png(image: &objc2_app_kit::NSImage) -> Result<Vec<u8>, String> {
     use objc2_app_kit::{NSBitmapImageFileType, NSBitmapImageRep};
@@ -224,7 +419,97 @@ fn prune_dir_at(dir: &Path, now: std::time::SystemTime, max_age_secs: u64, cap: 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use image::{DynamicImage, GenericImageView, ImageBuffer, ImageFormat, Rgba};
+    use std::io::Cursor;
     use std::time::{Duration, SystemTime};
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_webkit_snapshot_returns_a_png() {
+        if std::env::var_os("METACODEX_NATIVE_CAPTURE_TEST").is_none() {
+            return;
+        }
+
+        use gtk::prelude::*;
+        use webkit2gtk::{LoadEvent, WebView, WebViewExt};
+
+        gtk::init().unwrap();
+        let window = gtk::Window::new(gtk::WindowType::Toplevel);
+        window.set_default_size(320, 180);
+        let view = WebView::new();
+        window.add(&view);
+        window.show_all();
+
+        let (loaded_tx, loaded_rx) = mpsc::channel();
+        view.connect_load_changed(move |_, event| {
+            if event == LoadEvent::Finished {
+                let _ = loaded_tx.send(());
+            }
+        });
+        view.load_html(
+            "<!doctype html><style>html,body{margin:0;background:#123456}</style>",
+            Some("http://localhost/"),
+        );
+        pump_linux_main_context_until(|| loaded_rx.try_recv().is_ok());
+
+        let (snapshot_tx, snapshot_rx) = mpsc::channel();
+        request_linux_snapshot(&view, None, Some((320.0, 180.0)), snapshot_tx);
+        let mut snapshot = None;
+        pump_linux_main_context_until(|| {
+            if let Ok(result) = snapshot_rx.try_recv() {
+                snapshot = Some(result);
+                true
+            } else {
+                false
+            }
+        });
+        let png = snapshot.expect("snapshot callback did not run").unwrap();
+        let decoded = image::load_from_memory_with_format(&png, ImageFormat::Png).unwrap();
+        assert!(decoded.width() >= 300);
+        assert!(decoded.height() >= 160);
+        window.close();
+    }
+
+    #[cfg(target_os = "linux")]
+    fn pump_linux_main_context_until(mut done: impl FnMut() -> bool) {
+        let context = webkit2gtk::glib::MainContext::default();
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        let mut finished = done();
+        while !finished && std::time::Instant::now() < deadline {
+            while context.pending() {
+                context.iteration(false);
+            }
+            finished = done();
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        assert!(finished, "native Linux webview operation timed out");
+    }
+
+    #[test]
+    fn bitmap_crop_scales_css_coordinates_to_native_pixels() {
+        let source = ImageBuffer::from_fn(400, 200, |x, y| Rgba([x as u8, y as u8, 7, 255]));
+        let mut png = Cursor::new(Vec::new());
+        DynamicImage::ImageRgba8(source)
+            .write_to(&mut png, ImageFormat::Png)
+            .unwrap();
+
+        let cropped = crop_snapshot_png(
+            &png.into_inner(),
+            &BrowserCrop {
+                x: 25.0,
+                y: 20.0,
+                width: 50.0,
+                height: 40.0,
+            },
+            Some((200.0, 100.0)),
+        )
+        .unwrap();
+        let decoded = image::load_from_memory_with_format(&cropped, ImageFormat::Png).unwrap();
+
+        assert_eq!(decoded.dimensions(), (132, 112));
+        assert_eq!(decoded.get_pixel(0, 0), Rgba([34, 24, 7, 255]));
+        assert_eq!(decoded.get_pixel(131, 111), Rgba([165, 135, 7, 255]));
+    }
 
     #[test]
     fn prune_caps_newest() {

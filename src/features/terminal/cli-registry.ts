@@ -59,6 +59,7 @@ export const DEFAULT_CLI_REGISTRY: CliTool[] = [
     detectCommand: "command -v mcx",
     detectCommandWindows: "Get-Command mcx",
     installCommand: "pnpm build && pnpm link --global",
+    installCommandWindows: "pnpm build; if ($LASTEXITCODE -eq 0) { pnpm link --global }",
     description:
       "metacodex multi-provider coding agent. Build from the metacodex-cli repo, then link it on PATH.",
   },
@@ -221,7 +222,14 @@ export function cliCategory(cli: CliTool): CliCategory {
  * with custom overrides keep working without rewriting their JSON.
  */
 export function cliInstallCommand(cli: CliTool): string {
-  if (isWindows && cli.installCommandWindows) return cli.installCommandWindows;
+  return cliInstallCommandForPlatform(cli, isWindows ? "windows" : "unix");
+}
+
+export function cliInstallCommandForPlatform(
+  cli: CliTool,
+  platform: "unix" | "windows",
+): string {
+  if (platform === "windows" && cli.installCommandWindows) return cli.installCommandWindows;
   return cli.installCommand;
 }
 

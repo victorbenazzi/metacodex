@@ -57,7 +57,6 @@ pub(crate) fn preview_extensions() -> Vec<&'static str> {
     out
 }
 
-
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DirEntry {

@@ -36,8 +36,8 @@ describe("Tauri IPC parity", () => {
     );
     const rustCommands = sortedUnique(extractRustCommands(rust));
 
-    expect(tsCommands).toHaveLength(79);
-    expect(rustCommands).toHaveLength(79);
+    expect(tsCommands).toHaveLength(80);
+    expect(rustCommands).toHaveLength(80);
     expect(tsCommands).toEqual(rustCommands);
   });
 

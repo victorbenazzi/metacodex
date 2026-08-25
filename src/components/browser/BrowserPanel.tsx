@@ -41,6 +41,7 @@ export function BrowserPanel({ active }: BrowserPanelProps) {
   const navigation = useBrowserNavigation({
     invalidAddress: t("browser.invalidAddress"),
     navigateFailed: t("browser.navigateFailed"),
+    externalOpenFailed: t("browser.externalOpenFailed"),
     onFeedback: pushFeedback,
   });
   const { stoppingServerIds, stopServer } = useDevServerActions(servers);

@@ -1,11 +1,50 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  browserExternalTarget,
   isAllowedBrowserUrl,
   isBlankBrowserUrl,
   isBrowserPreviewFile,
   normalizeBrowserUrl,
 } from "./url";
+
+describe("browserExternalTarget", () => {
+  it("routes web URLs through the system browser command", () => {
+    expect(browserExternalTarget("https://example.com/docs")).toEqual({
+      command: "openExternalUrl",
+      value: "https://example.com/docs",
+    });
+  });
+
+  it("routes Linux, macOS, Windows, and UNC paths through native path opening", () => {
+    for (const path of [
+      "/home/victor/project/index.html",
+      "C:\\Users\\victor\\project\\index.html",
+      "\\\\server\\share\\index.html",
+    ]) {
+      expect(browserExternalTarget(path), path).toEqual({
+        command: "openExternalPath",
+        value: path,
+      });
+    }
+    expect(browserExternalTarget("file:///home/victor/project/index.html")).toEqual({
+      command: "openExternalPath",
+      value: "/home/victor/project/index.html",
+    });
+    expect(browserExternalTarget("file:///C:/Users/victor/project/index.html")).toEqual({
+      command: "openExternalPath",
+      value: "C:\\Users\\victor\\project\\index.html",
+    });
+  });
+
+  it("does not expose internal browser URLs to the operating system", () => {
+    expect(
+      browserExternalTarget(
+        "metacodex-file://0123456789abcdef.localhost/project/index.html",
+      ),
+    ).toBeNull();
+  });
+});
 
 describe("normalizeBrowserUrl", () => {
   it("maps a bare port to localhost", () => {

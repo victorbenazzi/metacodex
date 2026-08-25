@@ -111,20 +111,40 @@ pub fn git_info(root: &str, include_stats: bool) -> AppResult<Option<GitInfo>> {
 }
 
 fn index_status_code(s: Status) -> Option<&'static str> {
-    if s.contains(Status::CONFLICTED) { return Some("!"); }
-    if s.contains(Status::INDEX_NEW) { return Some("A"); }
-    if s.contains(Status::INDEX_MODIFIED) { return Some("M"); }
-    if s.contains(Status::INDEX_DELETED) { return Some("D"); }
-    if s.contains(Status::INDEX_RENAMED) { return Some("R"); }
+    if s.contains(Status::CONFLICTED) {
+        return Some("!");
+    }
+    if s.contains(Status::INDEX_NEW) {
+        return Some("A");
+    }
+    if s.contains(Status::INDEX_MODIFIED) {
+        return Some("M");
+    }
+    if s.contains(Status::INDEX_DELETED) {
+        return Some("D");
+    }
+    if s.contains(Status::INDEX_RENAMED) {
+        return Some("R");
+    }
     None
 }
 
 fn worktree_status_code(s: Status) -> Option<&'static str> {
-    if s.contains(Status::CONFLICTED) { return Some("!"); }
-    if s.contains(Status::WT_NEW) { return Some("?"); }
-    if s.contains(Status::WT_MODIFIED) { return Some("M"); }
-    if s.contains(Status::WT_DELETED) { return Some("D"); }
-    if s.contains(Status::WT_RENAMED) { return Some("R"); }
+    if s.contains(Status::CONFLICTED) {
+        return Some("!");
+    }
+    if s.contains(Status::WT_NEW) {
+        return Some("?");
+    }
+    if s.contains(Status::WT_MODIFIED) {
+        return Some("M");
+    }
+    if s.contains(Status::WT_DELETED) {
+        return Some("D");
+    }
+    if s.contains(Status::WT_RENAMED) {
+        return Some("R");
+    }
     None
 }
 

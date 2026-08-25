@@ -208,6 +208,7 @@ fn windows_env(project_path: &Path) -> Vec<(String, String)> {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(unix)]
     use super::cli_launch_args;
 
     #[cfg(unix)]

@@ -3,6 +3,7 @@ use std::process::Command;
 
 use serde::Serialize;
 use std::collections::HashMap;
+#[cfg(unix)]
 use std::time::{Duration, Instant};
 
 use crate::error::{AppError, AppResult};

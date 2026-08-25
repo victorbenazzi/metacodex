@@ -777,6 +777,7 @@
     "servers": "Dev servers",
     "serversEmpty": "No local servers detected. Start a dev process in a terminal tab.",
     "navigateFailed": "Could not open that URL",
+    "externalOpenFailed": "Could not open in the system browser",
     "invalidAddress": "Enter a URL, local port, or absolute file path",
     "captureFailed": "Could not capture the page",
     "modeFailed": "Could not change browser mode",
