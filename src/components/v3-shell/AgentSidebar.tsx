@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { FolderPlus, Plus, Search, Settings, Sliders } from "@/components/ui/icons";
+import { FolderPlus, Plus, Search, Settings } from "@/components/ui/icons";
 import { useTranslation } from "react-i18next";
 
 import { Icon } from "@/components/ui/Icon";
@@ -30,12 +30,7 @@ export function AgentSidebar() {
 
   const [renameTarget, setRenameTarget] = useState<Project | null>(null);
   const [removeTarget, setRemoveTarget] = useState<Project | null>(null);
-  const [sortAz, setSortAz] = useState(false);
   const ghostRef = useRef<HTMLDivElement | null>(null);
-
-  const listed = sortAz
-    ? [...projects].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))
-    : projects;
 
   const drag = useListReorder({
     ids: projects.map((p) => p.id),
@@ -86,62 +81,48 @@ export function AgentSidebar() {
             <span className="min-w-0 flex-1 text-caption text-body">
               {t("v3.repos.title")}
             </span>
-                <Tooltip content={t("v3.repos.filter")} side="bottom">
-                  <button
-                    type="button"
-                    aria-label={t("v3.repos.filter")}
-                    aria-pressed={sortAz}
-                    onClick={() => setSortAz((v) => !v)}
+            <Tooltip content={t("v3.repos.open")} side="bottom">
+              <button
+                type="button"
+                aria-label={t("v3.repos.open")}
+                onClick={() => setOpenProjectOpen(true)}
+                className="inline-flex h-[22px] w-[22px] cursor-pointer items-center justify-center rounded-sm text-muted transition-colors duration-fast hover:bg-surface-strong hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-hairline-strong"
+              >
+                <Icon icon={FolderPlus} size={12} />
+              </button>
+            </Tooltip>
+          </div>
+          <div className="relative min-h-0 flex-1 overflow-y-auto px-6px pb-8px">
+            {drag.indicatorTop !== null ? (
+              <ReorderDropLine top={drag.indicatorTop} insetX={8} />
+            ) : null}
+            {projects.length === 0 ? (
+              <p className="px-10px pt-8px text-caption leading-[1.5] text-muted">
+                {t("v3.repos.empty")}
+              </p>
+            ) : (
+              <div className="flex flex-col gap-[2px]">
+                {projects.map((p) => (
+                  <div
+                    key={p.id}
+                    ref={drag.itemRef(p.id)}
+                    {...drag.getItemProps(p.id)}
                     className={cn(
-                      "inline-flex h-[22px] w-[22px] cursor-pointer items-center justify-center rounded-sm transition-colors duration-fast hover:bg-surface-strong hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-hairline-strong",
-                      sortAz ? "bg-surface-strong text-ink" : "text-muted",
+                      "touch-none transition-opacity duration-fast",
+                      drag.draggingId === p.id && "opacity-30",
                     )}
                   >
-                    <Icon icon={Sliders} size={12} />
-                  </button>
-                </Tooltip>
-                <Tooltip content={t("v3.repos.open")} side="bottom">
-                  <button
-                    type="button"
-                    aria-label={t("v3.repos.open")}
-                    onClick={() => setOpenProjectOpen(true)}
-                    className="inline-flex h-[22px] w-[22px] cursor-pointer items-center justify-center rounded-sm text-muted transition-colors duration-fast hover:bg-surface-strong hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-hairline-strong"
-                  >
-                    <Icon icon={FolderPlus} size={12} />
-                  </button>
-                </Tooltip>
-              </div>
-              <div className="relative min-h-0 flex-1 overflow-y-auto px-6px pb-8px">
-                {drag.indicatorTop !== null && !sortAz ? (
-                  <ReorderDropLine top={drag.indicatorTop} insetX={8} />
-                ) : null}
-                {projects.length === 0 ? (
-                  <p className="px-10px pt-8px text-caption leading-[1.5] text-muted">
-                    {t("v3.repos.empty")}
-                  </p>
-                ) : (
-                  <div className="flex flex-col gap-[2px]">
-                    {listed.map((p) => (
-                      <div
-                        key={p.id}
-                        ref={sortAz ? undefined : drag.itemRef(p.id)}
-                        {...(sortAz ? {} : drag.getItemProps(p.id))}
-                        className={cn(
-                          "touch-none transition-opacity duration-fast",
-                          drag.draggingId === p.id && "opacity-30",
-                        )}
-                      >
-                        <RepoRow
-                          project={p}
-                          active={p.id === activeProjectId}
-                          onRequestRename={setRenameTarget}
-                          onRequestRemove={setRemoveTarget}
-                        />
-                      </div>
-                    ))}
+                    <RepoRow
+                      project={p}
+                      active={p.id === activeProjectId}
+                      onRequestRename={setRenameTarget}
+                      onRequestRemove={setRemoveTarget}
+                    />
                   </div>
-                )}
+                ))}
               </div>
+            )}
+          </div>
         </div>
 
         <footer className="flex shrink-0 items-center border-t border-hairline-soft px-8px py-8px">

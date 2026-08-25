@@ -153,7 +153,6 @@ export function TerminalTab({
       term,
       fit,
       getContainer: () => containerRef.current,
-      scrollToBottom: true,
     });
   }, [isVisible, termRef, fitRef, containerRef]);
 

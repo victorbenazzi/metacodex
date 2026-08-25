@@ -7,9 +7,7 @@ import { IconButton } from "@/components/ui/IconButton";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { CLI_BRAND_ICONS } from "@/components/icons/brand";
 import { ProjectContextMenu } from "@/components/project-rail/ProjectContextMenu";
-import { ProjectStatusDot } from "@/components/project-rail/ProjectStatusDot";
 import { TabStatusDot } from "@/components/tabs/TabStatusDot";
-import { statusTone } from "@/components/tabs/statusTone";
 import { resolveTabTitle } from "@/components/tabs/types";
 import { useTabsStore } from "@/components/tabs/tabsStore";
 import { requestCloseTab, focusProcessTab, openResume } from "@/features/tabs";
@@ -19,7 +17,6 @@ import { isLiveResumeSession } from "@/features/resume/resumeLaunch";
 import { resumeFlagFor } from "@/features/resume/sessionDetectors";
 import type { ResumeEntry } from "@/features/resume/resume.service";
 import { cliById } from "@/features/terminal/cli-registry";
-import { useProjectAgentStatus } from "@/features/terminal/projectStatus";
 import { useCodeSidebarStore } from "@/features/ui/codeSidebar.store";
 import { useV3ShellStore } from "@/features/v3-shell/v3Shell.store";
 import type { Project } from "@/features/projects/project.types";
@@ -71,11 +68,6 @@ export function RepoRow({
     [resumeEntries, project.id],
   );
 
-  const { status: aggStatus, urgency: aggUrgency, sessionCount } = useProjectAgentStatus(
-    project.id,
-  );
-  const aggTone = aggStatus ? statusTone(aggStatus, aggUrgency) : null;
-
   const historyOnly = history.filter((e) => !live.some((tab) => isLiveResumeSession(tab, e)));
   const totalThreads = live.length + historyOnly.length;
   const visibleLive = showAll ? live : live.slice(0, THREAD_CAP);
@@ -109,9 +101,7 @@ export function RepoRow({
           className={cn(
             "group/proj flex w-full items-center gap-8px rounded-sm px-8px py-5px",
             "transition-colors duration-fast",
-            active
-              ? "bg-surface-strong text-ink"
-              : "text-ink hover:bg-surface-strong/40",
+            "text-ink hover:bg-surface-strong/40",
           )}
         >
           <button
@@ -148,18 +138,10 @@ export function RepoRow({
             className={cn(
               "min-w-0 flex-1 truncate text-left text-ui leading-none outline-none",
               "focus-visible:ring-1 focus-visible:ring-hairline-strong",
-              active && "font-medium text-ink",
             )}
           >
             {project.name}
           </button>
-          {aggStatus && aggTone && sessionCount > 0 ? (
-            <ProjectStatusDot
-              status={aggStatus}
-              urgency={aggUrgency}
-              label={t(aggTone.labelKey)}
-            />
-          ) : null}
           <Tooltip content={t("v3.newAgent.title")} side="bottom">
             <IconButton
               size="sm"
@@ -201,6 +183,7 @@ export function RepoRow({
                 pathHint={tab.kind === "terminal" ? tab.cwd : undefined}
                 tabId={tab.id}
                 cliId={tab.kind === "cli" ? tab.cliId : undefined}
+                active={active && bucket?.activeTabId === tab.id}
                 onFocus={() => focusTab(tab.id)}
                 onClose={() => requestCloseTab(project.id, tab.id)}
                 closeLabel={t(tab.kind === "cli" ? "codeSidebar.endAgent" : "codeSidebar.endTerminal")}
@@ -245,6 +228,7 @@ function ThreadRow({
   pathHint,
   tabId,
   cliId,
+  active = false,
   age,
   onFocus,
   onClose,
@@ -254,6 +238,7 @@ function ThreadRow({
   pathHint?: string;
   tabId?: string;
   cliId?: string;
+  active?: boolean;
   age?: string;
   onFocus: () => void;
   onClose?: () => void;
@@ -264,6 +249,7 @@ function ThreadRow({
     <button
       type="button"
       onClick={onFocus}
+      aria-current={active ? "true" : undefined}
       className="flex min-w-0 flex-1 cursor-pointer items-center gap-8px text-left text-ui leading-none text-ink outline-none focus-visible:ring-1 focus-visible:ring-hairline-strong"
     >
       {Brand ? (
@@ -280,7 +266,12 @@ function ThreadRow({
   );
 
   return (
-    <div className="group/thread flex w-full items-center gap-8px rounded-sm py-[3px] pl-[30px] pr-8px transition-colors duration-fast hover:bg-surface-strong/40">
+    <div
+      className={cn(
+        "group/thread flex w-full items-center gap-8px rounded-sm py-[3px] pl-[30px] pr-8px transition-colors duration-fast",
+        active ? "bg-surface-strong" : "hover:bg-surface-strong/40",
+      )}
+    >
       {pathHint ? (
         <Tooltip content={pathHint} side="right">
           {row}

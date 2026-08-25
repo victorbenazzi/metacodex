@@ -256,7 +256,6 @@
     },
     "repos": {
       "title": "Repositories",
-      "filter": "Filter repositories",
       "open": "Open project",
       "empty": "Open a folder or clone from GitHub to start a repository here.",
       "noAgents": "No agents yet"

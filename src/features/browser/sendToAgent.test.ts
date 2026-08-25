@@ -10,6 +10,31 @@ import { useProjectsStore } from "@/features/projects/project.store";
 import { useTerminalStore } from "@/features/terminal/terminal.store";
 import { sendVisualToCli } from "./sendToAgent";
 
+function cliTab(id: string, title: string, cliId: string) {
+  return {
+    id,
+    kind: "cli" as const,
+    title,
+    projectId: "project",
+    cwd: "/project",
+    cliId,
+    launchCommand: cliId,
+  };
+}
+
+function cliSession(id: string, tabId: string, title: string) {
+  return {
+    id,
+    tabId,
+    projectId: "project",
+    cwd: "/project",
+    kind: "cli" as const,
+    status: "running" as const,
+    title,
+    createdAt: id,
+  };
+}
+
 describe("sendVisualToCli", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -17,17 +42,7 @@ describe("sendVisualToCli", () => {
     useTabsStore.setState({
       byProject: {
         project: {
-          tabs: [
-            {
-              id: "tab",
-              kind: "cli",
-              title: "Agent",
-              projectId: "project",
-              cwd: "/project",
-              cliId: "codex",
-              launchCommand: "codex",
-            },
-          ],
+          tabs: [cliTab("tab", "Agent", "codex")],
           activeTabId: null,
         },
       },
@@ -40,16 +55,7 @@ describe("sendVisualToCli", () => {
     write.mockImplementationOnce(() => new Promise<void>((resolve) => { release = resolve; }));
     useTerminalStore.setState({
       sessions: {
-        session: {
-          id: "session",
-          tabId: "tab",
-          projectId: "project",
-          cwd: "/project",
-          kind: "cli",
-          status: "running",
-          title: "Agent",
-          createdAt: "now",
-        },
+        session: cliSession("session", "tab", "Agent"),
       },
       lastFocusedByProject: { project: "session" },
     });
@@ -63,20 +69,92 @@ describe("sendVisualToCli", () => {
     expect(useTabsStore.getState().byProject.project.activeTabId).toBe("tab");
   });
 
+  it("sends to the active CLI when another running CLI was focused previously", async () => {
+    useTabsStore.setState({
+      byProject: {
+        project: {
+          tabs: [
+            cliTab("tab-mcx", "MCX", "mcx"),
+            cliTab("tab-claude", "Claude Code", "claude"),
+          ],
+          activeTabId: "tab-claude",
+        },
+      },
+    });
+    useTerminalStore.setState({
+      sessions: {
+        "session-mcx": cliSession("session-mcx", "tab-mcx", "MCX"),
+        "session-claude": cliSession("session-claude", "tab-claude", "Claude Code"),
+      },
+      lastFocusedByProject: { project: "session-mcx" },
+    });
+
+    await expect(sendVisualToCli("context")).resolves.toMatchObject({
+      status: "sent",
+      sessionId: "session-claude",
+      tabId: "tab-claude",
+    });
+    expect(write).toHaveBeenCalledWith("session-claude", expect.any(String));
+  });
+
+  it("does not fall back to another CLI when the active CLI is not running", async () => {
+    useTabsStore.setState({
+      byProject: {
+        project: {
+          tabs: [
+            cliTab("tab-mcx", "MCX", "mcx"),
+            cliTab("tab-claude", "Claude Code", "claude"),
+          ],
+          activeTabId: "tab-claude",
+        },
+      },
+    });
+    useTerminalStore.setState({
+      sessions: {
+        "session-mcx": cliSession("session-mcx", "tab-mcx", "MCX"),
+      },
+      lastFocusedByProject: { project: "session-mcx" },
+    });
+
+    await expect(sendVisualToCli("context")).resolves.toEqual({ status: "no-cli" });
+    expect(write).not.toHaveBeenCalled();
+    expect(useTabsStore.getState().byProject.project.activeTabId).toBe("tab-claude");
+  });
+
+  it("does not redirect an active terminal selection to another CLI", async () => {
+    useTabsStore.setState({
+      byProject: {
+        project: {
+          tabs: [
+            {
+              id: "tab-terminal",
+              kind: "terminal",
+              title: "Shell",
+              projectId: "project",
+              cwd: "/project",
+            },
+            cliTab("tab-mcx", "MCX", "mcx"),
+          ],
+          activeTabId: "tab-terminal",
+        },
+      },
+    });
+    useTerminalStore.setState({
+      sessions: {
+        "session-mcx": cliSession("session-mcx", "tab-mcx", "MCX"),
+      },
+      lastFocusedByProject: { project: "session-mcx" },
+    });
+
+    await expect(sendVisualToCli("context")).resolves.toEqual({ status: "no-cli" });
+    expect(write).not.toHaveBeenCalled();
+  });
+
   it("reports the normalized write failure and does not activate the tab", async () => {
     write.mockRejectedValueOnce({ code: "Pty", message: "pipe closed" });
     useTerminalStore.setState({
       sessions: {
-        session: {
-          id: "session",
-          tabId: "tab",
-          projectId: "project",
-          cwd: "/project",
-          kind: "cli",
-          status: "running",
-          title: "Agent",
-          createdAt: "now",
-        },
+        session: cliSession("session", "tab", "Agent"),
       },
       lastFocusedByProject: { project: "session" },
     });

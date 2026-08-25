@@ -21,6 +21,7 @@ export async function sendVisualToCli(text: string): Promise<SendVisualResult> {
       session.kind === "cli" &&
       (session.projectId ?? WORKSPACE_NULL) === projectKey,
   );
+  const activeTabId = useTabsStore.getState().getBucket(projectKey).activeTabId;
   const lastId = term.getLastFocused(projectKey);
   const last = lastId ? term.getById(lastId) : undefined;
   const lastMatches =
@@ -28,7 +29,10 @@ export async function sendVisualToCli(text: string): Promise<SendVisualResult> {
     last.status === "running" &&
     last.kind === "cli" &&
     (last.projectId ?? WORKSPACE_NULL) === projectKey;
-  const target = lastMatches ? last : runningCli[0];
+  // The selected process owns delivery. An active terminal blocks fallback to another CLI.
+  const target = activeTabId
+    ? runningCli.find((session) => session.tabId === activeTabId)
+    : (lastMatches ? last : runningCli[0]);
   if (!target) return { status: "no-cli" };
   const payload = `${text.replace(/\s+$/, "")}\n`;
   try {

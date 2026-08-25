@@ -22,8 +22,6 @@ export interface FitOnVisibleArgs {
   term: Terminal;
   fit: FitAddon;
   getContainer: () => HTMLElement | null;
-  /** When true, scroll to bottom after a successful fit (tab became visible). */
-  scrollToBottom?: boolean;
 }
 
 /**
@@ -46,7 +44,6 @@ export function runFitOnVisible({
   term,
   fit,
   getContainer,
-  scrollToBottom = true,
 }: FitOnVisibleArgs): () => void {
   let cancelled = false;
   let attempts = 0;
@@ -78,7 +75,6 @@ export function runFitOnVisible({
     }
     try {
       applyTerminalFit(term, fit);
-      if (scrollToBottom) term.scrollToBottom();
     } catch {
       // ignore; ResizeObserver path will retry
     }
