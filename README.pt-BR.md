@@ -15,7 +15,7 @@ Navegação de arquivos no estilo VS Code. Calma visual de Cursor. Claude Code, 
 [![React 19](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Rust](https://img.shields.io/badge/Rust-Edition%202021-CE412B?logo=rust&logoColor=white)](https://www.rust-lang.org/)
-[![macOS first](https://img.shields.io/badge/Plataforma-macOS%20first-000000?logo=apple&logoColor=white)](#requisitos)
+[![Desktop](https://img.shields.io/badge/Desktop-macOS%20%7C%20Windows%20%7C%20Linux-26251e)](#requisitos)
 
 [English 🇺🇸](./README.md)
 
@@ -37,27 +37,27 @@ A sensação é mais próxima de Linear / Raycast do que de uma IDE Electron tra
 
 ## Download & instalação
 
-**Para Macs Apple Silicon (M1 / M2 / M3 / M4).** Três passos, ~30 segundos:
+Baixe o instalador da sua plataforma na [release mais recente](https://github.com/victorbenazzi/metacodex/releases/latest):
 
-1. **Baixe** [`metacodex_<última>_aarch64.dmg`](https://github.com/victorbenazzi/metacodex/releases/latest) na página de Releases.
-2. **Abra o `.dmg`** e arraste `metacodex.app` pra `/Applications`.
-3. **Abra o Terminal e cole essa linha única:**
-   ```bash
-   sudo xattr -cr /Applications/metacodex.app && open /Applications/metacodex.app
-   ```
-   *Só uma vez por instalação. O macOS coloca apps não-assinados em quarentena; esse comando limpa o flag e abre o metacodex.*
+| Plataforma | Download | Instalação |
+|---|---|---|
+| macOS Apple Silicon | `metacodex_*_aarch64.dmg` | Arraste o app para `/Applications` |
+| macOS Intel | `metacodex_*_x64.dmg` | Arraste o app para `/Applications` |
+| Windows x64 | `metacodex_*_x64-setup.exe` ou `.msi` | Execute o instalador |
+| Debian / Ubuntu x64 | `metacodex_*_amd64.deb` | `sudo apt install ./metacodex_*_amd64.deb` |
+| Fedora / RPM x64 | `metacodex-*.x86_64.rpm` | `sudo dnf install ./metacodex-*.x86_64.rpm` |
 
-Pronto — sem conta, sem wizard de setup. Versões futuras chegam sozinhas (veja [Auto-update](#auto-update) abaixo).
-
-> Builds pra Mac Intel, Windows e Linux estão temporariamente desativadas enquanto cada plataforma é verificada ponta a ponta. Apple Silicon sai primeiro porque é o que o mantenedor usa no dia a dia; as outras voltam uma a uma. Abra uma issue se quiser priorizar alguma.
->
-> Travou em *"app está danificado"* ou *"o desenvolvedor não pode ser verificado"*? Veja o [workaround completo de assinatura](#erro-de-assinatura-no-macos-app-está-danificado--não-pode-ser-aberto).
+Sem conta e sem wizard de setup. As builds de macOS não são notarizadas, e as de Windows ainda não possuem assinatura de código. Leia os avisos da plataforma nas notas da release antes da primeira abertura.
 
 ## Auto-update
 
-A partir da **v0.0.3**, o metacodex se atualiza sozinho. Logo após abrir, o app consulta o `latest.json` deste repo; quando aparece versão nova, surge a pill azul **Update** no topbar. Um clique → o novo payload é baixado, a assinatura é verificada contra a chave pública embutida, o `.app` é trocado no lugar e o app reabre sozinho. Sem reinstalar.
+A partir da **v0.0.3**, as builds de macOS e Windows podem se atualizar sozinhas. Logo após abrir, o app consulta o `latest.json` deste repo; quando aparece uma versão nova, surge a pill azul **Update** no chrome central. Um clique baixa o payload, verifica a assinatura contra a chave pública embutida, instala e reabre o app. Pacotes Linux `.deb` e `.rpm` são atualizados pelo fluxo de instalação do sistema.
 
 > ⚠️ Se o macOS recolocar a quarentena após um update in-place (raro, mas acontece em apps não-assinados), rode `sudo xattr -cr /Applications/metacodex.app` uma vez e abra de novo. Sim, a gente sabe — a Apple cobra $99/ano pra essa mensagem sumir. No dia que o metacodex tiver cartão de crédito próprio, a gente assina. Até lá: terminal.
+
+## Versão Legacy
+
+O produto publicado antes da reconstrução do workspace 1.0 continua disponível como [Legacy v0.0.19](https://github.com/victorbenazzi/metacodex/releases/tag/v0.0.19). O código está congelado na branch [`legacy/v0`](https://github.com/victorbenazzi/metacodex/tree/legacy/v0). As tags e os artefatos antigos permanecem intactos.
 
 ## Por que existe
 
@@ -72,10 +72,11 @@ A partir da **v0.0.3**, o metacodex se atualiza sozinho. Logo após abrir, o app
 ## Funcionalidades
 
 ### Workspace
-- **Trilho de projetos** reordenável, com tint de arquivo recente e buckets de abas por projeto — trocar de projeto troca o conjunto inteiro de abas visíveis; abas de outros projetos continuam vivas em memória.
-- **Painéis redimensionáveis** (Explorer / principal / Source Control).
-- **Telas Welcome / vazio** que mostram sessões recentes de agente (`resume.json`).
+- **Shell de três superfícies** com projetos e sessões ao vivo à esquerda, processo ativo no centro e workbench persistente à direita.
+- **Colunas redimensionáveis e recolhíveis** que mantêm terminais e documentos montados enquanto estão ocultos.
+- **Histórico por projeto** para sessões recentes de agentes (`resume.json`).
 - **Command palette** (`Cmd+Shift+P`) pra comandos e arquivos.
+- **Temas Porcelain e Graphite** com densidade compacta, confortável ou espaçosa.
 
 ### File Explorer (totalmente mutável)
 - Criar, renomear, deletar, arrastar-mover — paridade com VS Code.
@@ -100,6 +101,12 @@ A partir da **v0.0.3**, o metacodex se atualiza sozinho. Logo após abrir, o app
 - Painel SCM à direita, baseado em `libgit2`.
 - **Worktrees** — listar, criar, trocar e fazer merge no mesmo painel.
 
+### Browser de projeto
+- Browser nativo dentro do app para servidores de desenvolvimento detectados e arquivos locais autorizados.
+- Selecione elementos, desenhe anotações e capture regiões precisas.
+- Envie DOM e contexto visual direto para o agente de código ativo.
+- Perfil isolado, mensagens autenticadas e controle de caminhos pelos roots do projeto.
+
 ### Configurações & Atalhos
 - JSON puro em `~/.metacodex/settings.json` e `~/.metacodex/keybindings.json` (este último guarda só os overrides).
 - Fonte do editor & terminal, scrollback, sticky headers, debounces, densidade de UI (compact / comfortable / spacious — alimenta cada `--space-*` via `calc()`).
@@ -112,14 +119,14 @@ A partir da **v0.0.3**, o metacodex se atualiza sozinho. Logo após abrir, o app
 
 ## Requisitos
 
-metacodex é **macOS-first**. Linux roda em larga medida (mesmo stack Rust/Tauri) mas ainda não tem QA dos mantenedores. Windows não é suportado.
+O metacodex 1.0 cobre macOS, Windows x64 e Linux x64 na mesma base Tauri. A captura do browser usa WKWebView no macOS, WebView2 no Windows e WebKitGTK no Linux.
 
 Pra rodar a partir do código você precisa de:
 
 | Ferramenta | Por quê |
 |---|---|
-| **macOS 12+ (Monterey ou mais novo)** | Baseline do Tauri 2 |
-| **Xcode Command Line Tools** | `xcode-select --install` |
+| **Sistema desktop suportado** | macOS 12+, Windows 10/11 x64 ou uma distribuição Linux x64 moderna com WebKitGTK 4.1 |
+| **Ferramentas da plataforma** | Xcode CLT no macOS, MSVC Build Tools no Windows ou dependências de sistema do Tauri no Linux |
 | **Rust** (stable) | Núcleo Rust do Tauri — instale via [`rustup`](https://rustup.rs) |
 | **Node.js 20+** | Vite / TS |
 | **pnpm** | Gerenciador de pacotes — `npm i -g pnpm` (ou `corepack enable`) |
@@ -143,7 +150,7 @@ O dev server do Vite sobe na **porta 1420** (`strictPort: true`); o `beforeDevCo
 ## Build de produção
 
 ```bash
-# Gera .app / .dmg em src-tauri/target/release/bundle/
+# Gera o bundle nativo do sistema operacional atual
 pnpm tauri build
 ```
 
@@ -157,10 +164,12 @@ O perfil release é otimizado pra tamanho (`opt-level = "s"`, `lto`, `panic = "a
 | Rodar só o frontend Vite (sem shell nativa) | `pnpm dev` |
 | Type-check + build de produção do frontend | `pnpm build` |
 | Só type-check | `pnpm exec tsc --noEmit` |
+| Testes unitários do frontend | `pnpm test` |
+| Checks e testes Rust | `cargo check` / `cargo test` em `src-tauri/` |
 | Bundle Tauri de produção | `pnpm tauri build` |
 | Preview do frontend buildado no browser | `pnpm preview` |
 
-Não tem suite de testes nem comando de lint separado — `tsc --noEmit` (rodado dentro do `pnpm build`) é o check estático.
+Não existe um comando separado de lint para o frontend. TypeScript, Vitest, formatação Rust, Clippy, testes Rust e rastreabilidade de especificação rodam na matriz de qualidade do GitHub Actions.
 
 ## Erro de assinatura no macOS ("app está danificado" / "não pode ser aberto")
 

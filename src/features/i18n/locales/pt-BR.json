@@ -704,8 +704,22 @@
   },
   "whatsNew": {
     "eyebrow": "Novidades da versão {{version}}",
+    "milestoneLabel": "metacodex",
+    "milestoneEdition": "Primeira grande edição",
     "cta": "Continuar",
     "releaseNotes": "Ver as notas completas no GitHub",
+    "r1000": {
+      "title": "O workspace, reconstruído",
+      "summary": "A versão 1.0 transforma o metacodex em um centro de comando focado em projetos locais, terminais reais e nos agentes de código que já fazem parte do seu fluxo.",
+      "workspaceTitle": "Um workspace, três superfícies focadas",
+      "workspaceBody": "Projetos e sessões ao vivo ficam à esquerda, o trabalho no terminal permanece no centro, e arquivos, diffs e previews continuam disponíveis à direita.",
+      "runtimeTitle": "Agentes preparados para trabalho real",
+      "runtimeBody": "Ciclo de vida PTY confiável, eventos seguros para replay, estados de atenção, histórico de sessões e encerramento cuidadoso mantêm trabalhos longos sob controle.",
+      "browserTitle": "Um browser feito para implementação",
+      "browserBody": "Abra previews locais, inspecione ou capture uma região e envie contexto visual direto ao agente ativo sem sair do workspace.",
+      "platformsTitle": "Pronto para ir além do macOS",
+      "platformsBody": "Captura nativa do browser, abertura externa de arquivos e descoberta de portas agora cobrem Linux e Windows na mesma base local-first."
+    },
     "r0019": {
       "title": "Um novo jeito de começar",
       "launchTitle": "Tela inicial redesenhada",
