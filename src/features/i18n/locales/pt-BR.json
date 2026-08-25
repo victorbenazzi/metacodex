@@ -220,6 +220,7 @@
     }
   },
   "cli": {
+    "metacodexCli": "Metacodex CLI",
     "dangerous": "perigoso",
     "needsConfig": "Requer config",
     "elevatedTitle": "Abrir {{label}} com aprovação elevada",

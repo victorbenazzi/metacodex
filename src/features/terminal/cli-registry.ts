@@ -1,3 +1,5 @@
+import i18n from "i18next";
+
 import { isWindows } from "@/lib/platform";
 
 export type CliDangerLevel = "normal" | "dangerous";
@@ -51,7 +53,7 @@ export interface CliTool {
 export const DEFAULT_CLI_REGISTRY: CliTool[] = [
   {
     id: "mcx",
-    label: "mcx",
+    label: i18n.t("cli.metacodexCli", { defaultValue: "Metacodex CLI" }),
     command: "mcx",
     args: [],
     detectCommand: "command -v mcx",

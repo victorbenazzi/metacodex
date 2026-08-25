@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import i18n from "@/features/i18n/config";
+
 import {
   cliLaunchString,
   DEFAULT_CLI_REGISTRY,
@@ -21,7 +23,16 @@ describe("CLI launch policy", () => {
 
   it("registers mcx as a safe PATH launch with no elevated flags", () => {
     const cli = DEFAULT_CLI_REGISTRY.find((entry) => entry.id === "mcx");
-    expect(cli).toMatchObject({ command: "mcx", args: [] });
+    const englishLabel = i18n.getFixedT("en")("cli.metacodexCli");
+    const portugueseLabel = i18n.getFixedT("pt-BR")("cli.metacodexCli");
+
+    expect(englishLabel).toBe("Metacodex CLI");
+    expect(portugueseLabel).toBe("Metacodex CLI");
+    expect(cli).toMatchObject({
+      label: englishLabel,
+      command: "mcx",
+      args: [],
+    });
     expect(cli?.elevatedArgs ?? []).toEqual([]);
     expect(cliLaunchString(cli!)).toBe("mcx");
   });
