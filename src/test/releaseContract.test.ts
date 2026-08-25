@@ -51,6 +51,8 @@ describe("metacodex 1.0 release contract", () => {
     expect(workflow).toContain(
       "checkout_ref: ${{ github.event.inputs.tag || github.ref }}",
     );
+    expect(workflow).toContain("node-version: 22");
+    expect(workflow).not.toContain("node-version: 20");
     expect(qualityWorkflow).toContain("checkout_ref:");
     expect(
       qualityWorkflow.match(
