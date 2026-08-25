@@ -107,9 +107,9 @@ jobs:
           set -euo pipefail
           VERSION="${RELEASE_TAG#v}"
           STABLE_VERSION="${VERSION%%-*}"
-          NOTES_PATH="docs/releases/${VERSION}.md"
+          NOTES_PATH="docs/releases/v${VERSION}.md"
           if [[ ! -f "$NOTES_PATH" ]]; then
-            NOTES_PATH="docs/releases/${STABLE_VERSION}.md"
+            NOTES_PATH="docs/releases/v${STABLE_VERSION}.md"
           fi
           if [[ ! -f "$NOTES_PATH" ]]; then
             echo "Missing release notes for ${RELEASE_TAG}" >&2
