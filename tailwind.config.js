@@ -13,6 +13,24 @@ const densitySpacing = Object.fromEntries(
   DENSITY_PX_STEPS.map((n) => [`${n}px`, `calc(${n}px * var(--density-multiplier))`]),
 );
 
+/** Hex CSS variables cannot take Tailwind's `rgb(channel / alpha)` syntax.
+ *  Slash modifiers (`bg-surface-strong/45`) pass a number; we paint those
+ *  with color-mix. Bare utilities pass `var(--tw-*-opacity, 1)`: Number() of
+ *  that string is NaN, and `color-mix(... NaN%)` is invalid CSS, so fills
+ *  vanished and borders fell back to currentColor (ink: white in dark, black
+ *  in light). Bare utilities must stay `var(--token)`. */
+const token = (name) => {
+  return ({ opacityValue }) => {
+    if (opacityValue === undefined) return `var(${name})`;
+    const numeric =
+      typeof opacityValue === "number" ? opacityValue : Number(opacityValue);
+    if (Number.isFinite(numeric)) {
+      return `color-mix(in srgb, var(${name}) ${numeric * 100}%, transparent)`;
+    }
+    return `var(${name})`;
+  };
+};
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
@@ -20,53 +38,53 @@ export default {
   theme: {
     extend: {
       colors: {
-        canvas: "var(--canvas)",
-        "canvas-soft": "var(--canvas-soft)",
-        "surface-card": "var(--surface-card)",
-        "surface-strong": "var(--surface-strong)",
+        canvas: token("--canvas"),
+        "canvas-soft": token("--canvas-soft"),
+        "surface-card": token("--surface-card"),
+        "surface-strong": token("--surface-strong"),
 
         // Semantic surface aliases — express intent (elevation) rather than
         // a specific color value. Defined in tokens.css.
-        "surface-0": "var(--surface-0)",
-        "surface-1": "var(--surface-1)",
-        "surface-2": "var(--surface-2)",
-        "surface-3": "var(--surface-3)",
+        "surface-0": token("--surface-0"),
+        "surface-1": token("--surface-1"),
+        "surface-2": token("--surface-2"),
+        "surface-3": token("--surface-3"),
 
-        hairline: "var(--hairline)",
-        "hairline-soft": "var(--hairline-soft)",
-        "hairline-strong": "var(--hairline-strong)",
+        hairline: token("--hairline"),
+        "hairline-soft": token("--hairline-soft"),
+        "hairline-strong": token("--hairline-strong"),
 
-        ink: "var(--ink)",
-        body: "var(--body)",
-        muted: "var(--muted)",
-        "muted-soft": "var(--muted-soft)",
+        ink: token("--ink"),
+        "ink-hover": token("--ink-hover"),
+        body: token("--body"),
+        muted: token("--muted"),
+        "muted-soft": token("--muted-soft"),
 
-        primary: "var(--primary)",
-        "primary-active": "var(--primary-active)",
-        "on-primary": "var(--on-primary)",
+        primary: token("--primary"),
+        "primary-active": token("--primary-active"),
+        "on-primary": token("--on-primary"),
 
-        "tab-active": "var(--tab-active-bg)",
-        "tab-active-border": "var(--tab-active-border)",
-        "tab-active-text": "var(--tab-active-text)",
+        "tab-active": token("--tab-active-bg"),
+        "tab-active-border": token("--tab-active-border"),
+        "tab-active-text": token("--tab-active-text"),
 
-        // Restrained indigo/lavender accent (active/selected/focus + glow).
-        // Token-driven so it stays consistent across every syntax theme.
-        accent: "var(--accent)",
-        "accent-strong": "var(--accent-strong)",
-        "on-accent": "var(--on-accent)",
+        // Brand voltage (Cursor Orange). Scarce: selection, identity bar, rare CTAs.
+        accent: token("--accent"),
+        "accent-strong": token("--accent-strong"),
+        "on-accent": token("--on-accent"),
 
-        success: "var(--success)",
-        danger: "var(--danger)",
-        warn: "var(--warn)",
-        "on-update": "var(--on-update)",
-        "update-blue-strong": "var(--update-blue-strong)",
-        "win-close": "var(--win-close)",
+        success: token("--success"),
+        danger: token("--danger"),
+        warn: token("--warn"),
+        "on-update": token("--on-update"),
+        "update-blue-strong": token("--update-blue-strong"),
+        "win-close": token("--win-close"),
 
         // Fixed-media overlays (what's-new hero): absolute in both themes.
-        "on-media": "var(--on-media)",
-        "media-scrim": "var(--media-scrim)",
-        "media-scrim-strong": "var(--media-scrim-strong)",
-        "media-ring": "var(--media-ring)",
+        "on-media": token("--on-media"),
+        "media-scrim": token("--media-scrim"),
+        "media-scrim-strong": token("--media-scrim-strong"),
+        "media-ring": token("--media-ring"),
 
         // Project palette swatches (warm/neutral)
         "p-1": "#7c7666",
@@ -212,7 +230,8 @@ export default {
         // Durations/easings are tokens — see --dur-enter/--dur-exit in tokens.css.
         "fade-in": "fade-in var(--dur-enter) var(--ease-out)",
         "fade-out": "fade-out var(--dur-exit) var(--ease-in) forwards",
-        "tab-status-pulse": "tab-status-pulse 1.6s ease-in-out infinite",
+        "tab-status-pulse":
+          "tab-status-pulse var(--agent-working-dur) ease-in-out infinite",
         "progress-indeterminate": "progress-indeterminate 1.4s linear infinite",
         "slide-in-left": "slide-in-left 180ms var(--ease-out) both",
         "rise-in": "rise-in 420ms var(--ease-out) both",

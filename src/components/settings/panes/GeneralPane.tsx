@@ -24,8 +24,8 @@ export function GeneralPane() {
                 className={cn(
                   "inline-flex h-[30px] items-center rounded-sm border px-12px text-caption transition-colors",
                   active
-                    ? "border-ink bg-ink text-on-primary"
-                    : "border-hairline-strong text-ink hover:bg-surface-strong/45",
+                    ? "border-ink bg-ink text-canvas"
+                    : "border-hairline bg-canvas-soft text-ink hover:bg-surface-strong/45",
                 )}
                 aria-pressed={active}
               >

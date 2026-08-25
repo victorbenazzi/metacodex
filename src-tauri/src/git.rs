@@ -16,6 +16,10 @@ pub struct GitInfo {
     pub behind: usize,
     /// Absolute path → single-char status code: "M"|"A"|"D"|"R"|"?"|"C"|"!"
     pub statuses: HashMap<String, String>,
+    /// Files that differ between HEAD and the staging area.
+    pub staged_statuses: HashMap<String, String>,
+    /// Files that differ between the staging area and the working tree.
+    pub unstaged_statuses: HashMap<String, String>,
     pub stats: Option<GitStats>,
 }
 
@@ -55,13 +59,11 @@ pub fn git_info(root: &str, include_stats: bool) -> AppResult<Option<GitInfo>> {
     {
         let local_oid = head.target();
         let upstream_branch_name = format!("refs/remotes/origin/{branch_name}");
-        let upstream_oid = repo
-            .refname_to_id(&upstream_branch_name)
-            .ok();
+        let upstream_oid = repo.refname_to_id(&upstream_branch_name).ok();
         match (local_oid, upstream_oid) {
-            (Some(local), Some(upstream)) => repo
-                .graph_ahead_behind(local, upstream)
-                .unwrap_or((0, 0)),
+            (Some(local), Some(upstream)) => {
+                repo.graph_ahead_behind(local, upstream).unwrap_or((0, 0))
+            }
             _ => (0, 0),
         }
     } else {
@@ -73,6 +75,8 @@ pub fn git_info(root: &str, include_stats: bool) -> AppResult<Option<GitInfo>> {
         .recurse_untracked_dirs(true)
         .include_ignored(false);
     let mut statuses_map: HashMap<String, String> = HashMap::new();
+    let mut staged_statuses: HashMap<String, String> = HashMap::new();
+    let mut unstaged_statuses: HashMap<String, String> = HashMap::new();
     if let Ok(statuses) = repo.statuses(Some(&mut opts)) {
         for entry in statuses.iter() {
             let s = entry.status();
@@ -83,6 +87,12 @@ pub fn git_info(root: &str, include_stats: bool) -> AppResult<Option<GitInfo>> {
             if let Some(rel) = entry.path() {
                 let abs = workdir.join(rel);
                 statuses_map.insert(abs.to_string_lossy().into_owned(), code.to_string());
+                if let Some(code) = index_status_code(s) {
+                    staged_statuses.insert(abs.to_string_lossy().into_owned(), code.into());
+                }
+                if let Some(code) = worktree_status_code(s) {
+                    unstaged_statuses.insert(abs.to_string_lossy().into_owned(), code.into());
+                }
             }
         }
     }
@@ -94,8 +104,48 @@ pub fn git_info(root: &str, include_stats: bool) -> AppResult<Option<GitInfo>> {
         ahead,
         behind,
         statuses: statuses_map,
+        staged_statuses,
+        unstaged_statuses,
         stats,
     }))
+}
+
+fn index_status_code(s: Status) -> Option<&'static str> {
+    if s.contains(Status::CONFLICTED) {
+        return Some("!");
+    }
+    if s.contains(Status::INDEX_NEW) {
+        return Some("A");
+    }
+    if s.contains(Status::INDEX_MODIFIED) {
+        return Some("M");
+    }
+    if s.contains(Status::INDEX_DELETED) {
+        return Some("D");
+    }
+    if s.contains(Status::INDEX_RENAMED) {
+        return Some("R");
+    }
+    None
+}
+
+fn worktree_status_code(s: Status) -> Option<&'static str> {
+    if s.contains(Status::CONFLICTED) {
+        return Some("!");
+    }
+    if s.contains(Status::WT_NEW) {
+        return Some("?");
+    }
+    if s.contains(Status::WT_MODIFIED) {
+        return Some("M");
+    }
+    if s.contains(Status::WT_DELETED) {
+        return Some("D");
+    }
+    if s.contains(Status::WT_RENAMED) {
+        return Some("R");
+    }
+    None
 }
 
 fn diff_stats(repo: &Repository, workdir: &Path) -> GitStats {
@@ -118,10 +168,7 @@ fn diff_stats(repo: &Repository, workdir: &Path) -> GitStats {
 
     let mut stats = GitStats::default();
     for (idx, delta) in diff.deltas().enumerate() {
-        let rel = delta
-            .new_file()
-            .path()
-            .or_else(|| delta.old_file().path());
+        let rel = delta.new_file().path().or_else(|| delta.old_file().path());
         let Some(rel) = rel else {
             continue;
         };
@@ -191,7 +238,11 @@ pub fn file_head_content(path: &str) -> AppResult<Option<String>> {
         Ok(r) => r,
         Err(_) => return Ok(None),
     };
-    let tree = match repo.head().and_then(|h| h.peel_to_commit()).and_then(|c| c.tree()) {
+    let tree = match repo
+        .head()
+        .and_then(|h| h.peel_to_commit())
+        .and_then(|c| c.tree())
+    {
         Ok(t) => t,
         Err(_) => return Ok(None), // unborn branch / no commits
     };

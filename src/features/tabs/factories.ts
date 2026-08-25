@@ -26,7 +26,11 @@ export function makeCliTab(args: {
   cwd: string;
   cli: CliTool;
   title?: string;
+  elevated?: boolean;
 }): Extract<Tab, { kind: "cli" }> {
+  const launchArgs = args.elevated
+    ? [...args.cli.args, ...(args.cli.elevatedArgs ?? [])]
+    : [...args.cli.args];
   return {
     id: `c-${newId(10)}`,
     kind: "cli",
@@ -34,7 +38,9 @@ export function makeCliTab(args: {
     projectId: args.projectId,
     cwd: args.cwd,
     cliId: args.cli.id,
-    launchCommand: cliLaunchString(args.cli),
+    launchCommand: cliLaunchString(args.cli, { elevated: args.elevated }),
+    launchExecutable: args.cli.command,
+    launchArgs,
   };
 }
 
@@ -114,4 +120,15 @@ export function makeDiffTab(args: {
 
 export function isProcessTab(tab: Tab): boolean {
   return tab.kind === "terminal" || tab.kind === "cli";
+}
+
+/** File, diff and preview tabs that belong in the right workbench strip. */
+export function isWorkbenchDocTab(tab: Tab): boolean {
+  return (
+    tab.kind === "editor" ||
+    tab.kind === "markdown" ||
+    tab.kind === "image" ||
+    tab.kind === "pdf" ||
+    tab.kind === "diff"
+  );
 }

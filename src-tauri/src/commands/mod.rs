@@ -1,3 +1,8 @@
+pub mod app_lifecycle;
+pub mod browser;
+pub(crate) mod browser_bridge;
+pub(crate) mod browser_capture;
+pub(crate) mod browser_local_protocol;
 pub mod cli;
 pub mod diagnostics;
 pub mod filesystem;

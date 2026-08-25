@@ -15,5 +15,3 @@ export const EMPTY_BUCKET = { tabs: [], activeTabId: null } as {
   tabs: [];
   activeTabId: null;
 };
-
-export const RAIL_WIDTH_PX = 48;

@@ -19,10 +19,10 @@ export function SidePanelToggle() {
         aria-label={t("sidePanel.toggle")}
         aria-pressed={open}
         className={cn(
-          "inline-flex h-[24px] w-[24px] items-center justify-center rounded-sm text-muted transition-colors duration-fast",
-          "hover:bg-surface-strong/55 hover:text-ink",
+          "inline-flex h-[22px] w-[22px] cursor-pointer items-center justify-center rounded-md text-muted transition-colors duration-fast",
+          "hover:bg-surface-strong hover:text-ink",
           "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-hairline-strong",
-          open && "bg-surface-strong/70 text-ink",
+          open && "bg-surface-strong text-ink",
         )}
       >
         <Icon icon={open ? PanelRightClose : PanelRightOpen} size={14} />

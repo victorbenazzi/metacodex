@@ -15,7 +15,7 @@ VS Code-style file navigation. Cursor-grade visual calm. Claude Code, Codex CLI,
 [![React 19](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Rust](https://img.shields.io/badge/Rust-Edition%202021-CE412B?logo=rust&logoColor=white)](https://www.rust-lang.org/)
-[![macOS first](https://img.shields.io/badge/Platform-macOS%20first-000000?logo=apple&logoColor=white)](#requirements)
+[![Desktop](https://img.shields.io/badge/Desktop-macOS%20%7C%20Windows%20%7C%20Linux-26251e)](#requirements)
 
 [Português 🇧🇷](./README.pt-BR.md)
 
@@ -37,27 +37,27 @@ It feels closer to Linear / Raycast than to a typical Electron IDE: token-driven
 
 ## Download & install
 
-**For Apple Silicon Macs (M1 / M2 / M3 / M4).** Three steps, ~30 seconds:
+Download the installer for your platform from the [latest release](https://github.com/victorbenazzi/metacodex/releases/latest):
 
-1. **Download** [`metacodex_<latest>_aarch64.dmg`](https://github.com/victorbenazzi/metacodex/releases/latest) from the Releases page.
-2. **Open the `.dmg`** and drag `metacodex.app` into `/Applications`.
-3. **Open Terminal and paste this one line:**
-   ```bash
-   sudo xattr -cr /Applications/metacodex.app && open /Applications/metacodex.app
-   ```
-   *One-time per install. macOS quarantines unsigned apps; this clears the flag and opens metacodex.*
+| Platform | Download | Install |
+|---|---|---|
+| macOS Apple Silicon | `metacodex_*_aarch64.dmg` | Drag the app to `/Applications` |
+| macOS Intel | `metacodex_*_x64.dmg` | Drag the app to `/Applications` |
+| Windows x64 | `metacodex_*_x64-setup.exe` or `.msi` | Run the installer |
+| Debian / Ubuntu x64 | `metacodex_*_amd64.deb` | `sudo apt install ./metacodex_*_amd64.deb` |
+| Fedora / RPM x64 | `metacodex-*.x86_64.rpm` | `sudo dnf install ./metacodex-*.x86_64.rpm` |
 
-That's it — no account, no setup wizard. Future versions arrive automatically (see [Auto-update](#auto-update) below).
-
-> Intel Mac, Windows and Linux builds are temporarily disabled while we verify each platform end-to-end. Apple Silicon ships first because it's what the maintainer runs daily; the others come back one by one. Open an issue if you want a specific platform prioritised.
->
-> Stuck on *"app is damaged"* or *"developer cannot be verified"*? See the full [signature workaround](#macos-signature-error-app-is-damaged--cannot-be-opened).
+No account and no setup wizard. macOS builds are not notarized, and Windows builds are not code-signed yet. See the platform notices in the release notes before the first launch.
 
 ## Auto-update
 
-From **v0.0.3** onwards, metacodex updates itself. Shortly after launch the app checks this repo's `latest.json`; when a newer release exists, a blue **Update** pill appears in the top bar. One click → the new payload is downloaded, signature-verified against the bundled public key, swapped in place, and the app relaunches. No reinstall.
+From **v0.0.3** onwards, the macOS and Windows builds can update themselves. Shortly after launch the app checks this repo's `latest.json`; when a newer release exists, a blue **Update** pill appears in the center chrome. One click downloads the updater payload, verifies it against the bundled public key, installs it and relaunches the app. Linux `.deb` and `.rpm` packages update through the system package installation flow.
 
 > ⚠️ If macOS re-quarantines the app after an in-place update (rare, but happens to unsigned bundles), run `sudo xattr -cr /Applications/metacodex.app` once and reopen. Yes, we know — Apple charges $99/year to make this message go away. The day metacodex pays its own credit card, we'll sign it. Until then: terminal.
+
+## Legacy version
+
+The product that shipped before the 1.0 workspace rebuild remains available as [Legacy v0.0.19](https://github.com/victorbenazzi/metacodex/releases/tag/v0.0.19). Its source is frozen on [`legacy/v0`](https://github.com/victorbenazzi/metacodex/tree/legacy/v0). Existing tags and release assets remain untouched.
 
 ## Why
 
@@ -72,10 +72,11 @@ From **v0.0.3** onwards, metacodex updates itself. Shortly after launch the app 
 ## Features
 
 ### Workspace
-- **Project rail** with reorderable projects, recent-file tint, and per-project tab buckets — switching project swaps the entire visible tab set; tabs from other projects stay alive in memory.
-- **Resizable panels** (Explorer / main / Source Control).
-- **Welcome / empty states** that surface recent agent sessions (`resume.json`).
+- **Three-surface shell** with projects and live sessions on the left, the active process in the center, and a persistent workbench on the right.
+- **Resizable and collapsible columns** that keep terminals and documents mounted while hidden.
+- **Per-project session history** for recent agent work (`resume.json`).
 - **Command palette** (`Cmd+Shift+P`) for commands and files.
+- **Porcelain and Graphite themes** plus compact, comfortable and spacious UI density.
 
 ### File Explorer (fully mutable)
 - Create, rename, delete, drag-move — VS Code parity.
@@ -100,6 +101,12 @@ From **v0.0.3** onwards, metacodex updates itself. Shortly after launch the app 
 - Right-panel SCM view backed by `libgit2`.
 - **Worktrees** — list, create, switch, merge from the same panel.
 
+### Project browser
+- Native in-app browser for detected development servers and authorized local files.
+- Pick elements, draw annotations and capture precise regions.
+- Send DOM and visual context directly to the active coding agent.
+- Isolated browser profile with authenticated bridge messages and project-root path controls.
+
 ### Settings & Keybindings
 - Plain JSON in `~/.metacodex/settings.json` and `~/.metacodex/keybindings.json` (the latter only stores overrides).
 - Editor & terminal font, scrollback, sticky headers, debounces, UI density (compact / comfortable / spacious — drives every `--space-*` token via a CSS `calc()`).
@@ -112,14 +119,14 @@ From **v0.0.3** onwards, metacodex updates itself. Shortly after launch the app 
 
 ## Requirements
 
-metacodex is **macOS-first**. Linux is largely supported by the same Rust/Tauri stack but is not yet QA'd by the maintainers. Windows is not supported.
+metacodex 1.0 targets macOS, Windows x64 and Linux x64 from one Tauri codebase. Platform-specific browser capture uses WKWebView on macOS, WebView2 on Windows and WebKitGTK on Linux.
 
 To run from source you need:
 
 | Tool | Why |
 |---|---|
-| **macOS 12+ (Monterey or newer)** | Tauri 2 baseline |
-| **Xcode Command Line Tools** | `xcode-select --install` |
+| **Supported desktop OS** | macOS 12+, Windows 10/11 x64, or a modern x64 Linux distribution with WebKitGTK 4.1 |
+| **Platform build tools** | Xcode CLT on macOS, MSVC Build Tools on Windows, or Tauri system dependencies on Linux |
 | **Rust** (stable) | Tauri Rust core — install via [`rustup`](https://rustup.rs) |
 | **Node.js 20+** | Vite / TS |
 | **pnpm** | Package manager — `npm i -g pnpm` (or `corepack enable`) |
@@ -143,7 +150,7 @@ The Vite dev server binds to **port 1420** (`strictPort: true`); Tauri's `before
 ## Build a release bundle
 
 ```bash
-# Produces a .app / .dmg under src-tauri/target/release/bundle/
+# Produces the native bundle for the current operating system
 pnpm tauri build
 ```
 
@@ -157,10 +164,12 @@ The release profile is tuned for size (`opt-level = "s"`, `lto`, `panic = "abort
 | Run only the Vite frontend (no native shell) | `pnpm dev` |
 | Type-check + production frontend build | `pnpm build` |
 | Type-check only | `pnpm exec tsc --noEmit` |
+| Frontend unit tests | `pnpm test` |
+| Rust checks and tests | `cargo check` / `cargo test` in `src-tauri/` |
 | Production Tauri bundle | `pnpm tauri build` |
 | Preview the built frontend in a browser | `pnpm preview` |
 
-There is no test suite and no separate lint step — `tsc --noEmit` (run as part of `pnpm build`) is the static check.
+There is no separate frontend lint command. TypeScript, Vitest, Rust formatting, Clippy, Rust tests and specification traceability run in the GitHub Actions quality matrix.
 
 ## macOS signature error ("app is damaged" / "cannot be opened")
 

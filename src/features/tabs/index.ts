@@ -6,6 +6,7 @@ export {
   makePathTab,
   makeDiffTab,
   isProcessTab,
+  isWorkbenchDocTab,
 } from "./factories";
 
 export {
@@ -27,8 +28,10 @@ export {
   cancelPendingClose,
   openTerminal,
   openCli,
+  openResume,
   openFileInProject,
   openPreview,
   openDiffInProject,
   openAfterSentToProject,
+  focusProcessTab,
 } from "./tabLifecycle";

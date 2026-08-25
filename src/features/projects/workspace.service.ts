@@ -14,11 +14,19 @@ export interface WorkspaceState {
   expandedPaths: string[];
 }
 
+export interface WorkspaceSnapshot extends WorkspaceState {
+  revision: number;
+}
+
+export type WorkspaceSaveResult =
+  | { status: "accepted"; revision: number }
+  | { status: "stale"; acceptedRevision: number };
+
 export const workspaceApi = {
-  save(projectId: string, state: WorkspaceState): Promise<void> {
-    return invoke<void>(CMD.saveWorkspaceState, { projectId, state });
+  save(projectId: string, revision: number, state: WorkspaceState): Promise<WorkspaceSaveResult> {
+    return invoke<WorkspaceSaveResult>(CMD.saveWorkspaceState, { projectId, revision, state });
   },
-  async load(projectId: string): Promise<WorkspaceState | null> {
-    return (await invoke<WorkspaceState | null>(CMD.loadWorkspaceState, { projectId })) ?? null;
+  async load(projectId: string): Promise<WorkspaceSnapshot | null> {
+    return (await invoke<WorkspaceSnapshot | null>(CMD.loadWorkspaceState, { projectId })) ?? null;
   },
 };

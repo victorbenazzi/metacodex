@@ -4,8 +4,7 @@ import { GitBranch, Trash2 } from "@/components/ui/icons";
 
 import { Icon } from "@/components/ui/Icon";
 import { useResumeStore } from "@/features/resume/resume.store";
-import { buildResumeTab } from "@/features/resume/resumeLaunch";
-import { useTabsStore, WORKSPACE_NULL } from "@/components/tabs/tabsStore";
+import { openResume } from "@/features/tabs";
 import { cliById } from "@/features/terminal/cli-registry";
 import { resumeFlagFor } from "@/features/resume/sessionDetectors";
 import { CLI_BRAND_ICONS } from "@/components/icons/brand";
@@ -38,7 +37,6 @@ export function ResumeCards({ projectId, title, limit = 5 }: ResumeCardsProps) {
   const recent = useResumeStore((s) => s.recent);
   const forProject = useResumeStore((s) => s.forProject);
   const discard = useResumeStore((s) => s.discard);
-  const openTab = useTabsStore((s) => s.openTab);
   const detections = useCliDetections();
 
   const entries = useMemo(() => {
@@ -51,10 +49,7 @@ export function ResumeCards({ projectId, title, limit = 5 }: ResumeCardsProps) {
   if (entries.length === 0) return null;
 
   const resume = (entry: ResumeEntry) => {
-    const tab = buildResumeTab(entry);
-    if (!tab) return;
-    const key = entry.projectId ?? WORKSPACE_NULL;
-    openTab(key, tab);
+    openResume(entry);
   };
 
   return (

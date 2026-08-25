@@ -74,6 +74,7 @@ import {
   FolderLockedIcon,
   FolderOpenIcon,
   FolderSearchIcon,
+  FullScreenIcon,
   GaugeIcon,
   GitBranchIcon,
   GitCompareIcon,
@@ -90,6 +91,7 @@ import {
   Layers01Icon,
   LayoutLeftIcon,
   Loading03Icon,
+  MinimizeScreenIcon,
   MinusSignIcon,
   MoonIcon,
   MoreHorizontalIcon,
@@ -241,6 +243,8 @@ export const PanelLeftClose = /*#__PURE__*/ iconOf("PanelLeftClose", PanelLeftCl
 export const PanelLeftOpen = /*#__PURE__*/ iconOf("PanelLeftOpen", PanelLeftOpenIcon);
 export const PanelRightClose = /*#__PURE__*/ iconOf("PanelRightClose", PanelRightCloseIcon);
 export const PanelRightOpen = /*#__PURE__*/ iconOf("PanelRightOpen", PanelRightOpenIcon);
+export const FullScreen = /*#__PURE__*/ iconOf("FullScreen", FullScreenIcon);
+export const MinimizeScreen = /*#__PURE__*/ iconOf("MinimizeScreen", MinimizeScreenIcon);
 
 // Settings / preferences
 export const Gauge = /*#__PURE__*/ iconOf("Gauge", GaugeIcon);

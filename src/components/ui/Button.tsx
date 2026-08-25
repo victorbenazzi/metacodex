@@ -11,7 +11,7 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantClasses: Record<Variant, string> = {
   primary:
-    "press-feedback bg-ink text-on-primary hover:bg-primary-active focus-visible:outline-ink",
+    "press-feedback bg-ink text-canvas hover:bg-ink-hover focus-visible:outline-ink",
   ghost:
     "bg-transparent text-ink hover:bg-surface-strong/60 focus-visible:outline-ink",
   outline:
@@ -36,7 +36,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       ref={ref}
       type={type}
       className={cn(
-        "inline-flex items-center justify-center gap-6px font-medium tracking-tight transition-colors duration-fast disabled:opacity-40 disabled:cursor-not-allowed select-none",
+        "inline-flex cursor-pointer items-center justify-center gap-6px font-medium leading-none tracking-tight transition-colors duration-fast disabled:cursor-not-allowed disabled:opacity-40 select-none",
         variantClasses[variant],
         sizeClasses[size],
         className,

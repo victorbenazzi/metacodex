@@ -11,22 +11,52 @@ import { EV, listenTo, type FsChangedPayload, type FsRenamedPayload } from "@/li
 import { dirname } from "@/lib/path";
 import { CMD, invoke } from "@/lib/ipc";
 import { recordDiag } from "@/features/diagnostics/diagnostics.store";
+import { useTerminalStore } from "@/features/terminal/terminal.store";
+import type { TerminalSession } from "@/features/terminal/terminal.types";
+
+export function desiredWatcherProjectIds(
+  activeProjectId: string | null,
+  sessions: Record<string, TerminalSession>,
+): Set<string> {
+  const ids = new Set<string>();
+  if (activeProjectId) ids.add(activeProjectId);
+  for (const session of Object.values(sessions)) {
+    if (
+      session.projectId &&
+      (session.status === "starting" || session.status === "running")
+    ) {
+      ids.add(session.projectId);
+    }
+  }
+  return ids;
+}
+
+interface RevalidationDependencies {
+  refreshGit: (projectId: string, root: string) => Promise<void>;
+  refreshWorktrees: (projectId: string, root: string) => Promise<void>;
+  refreshExplorer: (projectId: string) => Promise<void>;
+}
+
+export function revalidateActivatedProject(
+  project: Pick<Project, "id" | "path">,
+  dependencies: RevalidationDependencies,
+): void {
+  void dependencies.refreshGit(project.id, project.path);
+  void dependencies.refreshWorktrees(project.id, project.path);
+  void dependencies.refreshExplorer(project.id);
+}
 
 export function useFilesystemSync(project: Project | null): void {
   const refreshGit = useGitStore((s) => s.refresh);
   const projects = useProjectsStore((s) => s.projects);
+  const sessions = useTerminalStore((s) => s.sessions);
   const watchedIds = useRef(new Set<string>());
 
-  // Watch EVERY registered project, not just the active one. Terminals (and
-  // the agents running in them) stay alive across project switches, so files
-  // keep changing in background projects; watching only the active root made
-  // those trees go silently stale until the next app-driven refresh. watch()
-  // is idempotent per (id, path) on the Rust side, so re-running this effect
-  // on any projects-array change is cheap. Project removal tears the watcher
-  // down authoritatively in the backend; the diff below is belt and braces.
+  // Keep watcher ownership aligned with visible or live work. Reactivation
+  // performs a full cache revalidation below before the user relies on it.
   useEffect(() => {
-    const current = new Set(projects.map((p) => p.id));
-    for (const p of projects) {
+    const current = desiredWatcherProjectIds(project?.id ?? null, sessions);
+    for (const p of projects.filter((candidate) => current.has(candidate.id))) {
       void watcherApi.watch(p.id, p.path).catch((err) => {
         console.warn("[watcher] watch failed", err);
       });
@@ -35,7 +65,7 @@ export function useFilesystemSync(project: Project | null): void {
       if (!current.has(id)) void watcherApi.unwatch(id).catch(() => undefined);
     }
     watchedIds.current = current;
-  }, [projects]);
+  }, [project?.id, projects, sessions]);
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;
@@ -132,8 +162,13 @@ export function useFilesystemSync(project: Project | null): void {
   const projectPath = project?.path;
   useEffect(() => {
     if (!projectId || !projectPath) return;
-    void refreshGit(projectId, projectPath);
-    void useWorktreesStore.getState().refresh(projectId, projectPath);
-    void useExplorerStore.getState().refreshAll(projectId);
+    revalidateActivatedProject(
+      { id: projectId, path: projectPath },
+      {
+        refreshGit,
+        refreshWorktrees: useWorktreesStore.getState().refresh,
+        refreshExplorer: useExplorerStore.getState().refreshAll,
+      },
+    );
   }, [projectId, projectPath, refreshGit]);
 }

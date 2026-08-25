@@ -12,7 +12,7 @@ metacodex is a premium **local-first developer workspace** built as a Tauri 2 de
 
 ## Commands
 
-Package manager is **pnpm**. There is no frontend test suite and no separate lint command: `tsc --noEmit` (run via `pnpm build`) is the only TS static check. The Rust side has unit tests (notably the path sandbox in `util/paths.rs`), run with `cargo test` inside `src-tauri/`.
+Package manager is **pnpm**. Frontend unit tests are Vitest (`pnpm test`); `tsc --noEmit` (run via `pnpm build`) is the TS static check. There is no separate lint command. The Rust side has unit tests (notably the path sandbox in `util/paths.rs`), run with `cargo test` inside `src-tauri/`.
 
 | Task | Command |
 |---|---|
@@ -21,6 +21,7 @@ Package manager is **pnpm**. There is no frontend test suite and no separate lin
 | Run only the Vite frontend (no native shell) | `pnpm dev` |
 | Type-check + production frontend build | `pnpm build` |
 | Type-check only | `pnpm exec tsc --noEmit` |
+| Frontend unit tests | `pnpm test` |
 | Rust check / tests | `cargo check` / `cargo test` (in `src-tauri/`) |
 | Production Tauri bundle | `pnpm tauri build` |
 | Preview built frontend in browser | `pnpm preview` |
@@ -45,26 +46,25 @@ The boundary is strict: **Rust owns all OS/IO; React owns rendering and ephemera
 
 Paths OUTSIDE project roots are reachable only through unforgeable grants minted behind consent boundaries: `preview_grants.rs` (files opened via preview mode or macOS "Open With", see `open_files.rs`) and `directory_grants.rs` (clone parent dirs picked via native dialog). `config_paths.rs` carries the `~/.metacodex` carve-out. If you add a new FS-touching command it MUST validate through one of these paths before any `fs::*` call.
 
-### Shell layout (post v0.0.12 redesign)
+### Shell layout (v3)
 
-- `src/app/AppShell.tsx` owns only the CSS grid and top-level composition: a title bar row (`--title-bar-h`, 44px) over columns [projects sidebar | explorer | center | side panel (optional right column: launcher or Git/Review)]. The sidebars are floating cards separated by gap columns; the gaps come from `--panel-gap-x` / `--panel-gap-y` (tokens.css) and collapse to 0 with their panel in the same `grid-template-columns` transition. That transition is always on except while a `ResizeHandle` is being dragged (`resizing` flag). Bootstrap, filesystem sync, workspace persistence and tab actions live in `src/app/hooks/`.
-- The projects sidebar has two forms, toggled from the title bar and persisted in `features/ui/codeSidebar.store.ts` (localStorage): the collapsed icon rail (`components/project-rail/MiniProjectSidebar.tsx`) and the expanded list (`components/code-sidebar/ExpandedProjectsSidebar.tsx` + `CodeProjectGroup.tsx`) with nested per-project sections: Histórico (resume registry), and in vertical layout also Agentes, Terminais and Arquivos (open file tabs).
-- **Projects reorder by drag in BOTH sidebar forms** through the shared `components/ui/useListReorder.tsx` hook (pointer events, 8px threshold, trailing-click suppression, `data-no-drag` opt-out for nested interactive regions). Do NOT add `setPointerCapture` there: capturing suppresses the nested button's click under composed Radix Slots in WKWebView (see the hook's note). The context menu also offers Move up / Move down as the keyboard-friendly path. Order persists via `reorder_projects`.
-- **Active project identity:** accent bar + medium label on the expanded row (`SidebarRow` `accent` prop), accent bar + tinted glyph on the rail tile, and glyph + name in the title bar center. **Per-project session status** (worst of the per-tab agent statuses, plus session count) renders as a dot on the row and as a tile corner badge: rollup in `features/terminal/projectStatus.ts`, dot in `components/project-rail/ProjectStatusDot.tsx`, tone mapping shared with the tab dot in `components/tabs/statusTone.ts`.
-- `interface.layoutMode` setting: `horizontal` (top tab bar, sidebar shows only Histórico) or `vertical` (no tab bar; the sidebar sections are the ONLY tab management surface, which is why the Arquivos section must list every non-process tab kind).
-- Title bar (`src/app/TitleBar.tsx`): sidebar toggle + add-project (open folder / clone from GitHub) on the left; active project glyph + name, branch (ahead/behind) and `UpdatePill` center; the side panel toggle right; custom min/max/close controls on Windows only. (Workspace save failures surface in the Cmd+Shift+D diagnostics log, not a title-bar dot.)
+- `src/app/AppShell.tsx` owns the CSS grid: three columns `[AgentSidebar | CenterChrome+WorkArea | RightWorkbench]`. There is no top-level TitleBar and no icon rail. Each column paints its own 44px chrome (`--title-bar-h`) so macOS traffic lights and Windows caption buttons have clearance. Column widths collapse to 0 when a side is closed; that transition is always on except while a `ResizeHandle` is dragged (`resizing` flag). The document host is a sibling of `RightWorkbench` on `AppShell` (not a portal target that moves): it stays mounted even at width 0 / `display:none` so CodeMirror does not remount. Bootstrap, filesystem sync, workspace persistence and tab actions live in `src/app/hooks/`.
+- Left column: `components/v3-shell/AgentSidebar.tsx` + `RepoRow.tsx`. Collapse (`codeSidebar.store`, localStorage) hides the whole sidebar. Per-project expansion lists live process tabs plus Histórico (resume registry). **Projects reorder by drag** through `components/ui/useListReorder.tsx` (pointer events, 8px threshold, trailing-click suppression, `data-no-drag` opt-out). Do NOT add `setPointerCapture` there: capturing suppresses the nested button's click under composed Radix Slots in WKWebView. The context menu also offers Move up / Move down. Order persists via `reorder_projects`.
+- Center column is process tabs only (`terminal` / `cli`). `tabsStore.activeTabId` never points at a document. `CenterChrome` shows the focused agent title plus `UpdatePill`.
+- Right workbench (`sidePanel.store`): surfaces `changes | files`, plus document tabs (`editor | markdown | image | pdf | diff`). Keyboard close/cycle (`Cmd+W`, Ctrl+Tab) follow `shellFocus` (`center | workbench`), not whether the panel is open. Default: Changes is open, keyboard still owns the center process. Opening a file goes through `tabLifecycle` (`setActive: false` + `focusDoc`). Never `selectTab` a document.
+- **Per-project session status** (worst of the per-tab agent statuses, plus session count) renders as a dot on `RepoRow`: rollup in `features/terminal/projectStatus.ts`, `components/project-rail/ProjectStatusDot.tsx`, tone mapping shared with the tab dot in `components/tabs/statusTone.ts`. Workspace save failures surface in the Cmd+Shift+D diagnostics log.
 
 ### State (frontend)
 
 Zustand stores per feature (`src/features/<feature>/*.store.ts`):
 
-- `projects/project.store.ts`: list + activeProjectId. Its `remove()` tears down every live resource (PTYs, tab bucket, explorer/git caches, watcher) BEFORE the Rust registry forgets the project.
-- `tabs` store (`src/components/tabs/tabsStore.ts`): `byProject: Record<projectKey, { tabs, activeTabId }>`; `WORKSPACE_NULL` is the bucket key when no project is active.
-- `explorer`, `git`, `editor` + `editor-status`, `search`, `theme`, `keybindings`, `worktrees`, `resume`, `terminal`, `command-palette`: feature-local slices.
+- `projects/project.store.ts`: list + activeProjectId. Its `remove()` first awaits the transactional Rust removal. A persistence failure leaves every frontend resource intact. After backend commit succeeds, Rust stops project PTYs and its watcher, then the frontend tears down tab and cache state. Cleanup warnings go to diagnostics.
+- `tabs` store (`src/components/tabs/tabsStore.ts`): `byProject: Record<projectKey, { tabs, activeTabId }>`; `activeTabId` is the center process only; `WORKSPACE_NULL` is the bucket key when no project is active.
+- `explorer`, `git`, `editor` + `editor-status`, `search`, `theme`, `keybindings`, `worktrees`, `resume`, `terminal`, `command-palette`, `v3-shell`: feature-local slices.
 - `settings` (dialog open/close) vs `settings.data` (user preferences, the single source of truth for tunables).
-- `terminal/agent-status.store.ts`: per-tab `idle | working | needs-attention | done` derived from OSC + heuristics; powers the tab dot, the per-project rollup and Cmd+Shift+U.
-- `terminal/tabMetadata.store.ts`: per-tab branch / cwd / listening ports (polled); powers `TabTooltip` and the sidebar port chips.
-- `side-panel/sidePanel.store.ts`: the right column's single `view` (`closed | launcher | review`).
+- `terminal/agent-status.store.ts`: per-tab `idle | working | needs-attention | done` derived from OSC + heuristics (CLI: silence after working = your turn; shell: confirm-regex only); powers the tab dot, the per-project rollup, the CenterChrome working shimmer and Cmd+Shift+U.
+- `terminal/tabMetadata.store.ts`: per-tab branch / cwd / listening ports (polled); powers resume capture.
+- `side-panel/sidePanel.store.ts`: right column `view` (`closed | changes | files`), `activeDocId`, and `shellFocus` (`center | workbench`).
 - `diagnostics/diagnostics.store.ts`: the Cmd+Shift+D diagnostic log panel (also where workspace save failures are recorded).
 - `updates/updates.store.ts`: updater lifecycle (silent boot check, `UpdatePill`, About pane).
 - `ui/codeSidebar.store.ts` (collapsed + per-project expansion, localStorage) and `ui/toast.store.ts`.
@@ -76,13 +76,15 @@ Plain, pretty-printed, hand-editable JSON written atomically (tmp then rename) v
 
 ```
 ~/.metacodex/
-├── settings.json        # user prefs (theme, language, fonts, terminal, debounces, uiDensity, layoutMode)
+├── settings.json        # user prefs (theme, language, fonts, terminal, debounces, uiDensity)
 ├── keybindings.json     # shortcut overrides (only what differs from defaults)
 └── state/
     ├── projects.json     # registry + lastActiveProjectId (ordering = sidebar order)
     ├── resume.json       # recent CLI sessions (pruned to last 30 days at boot, prune_blocking)
     ├── last-session.log  # diagnostics ring-buffer dump on quit
     ├── last-crash.json   # last ErrorBoundary catch
+    ├── browser-profile/  # isolated webview cookies/cache
+    ├── browser-captures/ # short-lived PNGs sent to the coding agent
     ├── legacy-agent/     # archived state from the removed Agent view (startup migration)
     ├── legacy-ssh/       # archived state from the removed SSH feature (startup migration)
     └── workspace/{id}.json  # per-project: open tabs, active tab, expanded paths
@@ -120,12 +122,12 @@ One `notify_debouncer_mini::Debouncer` per project root, owned by `WatcherManage
 ### Theming
 
 - **Tokens drive everything.** Never hardcode colors in components. Tailwind `colors: { canvas, ink, hairline, ... }` map to CSS variables in `src/styles/tokens.css`. Light/dark switches via `data-theme` on `<html>`.
-- **11 selectable themes** live in `src/features/theme/themes/*.ts`, all typed by `Theme` (`theme/types.ts`) so every theme is forced to define the full `chrome`/`syntax`/`terminal` key set. `applyTheme.ts` writes those vars; accents, atmosphere, shadows and `--update-blue*` stay per-kind (light|dark) in `tokens.css`.
+- **Two themes.** Porcelain (light, cream `#f7f7f4`) and Graphite (dark, warm near-black `#141412`) live in `src/features/theme/themes/*.ts`, typed by `Theme` (`theme/types.ts`) so each defines the full `chrome`/`syntax`/`terminal` key set. Settings exposes System (default, follows the OS), Light, and Dark. `applyTheme.ts` writes those vars; `--accent`, `--atmosphere`, shadows, `--ink-hover` and `--update-blue*` stay per-kind in `tokens.css`. Brand voltage is Cursor Orange (`#f54e00`) as `--primary`/`--accent`, scarce (selection, identity bar, rare CTAs). Chrome filled buttons use `--ink` + `--canvas` text, never orange. Source spec: `DESIGN.md` (marketing) plus the in-app appendix. Do not resurrect the old gallery palettes (Tokyo Night, Solar Cream, …). New PTY sessions get `COLORFGBG` + `CLITHEME` from the resolved kind so agent TUIs start light or dark with the app.
 - **Type scale is enforced:** `text-micro` (10, mono metadata) / `text-label` (11) / `text-caption` (12) / `text-ui` (13) / `text-content` (14) / `text-title` (15) / `text-display-*`. Never `text-[Npx]`; the only sanctioned exception is one-off display sizes on hero surfaces. Section eyebrows/titles are sentence case (first letter capitalized only) via `editorial-caps`; never all-caps titles. `tracking-label` survives only on micro badges/chips (`Badge`). **If you add a fontSize tier to `tailwind.config.js`, register it in `src/lib/cn.ts`** (tailwind-merge classGroups) or twMerge will treat it as a text COLOR and drop it silently.
-- **Spacing is density-aware:** chrome padding/margin/gap uses the named pixel scale from `tailwind.config.js` (`p-10px`, `gap-6px`, `-mt-4px`, steps 4-64), which renders as `calc(Npx * var(--density-multiplier))` so the Density setting (compact 0.85 / comfortable 1 / spacious 1.15) flexes the whole chrome. Never write `p-[10px]` for chrome rhythm; arbitrary `[Npx]` survives only for 1-3px hairline nudges and for offsets that align to fixed-size elements (e.g. the title bar's traffic-light insets). Width/height/inset utilities do NOT scale. `--panel-header-h` and `--panel-gap-x/y` are density-scaled in `tokens.css`; `src/lib/cn.ts` already recognizes any `<n>px` spacing value, so adding a step needs no cn.ts change.
+- **Spacing is density-aware:** chrome padding/margin/gap uses the named pixel scale from `tailwind.config.js` (`p-10px`, `gap-6px`, `-mt-4px`, steps 4-64), which renders as `calc(Npx * var(--density-multiplier))` so the Density setting (compact 0.85 / comfortable 1 / spacious 1.15) flexes the whole chrome. Never write `p-[10px]` for chrome rhythm; arbitrary `[Npx]` survives only for 1-3px hairline nudges and for offsets that align to fixed-size elements (e.g. the title bar's traffic-light insets). Width/height/inset utilities do NOT scale. `--panel-header-h` and `--panel-gap-x` are density-scaled in `tokens.css`; `src/lib/cn.ts` already recognizes any `<n>px` spacing value, so adding a step needs no cn.ts change.
 - **Radius:** token classes only (`rounded-xs|sm|md|lg|xl|pill`). Never `rounded-full` / `rounded-2xl` / `rounded-[var(...)]`.
 - **Motion:** bare `transition-*` defaults to `--dur-fast`; use `duration-fast|base|slow` when explicit. Never `duration-100/150/200/300`.
-- **Buttons:** use `Button` / `IconButton` from `components/ui/` instead of ad-hoc `<button>` styling; hand-styled primary CTAs must include `press-feedback` + a focus-visible treatment.
+- **Buttons:** use `Button` / `IconButton` from `components/ui/` instead of ad-hoc `<button>` styling; hand-styled primary CTAs must include `press-feedback` + a focus-visible treatment. Filled chrome uses `bg-ink text-canvas hover:bg-ink-hover`. `text-on-primary` is for orange / danger / warn fills only.
 - Text over update-blue surfaces uses `text-on-update`.
 - The xterm theme is built from the same CSS vars (`--term-*`) and re-applied on theme change. Theme choice persists to `settings.json`; `localStorage` is only a first-paint cache.
 
@@ -149,10 +151,10 @@ One `notify_debouncer_mini::Debouncer` per project root, owned by `WatcherManage
 | You want to… | Start here |
 |---|---|
 | Add a new Tauri command | `src-tauri/src/commands/<area>.rs` + register in `lib.rs::invoke_handler!` + mirror in `src/lib/ipc.ts::CMD` |
-| Change app shell layout | `src/app/AppShell.tsx` (grid template lives there); use `src/app/hooks/*` for bootstrap, filesystem sync, persistence and tab actions |
-| Projects sidebar (rail / expanded, reorder, status dots) | `components/project-rail/*`, `components/code-sidebar/*`, `components/ui/useListReorder.tsx`, `features/terminal/projectStatus.ts`, `features/ui/codeSidebar.store.ts` |
-| Title bar (project identity, branch, updates, side panel toggle) | `src/app/TitleBar.tsx` |
-| Add a new tab kind | `src/components/tabs/types.ts` (union) → `TabContent.tsx` (renderer) → factories/open helpers in `features/tabs/` → Arquivos section in `CodeProjectGroup.tsx` (vertical layout) |
+| Change app shell layout | `src/app/AppShell.tsx` (grid template lives there) + `components/v3-shell/*`; use `src/app/hooks/*` for bootstrap, filesystem sync, persistence and tab actions |
+| Projects sidebar (list, reorder, status dots) | `components/v3-shell/AgentSidebar.tsx`, `RepoRow.tsx`, `components/ui/useListReorder.tsx`, `features/terminal/projectStatus.ts`, `features/ui/codeSidebar.store.ts` |
+| Column chrome (agent title, updates, workbench strip) | `components/v3-shell/CenterChrome.tsx`, `RightWorkbench.tsx`, `WorkbenchTabBar.tsx` |
+| Add a new tab kind | `src/components/tabs/types.ts` (union) → `TabContent.tsx` (renderer) → factories/open helpers in `features/tabs/` → workbench strip and/or `RepoRow` |
 | Tab open/close policy (factories, confirm, Process kill) | `src/features/tabs/` (`tabLifecycle`, `factories`, `closePolicy`, `pendingClose.store`); React adapter `useTabActions` only |
 | PTY Session lifecycle (spawn/stop/fit-on-visible) | `src/features/terminal/sessionController.ts` + `fitOnVisible.ts`; TerminalTab is chrome only |
 | Path authorization (Project roots + Finder reveal) | `src-tauri/src/util/paths.rs` + `ProjectsCache::require_within_*`; grants in `preview_grants.rs` / `directory_grants.rs` |
@@ -162,16 +164,17 @@ One `notify_debouncer_mini::Debouncer` per project root, owned by `WatcherManage
 | Add an app-wide UI command | `src/app/appCommands.ts` + implementation in `src/app/hooks/useTabActions.ts` or the relevant store-backed dispatcher |
 | Source Control panel / worktrees | `src/components/source-control/*` + `features/git/*`; Rust in `commands/git.rs` |
 | Clone from GitHub | `components/project-rail/CloneFromGithubDialog.tsx` + `commands/git.rs::git_clone` (+ `git://clone-progress`) |
-| Resume registry (recent CLI sessions) | `features/resume/*` + `components/resume/ResumeCards.tsx` + Histórico rows in `CodeProjectGroup.tsx`; Rust `commands/resume.rs` |
+| Resume registry (recent CLI sessions) | `features/resume/*` + Histórico rows in `components/v3-shell/RepoRow.tsx`; Rust `commands/resume.rs` |
 | Agent status (idle/working/needs-attention/done) | OSC parsing in `features/terminal/oscHandlers.ts` + `agentHeuristic.ts` → `agent-status.store.ts`; shared tone in `components/tabs/statusTone.ts` |
-| Tab tooltip / per-tab branch+ports | `features/terminal/tabMetadata.store.ts` + `useTabMetadataPolling` → `components/tabs/TabTooltip.tsx` |
+| Per-tab branch/cwd/ports | `features/terminal/tabMetadata.store.ts` + `useTabMetadataPolling` → resume capture |
 | OS notifications / sound | `commands/notifications.rs` ← `features/terminal/notificationDispatch.ts` |
 | Diagnostics log panel (Cmd+Shift+D) | `features/diagnostics/*` + `components/diagnostics/*`; Rust `commands/diagnostics.rs` |
 | Preview mode / macOS "Open With" | `src-tauri/src/open_files.rs` + `preview_grants.rs`; frontend preview tabs |
+| In-app browser (right workbench) | `components/browser/*` + `features/browser/*`; Rust `commands/browser.rs` + `browser_init.js` (child webview `preview-browser`, no Tauri IPC) |
 | Updates (pill, About pane, silent check) | `features/updates/*` + `components/updates/UpdatePill.tsx` |
-| UI density | `settings.types.ts::UI_DENSITY_MULTIPLIER` → `--density-multiplier` → density spacing scale in `tailwind.config.js` (`p-10px`/`gap-6px`) + `--space-*` / `--panel-header-h` / `--panel-gap-*` tokens |
+| UI density | `settings.types.ts::UI_DENSITY_MULTIPLIER` → `--density-multiplier` → density spacing scale in `tailwind.config.js` (`p-10px`/`gap-6px`) + `--space-*` / `--panel-header-h` / `--panel-gap-x` tokens |
 | Empty / loading / missing state | `components/ui/EmptyState.tsx` |
 | Where config + state persist | `~/.metacodex/` via `src-tauri/src/config_paths.rs` (honors `METACODEX_HOME`) |
-| Tweak design tokens / add a theme | `src/styles/tokens.css` + `src/features/theme/themes/*` (+ `tailwind.config.js` for new token classes) |
+| Tweak design tokens / light-dark palettes | `src/styles/tokens.css` + `src/features/theme/themes/{porcelain,graphite}.ts` (+ `tailwind.config.js` for new token classes) |
 | Tauri app config / capability grants | `src-tauri/tauri.conf.json` / `src-tauri/capabilities/default.json` |
-| Shell redesign rationale (v0.0.12) | `REDESIGN_PLAN.md` (root) + `MENU_UX_PLAN.md` |
+| Shell redesign rationale (historical v0.0.12) | `REDESIGN_PLAN.md` (superseded) + `MENU_UX_PLAN.md` |

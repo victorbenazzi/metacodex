@@ -1,53 +1,132 @@
 import type { IDisposable, Terminal } from "@xterm/xterm";
 
 import type { AgentStatus } from "@/features/terminal/agent-status.store";
+import {
+  firstMatch,
+  resolveAttentionProfile,
+  type AttentionProfile,
+} from "@/features/terminal/attentionProfile";
 
 /**
- * Local heuristic that classifies what the agent is doing right now without
- * the agent itself emitting OSC sequences. cmux relies primarily on OSCs, but
- * Claude Code / Codex / Aider / etc. don't emit them yet — so we fall back to:
+ * Classifies what a process tab is doing when the CLI does not emit OSC 99.
  *
- *   1. **Enter detection** — when the user submits a line via `\r` or `\n`,
- *      we flip the tab to `working`. Cheap, always right when wrong: the
- *      idle-decay below will repair it within ~800ms.
+ * CLI tabs (`cliId` set): output or Enter → `working`; real silence →
+ * `needs-attention` (your turn). Spinner copy can hold `working`. Confirm
+ * regexes still force attention if the TUI never goes quiet.
  *
- *   2. **Output silence** — when the PTY has been quiet for `idleAfterMs`,
- *      we either drop back to `idle` or, if the scrollback tail matches a
- *      confirm prompt, flip to `needs-attention`.
+ * Shell tabs: Enter → `working`; silence → `idle`, unless a confirm prompt
+ * sits on the cursor.
  *
- * OSC handlers (oscHandlers.ts) override this anytime — they're authoritative.
+ * OSC handlers override this. They are authoritative.
  */
 export interface AgentHeuristicOpts {
   cliId?: string;
-  /** Read the current status to know whether to write a new one. */
   getStatus: () => AgentStatus | undefined;
-  /** Write a new status to the agent-status store. */
   setStatus: (status: AgentStatus, hint?: string) => void;
-  /** Override the idle debounce. Defaults to 800ms. */
-  idleAfterMs?: number;
-  /** Override scrollback tail size scanned for confirm prompts. Default 50 lines. */
-  tailLines?: number;
 }
 
-/** Regexes that mean "the agent is waiting for the user to type y/n/Enter". */
-const CONFIRM_REGEXES: RegExp[] = [
-  /Do you want to[\s\S]{0,80}?\[y\/n\]/i,
-  /Continue\?\s*\(y\/n\)/i,
-  /Press\s+(?:Enter|RETURN)[\s\S]{0,40}?to\s+(?:continue|approve)/i,
-  /Approve this (?:action|command|edit)\?/i,
-  /(?:Allow|Apply|Run) this (?:edit|change|command)\?/i,
-  /\?\s*Continue/i,
-  /❯\s*Yes,?[\s\S]{0,8}?\bNo\b/, // arrow-key Yes/No menus (Claude Code & Codex)
-  /Tool use \(.*\) requires approval/i,
-];
+export type QuietDecision =
+  | { action: "working" }
+  | { action: "needs-attention"; hint?: string }
+  | { action: "idle" }
+  | { action: "keep" };
 
-/**
- * Read the lines around the cursor — where an active confirm prompt lives. We
- * deliberately do NOT scan the whole scrollback tail: an already-answered prompt
- * that scrolled up a few lines must not keep re-matching and pinning the tab to
- * `needs-attention` forever. The prompt the agent is waiting on is on / just
- * above the row the cursor sits on.
- */
+const VICINITY_LINES = 12;
+
+interface ScheduledDeadline {
+  at: number;
+  run: () => void;
+}
+
+class SharedDeadlineScheduler {
+  private readonly deadlines = new Map<symbol, ScheduledDeadline>();
+  private timer: ReturnType<typeof setTimeout> | null = null;
+
+  schedule(key: symbol, delayMs: number, run: () => void): void {
+    this.deadlines.set(key, { at: Date.now() + delayMs, run });
+    this.arm();
+  }
+
+  cancel(key: symbol): void {
+    this.deadlines.delete(key);
+    this.arm();
+  }
+
+  pendingCount(): number {
+    return this.deadlines.size;
+  }
+
+  private arm(): void {
+    if (this.timer !== null) {
+      clearTimeout(this.timer);
+      this.timer = null;
+    }
+    let nextAt = Number.POSITIVE_INFINITY;
+    for (const deadline of this.deadlines.values()) {
+      nextAt = Math.min(nextAt, deadline.at);
+    }
+    if (!Number.isFinite(nextAt)) return;
+    this.timer = setTimeout(() => this.flush(), Math.max(0, nextAt - Date.now()));
+  }
+
+  private flush(): void {
+    this.timer = null;
+    const now = Date.now();
+    const due: ScheduledDeadline[] = [];
+    for (const [key, deadline] of this.deadlines) {
+      if (deadline.at <= now) {
+        this.deadlines.delete(key);
+        due.push(deadline);
+      }
+    }
+    this.arm();
+    for (const deadline of due) deadline.run();
+  }
+}
+
+const quietScheduler = new SharedDeadlineScheduler();
+
+export function pendingAgentHeuristicDeadlines(): number {
+  return quietScheduler.pendingCount();
+}
+
+function fromVicinity(vicinity: string, profile: AttentionProfile): QuietDecision | null {
+  if (firstMatch(vicinity, profile.workingPatterns)) {
+    return { action: "working" };
+  }
+  const attentionHint = firstMatch(vicinity, profile.attentionPatterns);
+  if (attentionHint) return { action: "needs-attention", hint: attentionHint };
+  return null;
+}
+
+export function classifyCliQuiet(args: {
+  current: AgentStatus | undefined;
+  vicinity: string;
+  profile: AttentionProfile;
+}): QuietDecision {
+  if (args.current === "done") return { action: "keep" };
+  const hit = fromVicinity(args.vicinity, args.profile);
+  if (hit) return hit;
+  if (args.current === "working") return { action: "needs-attention" };
+  return { action: "keep" };
+}
+
+export function classifyShellQuiet(args: {
+  current: AgentStatus | undefined;
+  vicinity: string;
+  profile: AttentionProfile;
+  attentionFromHeuristic: boolean;
+}): QuietDecision {
+  if (args.current === "done") return { action: "keep" };
+  const hit = fromVicinity(args.vicinity, args.profile);
+  if (hit) return hit;
+  if (args.current === "working") return { action: "idle" };
+  if (args.current === "needs-attention" && args.attentionFromHeuristic) {
+    return { action: "idle" };
+  }
+  return { action: "keep" };
+}
+
 function readCursorVicinity(term: Terminal, lines: number): string {
   const buf = term.buffer.active;
   const cursorAbs = buf.baseY + buf.cursorY;
@@ -65,48 +144,55 @@ export function createAgentHeuristic(
   term: Terminal,
   opts: AgentHeuristicOpts,
 ): IDisposable {
-  const idleAfterMs = opts.idleAfterMs ?? 800;
-  // Tight window around the cursor: enough to span a multi-line prompt, small
-  // enough that a scrolled-past, answered prompt no longer matches.
-  const vicinityLines = opts.tailLines ?? 12;
-  let idleTimer: number | null = null;
-  // Did WE set the current `needs-attention`? If so we may clear it once the
-  // prompt is gone. An OSC-driven needs-attention (authoritative) stays put.
+  const isCli = Boolean(opts.cliId);
+  const profile = resolveAttentionProfile(opts.cliId);
+  const deadlineKey = Symbol("agent-quiet-deadline");
   let attentionFromHeuristic = false;
 
-  const writeListener = term.onWriteParsed(() => {
-    if (idleTimer != null) {
-      window.clearTimeout(idleTimer);
-    }
-    idleTimer = window.setTimeout(() => {
-      const current = opts.getStatus();
-      // Someone authoritative (OSC) changed the status out from under us; stop
-      // claiming ownership of a needs-attention we no longer set.
-      if (current !== "needs-attention") attentionFromHeuristic = false;
+  const applyQuiet = () => {
+    const current = opts.getStatus();
+    if (current !== "needs-attention") attentionFromHeuristic = false;
 
-      const text = readCursorVicinity(term, vicinityLines);
-      const matched = CONFIRM_REGEXES.find((re) => re.test(text));
-      if (matched) {
-        // Never override a `done` the agent just signalled via OSC.
-        if (current === "done") return;
-        const hint = (text.match(matched)?.[0] ?? "").slice(0, 80);
-        opts.setStatus("needs-attention", hint);
-        attentionFromHeuristic = true;
-      } else if (current === "working") {
-        opts.setStatus("idle");
-      } else if (current === "needs-attention" && attentionFromHeuristic) {
-        // The prompt we flagged is gone (answered / scrolled away) — recover.
-        opts.setStatus("idle");
-        attentionFromHeuristic = false;
-      }
-    }, idleAfterMs);
+    const vicinity = readCursorVicinity(term, VICINITY_LINES);
+    const decision = isCli
+      ? classifyCliQuiet({ current, vicinity, profile })
+      : classifyShellQuiet({
+          current,
+          vicinity,
+          profile,
+          attentionFromHeuristic,
+        });
+
+    if (decision.action === "keep") return;
+    if (decision.action === "needs-attention") {
+      opts.setStatus("needs-attention", decision.hint);
+      attentionFromHeuristic = true;
+      return;
+    }
+    if (decision.action === "working") {
+      opts.setStatus("working");
+      attentionFromHeuristic = false;
+      return;
+    }
+    opts.setStatus("idle");
+    attentionFromHeuristic = false;
+  };
+
+  const writeListener = term.onWriteParsed(() => {
+    const current = opts.getStatus();
+    // Fresh output on a CLI tab means the agent is busy, except when we
+    // already flagged attention: TUIs redraw the idle prompt and must not
+    // bounce yellow → gray → yellow. Enter is what resumes working.
+    if (isCli && current !== "done" && current !== "needs-attention") {
+      opts.setStatus("working");
+    }
+
+    quietScheduler.schedule(deadlineKey, profile.quietAfterMs, applyQuiet);
   });
 
   const inputListener = term.onData((d) => {
-    // Match `\r`, `\n`, or a sequence ending with one of them. The check
-    // covers both naked Enter (`\r`) and modified Enter sequences other than
-    // Shift+Enter (which Terminal sends as `ESC \r` and we want to ignore).
     if (d === "\r" || d === "\n") {
+      attentionFromHeuristic = false;
       opts.setStatus("working");
     }
   });
@@ -115,10 +201,7 @@ export function createAgentHeuristic(
     dispose() {
       writeListener.dispose();
       inputListener.dispose();
-      if (idleTimer != null) {
-        window.clearTimeout(idleTimer);
-        idleTimer = null;
-      }
+      quietScheduler.cancel(deadlineKey);
     },
   };
 }

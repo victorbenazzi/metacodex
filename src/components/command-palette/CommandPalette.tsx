@@ -184,14 +184,14 @@ export function CommandPalette() {
     <RD.Root open={open} onOpenChange={(o) => !o && close()}>
       <RD.Portal>
         <RD.Overlay
-          className="fixed inset-0 z-[100] bg-scrim"
+          className="fixed inset-0 z-[100] overlay-scrim"
         />
         <RD.Content
           aria-describedby={undefined}
           onKeyDown={onKeyDown}
           className={cn(
             "fixed left-1/2 top-[12vh] z-[101] -translate-x-1/2",
-            "max-h-[72vh] w-[min(640px,92vw)] overflow-hidden rounded-lg border border-hairline bg-surface-card",
+            "max-h-[72vh] w-[min(640px,92vw)] overflow-hidden rounded-lg border border-hairline surface-raised",
           )}
         >
           <RD.Title className="sr-only">

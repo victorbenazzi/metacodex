@@ -73,3 +73,22 @@ export function gitStatusRank(status: string): number {
       return 6;
   }
 }
+
+/** Compact +651332 / -564 style counts used in the Changes chrome. */
+export function compactCount(value: number): string {
+  const abs = Math.abs(value);
+  if (abs < 10_000) return String(value);
+  const unit = abs < 1_000_000 ? 1_000 : 1_000_000;
+  const suffix = unit === 1_000 ? "k" : "m";
+  const scaled = value / unit;
+  const decimals = Math.abs(scaled) < 10 && !Number.isInteger(scaled) ? 1 : 0;
+  return `${scaled.toFixed(decimals).replace(/\.0$/, "")}${suffix}`;
+}
+
+/** A file (or the whole review) is "large" past this many changed lines. */
+export const LARGE_DIFF_LINES = 400;
+export const LARGE_DIFF_CHARS = 200_000;
+
+export function isLargeLineDiff(additions: number, deletions: number): boolean {
+  return additions + deletions >= LARGE_DIFF_LINES;
+}

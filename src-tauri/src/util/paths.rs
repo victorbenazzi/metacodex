@@ -164,10 +164,8 @@ mod tests {
     fn rejects_symlink_below_root() {
         use std::os::unix::fs::symlink;
 
-        let base = std::env::temp_dir().join(format!(
-            "metacodex-paths-{}",
-            uuid::Uuid::new_v4().simple()
-        ));
+        let base =
+            std::env::temp_dir().join(format!("metacodex-paths-{}", uuid::Uuid::new_v4().simple()));
         let root = base.join("root");
         let outside = base.join("outside");
         std::fs::create_dir_all(&root).unwrap();

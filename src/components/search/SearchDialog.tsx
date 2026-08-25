@@ -10,10 +10,9 @@ import { searchApi } from "@/features/search/search.service";
 import type { SearchResults } from "@/features/search/search.types";
 import { useProjectsStore } from "@/features/projects/project.store";
 import { useSettingsDataStore } from "@/features/settings/settings.data.store";
-import { useTabsStore } from "@/components/tabs/tabsStore";
+import { openFileInProject } from "@/features/tabs";
 import { basename } from "@/lib/path";
 import { ext } from "@/lib/path";
-import type { Tab } from "@/components/tabs/types";
 
 export function SearchDialog() {
   const { t } = useTranslation();
@@ -64,34 +63,15 @@ export function SearchDialog() {
     };
   }, [open, query, caseSensitive, wholeWord, regex, project]);
 
-  const openTab = useTabsStore((s) => s.openTab);
   const setPendingGoto = usePendingGotoStore((s) => s.set);
 
   const onResultClick = (path: string, line: number) => {
     if (!project) return;
     const name = basename(path);
     const id = `f-${path}`;
-    const e = ext(name);
-    let tab: Tab;
-    if (["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(e)) {
-      tab = { id, kind: "image", title: name, projectId: project.id, path };
-    } else if (e === "pdf") {
-      tab = { id, kind: "pdf", title: name, projectId: project.id, path };
-    } else if (["md", "mdx", "markdown"].includes(e)) {
-      // open in source mode so the line jump makes sense
-      tab = {
-        id,
-        kind: "markdown",
-        title: name,
-        projectId: project.id,
-        path,
-        mode: "source",
-      };
-    } else {
-      tab = { id, kind: "editor", title: name, projectId: project.id, path };
-    }
+    const markdown = ["md", "mdx", "markdown"].includes(ext(name));
     setPendingGoto(id, line);
-    openTab(project.id, tab);
+    openFileInProject(project, path, name, markdown);
     setOpen(false);
   };
 
@@ -99,13 +79,13 @@ export function SearchDialog() {
     <RD.Root open={open} onOpenChange={setOpen}>
       <RD.Portal>
         <RD.Overlay
-          className="fixed inset-0 z-[100] bg-scrim"
+          className="fixed inset-0 z-[100] overlay-scrim"
         />
         <RD.Content
           aria-describedby={undefined}
           className={cn(
             "fixed left-1/2 top-[12vh] z-[101] -translate-x-1/2",
-            "max-h-[72vh] w-[min(720px,92vw)] overflow-hidden rounded-md border border-hairline bg-surface-card",
+            "max-h-[72vh] w-[min(720px,92vw)] overflow-hidden rounded-md border border-hairline surface-raised",
           )}
         >
           <RD.Title className="sr-only">{t("search.title")}</RD.Title>
@@ -238,7 +218,7 @@ function ToggleButton({
       className={cn(
         "inline-flex h-[22px] w-[22px] items-center justify-center rounded-xs transition-colors",
         active
-          ? "bg-ink text-on-primary"
+          ? "bg-ink text-canvas"
           : "text-muted hover:bg-surface-strong/55 hover:text-ink",
       )}
     >

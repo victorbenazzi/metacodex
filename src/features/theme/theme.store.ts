@@ -5,8 +5,6 @@ import {
   DEFAULT_DARK_THEME_ID,
   DEFAULT_LIGHT_THEME_ID,
   defaultThemeForKind,
-  getTheme,
-  isThemeId,
 } from "./themes";
 import type { Theme } from "./types";
 
@@ -16,15 +14,12 @@ export type EffectiveTheme = "light" | "dark";
 interface ThemeState {
   /** User-chosen light/dark preference (or "system" to follow the OS). */
   mode: ThemeMode;
-  /** Active palette. Determines `effective` via `theme.kind`. */
+  /** Active palette. Always Porcelain (light) or Graphite (dark). */
   theme: Theme;
-  /** Resolved kind currently applied to the document. Mirrors `theme.kind`. */
+  /** Resolved kind currently applied to the document. */
   effective: EffectiveTheme;
 
   setMode: (mode: ThemeMode) => void;
-  /** Pick a specific palette. Mode is synchronised to the theme's kind so the
-   *  picker selection and the Light/Dark toggle never disagree. */
-  setThemeId: (id: string) => void;
   /** Recompute the effective theme from the current OS preference (no-op when
    *  mode is "light" or "dark"). */
   refresh: () => void;
@@ -52,15 +47,6 @@ function readStoredMode(): ThemeMode {
   return "system";
 }
 
-function readStoredThemeId(): string | null {
-  try {
-    const v = localStorage.getItem(THEME_ID_KEY);
-    return isThemeId(v) ? v : null;
-  } catch {
-    return null;
-  }
-}
-
 function writeStored(mode: ThemeMode, themeId: string) {
   try {
     localStorage.setItem(MODE_KEY, mode);
@@ -70,58 +56,51 @@ function writeStored(mode: ThemeMode, themeId: string) {
   }
 }
 
-// One-time identity migration: the cool Porcelain/Graphite pair replaced the
-// warm Solar Cream / Mono Slate as the defaults. Anyone whose stored choice was
-// one of the OLD defaults is moved to the matching NEW default exactly once
-// (stamped via THEME_REV), so the redesign actually shows on existing installs.
-// A deliberate non-default pick (e.g. Tokyo Night) is left untouched.
+// Collapse any leftover gallery id (Tokyo Night, Solar Cream, …) onto the
+// Porcelain / Graphite pair. Mode stays authoritative: System still follows
+// the OS, Light/Dark stay locked. Stamped via THEME_REV so it runs once.
 const THEME_REV_KEY = "metacodex:themeRev";
-const THEME_REV = "cool-1";
-function migrateDefaultIdentity() {
+const THEME_REV = "pair-1";
+function migrateToPair() {
   try {
     if (localStorage.getItem(THEME_REV_KEY) === THEME_REV) return;
-    const stored = localStorage.getItem(THEME_ID_KEY);
-    if (stored === "solar-cream") localStorage.setItem(THEME_ID_KEY, DEFAULT_LIGHT_THEME_ID);
-    else if (stored === "mono-slate") localStorage.setItem(THEME_ID_KEY, DEFAULT_DARK_THEME_ID);
+    const mode = readStoredMode();
+    const effective = resolveEffective(mode);
+    localStorage.setItem(
+      THEME_ID_KEY,
+      effective === "dark" ? DEFAULT_DARK_THEME_ID : DEFAULT_LIGHT_THEME_ID,
+    );
     localStorage.setItem(THEME_REV_KEY, THEME_REV);
   } catch {
     // localStorage may be unavailable; the new defaults still apply for fresh state
   }
 }
-migrateDefaultIdentity();
+migrateToPair();
 
-// First-paint resolution: pick the stored themeId if any, otherwise derive
-// from the stored mode (falling back to OS). This runs synchronously at module
-// load so the cascade is correct before React mounts — no FOUC.
+// First-paint resolution: mode (System / Light / Dark) picks Porcelain or
+// Graphite. This runs synchronously at module load so the cascade is correct
+// before React mounts — no FOUC.
 const initialMode = readStoredMode();
-const storedThemeId = readStoredThemeId();
 const initialEffective = resolveEffective(initialMode);
-const initialTheme: Theme = storedThemeId
-  ? getTheme(storedThemeId)
-  : defaultThemeForKind(initialEffective);
+const initialTheme: Theme = defaultThemeForKind(initialEffective);
 applyTheme(initialTheme);
+
+function applyMode(mode: ThemeMode): { theme: Theme; effective: EffectiveTheme } {
+  const effective = resolveEffective(mode);
+  const theme = defaultThemeForKind(effective);
+  applyTheme(theme);
+  writeStored(mode, theme.id);
+  return { theme, effective };
+}
 
 export const useThemeStore = create<ThemeState>((set, get) => ({
   mode: initialMode,
   theme: initialTheme,
-  effective: initialTheme.kind,
+  effective: initialEffective,
 
   setMode: (mode) => {
-    const effective = resolveEffective(mode);
-    // Switching mode resets to the baseline theme for that kind. If you want
-    // to keep an exotic palette you re-pick it from the theme grid.
-    const nextTheme = defaultThemeForKind(effective);
-    applyTheme(nextTheme);
-    writeStored(mode, nextTheme.id);
-    set({ mode, theme: nextTheme, effective });
-  },
-
-  setThemeId: (id) => {
-    const theme = getTheme(id);
-    const mode: ThemeMode = theme.kind;
-    applyTheme(theme);
-    writeStored(mode, theme.id);
-    set({ mode, theme, effective: theme.kind });
+    const { theme, effective } = applyMode(mode);
+    set({ mode, theme, effective });
   },
 
   refresh: () => {
@@ -129,10 +108,10 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
     if (state.mode !== "system") return;
     const effective = readSystemTheme();
     if (effective === state.effective) return;
-    const nextTheme = defaultThemeForKind(effective);
-    applyTheme(nextTheme);
-    writeStored(state.mode, nextTheme.id);
-    set({ theme: nextTheme, effective });
+    const theme = defaultThemeForKind(effective);
+    applyTheme(theme);
+    writeStored(state.mode, theme.id);
+    set({ theme, effective });
   },
 }));
 

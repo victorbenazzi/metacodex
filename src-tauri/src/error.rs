@@ -20,6 +20,12 @@ pub enum AppError {
     #[error("store error: {0}")]
     Store(String),
 
+    #[error("invalid argument: {0}")]
+    InvalidArgument(String),
+
+    #[error("application is preparing to quit")]
+    AppQuiescing,
+
     #[error("io: {0}")]
     Io(#[from] std::io::Error),
 
@@ -40,6 +46,8 @@ impl Serialize for AppError {
             AppError::FileTooLarge(m) => ("FileTooLarge", m.clone()),
             AppError::Pty(m) => ("Pty", m.clone()),
             AppError::Store(m) => ("Store", m.clone()),
+            AppError::InvalidArgument(m) => ("InvalidArgument", m.clone()),
+            AppError::AppQuiescing => ("app_quiescing", self.to_string()),
             AppError::Io(e) => ("Io", e.to_string()),
             AppError::Other(m) => ("Other", m.clone()),
         };

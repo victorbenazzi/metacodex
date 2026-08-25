@@ -1,5 +1,10 @@
+use std::path::PathBuf;
+use std::sync::Arc;
+
 use chrono::Utc;
+use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
+use tauri::State;
 
 use crate::config_paths::{read_json, resume_file, write_json_atomic};
 use crate::error::{AppError, AppResult};
@@ -7,21 +12,16 @@ use crate::error::{AppError, AppResult};
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ResumeEntry {
-    /// Local nanoid , the resume registry's primary key, distinct from
-    /// `session_id` which is whatever the CLI prints.
     pub id: String,
-    /// Project the session belongs to. `None` if captured in a no-project tab.
     pub project_id: Option<String>,
-    /// "claude-code" | "codex-cli" | "opencode" | … , the registry id.
     pub cli_id: String,
-    /// CLI-printed session token. UUID for Claude Code; format varies for others.
     pub session_id: String,
     pub cwd: String,
     pub branch: Option<String>,
-    /// RFC3339 , when the detector first saw this session id.
     pub captured_at: String,
-    /// RFC3339 , bumped on every subsequent detection so prune knows what's recent.
     pub last_seen_at: String,
+    #[serde(default)]
+    pub revision: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -29,102 +29,237 @@ struct ResumeFile {
     entries: Vec<ResumeEntry>,
 }
 
-fn read_all() -> AppResult<Vec<ResumeEntry>> {
-    let path = resume_file()?;
-    let file: ResumeFile = read_json(&path)?;
-    Ok(file.entries)
+pub struct ResumeStore {
+    path: PathBuf,
+    file: Mutex<ResumeFile>,
 }
 
-fn write_all(entries: Vec<ResumeEntry>) -> AppResult<()> {
-    let path = resume_file()?;
-    write_json_atomic(&path, &ResumeFile { entries })
+impl ResumeStore {
+    pub fn hydrate() -> AppResult<Self> {
+        let path = resume_file()?;
+        let file = read_json(&path)?;
+        Ok(Self {
+            path,
+            file: Mutex::new(file),
+        })
+    }
+
+    #[cfg(test)]
+    fn at(path: PathBuf) -> AppResult<Self> {
+        let file = read_json(&path)?;
+        Ok(Self {
+            path,
+            file: Mutex::new(file),
+        })
+    }
+
+    pub fn list(&self, project_id: Option<&str>, days: Option<u32>) -> Vec<ResumeEntry> {
+        let mut entries = self.file.lock().entries.clone();
+        if let Some(project_id) = project_id {
+            entries.retain(|entry| entry.project_id.as_deref() == Some(project_id));
+        }
+        if let Some(days) = days {
+            let cutoff = Utc::now() - chrono::Duration::days(days as i64);
+            entries.retain(|entry| {
+                chrono::DateTime::parse_from_rfc3339(&entry.last_seen_at)
+                    .map(|time| time.with_timezone(&Utc) >= cutoff)
+                    .unwrap_or(false)
+            });
+        }
+        entries.sort_by(|left, right| right.last_seen_at.cmp(&left.last_seen_at));
+        entries
+    }
+
+    pub fn save(&self, mut entry: ResumeEntry) -> AppResult<()> {
+        let mut file = self.file.lock();
+        let mut next = file.clone();
+        let now = Utc::now().to_rfc3339();
+        if let Some(existing) = next.entries.iter_mut().find(|existing| {
+            existing.cli_id == entry.cli_id && existing.session_id == entry.session_id
+        }) {
+            if entry.revision < existing.revision {
+                return Ok(());
+            }
+            existing.last_seen_at = now;
+            existing.revision = entry.revision;
+            existing.cwd = entry.cwd;
+            existing.branch = entry.branch.or_else(|| existing.branch.clone());
+            if entry.project_id.is_some() {
+                existing.project_id = entry.project_id;
+            }
+        } else {
+            if entry.id.is_empty() {
+                entry.id = format!("r-{}", uuid::Uuid::new_v4());
+            }
+            if entry.captured_at.is_empty() {
+                entry.captured_at = now.clone();
+            }
+            if entry.last_seen_at.is_empty() {
+                entry.last_seen_at = now;
+            }
+            next.entries.push(entry);
+        }
+        write_json_atomic(&self.path, &next)?;
+        *file = next;
+        Ok(())
+    }
+
+    pub fn discard(&self, id: &str) -> AppResult<()> {
+        let mut file = self.file.lock();
+        let mut next = file.clone();
+        let before = next.entries.len();
+        next.entries.retain(|entry| entry.id != id);
+        if next.entries.len() == before {
+            return Err(AppError::NotFound(format!("resume entry {id}")));
+        }
+        write_json_atomic(&self.path, &next)?;
+        *file = next;
+        Ok(())
+    }
+
+    pub fn prune(&self, older_than_days: u32) -> AppResult<()> {
+        let mut file = self.file.lock();
+        let mut next = file.clone();
+        let cutoff = Utc::now() - chrono::Duration::days(older_than_days as i64);
+        let before = next.entries.len();
+        next.entries.retain(|entry| {
+            chrono::DateTime::parse_from_rfc3339(&entry.last_seen_at)
+                .map(|time| time.with_timezone(&Utc) >= cutoff)
+                .unwrap_or(true)
+        });
+        if next.entries.len() != before {
+            write_json_atomic(&self.path, &next)?;
+            *file = next;
+        }
+        Ok(())
+    }
 }
 
 #[tauri::command]
 pub async fn resume_list(
+    store: State<'_, Arc<ResumeStore>>,
     project_id: Option<String>,
     days: Option<u32>,
 ) -> AppResult<Vec<ResumeEntry>> {
-    let mut entries = read_all()?;
-
-    // Filter by project if given.
-    if let Some(pid) = project_id.as_ref() {
-        entries.retain(|e| e.project_id.as_ref() == Some(pid));
-    }
-
-    // Filter by `last_seen_at` recency.
-    if let Some(days) = days {
-        let cutoff = Utc::now() - chrono::Duration::days(days as i64);
-        entries.retain(|e| {
-            chrono::DateTime::parse_from_rfc3339(&e.last_seen_at)
-                .map(|t| t.with_timezone(&Utc) >= cutoff)
-                .unwrap_or(false)
-        });
-    }
-
-    // Most recent first.
-    entries.sort_by(|a, b| b.last_seen_at.cmp(&a.last_seen_at));
-    Ok(entries)
+    Ok(store.list(project_id.as_deref(), days))
 }
 
 #[tauri::command]
-pub async fn resume_save(entry: ResumeEntry) -> AppResult<()> {
-    let mut entries = read_all()?;
-    let now = Utc::now().to_rfc3339();
-    let key = (entry.cli_id.clone(), entry.session_id.clone(), entry.cwd.clone());
-    if let Some(existing) = entries.iter_mut().find(|e| {
-        (e.cli_id.clone(), e.session_id.clone(), e.cwd.clone()) == key
-    }) {
-        existing.last_seen_at = now.clone();
-        if let Some(b) = entry.branch {
-            existing.branch = Some(b);
-        }
-        if entry.project_id.is_some() {
-            existing.project_id = entry.project_id;
-        }
-    } else {
-        let mut entry = entry;
-        if entry.id.is_empty() {
-            entry.id = format!("r-{}", chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0));
-        }
-        if entry.captured_at.is_empty() {
-            entry.captured_at = now.clone();
-        }
-        if entry.last_seen_at.is_empty() {
-            entry.last_seen_at = now;
-        }
-        entries.push(entry);
-    }
-    write_all(entries)
+pub async fn resume_save(store: State<'_, Arc<ResumeStore>>, entry: ResumeEntry) -> AppResult<()> {
+    store.save(entry)
 }
 
 #[tauri::command]
-pub async fn resume_discard(id: String) -> AppResult<()> {
-    let mut entries = read_all()?;
-    let before = entries.len();
-    entries.retain(|e| e.id != id);
-    if entries.len() == before {
-        return Err(AppError::NotFound(format!("resume entry {id}")));
-    }
-    write_all(entries)
+pub async fn resume_discard(store: State<'_, Arc<ResumeStore>>, id: String) -> AppResult<()> {
+    store.discard(&id)
 }
 
-/// Startup pruning for `lib.rs::setup`. Best-effort: ignore errors so a
-/// corrupt resume.json doesn't block startup. (The old `resume_prune` IPC
-/// command was removed: nothing in the frontend ever called it.)
-pub fn prune_blocking(older_than_days: u32) {
-    let _ = (|| -> AppResult<()> {
-        let mut entries = read_all()?;
-        let cutoff = Utc::now() - chrono::Duration::days(older_than_days as i64);
-        let before = entries.len();
-        entries.retain(|e| {
-            chrono::DateTime::parse_from_rfc3339(&e.last_seen_at)
-                .map(|t| t.with_timezone(&Utc) >= cutoff)
-                .unwrap_or(true)
-        });
-        if entries.len() != before {
-            write_all(entries)?;
+#[cfg(test)]
+mod tests {
+    use super::{ResumeEntry, ResumeStore};
+    use std::sync::Arc;
+
+    fn test_path(name: &str) -> std::path::PathBuf {
+        std::env::temp_dir().join(format!("metacodex-{name}-{}.json", uuid::Uuid::new_v4()))
+    }
+
+    fn entry(cli: &str, session: &str, cwd: &str) -> ResumeEntry {
+        ResumeEntry {
+            id: String::new(),
+            project_id: Some("project".into()),
+            cli_id: cli.into(),
+            session_id: session.into(),
+            cwd: cwd.into(),
+            branch: None,
+            captured_at: String::new(),
+            last_seen_at: String::new(),
+            revision: 0,
         }
-        Ok(())
-    })();
+    }
+
+    #[test]
+    fn concurrent_unique_saves_preserve_both_records() {
+        let path = test_path("resume-concurrent");
+        let store = Arc::new(ResumeStore::at(path.clone()).unwrap());
+        let left = {
+            let store = store.clone();
+            std::thread::spawn(move || store.save(entry("claude", "a", "/one")))
+        };
+        let right = {
+            let store = store.clone();
+            std::thread::spawn(move || store.save(entry("codex", "b", "/two")))
+        };
+        left.join().unwrap().unwrap();
+        right.join().unwrap().unwrap();
+        assert_eq!(store.list(None, None).len(), 2);
+        assert_eq!(
+            ResumeStore::at(path.clone())
+                .unwrap()
+                .list(None, None)
+                .len(),
+            2
+        );
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn same_identity_keeps_newest_fields() {
+        let path = test_path("resume-merge");
+        let store = ResumeStore::at(path.clone()).unwrap();
+        store.save(entry("claude", "same", "/old")).unwrap();
+        let mut newest = entry("claude", "same", "/new");
+        newest.revision = 2;
+        newest.branch = Some("feature".into());
+        store.save(newest).unwrap();
+        let entries = store.list(None, None);
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].cwd, "/new");
+        assert_eq!(entries[0].branch.as_deref(), Some("feature"));
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn concurrent_same_identity_keeps_highest_revision() {
+        let path = test_path("resume-concurrent-merge");
+        let store = Arc::new(ResumeStore::at(path.clone()).unwrap());
+        let barrier = Arc::new(std::sync::Barrier::new(3));
+        let old = {
+            let store = store.clone();
+            let barrier = barrier.clone();
+            std::thread::spawn(move || {
+                let mut value = entry("claude", "same", "/old");
+                value.revision = 10;
+                barrier.wait();
+                store.save(value)
+            })
+        };
+        let new = {
+            let store = store.clone();
+            let barrier = barrier.clone();
+            std::thread::spawn(move || {
+                let mut value = entry("claude", "same", "/new");
+                value.branch = Some("feature".into());
+                value.revision = 20;
+                barrier.wait();
+                store.save(value)
+            })
+        };
+        barrier.wait();
+        old.join().unwrap().unwrap();
+        new.join().unwrap().unwrap();
+        let entries = store.list(None, None);
+        assert_eq!(entries[0].cwd, "/new");
+        assert_eq!(entries[0].branch.as_deref(), Some("feature"));
+        assert_eq!(entries[0].revision, 20);
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn loads_legacy_fixture() {
+        let path = test_path("resume-legacy");
+        std::fs::write(&path, r#"{"entries":[{"id":"old","projectId":null,"cliId":"codex","sessionId":"s","cwd":"/tmp","branch":null,"capturedAt":"2026-01-01T00:00:00Z","lastSeenAt":"2026-01-01T00:00:00Z"}]}"#).unwrap();
+        let store = ResumeStore::at(path.clone()).unwrap();
+        assert_eq!(store.list(None, None)[0].id, "old");
+        let _ = std::fs::remove_file(path);
+    }
 }

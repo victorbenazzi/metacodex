@@ -4,7 +4,9 @@ use tauri::{AppHandle, Manager};
 
 use crate::error::{AppError, AppResult};
 use crate::open_files::PendingOpenFiles;
-use crate::preview_grants::PreviewGrant;
+use crate::preview_grants::{PreviewGrant, PreviewGrants};
+use crate::projects::ProjectsCache;
+use crate::util::paths;
 
 /// Open an http(s) URL in the user's default browser.
 ///
@@ -14,8 +16,8 @@ use crate::preview_grants::PreviewGrant;
 /// else (`file://`, `javascript:`, …) is refused defensively.
 #[tauri::command]
 pub async fn open_external_url(url: String) -> AppResult<()> {
-    let parsed = tauri::Url::parse(url.trim())
-        .map_err(|e| AppError::Other(format!("invalid URL: {e}")))?;
+    let parsed =
+        tauri::Url::parse(url.trim()).map_err(|e| AppError::Other(format!("invalid URL: {e}")))?;
     if parsed.scheme() != "https" && parsed.scheme() != "http" {
         return Err(AppError::Other(format!(
             "refusing to open non-http(s) URL: {url}"
@@ -27,11 +29,11 @@ pub async fn open_external_url(url: String) -> AppResult<()> {
 
     #[cfg(target_os = "macos")]
     {
-        silent_command("open")
+        let status = silent_command("open")
             .arg(&url)
             .status()
             .map_err(|e| AppError::Other(format!("open failed: {e}")))?;
-        Ok(())
+        require_opener_success(status, "open")
     }
 
     #[cfg(target_os = "windows")]
@@ -45,11 +47,59 @@ pub async fn open_external_url(url: String) -> AppResult<()> {
 
     #[cfg(all(unix, not(target_os = "macos")))]
     {
-        silent_command("xdg-open")
+        let status = silent_command("xdg-open")
             .arg(&url)
             .status()
             .map_err(|e| AppError::Other(format!("xdg-open failed: {e}")))?;
+        require_opener_success(status, "xdg-open")
+    }
+}
+
+/// Open an authorized local path with its system default application.
+#[tauri::command]
+pub async fn open_external_path(path: String, app: AppHandle) -> AppResult<()> {
+    use crate::util::process::silent_command;
+
+    let roots = app.state::<Arc<ProjectsCache>>().project_roots();
+    let preview_ok = app.state::<Arc<PreviewGrants>>().contains_path(&path);
+    paths::authorize_reveal(&roots, preview_ok, &path)?;
+
+    #[cfg(target_os = "macos")]
+    {
+        let status = silent_command("open")
+            .arg(&path)
+            .status()
+            .map_err(|e| AppError::Other(format!("open failed: {e}")))?;
+        require_opener_success(status, "open")
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        silent_command("explorer")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| AppError::Other(format!("explorer failed: {e}")))?;
         Ok(())
+    }
+
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        let status = silent_command("xdg-open")
+            .arg(&path)
+            .status()
+            .map_err(|e| AppError::Other(format!("xdg-open failed: {e}")))?;
+        require_opener_success(status, "xdg-open")
+    }
+}
+
+#[cfg(unix)]
+fn require_opener_success(status: std::process::ExitStatus, opener: &str) -> AppResult<()> {
+    if status.success() {
+        Ok(())
+    } else {
+        Err(AppError::Other(format!(
+            "{opener} exited with status {status}"
+        )))
     }
 }
 

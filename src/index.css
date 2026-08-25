@@ -2,6 +2,7 @@
 @import "./styles/fonts.css";
 @import "./styles/tokens.css";
 @import "./styles/scrollbar.css";
+@import "./styles/tab-strip.css";
 @import "./styles/xterm.css";
 @import "./styles/diff.css";
 
@@ -76,26 +77,29 @@
   :focus:not(:focus-visible) {
     outline: none;
   }
+
+  /* Hairline is a token, never currentColor/ink. Preflight already sets this
+     via borderColor.DEFAULT; this keeps the contract if a utility fails. */
+  *,
+  *::before,
+  *::after {
+    border-color: var(--hairline);
+  }
 }
 
 @layer components {
-  /* Atmosphere, a faint lavender glow bleeding from the left corners, layered
-     UNDER the surface color (backgrounds always paint behind content, so this
-     never touches text contrast). The gradient itself is theme-defined via
-     --atmosphere in tokens.css. `-soft` sits on the projects sidebar's
-     floating card (surface-card + glow), `-canvas` on the main work surface. */
-  .atmosphere-soft {
-    background: var(--atmosphere), var(--surface-card);
+  /* Dialog/modal surfaces. Painted from tokens directly so a broken Tailwind
+     color function cannot leave a hollow overlay or an ink-colored outline. */
+  .overlay-scrim {
+    background-color: var(--overlay-scrim);
   }
-  .atmosphere-canvas {
-    background: var(--atmosphere), var(--canvas);
+  .surface-raised {
+    background-color: var(--surface-card);
   }
 
-  /* Empty-state stage decorations. `dot-grid` is a faint hairline dot lattice
-     masked so it dissolves before reaching the edges (the vignette keeps the
-     canvas reading as negative space, not wallpaper). `accent-bloom` is the
-     soft radial glow behind the hero glyph; both derive from tokens so every
-     theme keeps its own tint. */
+  /* Empty-state stage decoration: a faint hairline dot lattice masked so it
+     dissolves before reaching the edges (the vignette keeps the canvas reading
+     as negative space, not wallpaper). */
   .dot-grid {
     background-image: radial-gradient(var(--hairline-strong) 1px, transparent 1px);
     background-size: 22px 22px;
@@ -105,12 +109,74 @@
     mask-image: radial-gradient(68% 60% at 50% 38%, black 0%, transparent 70%);
     opacity: 0.45;
   }
-  .accent-bloom {
-    background: radial-gradient(
-      closest-side,
-      color-mix(in srgb, var(--accent) 16%, transparent),
-      transparent 72%
-    );
+
+  /* The center work area can become much narrower than the app window when
+     both side columns are open. Adapt its launch stage from a wide hero into a
+     compact vertical action list based on the work area's own width. */
+  .launch-stage {
+    container-type: inline-size;
+  }
+
+  @container (max-width: 440px) {
+    .launch-stage-content {
+      padding-inline: var(--space-md);
+    }
+
+    .launch-stage-stack {
+      max-width: 240px;
+      padding-block: var(--space-xl);
+    }
+
+    .launch-stage-glyph {
+      width: calc(56px * var(--density-multiplier));
+      height: calc(56px * var(--density-multiplier));
+      margin-bottom: var(--space-sm);
+    }
+
+    .launch-stage-title {
+      font-size: var(--fs-display-s);
+      line-height: 1.2;
+      letter-spacing: -0.012em;
+    }
+
+    .launch-stage-meta {
+      width: 100%;
+    }
+
+    .launch-stage-actions {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .launch-stage-chip {
+      width: 100%;
+      height: calc(30px * var(--density-multiplier));
+      gap: var(--space-xs);
+      font-size: var(--fs-caption);
+      justify-content: flex-start;
+    }
+
+    .launch-stage-shortcuts {
+      margin-top: var(--space-xl);
+      flex-direction: column;
+      align-items: flex-start;
+      gap: var(--space-xs);
+    }
+  }
+
+  @container (max-width: 320px) {
+    .launch-stage-content {
+      padding-inline: var(--space-base);
+    }
+
+    .launch-stage-stack {
+      max-width: 100%;
+    }
+
+    .launch-stage-glyph {
+      width: calc(52px * var(--density-multiplier));
+      height: calc(52px * var(--density-multiplier));
+    }
   }
 
   /* Editorial section label, used for section labels and titles. Historical

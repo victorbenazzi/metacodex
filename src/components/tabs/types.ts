@@ -52,6 +52,9 @@ export interface CliTabT extends TabBase {
   cwd: string;
   cliId: string;
   launchCommand: string;
+  launchExecutable?: string;
+  launchArgs?: string[];
+  providerSessionId?: string;
 }
 
 export type Tab =

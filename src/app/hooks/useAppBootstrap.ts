@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { homeDir } from "@tauri-apps/api/path";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import { useEditorReconcile } from "@/features/editor/useEditorReconcile";
 import { preloadCliDetections } from "@/features/terminal/cli-detection";
@@ -19,12 +20,27 @@ import { recordDiag } from "@/features/diagnostics/diagnostics.store";
 import { checkSilent as checkUpdatesSilent } from "@/features/updates/updates.service";
 import { useTabMetadataPolling } from "@/features/terminal/useTabMetadataPolling";
 import { useWorktreeOccupancySync } from "@/features/git/useWorktreeOccupancySync";
+import { setNativeWindowFocused } from "@/features/terminal/notificationDispatch";
 
-export function useAppBootstrap(): { homeDirPath: string | null } {
+export type BootstrapStatus = "loading" | "ready" | "failed";
+let appReady = false;
+export function isAppBootstrapReady(): boolean {
+  return appReady;
+}
+
+export function useAppBootstrap(): {
+  homeDirPath: string | null;
+  status: BootstrapStatus;
+  error: string | null;
+  retry: () => void;
+} {
   const [homeDirPath, setHomeDirPath] = useState<string | null>(null);
+  const [homeError, setHomeError] = useState<string | null>(null);
+  const [retryRevision, setRetryRevision] = useState(0);
 
   const projectsHydrated = useProjectsStore((s) => s.hydrated);
   const hydrateProjects = useProjectsStore((s) => s.hydrate);
+  const projectsError = useProjectsStore((s) => s.hydrateError);
   const settingsHydrated = useSettingsDataStore((s) => s.hydrated);
   const hydrateSettings = useSettingsDataStore((s) => s.hydrate);
   const keybindingsHydrated = useKeybindingsStore((s) => s.hydrated);
@@ -51,11 +67,19 @@ export function useAppBootstrap(): { homeDirPath: string | null } {
   // default factor (visual no-op) and again once the persisted value hydrates
   // or the user changes it. Failure is non-fatal: the app stays at 1.0 but the
   // setting persists, so a binary carrying the zoom capability picks it up on
-  // the next launch.
+  // the next launch. getCurrentWebview() itself can throw synchronously when
+  // Tauri internals are not injected yet (HMR, first paint), so the try wraps
+  // the call, not only the Promise.
   useEffect(() => {
-    getCurrentWebview()
-      .setZoom(UI_SCALE_FACTOR[uiScale])
-      .catch((err) => console.warn("[accessibility] setZoom failed", err));
+    const factor = UI_SCALE_FACTOR[uiScale];
+    if (factor == null) return;
+    try {
+      void getCurrentWebview()
+        .setZoom(factor)
+        .catch((err) => console.warn("[accessibility] setZoom failed", err));
+    } catch (err) {
+      console.warn("[accessibility] setZoom failed", err);
+    }
   }, [uiScale]);
 
   useEffect(() => {
@@ -68,6 +92,22 @@ export function useAppBootstrap(): { homeDirPath: string | null } {
 
   useEffect(() => {
     preloadCliDetections();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    let unlisten: (() => void) | undefined;
+    void getCurrentWindow().isFocused().then(setNativeWindowFocused).catch(() => undefined);
+    void getCurrentWindow().onFocusChanged(({ payload }) => {
+      if (!cancelled) setNativeWindowFocused(payload);
+    }).then((off) => {
+      if (cancelled) off();
+      else unlisten = off;
+    });
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
   }, []);
 
   useEffect(() => {
@@ -86,11 +126,13 @@ export function useAppBootstrap(): { homeDirPath: string | null } {
       try {
         const h = await homeDir();
         setHomeDirPath(h.replace(/\/+$/, ""));
-      } catch {
+        setHomeError(null);
+      } catch (error) {
         setHomeDirPath(null);
+        setHomeError(error instanceof Error ? error.message : String(error));
       }
     })();
-  }, []);
+  }, [retryRevision]);
 
   useEffect(() => {
     let offBp: (() => void) | undefined;
@@ -117,5 +159,21 @@ export function useAppBootstrap(): { homeDirPath: string | null } {
     };
   }, []);
 
-  return { homeDirPath };
+  const error = projectsError ?? homeError;
+  const status: BootstrapStatus = error
+    ? "failed"
+    : projectsHydrated && settingsHydrated && keybindingsHydrated && homeDirPath
+      ? "ready"
+      : "loading";
+  appReady = status === "ready";
+  return {
+    homeDirPath,
+    status,
+    error,
+    retry: () => {
+      useProjectsStore.setState({ hydrated: false, hydrateError: null });
+      setHomeError(null);
+      setRetryRevision((value) => value + 1);
+    },
+  };
 }

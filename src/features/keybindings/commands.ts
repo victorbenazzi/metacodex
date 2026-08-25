@@ -40,12 +40,6 @@ export const COMMANDS: CommandDef[] = [
     category: "view",
   },
   {
-    id: "tab.rename",
-    defaultBinding: ["f2"],
-    descriptionKey: "settings.shortcuts.cmd.tabRename",
-    category: "view",
-  },
-  {
     id: "tab.next",
     defaultBinding: ["ctrl+tab"],
     descriptionKey: "settings.shortcuts.cmd.tabNext",
@@ -111,6 +105,24 @@ export const COMMANDS: CommandDef[] = [
     id: "diagnostics.toggle",
     defaultBinding: ["mod+shift+d"],
     descriptionKey: "settings.shortcuts.cmd.diagnosticsToggle",
+    category: "view",
+  },
+  {
+    id: "agent.new",
+    defaultBinding: ["mod+n"],
+    descriptionKey: "settings.shortcuts.cmd.agentNew",
+    category: "general",
+  },
+  {
+    id: "browser.open",
+    defaultBinding: ["mod+shift+b"],
+    descriptionKey: "settings.shortcuts.cmd.browserOpen",
+    category: "view",
+  },
+  {
+    id: "browser.toggleExpand",
+    defaultBinding: ["mod+alt+m"],
+    descriptionKey: "settings.shortcuts.cmd.browserToggleExpand",
     category: "view",
   },
 ];

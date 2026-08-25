@@ -9,6 +9,7 @@ export interface ResumeEntry {
   branch: string | null;
   capturedAt: string;
   lastSeenAt: string;
+  revision: number;
 }
 
 export const resumeApi = {
@@ -18,10 +19,11 @@ export const resumeApi = {
       days: days ?? null,
     });
   },
-  save(entry: Omit<ResumeEntry, "id" | "capturedAt" | "lastSeenAt"> & {
+  save(entry: Omit<ResumeEntry, "id" | "capturedAt" | "lastSeenAt" | "revision"> & {
     id?: string;
     capturedAt?: string;
     lastSeenAt?: string;
+    revision?: number;
   }): Promise<void> {
     return invoke<void>(CMD.resumeSave, {
       entry: {
@@ -33,6 +35,7 @@ export const resumeApi = {
         branch: entry.branch,
         capturedAt: entry.capturedAt ?? "",
         lastSeenAt: entry.lastSeenAt ?? "",
+        revision: entry.revision ?? 0,
       },
     });
   },

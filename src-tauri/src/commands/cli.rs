@@ -2,6 +2,9 @@
 use std::process::Command;
 
 use serde::Serialize;
+use std::collections::HashMap;
+#[cfg(unix)]
+use std::time::{Duration, Instant};
 
 use crate::error::{AppError, AppResult};
 #[cfg(unix)]
@@ -11,6 +14,7 @@ use crate::pty::shell;
 pub struct CliDetectResult {
     pub installed: bool,
     pub path: Option<String>,
+    pub environment: HashMap<String, String>,
 }
 
 #[tauri::command]
@@ -20,57 +24,88 @@ pub async fn cli_detect(command: String) -> AppResult<CliDetectResult> {
         return Ok(CliDetectResult {
             installed: false,
             path: None,
+            environment: HashMap::new(),
         });
     }
 
     tokio::task::spawn_blocking(move || detect_cli_blocking(&command))
         .await
-        .map_err(|e| AppError::Other(format!("cli detect task failed: {e}")))
+        .map_err(|e| AppError::Other(format!("cli detect task failed: {e}")))?
 }
 
-fn detect_cli_blocking(command: &str) -> CliDetectResult {
+fn result_for(path: Option<String>) -> CliDetectResult {
+    let mut environment = HashMap::new();
+    if let Some(path) = path.as_deref() {
+        if let Some(parent) = std::path::Path::new(path).parent() {
+            let inherited_path = std::env::var_os("PATH");
+            let paths = std::iter::once(parent.to_path_buf()).chain(
+                inherited_path
+                    .as_deref()
+                    .map(std::env::split_paths)
+                    .into_iter()
+                    .flatten(),
+            );
+            if let Ok(joined) = std::env::join_paths(paths) {
+                environment.insert("PATH".into(), joined.to_string_lossy().into_owned());
+            }
+        }
+    }
+    CliDetectResult {
+        installed: path.is_some(),
+        path,
+        environment,
+    }
+}
+
+fn detect_cli_blocking(command: &str) -> AppResult<CliDetectResult> {
     if let Ok(p) = which::which(command) {
-        return CliDetectResult {
-            installed: true,
-            path: Some(p.display().to_string()),
-        };
+        return Ok(result_for(Some(p.display().to_string())));
     }
 
-    match detect_via_login_shell(command) {
-        Some(path) => CliDetectResult {
-            installed: true,
-            path: Some(path),
-        },
-        None => CliDetectResult {
-            installed: false,
-            path: None,
-        },
-    }
+    Ok(result_for(detect_via_login_shell(command)?))
 }
 
 #[cfg(unix)]
-fn detect_via_login_shell(command: &str) -> Option<String> {
+fn detect_via_login_shell(command: &str) -> AppResult<Option<String>> {
     let (shell_path, _) = shell::detect_login_shell();
     let script = format!("command -v -- {}", shell_quote(command));
-    let output = Command::new(shell_path)
+    let mut child = Command::new(shell_path)
         .args(["-l", "-i", "-c", script.as_str()])
-        .output()
-        .ok()?;
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .map_err(|error| AppError::Other(format!("cli detect spawn: {error}")))?;
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => break,
+            Ok(None) if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(20)),
+            Ok(None) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(AppError::Other("cli detection timed out".into()));
+            }
+            Err(error) => return Err(AppError::Other(format!("cli detect wait: {error}"))),
+        }
+    }
+    let output = child
+        .wait_with_output()
+        .map_err(|error| AppError::Other(format!("cli detect output: {error}")))?;
 
     if !output.status.success() {
-        return None;
+        return Ok(None);
     }
 
-    String::from_utf8_lossy(&output.stdout)
+    Ok(String::from_utf8_lossy(&output.stdout)
         .lines()
         .rev()
         .map(str::trim)
         .find(|line| !line.is_empty())
-        .map(ToOwned::to_owned)
+        .map(ToOwned::to_owned))
 }
 
 #[cfg(windows)]
-fn detect_via_login_shell(command: &str) -> Option<String> {
+fn detect_via_login_shell(command: &str) -> AppResult<Option<String>> {
     use crate::util::process::silent_command;
 
     // Primary: `where.exe` (resolves via PATH + PATHEXT). Silent_command keeps
@@ -82,7 +117,7 @@ fn detect_via_login_shell(command: &str) -> Option<String> {
                 .map(str::trim)
                 .find(|l| !l.is_empty())
             {
-                return Some(line.to_owned());
+                return Ok(Some(line.to_owned()));
             }
         }
     }
@@ -106,11 +141,11 @@ fn detect_via_login_shell(command: &str) -> Option<String> {
         for ext in pathext.split(';').filter(|e| !e.is_empty()) {
             let candidate = root.join(format!("{command}{ext}"));
             if candidate.is_file() {
-                return Some(candidate.display().to_string());
+                return Ok(Some(candidate.display().to_string()));
             }
         }
     }
-    None
+    Ok(None)
 }
 
 #[cfg(unix)]
@@ -133,7 +168,7 @@ mod tests {
 
     #[test]
     fn direct_detection_reports_installed_commands() {
-        let result = detect_cli_blocking("sh");
+        let result = detect_cli_blocking("sh").unwrap();
         assert!(result.installed);
         assert!(result.path.is_some());
     }

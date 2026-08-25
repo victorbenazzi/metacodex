@@ -18,7 +18,6 @@ pub struct Project {
     pub name: String,
     pub path: String,
     pub color: String,
-    pub icon: String,
     pub created_at: String,
     pub last_opened_at: String,
 }
@@ -72,23 +71,33 @@ impl ProjectsCache {
         crate::util::paths::require_within_project(&root, path)
     }
 
-    /// Find the project (id, path) whose root is a prefix of `path`. Picks the
-    /// longest matching root in case the user has registered nested folders.
-    /// Returns `None` when no project owns the path.
-    pub fn find_owner(&self, path: &str) -> Option<(String, String)> {
-        let normalized = crate::util::paths::normalize(std::path::Path::new(path));
-        let mut best: Option<(String, String, usize)> = None;
-        for p in self.inner.read().iter() {
-            let root = crate::util::paths::normalize(std::path::Path::new(&p.path));
-            if normalized == root || normalized.starts_with(&root) {
-                let depth = root.components().count();
-                if best.as_ref().map(|(_, _, d)| depth > *d).unwrap_or(true) {
-                    best = Some((p.id.clone(), p.path.clone(), depth));
-                }
-            }
-        }
-        best.map(|(id, root, _)| (id, root))
+    /// Project whose root contains `path`. Longest root wins when folders nest.
+    /// Returns `None` when no registered project owns the path.
+    pub fn find_owner_project(&self, path: &str) -> Option<Project> {
+        owning_project(&self.inner.read(), path).cloned()
     }
+
+    /// Find the project (id, path) whose root is a prefix of `path`.
+    pub fn find_owner(&self, path: &str) -> Option<(String, String)> {
+        self.find_owner_project(path).map(|p| (p.id, p.path))
+    }
+}
+
+/// Longest registered root that contains `path`.
+pub fn owning_project<'a>(projects: &'a [Project], path: &str) -> Option<&'a Project> {
+    let child = std::path::Path::new(path);
+    let mut best: Option<(&'a Project, usize)> = None;
+    for project in projects {
+        let root = std::path::Path::new(&project.path);
+        if !crate::util::paths::is_within(root, child) {
+            continue;
+        }
+        let depth = crate::util::paths::normalize(root).components().count();
+        if best.as_ref().map(|(_, d)| depth > *d).unwrap_or(true) {
+            best = Some((project, depth));
+        }
+    }
+    best.map(|(project, _)| project)
 }
 
 fn load_file() -> AppResult<ProjectsFile> {
@@ -323,7 +332,6 @@ pub fn add(app: &AppHandle, path: String) -> AppResult<Project> {
         name: basename(&path),
         path: path.clone(),
         color: assign_color(&file.projects),
-        icon: "Folder".into(),
         created_at: now.clone(),
         last_opened_at: now,
     };
@@ -399,30 +407,6 @@ pub fn rename(app: &AppHandle, id: &str, name: String) -> AppResult<Project> {
         .position(|p| p.id == id)
         .ok_or_else(|| AppError::NotFound(format!("project {id}")))?;
     file.projects[found_idx].name = trimmed;
-    save_file(&file)?;
-    app.state::<Arc<ProjectsCache>>()
-        .replace(file.projects.clone());
-    Ok(file.projects.into_iter().nth(found_idx).unwrap())
-}
-
-pub fn update_meta(
-    app: &AppHandle,
-    id: &str,
-    color: Option<String>,
-    icon: Option<String>,
-) -> AppResult<Project> {
-    let mut file = load_file()?;
-    let found_idx = file
-        .projects
-        .iter()
-        .position(|p| p.id == id)
-        .ok_or_else(|| AppError::NotFound(format!("project {id}")))?;
-    if let Some(c) = color {
-        file.projects[found_idx].color = c;
-    }
-    if let Some(i) = icon {
-        file.projects[found_idx].icon = i;
-    }
     save_file(&file)?;
     app.state::<Arc<ProjectsCache>>()
         .replace(file.projects.clone());

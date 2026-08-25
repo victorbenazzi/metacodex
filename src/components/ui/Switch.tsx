@@ -30,7 +30,7 @@ export function Switch({
       <span
         className={cn(
           "inline-block h-[12px] w-[12px] rounded-pill transition-transform motion-reduce:transition-none",
-          checked ? "translate-x-[16px] bg-on-primary" : "translate-x-[2px] bg-muted",
+          checked ? "translate-x-[16px] bg-canvas" : "translate-x-[2px] bg-muted",
         )}
       />
     </button>

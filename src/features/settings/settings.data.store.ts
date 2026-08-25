@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
 import i18n, { isLanguageId, type LanguageId } from "@/features/i18n/config";
+import { recordDiag } from "@/features/diagnostics/diagnostics.store";
 import { useThemeStore, type ThemeMode } from "@/features/theme/theme.store";
 
 import { settingsApi } from "./settings.service";
@@ -28,12 +29,37 @@ interface SettingsDataState {
 
 const PERSIST_DEBOUNCE_MS = 400;
 let persistTimer: ReturnType<typeof setTimeout> | null = null;
+let settingsRevision = 0;
+let persistedRevision = 0;
+let persistInFlight: Promise<void> = Promise.resolve();
+
+function errorDetail(err: unknown): Record<string, unknown> {
+  return { error: err instanceof Error ? err.message : String(err) };
+}
+
+function persistSnapshot(settings: AppSettings, revision: number): Promise<void> {
+  const operation = persistInFlight.catch(() => undefined).then(async () => {
+    try {
+      await settingsApi.write(settings);
+      persistedRevision = Math.max(persistedRevision, revision);
+    } catch (err) {
+      recordDiag("settings.save.fail", { detail: { area: "settings", ...errorDetail(err) } });
+      throw err;
+    }
+  });
+  persistInFlight = operation;
+  return operation;
+}
 
 function schedulePersist(read: () => AppSettings) {
+  settingsRevision += 1;
   if (persistTimer) clearTimeout(persistTimer);
   persistTimer = setTimeout(() => {
     persistTimer = null;
-    settingsApi.write(read()).catch((err) => console.error("[settings] persist failed", err));
+    const revision = settingsRevision;
+    void persistSnapshot(read(), revision).catch((err) => {
+      console.error("[settings] persist failed", err);
+    });
   }, PERSIST_DEBOUNCE_MS);
 }
 
@@ -48,11 +74,14 @@ export async function flushSettings(): Promise<void> {
     clearTimeout(persistTimer);
     persistTimer = null;
   }
-  try {
-    await settingsApi.write(useSettingsDataStore.getState().settings);
-  } catch (err) {
+  await persistInFlight.catch(() => undefined);
+  if (persistedRevision >= settingsRevision && settingsRevision > 0) return;
+
+  const revision = settingsRevision;
+  await persistSnapshot(useSettingsDataStore.getState().settings, revision).catch((err) => {
     console.error("[settings] flush failed", err);
-  }
+    throw err;
+  });
 }
 
 export const useSettingsDataStore = create<SettingsDataState>((set, get) => ({
@@ -75,15 +104,10 @@ export const useSettingsDataStore = create<SettingsDataState>((set, get) => ({
 
       set({ settings: merged, hydrated: true });
 
-      // settings.json is now authoritative — reconcile the live stores to it once.
-      // Prefer themeId (more specific) over mode when both diverge from the
-      // live store: the user picked a palette, honor that. If the persisted
-      // themeId matches the current store we still call setThemeId so the
-      // CSS variables are guaranteed to reflect that exact palette (the
-      // module-init paint cache may have used a different one).
-      if (useThemeStore.getState().theme.id !== merged.themeId) {
-        useThemeStore.getState().setThemeId(merged.themeId);
-      } else if (useThemeStore.getState().mode !== merged.theme) {
+      // settings.json is now authoritative for Mode (system / light / dark).
+      // The palette (Porcelain vs Graphite) is derived from that mode; leftover
+      // gallery ids are collapsed in mergeSettings and ignored here.
+      if (useThemeStore.getState().mode !== merged.theme) {
         useThemeStore.getState().setMode(merged.theme);
       }
       if (i18n.language !== merged.language) {

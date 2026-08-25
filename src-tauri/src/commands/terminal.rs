@@ -10,19 +10,38 @@ use tauri::{AppHandle, Manager, State};
 
 use crate::error::{AppError, AppResult};
 use crate::projects::ProjectsCache;
+use crate::pty::protocol::{PtyAttachResponse, PtyPrepareResponse};
 use crate::pty::{PtyManager, PtySessionInfo, PtySpawnSpec};
+use crate::runtime_supervisor::RuntimeSupervisor;
+use crate::util::process_tree;
 
 #[tauri::command]
-pub async fn pty_spawn(
+pub async fn pty_prepare(
     spec: PtySpawnSpec,
     app: AppHandle,
     mgr: State<'_, PtyManager>,
-) -> AppResult<String> {
+    runtime: State<'_, Arc<RuntimeSupervisor>>,
+) -> AppResult<PtyPrepareResponse> {
+    runtime.ensure_running()?;
     if let Some(project_id) = spec.project_id.as_deref() {
         app.state::<Arc<ProjectsCache>>()
             .require_within_project(project_id, &spec.cwd)?;
     }
-    mgr.spawn(spec)
+    mgr.prepare(spec)
+}
+
+#[tauri::command]
+pub async fn pty_attach(
+    session_id: String,
+    after_seq: u64,
+    mgr: State<'_, PtyManager>,
+) -> AppResult<PtyAttachResponse> {
+    mgr.attach(&session_id, after_seq)
+}
+
+#[tauri::command]
+pub async fn pty_start(session_id: String, mgr: State<'_, PtyManager>) -> AppResult<()> {
+    mgr.start(&session_id)
 }
 
 #[tauri::command]
@@ -49,7 +68,24 @@ pub async fn pty_resize(
 
 #[tauri::command]
 pub async fn pty_kill(session_id: String, mgr: State<'_, PtyManager>) -> AppResult<()> {
-    mgr.kill(&session_id)
+    mgr.kill(&session_id).await
+}
+
+#[tauri::command]
+pub async fn pty_kill_process(
+    session_id: String,
+    pid: u32,
+    mgr: State<'_, PtyManager>,
+) -> AppResult<()> {
+    let root_pid = mgr
+        .session_pid(&session_id)
+        .ok_or_else(|| AppError::NotFound(format!("pty session {session_id}")))?;
+    if pid == root_pid {
+        return mgr.kill(&session_id).await;
+    }
+    tokio::task::spawn_blocking(move || process_tree::terminate_owned_process(root_pid, pid))
+        .await
+        .map_err(|error| AppError::Other(format!("join: {error}")))?
 }
 
 #[tauri::command]
@@ -65,6 +101,13 @@ pub struct ListeningPort {
     pub port: u16,
     pub protocol: String, // "tcp" | "udp"
     pub address: String,  // "127.0.0.1", "0.0.0.0", "*"
+    pub pid: u32,
+}
+
+fn dedupe_listening_ports(mut listeners: Vec<ListeningPort>) -> Vec<ListeningPort> {
+    listeners.sort_by_key(|listener| (listener.port, listener.protocol.clone(), listener.pid));
+    listeners.dedup_by(|a, b| a.port == b.port && a.protocol == b.protocol && a.pid == b.pid);
+    listeners
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -74,7 +117,7 @@ pub struct PtyMetadata {
     pub pid: u32,
     pub cwd: String,
     pub branch: Option<String>,
-    pub listening_ports: Vec<ListeningPort>,
+    pub listening_ports: Option<Vec<ListeningPort>>,
 }
 
 /// Synchronous worker. Runs on a blocking thread because lsof is shell-out and
@@ -83,16 +126,15 @@ fn metadata_for_session(
     pid: u32,
     cwd: String,
     session_id: String,
+    branch: Option<String>,
+    owned_pids: Option<Vec<u32>>,
 ) -> PtyMetadata {
-    let branch = if pid > 0 {
-        detect_branch(&cwd)
+    let listening_ports = if pid > 0 {
+        owned_pids
+            .or_else(|| process_tree::owned_process_ids(pid))
+            .and_then(|pids| list_listening_ports(&pids))
     } else {
         None
-    };
-    let listening_ports = if pid > 0 {
-        list_listening_ports(pid).unwrap_or_default()
-    } else {
-        Vec::new()
     };
     PtyMetadata {
         session_id,
@@ -112,21 +154,33 @@ fn detect_branch(cwd: &str) -> Option<String> {
 }
 
 #[cfg(target_os = "macos")]
-fn list_listening_ports(pid: u32) -> Option<Vec<ListeningPort>> {
-    // `lsof -nP -p<pid> -iTCP -sTCP:LISTEN -F nP` , `-F nP` switches to the
+fn macos_lsof_args(pids: &[u32]) -> Vec<String> {
+    vec![
+        "-nP".into(),
+        "-a".into(),
+        format!(
+            "-p{}",
+            pids.iter()
+                .map(u32::to_string)
+                .collect::<Vec<_>>()
+                .join(",")
+        ),
+        "-iTCP".into(),
+        "-sTCP:LISTEN".into(),
+        "-F".into(),
+        "pnP".into(),
+    ]
+}
+
+#[cfg(target_os = "macos")]
+fn list_listening_ports(pids: &[u32]) -> Option<Vec<ListeningPort>> {
+    // `lsof -nP -p<pid> -iTCP -sTCP:LISTEN -F pnP` switches to the
     // field output mode where each record has lines tagged `p<pid>`, `n<addr>`,
     // `P<protocol>`. We only care about the `n` lines following a `p` we've
     // already filtered with `-p<pid>`. lsof times out implicitly on a quiet
     // system, so we cap our own wait at 250ms.
     let mut child = Command::new("lsof")
-        .args([
-            "-nP",
-            &format!("-p{pid}"),
-            "-iTCP",
-            "-sTCP:LISTEN",
-            "-F",
-            "nP",
-        ])
+        .args(macos_lsof_args(pids))
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::null())
         .spawn()
@@ -154,6 +208,12 @@ fn list_listening_ports(pid: u32) -> Option<Vec<ListeningPort>> {
         }
     };
     let text = String::from_utf8_lossy(&output.stdout);
+    parse_macos_lsof_listeners(&text)
+}
+
+#[cfg(target_os = "macos")]
+fn parse_macos_lsof_listeners(text: &str) -> Option<Vec<ListeningPort>> {
+    let mut current_pid: Option<u32> = None;
     let mut current_proto: Option<String> = None;
     let mut out: Vec<ListeningPort> = Vec::new();
     for line in text.lines() {
@@ -162,15 +222,17 @@ fn list_listening_ports(pid: u32) -> Option<Vec<ListeningPort>> {
         }
         let (tag, rest) = line.split_at(1);
         match tag {
+            "p" => current_pid = rest.parse::<u32>().ok(),
             "P" => current_proto = Some(rest.to_lowercase()),
             "n" => {
                 // Formats: "*:5173", "127.0.0.1:5173", "[::1]:5173".
                 if let Some((addr, port_str)) = rest.rsplit_once(':') {
-                    if let Ok(port) = port_str.parse::<u16>() {
+                    if let (Ok(port), Some(pid)) = (port_str.parse::<u16>(), current_pid) {
                         out.push(ListeningPort {
                             port,
                             protocol: current_proto.clone().unwrap_or_else(|| "tcp".into()),
                             address: addr.to_string(),
+                            pid,
                         });
                     }
                 }
@@ -180,17 +242,13 @@ fn list_listening_ports(pid: u32) -> Option<Vec<ListeningPort>> {
     }
     // Dedupe identical entries , lsof prints both IPv4 and IPv6 bound on the
     // same port and the user only cares once.
-    out.sort_by_key(|p| (p.port, p.protocol.clone()));
-    out.dedup_by(|a, b| a.port == b.port && a.protocol == b.protocol);
-    Some(out)
+    Some(dedupe_listening_ports(out))
 }
 
-#[cfg(target_os = "windows")]
-fn list_listening_ports(pid: u32) -> Option<Vec<ListeningPort>> {
-    // Use the IP Helper API (`GetExtendedTcpTable`) via `netstat2` , sub-ms,
-    // pure Rust, no PowerShell round-trip. We iterate every TCP socket, keep
-    // only LISTEN sockets owned by `pid`, and dedupe identical IPv4/IPv6
-    // entries on the same port for display.
+#[cfg(any(target_os = "linux", target_os = "windows"))]
+fn list_listening_ports(pids: &[u32]) -> Option<Vec<ListeningPort>> {
+    // netstat2 uses the native socket table for the current platform. Keep only
+    // listening TCP sockets owned by the PTY process tree.
     use netstat2::{
         get_sockets_info, AddressFamilyFlags, ProtocolFlags, ProtocolSocketInfo, TcpState,
     };
@@ -201,7 +259,7 @@ fn list_listening_ports(pid: u32) -> Option<Vec<ListeningPort>> {
     .ok()?;
     let mut out: Vec<ListeningPort> = Vec::new();
     for si in sockets {
-        if !si.associated_pids.iter().any(|p| *p == pid) {
+        if !si.associated_pids.iter().any(|pid| pids.contains(pid)) {
             continue;
         }
         if let ProtocolSocketInfo::Tcp(tcp) = si.protocol_socket_info {
@@ -212,19 +270,11 @@ fn list_listening_ports(pid: u32) -> Option<Vec<ListeningPort>> {
                 port: tcp.local_port,
                 protocol: "tcp".into(),
                 address: tcp.local_addr.to_string(),
+                pid: *si.associated_pids.iter().find(|pid| pids.contains(pid))?,
             });
         }
     }
-    out.sort_by_key(|p| (p.port, p.protocol.clone()));
-    out.dedup_by(|a, b| a.port == b.port && a.protocol == b.protocol);
-    Some(out)
-}
-
-#[cfg(all(unix, not(target_os = "macos")))]
-fn list_listening_ports(_pid: u32) -> Option<Vec<ListeningPort>> {
-    // Linux port discovery is out of scope for the MVP , the UI degrades
-    // gracefully (chips list stays empty).
-    None
+    Some(dedupe_listening_ports(out))
 }
 
 #[tauri::command]
@@ -234,19 +284,104 @@ pub async fn pty_metadata_batch(
 ) -> AppResult<Vec<PtyMetadata>> {
     // Snapshot pid + cwd under the manager's lock, release it, THEN do the
     // slow per-session work on a blocking thread.
-    let snapshots: Vec<(String, u32, String)> = mgr
+    let snapshots: Vec<(String, u32, String, Option<Vec<u32>>)> = mgr
         .sessions_for_metadata(&session_ids)
         .into_iter()
         .collect();
 
     tokio::task::spawn_blocking(move || {
+        let mut branch_by_cwd = std::collections::HashMap::new();
         snapshots
             .into_iter()
-            .map(|(id, pid, cwd)| metadata_for_session(pid, cwd, id))
+            .map(|(id, pid, cwd, owned_pids)| {
+                let branch = branch_by_cwd
+                    .entry(cwd.clone())
+                    .or_insert_with(|| detect_branch(&cwd))
+                    .clone();
+                metadata_for_session(pid, cwd, id, branch, owned_pids)
+            })
             .collect()
     })
     .await
     .map_err(|e| AppError::Other(format!("join: {e}")))
+}
+
+#[cfg(test)]
+mod metadata_tests {
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_metadata_reports_a_listener_owned_by_the_session() {
+        let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let pid = std::process::id();
+
+        let metadata = super::metadata_for_session(
+            pid,
+            "/tmp".into(),
+            "session".into(),
+            None,
+            Some(vec![pid]),
+        );
+
+        let listeners = metadata.listening_ports.expect("listener discovery");
+        assert!(listeners
+            .iter()
+            .any(|entry| entry.pid == pid && entry.port == port));
+    }
+
+    #[test]
+    fn listener_deduplication_preserves_distinct_processes() {
+        let listeners = super::dedupe_listening_ports(vec![
+            super::ListeningPort {
+                port: 5173,
+                protocol: "tcp".into(),
+                address: "127.0.0.1".into(),
+                pid: 27,
+            },
+            super::ListeningPort {
+                port: 5173,
+                protocol: "tcp".into(),
+                address: "::1".into(),
+                pid: 31,
+            },
+        ]);
+        assert_eq!(listeners.len(), 2);
+        assert_eq!(listeners[0].pid, 27);
+        assert_eq!(listeners[1].pid, 31);
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_lsof_intersects_pid_and_listener_filters() {
+        let args = super::macos_lsof_args(&[12, 14]);
+        assert_eq!(
+            args,
+            ["-nP", "-a", "-p12,14", "-iTCP", "-sTCP:LISTEN", "-F", "pnP"]
+        );
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_lsof_preserves_the_listener_pid() {
+        let parsed =
+            super::parse_macos_lsof_listeners("p27\nPtcp\nn127.0.0.1:5173\np31\nPtcp\nn*:3000\n")
+                .unwrap();
+        assert_eq!(parsed.len(), 2);
+        assert_eq!((parsed[0].port, parsed[0].pid), (3000, 31));
+        assert_eq!((parsed[1].port, parsed[1].pid), (5173, 27));
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_lsof_keeps_distinct_processes_on_the_same_port() {
+        let parsed = super::parse_macos_lsof_listeners(
+            "p27\nPtcp\nn127.0.0.1:5173\np31\nPtcp\nn[::1]:5173\n",
+        )
+        .unwrap();
+        assert_eq!(parsed.len(), 2);
+        assert_eq!((parsed[0].port, parsed[0].pid), (5173, 27));
+        assert_eq!((parsed[1].port, parsed[1].pid), (5173, 31));
+    }
 }
 
 #[tauri::command]

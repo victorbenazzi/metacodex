@@ -7,6 +7,9 @@
 //! ├── keybindings.json       # shortcut overrides
 //! └── state/
 //!     ├── projects.json       # { projects, lastActiveProjectId }
+//!     ├── resume.json
+//!     ├── browser-captures/   # short-lived PNGs sent to the coding agent
+//!     ├── browser-profile/    # isolated in-app browser data
 //!     ├── legacy-ssh/         # archived state from the removed SSH feature
 //!     └── workspace/
 //!         └── {projectId}.json
@@ -95,6 +98,17 @@ pub fn last_crash_file() -> AppResult<PathBuf> {
 /// (which release notes the user has already seen).
 pub fn whats_new_file() -> AppResult<PathBuf> {
     Ok(state_dir()?.join("whats-new.json"))
+}
+
+/// `~/.metacodex/state/browser-profile`, isolated webview data (cookies, cache).
+pub fn browser_profile_dir() -> AppResult<PathBuf> {
+    Ok(state_dir()?.join("browser-profile"))
+}
+
+/// `~/.metacodex/state/browser-captures`, short-lived screenshots for the agent.
+/// Files older than 24h and anything past the newest 8 are deleted on capture and at boot.
+pub fn browser_captures_dir() -> AppResult<PathBuf> {
+    Ok(state_dir()?.join("browser-captures"))
 }
 
 /// Path to a single project's workspace file: `state/workspace/{id}.json`.
@@ -237,7 +251,7 @@ pub fn read_json_opt<T: DeserializeOwned>(path: &Path) -> AppResult<Option<T>> {
 /// safe because the destination path is always app-derived: read commands take
 /// no path argument, and write commands take only opaque JSON or a guarded
 /// project id (see [`workspace_file`]). The webview can never inject an arbitrary
-/// path here. Same documented precedent as `fs_ops::read_project_icon_image`.
+/// path here.
 pub fn write_json_atomic<T: Serialize>(path: &Path, value: &T) -> AppResult<()> {
     let json = serde_json::to_string_pretty(value)
         .map_err(|e| AppError::Other(format!("serialize config: {e}")))?;

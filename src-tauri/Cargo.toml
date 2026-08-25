@@ -1,6 +1,6 @@
 [package]
 name = "metacodex"
-version = "0.0.19"
+version = "1.0.0"
 description = "metacodex: premium local-first developer workspace"
 authors = ["Victor"]
 edition = "2021"
@@ -13,7 +13,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["unstable"] }
 tauri-plugin-single-instance = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-clipboard-manager = "2"
@@ -29,6 +29,7 @@ portable-pty = "0.8"
 parking_lot = "0.12"
 uuid = { version = "1", features = ["v4", "serde"] }
 base64 = "0.22"
+percent-encoding = "2"
 which = "6"
 chrono = { version = "0.4", features = ["serde"] }
 dirs = "5"
@@ -44,23 +45,62 @@ git2 = { version = "0.18", default-features = false, features = ["vendored-libgi
 # reqwest::Client doesn't panic "No provider set". Pinned to the ring provider
 # that's already in the tree (no aws-lc-rs).
 rustls = { version = "0.23", default-features = false, features = ["ring"] }
+image = { version = "0.25", default-features = false, features = ["png"] }
+
+# SIGKILL escalation for stuck PTY children (portable-pty's killer only sends
+# SIGHUP). Unix-only; on Windows portable-pty already does a forceful kill.
+# Isolated in-app browser: WKWebView.takeSnapshot (no Screen Recording prompt).
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+block2 = "0.6"
+objc2-foundation = { version = "0.3", default-features = false, features = [
+  "NSObject",
+  "NSData",
+  "NSError",
+  "NSDictionary",
+  "NSGeometry",
+  "NSString",
+] }
+objc2-core-foundation = { version = "0.3", default-features = false, features = ["CFCGTypes"] }
+objc2-app-kit = { version = "0.3", default-features = false, features = [
+  "NSImage",
+  "NSImageRep",
+  "NSBitmapImageRep",
+] }
+objc2-web-kit = { version = "0.3", default-features = false, features = [
+  "objc2-app-kit",
+  "objc2-core-foundation",
+  "block2",
+  "WKWebView",
+  "WKSnapshotConfiguration",
+] }
 
 # SIGKILL escalation for stuck PTY children (portable-pty's killer only sends
 # SIGHUP). Unix-only; on Windows portable-pty already does a forceful kill.
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
 
-# Windows-only.
-# - `netstat2`: fast listening-port enumeration via IP Helper API. Replaces the
-#   macOS `lsof` shell-out path inside `commands::terminal::list_listening_ports`.
-# - `windows`: Job Object bindings (see `pty::job`) so killing a PTY also kills
-#   every descendant (`claude.cmd` → `node.exe`) via `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`.
-[target.'cfg(target_os = "windows")'.dependencies]
+# Native listener discovery on Linux and Windows.
+[target.'cfg(any(target_os = "linux", target_os = "windows"))'.dependencies]
 netstat2 = "0.11"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+cairo-rs = { version = "0.18", features = ["png"] }
+webkit2gtk = "2.0.2"
+
+[target.'cfg(target_os = "linux")'.dev-dependencies]
+gtk = "0.18"
+
+# Windows-only Job Object bindings. Killing a PTY also kills every descendant.
+[target.'cfg(target_os = "windows")'.dependencies]
+webview2-com = "0.38.2"
 windows = { version = "0.61", features = [
   "Win32_Foundation",
   "Win32_Security",
+  "Win32_System_Com",
+  "Win32_System_Com_StructuredStorage",
   "Win32_System_JobObjects",
+  "Win32_System_Diagnostics_ToolHelp",
   "Win32_System_Threading",
 ] }
 

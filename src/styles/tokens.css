@@ -1,134 +1,101 @@
 /*
  * metacodex design tokens
  *
- * Warm-cream light canvas / warm near-black dark canvas.
- * Hairline borders only. 14px base. Editorial typography.
- * Tokens drive everything — never hardcode colors in components.
+ * Cursor cream light / warm near-black dark. Hairline-only depth.
+ * 14px chrome base. Tokens drive everything — never hardcode colors.
+ * Source: DESIGN.md (getdesign cursor), applied to in-app chrome.
  */
 
 :root {
-  /* Surfaces — light (default). Cool, airy near-white (Porcelain). */
-  --canvas: #f5f6f9;
-  --canvas-soft: #f9fafc;
+  --brand-black: #000000;
+  /* Surfaces — light (default). Warm cream, not cool white. */
+  --canvas: #f7f7f4;
+  --canvas-soft: #fafaf7;
   --surface-card: #ffffff;
-  --surface-strong: #e6e8ef;
+  --surface-strong: #e6e5e0;
 
-  /* Surface elevation scale — aliases on top of the canvas/card tokens so
-     components can express intent ("this is elevated") instead of color
-     ("this is white"). Same physical color today, different semantic. */
   --surface-0: var(--canvas);
   --surface-1: var(--canvas-soft);
   --surface-2: var(--surface-card);
   --surface-3: var(--surface-card);
 
-  /* Hairlines */
-  --hairline: #e5e7ee;
-  --hairline-soft: #eef0f5;
-  --hairline-strong: #d2d5df;
+  /* Hairlines are ink at low alpha, never solid ink/white. Solid ink as a
+     border is the wireframe look (black in light, white in dark). */
+  --hairline: rgba(38, 37, 30, 0.10);
+  --hairline-soft: rgba(38, 37, 30, 0.06);
+  --hairline-strong: rgba(38, 37, 30, 0.16);
 
-  /* Scrim + elevation. Light theme: cool ink at low alpha so modals read as
-     "the canvas tinted darker", not "a black square covering everything". */
-  --overlay-scrim: rgba(18, 19, 28, 0.34);
-  --shadow-elevated:
-    0 1px 0 var(--hairline-soft),
-    0 12px 28px -10px rgba(18, 19, 28, 0.10);
+  /* Hairline-only elevation. Drag ghost keeps a quiet shadow so it reads
+     above the canvas; cards and dialogs do not. */
+  --overlay-scrim: rgba(38, 37, 30, 0.42);
+  --shadow-elevated: 0 0 0 1px var(--hairline);
   --shadow-drag:
-    0 18px 36px -12px rgba(18, 19, 28, 0.26),
-    0 4px 8px -4px rgba(18, 19, 28, 0.16);
+    0 0 0 1px var(--hairline),
+    0 10px 24px -12px rgba(38, 37, 30, 0.22);
 
-  /* High-contrast scrollbar thumb for the tab strip — visible at 1px against
-     the canvas-soft background. Light theme: near-black; dark theme: near-white. */
-  --scrollbar-tab-thumb: rgba(0, 0, 0, 0.9);
+  --scrollbar-tab-thumb: rgba(38, 37, 30, 0.85);
 
-  /* Ink */
-  --ink: #1b1c21;
-  --body: #51545e;
-  --muted: #767a86;
-  --muted-soft: #a0a4b1;
+  --ink: #26251e;
+  --ink-hover: #1a1914;
+  --body: #3f3d37;
+  --muted: #5c5a54;
+  --muted-soft: #807d72;
 
-  /* Brand-as-ink (ink stays the solid-CTA color; accent is a separate, quiet
-     highlight, never a loud fill). */
-  --primary: #1b1c21;
-  --primary-active: #0a0b0f;
+  /* Brand voltage: Cursor Orange. Scarce. Chrome fills stay ink. */
+  --primary: #f54e00;
+  --primary-active: #d04200;
   --on-primary: #ffffff;
 
-  /* Active tab: a white foreground surface in light themes. Kept separate
-     from primary actions because tabs preserve the normal ink direction. */
   --tab-active-bg: #ffffff;
   --tab-active-border: var(--hairline);
   --tab-active-text: var(--ink);
 
-  /* Accent — restrained indigo/lavender. Powers selected/active/focus tints
-     (bg-accent/NN, ring-accent, text-accent) and the corner atmosphere glow.
-     Kept consistent across every light syntax theme (defined here, not in the
-     theme chrome schema). */
-  --accent: #5a5ad8;
-  --accent-strong: #4a4ac4;
+  --accent: #f54e00;
+  --accent-strong: #d04200;
   --on-accent: #ffffff;
 
-  /* Atmosphere — faint lavender glow bleeding from the left corners. Consumed
-     by the `.atmosphere-*` utilities as a background layer (always behind
-     content, so it never touches text contrast). */
+  /* Atmosphere — warm ink whisper, not a colored glow. */
   --atmosphere:
-    radial-gradient(120% 90% at 0% 0%, rgba(90, 90, 216, 0.06), transparent 58%),
-    radial-gradient(110% 80% at 0% 100%, rgba(90, 90, 216, 0.045), transparent 52%);
+    radial-gradient(120% 90% at 0% 0%, rgba(38, 37, 30, 0.035), transparent 58%),
+    radial-gradient(110% 80% at 0% 100%, rgba(38, 37, 30, 0.02), transparent 52%);
 
-  /* Semantic */
-  --success: #18906b;
-  --danger: #d83b4a;
-  --warn: #b3760f;
+  --success: #1f8a65;
+  --danger: #cf2d56;
+  --warn: #b9722a;
 
-  /* Update pill (top bar) — a quiet blue that reads as "informational action"
-     without competing with --success (git clean) or --warn (saving). Light
-     theme stays muted; the dark variant lifts saturation to survive the dim
-     canvas. `-strong` is the solid-bg variant tuned to pair with white text
-     at AA contrast in both themes (~5:1 light, ~4.7:1 dark). */
-  --update-blue: #3b6fb8;
-  --update-blue-strong: #3162c9;
-  /* Text over the solid update-blue surface. Stays white in BOTH themes:
-     dark-theme --on-primary is near-black and would fail AA on this blue. */
+  --update-blue: #4c6f8a;
+  --update-blue-strong: #3b5f7a;
   --on-update: #ffffff;
 
-  /* Windows close-control hover: Microsoft's convention red. Same value in
-     both themes (a platform color, not a theme color). */
   --win-close: #e81123;
 
-  /* Controls layered over fixed dark imagery (the what's-new hero). The
-     artwork doesn't change with the theme, so these stay absolute in BOTH
-     themes; theme-relative ink/on-primary would invert and fail on it. */
   --on-media: #ffffff;
   --media-scrim: rgba(10, 10, 16, 0.42);
   --media-scrim-strong: rgba(10, 10, 16, 0.62);
   --media-ring: rgba(255, 255, 255, 0.22);
 
-  /* BackgroundGrain: the two faint radial spots behind editorial empty
-     states. Warm ink tint, same in both themes (over the dark canvas they
-     read as near-invisible texture, which is intended). */
   --grain-spot-a: rgba(38, 37, 30, 0.04);
   --grain-spot-b: rgba(38, 37, 30, 0.025);
 
-  /* Diff / git change gutter */
-  --diff-add: #1f9b73;
-  --diff-modify: #4d6f97;
-  --diff-remove: #d83b4a;
+  /* Agent-timeline pastels. In-product action stages only, never chrome. */
+  --timeline-thinking: #dfa88f;
+  --timeline-grep: #9fc9a2;
+  --timeline-read: #9fbbe0;
+  --timeline-edit: #c0a8dd;
+  --timeline-done: #c08532;
 
-  /* Explorer: ephemeral tint for files that just appeared on disk
-     (created by the IA in the terminal, by another process, or by the
-     user via inline create). Held full for ~14.4s, then fades the last
-     600ms via the `explorer-recent-tint` keyframe. */
-  --explorer-recent: rgba(90, 90, 216, 0.12);
+  --diff-add: #1f8a65;
+  --diff-modify: #6a8fb3;
+  --diff-remove: #cf2d56;
 
-  /* Diff view (side-by-side) line + token surfaces */
-  --diff-add-line: rgba(31, 155, 115, 0.10);
-  --diff-add-text: rgba(31, 155, 115, 0.24);
-  --diff-remove-line: rgba(216, 59, 74, 0.09);
-  --diff-remove-text: rgba(216, 59, 74, 0.22);
+  --explorer-recent: rgba(245, 78, 0, 0.10);
 
-  /* Editor selection — must keep ~AA contrast with every syntax token, so we
-     darken the canvas (light theme) rather than tint it with an accent. Themes
-     override --selection via applyTheme(); these defaults catch the boot
-     window before a theme is applied. */
-  --selection: rgba(40, 42, 54, 0.18);
+  --diff-add-line: rgba(31, 138, 101, 0.10);
+  --diff-add-text: rgba(31, 138, 101, 0.22);
+  --diff-remove-line: rgba(207, 45, 86, 0.09);
+  --diff-remove-text: rgba(207, 45, 86, 0.20);
+
+  --selection: rgba(38, 37, 30, 0.16);
 
   /* Radius */
   --radius-xs: 4px;
@@ -170,14 +137,14 @@
   --tracking-label: 0.06em;
 
   /* Fonts */
-  /* Default UI face is SF Pro (the macOS system font, via -apple-system),
-     falling back to Inter, then Menlo, then the platform system face. Display
-     reuses the same stack: at display sizes macOS automatically applies the
-     SF Pro Display optical variant. Tailwind's font-sans/mono/display read
-     these vars, so this block is the single source of truth. */
-  --font-sans: -apple-system, BlinkMacSystemFont, "Inter", "Menlo", system-ui, sans-serif;
-  --font-mono: "JetBrainsMono Nerd Font Mono", "JetBrainsMono NFM", "SF Mono", ui-monospace, Menlo, monospace;
-  --font-display: -apple-system, BlinkMacSystemFont, "Inter", "Menlo", system-ui, sans-serif;
+  /* Chrome + editor: SF Pro on macOS (`-apple-system` / BlinkMacSystemFont),
+     Inter then the platform UI font elsewhere. `--font-mono` aliases the same
+     stack so paths, diffs and worktrees match the rest of the UI.
+     `--font-term` is the PTY face only: Nerd Font for TUI glyphs. */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif;
+  --font-mono: var(--font-sans);
+  --font-display: var(--font-sans);
+  --font-term: "JetBrainsMono Nerd Font Mono", "SF Mono", ui-monospace, Menlo, monospace;
 
   /* Motion */
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
@@ -188,6 +155,7 @@
   --dur-base: 180ms;
   --dur-drawer: 240ms;
   --dur-slow: 280ms;
+  --agent-working-dur: 1.6s;
 
   /* Press feedback for primary CTAs — tiny scale-down on :active to give
      tactile confirmation. Restricted to actions (not navigation/tabs). */
@@ -206,8 +174,6 @@
   --density-multiplier: 1;
 
   /* Layout */
-  --rail-w: 48px;
-  --explorer-w: 248px;
   /* Taller than a bare macOS title bar so the traffic lights (repositioned
      via `trafficLightPosition` in tauri.conf.json) and the window controls
      sit vertically centered with breathing room above, matching the floating
@@ -228,33 +194,30 @@
      for the grid template, the handle offsets and the vertical insets.
      Density-scaled like the spacing tokens. */
   --panel-gap-x: calc(8px * var(--density-multiplier));
-  --panel-gap-y: calc(4px * var(--density-multiplier));
 
   /* Terminal palette (warm, neutral ANSI) */
   --term-bg: var(--canvas);
   --term-fg: var(--ink);
   --term-cursor: var(--ink);
-  --term-selection: rgba(38, 37, 30, 0.18);
+  --term-selection: rgba(38, 37, 30, 0.16);
   --term-black: #26251e;
   --term-red: #c43a5b;
-  --term-green: #2c8064;
-  --term-yellow: #a86b2a;
+  --term-green: #1f8a65;
+  --term-yellow: #b9722a;
   --term-blue: #4c6f8a;
   --term-magenta: #8a4f73;
   --term-cyan: #3b7a78;
   --term-white: #c8c5ba;
-  --term-bright-black: #5a5852;
+  --term-bright-black: #807d72;
   --term-bright-red: #cf2d56;
-  --term-bright-green: #1f8a65;
-  --term-bright-yellow: #b9722a;
+  --term-bright-green: #2c8064;
+  --term-bright-yellow: #c08532;
   --term-bright-blue: #5a86a7;
   --term-bright-magenta: #a3678f;
   --term-bright-cyan: #4f8e8c;
   --term-bright-white: #f7f7f4;
 
-  /* Syntax palette (used by editor + Shiki for markdown). Defaults below
-     preserve the original Solar Cream highlighting; themes override these via
-     applyTheme(). */
+  /* Syntax palette (editor + Shiki). Themes override these via applyTheme(). */
   --syntax-keyword: #26251e;
   --syntax-control-keyword: #26251e;
   --syntax-operator: #807d72;
@@ -280,97 +243,83 @@
   --syntax-attribute-value: #b9722a;
   --syntax-punctuation: #807d72;
   --syntax-bracket: #807d72;
-  --syntax-link: #b9722a;
+  --syntax-link: #f54e00;
   --syntax-heading: #26251e;
   --syntax-invalid: #cf2d56;
 }
 
 [data-theme="dark"] {
-  /* Surfaces — dark. Cool near-black (Graphite). */
-  --canvas: #0f1015;
-  --canvas-soft: #14151b;
-  --surface-card: #181a21;
-  --surface-strong: #252830;
+  /* Surfaces — dark. Warm near-black inverse of the cream pair. */
+  --canvas: #141412;
+  --canvas-soft: #1a1a17;
+  --surface-card: #1e1e1b;
+  --surface-strong: #2a2a26;
 
-  /* Surface elevation scale — see :root for the rationale. */
   --surface-0: var(--canvas);
   --surface-1: var(--canvas-soft);
   --surface-2: var(--surface-card);
   --surface-3: var(--surface-card);
 
-  /* Hairlines */
-  --hairline: #24262e;
-  --hairline-soft: #1c1e25;
-  --hairline-strong: #3a3d47;
+  --hairline: rgba(247, 247, 244, 0.08);
+  --hairline-soft: rgba(247, 247, 244, 0.05);
+  --hairline-strong: rgba(247, 247, 244, 0.14);
 
-  /* Scrim + elevation. Dark theme: deeper alpha because the canvas itself is
-     already low-luminance — needs more separation to read as overlay. */
-  --overlay-scrim: rgba(0, 0, 0, 0.55);
-  --shadow-elevated:
-    0 1px 0 var(--hairline-soft),
-    0 12px 28px -10px rgba(0, 0, 0, 0.50);
+  /* Deeper scrim: the canvas is already low-luminance. Elevation stays a
+     hairline; the drag ghost keeps a quiet shadow so it reads above canvas. */
+  --overlay-scrim: rgba(10, 10, 8, 0.58);
+  --shadow-elevated: 0 0 0 1px var(--hairline);
   --shadow-drag:
-    0 18px 36px -12px rgba(0, 0, 0, 0.70),
-    0 4px 8px -4px rgba(0, 0, 0, 0.50);
+    0 0 0 1px var(--hairline),
+    0 10px 24px -12px rgba(0, 0, 0, 0.55);
 
-  --scrollbar-tab-thumb: rgba(255, 255, 255, 0.9);
+  --scrollbar-tab-thumb: rgba(247, 247, 244, 0.85);
 
-  /* Ink */
-  --ink: #f3f4f7;
-  --body: #c0c3cd;
-  --muted: #888c99;
-  --muted-soft: #5b5e69;
+  --ink: #f7f7f4;
+  --body: #d4d1c8;
+  --muted: #a09c92;
+  --muted-soft: #807d72;
+  --ink-hover: #ecebe6;
 
-  --primary: #f3f4f7;
-  --primary-active: #ffffff;
-  --on-primary: #0f1015;
+  --primary: #f54e00;
+  --primary-active: #ff6a2a;
+  --on-primary: #ffffff;
 
-  /* Active tab: deeper than the surrounding dark canvas, with the same
-     hairline used by the sidebar surfaces. */
-  --tab-active-bg: #08090d;
+  --tab-active-bg: #0e0e0c;
   --tab-active-border: var(--hairline);
   --tab-active-text: var(--ink);
 
-  /* Accent — lavender lifted brighter so it reads on the dim canvas. */
-  --accent: #8a8af3;
-  --accent-strong: #9d9dff;
-  --on-accent: #0f1015;
+  --accent: #f54e00;
+  --accent-strong: #ff6a2a;
+  --on-accent: #ffffff;
   --atmosphere:
-    radial-gradient(120% 90% at 0% 0%, rgba(138, 138, 243, 0.10), transparent 58%),
-    radial-gradient(110% 80% at 0% 100%, rgba(138, 138, 243, 0.07), transparent 52%);
+    radial-gradient(120% 90% at 0% 0%, rgba(247, 247, 244, 0.03), transparent 58%),
+    radial-gradient(110% 80% at 0% 100%, rgba(247, 247, 244, 0.018), transparent 52%);
 
-  --success: #3ed092;
-  --danger: #ff626a;
-  --warn: #e2a65c;
-  --update-blue: #6aa3e8;
-  --update-blue-strong: #3b6fb8;
+  --success: #4ec99a;
+  --danger: #ff7c93;
+  --warn: #e3a35a;
+  --update-blue: #88a8c2;
+  --update-blue-strong: #4c6f8a;
 
-  /* Diff / git change gutter */
-  --diff-add: #3ed092;
-  --diff-modify: #7da2c6;
-  --diff-remove: #ff626a;
+  --diff-add: #4ec99a;
+  --diff-modify: #88a8c2;
+  --diff-remove: #ff7c93;
 
-  /* Explorer recent-file tint — dark variant, accent-keyed. */
-  --explorer-recent: rgba(138, 138, 243, 0.18);
+  --explorer-recent: rgba(245, 78, 0, 0.16);
 
-  /* Diff view (side-by-side) line + token surfaces */
-  --diff-add-line: rgba(62, 208, 146, 0.13);
-  --diff-add-text: rgba(62, 208, 146, 0.26);
-  --diff-remove-line: rgba(255, 98, 106, 0.13);
-  --diff-remove-text: rgba(255, 98, 106, 0.26);
+  --diff-add-line: rgba(78, 201, 154, 0.13);
+  --diff-add-text: rgba(78, 201, 154, 0.26);
+  --diff-remove-line: rgba(255, 124, 147, 0.13);
+  --diff-remove-text: rgba(255, 124, 147, 0.26);
 
-  /* Opaque + darker than every syntax token so selected text stays legible.
-     The previous fallback `--term-selection rgba(247,247,244,0.18)` was a
-     white overlay on dark canvas — produced a pale lavender that crushed
-     contrast against mid-tone tokens. */
-  --selection: #2a2d39;
+  /* Opaque, darker than syntax tokens so selected text stays legible. */
+  --selection: #2c2b26;
 
-  /* Terminal palette dark */
   --term-bg: var(--canvas);
   --term-fg: var(--ink);
   --term-cursor: var(--ink);
-  --term-selection: rgba(247, 247, 244, 0.18);
-  --term-black: #2a2924;
+  --term-selection: rgba(247, 247, 244, 0.16);
+  --term-black: #2a2a26;
   --term-red: #d9627d;
   --term-green: #4ec99a;
   --term-yellow: #e3a35a;
@@ -378,7 +327,7 @@
   --term-magenta: #c08fab;
   --term-cyan: #75b3b0;
   --term-white: #c8c5ba;
-  --term-bright-black: #5a5852;
+  --term-bright-black: #807d72;
   --term-bright-red: #ff7c93;
   --term-bright-green: #6fd9af;
   --term-bright-yellow: #f0b870;
@@ -387,7 +336,6 @@
   --term-bright-cyan: #8cc4c1;
   --term-bright-white: #f7f7f4;
 
-  /* Syntax palette — Mono Slate defaults (overridden by applyTheme()). */
   --syntax-keyword: #f7f7f4;
   --syntax-control-keyword: #f7f7f4;
   --syntax-operator: #969287;
@@ -408,14 +356,14 @@
   --syntax-type: #f7f7f4;
   --syntax-class-name: #f7f7f4;
   --syntax-namespace: #f7f7f4;
-  --syntax-tag: #ff5a7d;
+  --syntax-tag: #ff7c93;
   --syntax-attribute-name: #969287;
   --syntax-attribute-value: #e3a35a;
   --syntax-punctuation: #969287;
   --syntax-bracket: #969287;
-  --syntax-link: #e3a35a;
+  --syntax-link: #ff6a2a;
   --syntax-heading: #f7f7f4;
-  --syntax-invalid: #ff5a7d;
+  --syntax-invalid: #ff7c93;
 }
 
 /* Press feedback — opt-in via the .press-feedback class on primary action
@@ -431,26 +379,6 @@
   .press-feedback:active {
     transform: scale(var(--press-scale));
     transition-duration: var(--press-dur);
-  }
-}
-
-/* Explorer toggle feedback stays small and only stretches on devices with a
-   precise hover pointer. The component owns color feedback independently. */
-.explorer-toggle-indicator {
-  transition:
-    transform var(--dur-fast) var(--ease-out),
-    background-color var(--dur-fast) var(--ease-out);
-}
-
-@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
-  .explorer-toggle-pill:hover .explorer-toggle-indicator {
-    transform: scaleY(1.04);
-  }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .explorer-toggle-pill:active .explorer-toggle-indicator {
-    transform: scaleY(0.97);
   }
 }
 
@@ -507,10 +435,56 @@
   transition-duration: var(--dur-exit);
 }
 
+@keyframes loading-pixel-on {
+  0%,
+  100% {
+    opacity: 0.15;
+  }
+  45%,
+  55% {
+    opacity: 1;
+  }
+}
+
+@keyframes loading-shimmer-text {
+  0% {
+    background-position: 100% center;
+  }
+  100% {
+    background-position: -100% center;
+  }
+}
+
+.loading-pixel {
+  animation: loading-pixel-on var(--loading-pixel-dur, 650ms) ease-in-out
+    var(--loading-pixel-delay, 0ms) infinite;
+}
+
+.loading-shimmer {
+  color: transparent;
+  background-image: linear-gradient(
+    90deg,
+    var(--muted) 35%,
+    var(--ink) 50%,
+    var(--muted) 65%
+  );
+  background-size: 200% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  animation: loading-shimmer-text var(--agent-working-dur) linear infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .explorer-toggle-indicator {
-    transform: none;
-    transition-property: background-color;
+  .loading-pixel {
+    animation: none;
+    opacity: 0.15;
+  }
+
+  .loading-shimmer {
+    color: var(--ink);
+    background-image: none;
+    animation: none;
+    -webkit-text-fill-color: var(--ink);
   }
 
   .explorer-recent::before {

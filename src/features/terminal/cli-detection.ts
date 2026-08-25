@@ -4,7 +4,7 @@ import type { CliTool } from "@/features/terminal/cli-registry";
 import { DEFAULT_CLI_REGISTRY } from "@/features/terminal/cli-registry";
 import { cliApi, type CliDetectResult } from "@/features/terminal/cli.service";
 
-export type CliDetectionStatus = "checking" | "installed" | "missing";
+export type CliDetectionStatus = "checking" | "installed" | "missing" | "failed";
 
 export interface CliDetectionState extends CliDetectResult {
   status: CliDetectionStatus;
@@ -16,6 +16,7 @@ const checkingState: CliDetectionState = {
   status: "checking",
   installed: false,
   path: null,
+  environment: {},
 };
 
 // Detection round-trips through a login shell (`$SHELL -l -c "command -v ..."`)
@@ -25,27 +26,39 @@ const checkingState: CliDetectionState = {
 // per session, results are shared across every mount of the hook, and the menu
 // reopens render the cached snapshot synchronously.
 const cache = new Map<string, CliDetectionState>();
-const inflight = new Map<string, Promise<void>>();
+const inflight = new Map<string, Promise<CliDetectionState>>();
 const listeners = new Set<() => void>();
 
 function notify() {
   for (const l of listeners) l();
 }
 
-function ensureDetected(cli: CliTool) {
-  if (cache.has(cli.id) || inflight.has(cli.id)) return;
+export function detectCli(cli: CliTool): Promise<CliDetectionState> {
+  const cached = cache.get(cli.id);
+  if (cached) return Promise.resolve(cached);
+  const existing = inflight.get(cli.id);
+  if (existing) return existing;
   const p = cliApi
     .detect(cli.command)
     .then(
       (result) => {
-        cache.set(cli.id, {
+        const state: CliDetectionState = {
           ...result,
           status: result.installed ? "installed" : "missing",
-        });
+        };
+        cache.set(cli.id, state);
+        return state;
       },
       (err) => {
         console.warn("[cli] detect failed", cli.id, err);
-        cache.set(cli.id, { status: "missing", installed: false, path: null });
+        const state: CliDetectionState = {
+          status: "failed",
+          installed: false,
+          path: null,
+          environment: {},
+        };
+        cache.set(cli.id, state);
+        return state;
       },
     )
     .finally(() => {
@@ -53,6 +66,7 @@ function ensureDetected(cli: CliTool) {
       notify();
     });
   inflight.set(cli.id, p);
+  return p;
 }
 
 function snapshot(registry: CliTool[]): CliDetections {
@@ -73,7 +87,7 @@ export function emptyCliDetections(registry: CliTool[] = DEFAULT_CLI_REGISTRY): 
  * skipped. Wire this into app startup so the first menu open is instant.
  */
 export function preloadCliDetections(registry: CliTool[] = DEFAULT_CLI_REGISTRY): void {
-  for (const cli of registry) ensureDetected(cli);
+  for (const cli of registry) void detectCli(cli);
 }
 
 export function useCliDetections(registry: CliTool[] = DEFAULT_CLI_REGISTRY): CliDetections {
@@ -99,5 +113,10 @@ export function cliDetectionFor(cli: CliTool, detections: CliDetections): CliDet
  *  user installs a CLI mid-session (the cache is otherwise session-long). */
 export function refreshCliDetection(cli: CliTool): void {
   cache.delete(cli.id);
-  ensureDetected(cli);
+  void detectCli(cli);
+}
+
+export function resetCliDetectionsForTests(): void {
+  cache.clear();
+  inflight.clear();
 }

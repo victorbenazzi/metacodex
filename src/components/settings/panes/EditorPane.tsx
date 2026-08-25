@@ -5,14 +5,12 @@ import { Select, type SelectOption } from "@/components/ui/Select";
 import { PaneHeader, Row, withCurrent } from "@/components/settings/SettingsPrimitives";
 import { useSettingsDataStore } from "@/features/settings/settings.data.store";
 
-/** Curated monospace families. Stored value is the CSS font stack. */
+/** Curated faces. Stored value is the CSS font stack. Default is SF Pro. */
 const EDITOR_FONT_OPTIONS: SelectOption[] = [
-  { value: "var(--font-mono)", label: "JetBrains Mono" },
-  { value: '"SF Mono", ui-monospace, monospace', label: "SF Mono" },
+  { value: "var(--font-sans)", label: "SF Pro" },
+  { value: '"SF Mono", ui-monospace, Menlo, monospace', label: "SF Mono" },
   { value: "Menlo, monospace", label: "Menlo" },
   { value: "Monaco, monospace", label: "Monaco" },
-  { value: '"Fira Code", monospace', label: "Fira Code" },
-  { value: '"Cascadia Code", monospace', label: "Cascadia Code" },
 ];
 
 export function EditorPane() {

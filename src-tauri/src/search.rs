@@ -1,6 +1,6 @@
 use std::path::Path;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 use grep_matcher::Matcher;
 use grep_regex::RegexMatcher;
@@ -118,8 +118,8 @@ pub fn search(
         pattern
     };
 
-    let matcher = RegexMatcher::new(&pattern)
-        .map_err(|e| AppError::Other(format!("invalid regex: {e}")))?;
+    let matcher =
+        RegexMatcher::new(&pattern).map_err(|e| AppError::Other(format!("invalid regex: {e}")))?;
 
     let mut searcher: Searcher = SearcherBuilder::new()
         .line_number(true)
@@ -206,11 +206,7 @@ struct CollectSink<'a> {
 impl<'a> grep_searcher::Sink for CollectSink<'a> {
     type Error = std::io::Error;
 
-    fn matched(
-        &mut self,
-        _searcher: &Searcher,
-        mat: &SinkMatch<'_>,
-    ) -> Result<bool, Self::Error> {
+    fn matched(&mut self, _searcher: &Searcher, mat: &SinkMatch<'_>) -> Result<bool, Self::Error> {
         if self.cap_remaining == 0 {
             return Ok(false);
         }

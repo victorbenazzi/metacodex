@@ -6,7 +6,7 @@ import { cn } from "@/lib/cn";
 
 interface EmptyStateProps {
   icon?: IconComponent;
-  /** Short headline. Rendered as Fraunces display — keep it 1 line. */
+  /** Short headline. Keep it 1 line. */
   title?: ReactNode;
   /** Supporting paragraph. */
   body?: ReactNode;

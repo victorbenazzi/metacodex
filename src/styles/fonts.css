@@ -1,8 +1,7 @@
-/* Bundled monospace stack — JetBrainsMono Nerd Font Mono.
-   Includes Powerline + Nerd Font icon glyphs (Private Use Area) that vanilla
-   JetBrains Mono lacks, so TUIs (Claude Code, Codex, opencode, starship) render
-   their status-bar icons instead of tofu boxes.
-   Licensed under SIL OFL 1.1 — see src/assets/fonts/LICENSE. */
+/* Terminal-only Nerd Font. Loaded for PTY tabs so Powerline / Nerd glyphs
+   (Claude Code, Codex, opencode, starship) render instead of tofu.
+   Chrome, editor and the rest of the UI stay on `--font-sans` (SF Pro).
+   Licensed under SIL OFL 1.1. See src/assets/fonts/LICENSE. */
 
 @font-face {
   font-family: "JetBrainsMono Nerd Font Mono";

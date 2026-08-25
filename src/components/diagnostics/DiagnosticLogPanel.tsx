@@ -14,6 +14,7 @@ import { cn } from "@/lib/cn";
  *  scannable at a glance without coloring every row. */
 const KIND_META: Record<DiagKind, { letter: string; tone: "ink" | "success" | "warn" | "danger" }> = {
   "pty.spawn":           { letter: "P", tone: "ink" },
+  "pty.start.fail":      { letter: "P", tone: "danger" },
   "pty.exit":            { letter: "P", tone: "ink" },
   "pty.kill":            { letter: "P", tone: "warn" },
   "pty.backpressure":    { letter: "P", tone: "warn" },
@@ -24,6 +25,8 @@ const KIND_META: Record<DiagKind, { letter: string; tone: "ink" | "success" | "w
   "workspace.save.ok":   { letter: "W", tone: "success" },
   "workspace.save.fail": { letter: "W", tone: "danger" },
   "workspace.load.fail": { letter: "W", tone: "danger" },
+  "settings.save.fail":  { letter: "S", tone: "danger" },
+  "resume.save.fail":    { letter: "R", tone: "danger" },
   "ipc.command.fail":    { letter: "I", tone: "danger" },
   "tab.remap":           { letter: "T", tone: "ink" },
   "tab.close_external":  { letter: "T", tone: "warn" },

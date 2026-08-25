@@ -63,13 +63,19 @@ export function useXterm(): UseXtermResult {
   const firstTypoRun = useRef(true);
   const firstCursorRun = useRef(true);
   const firstScrollbackRun = useRef(true);
-  // Reapply on any theme switch (light↔dark *and* swaps within the same kind,
-  // e.g. Tokyo Night → One Dark — both dark, different ANSI palettes).
+  const firstScreenReaderRun = useRef(true);
+  // Reapply when the resolved kind changes (System following the OS, or the
+  // user locking Light / Dark). Porcelain and Graphite have different ids, so
+  // themeId is a precise signal for the ANSI palette as well as chrome.
   const themeId = useThemeStore((s) => s.theme.id);
+  const themeKind = useThemeStore((s) => s.effective);
   const termFontFamily = useSettingsDataStore((s) => s.settings.terminal.fontFamily);
   const termFontSize = useSettingsDataStore((s) => s.settings.terminal.fontSize);
   const termCursorStyle = useSettingsDataStore((s) => s.settings.terminal.cursorStyle);
   const termScrollback = useSettingsDataStore((s) => s.settings.terminal.scrollback);
+  const screenReaderMode = useSettingsDataStore(
+    (s) => s.settings.accessibility.screenReaderMode,
+  );
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -80,6 +86,7 @@ export function useXterm(): UseXtermResult {
     // visible as a blank terminal that "doesn't load".
     disposedRef.current = false;
     const initialTerm = useSettingsDataStore.getState().settings.terminal;
+    const initialAccessibility = useSettingsDataStore.getState().settings.accessibility;
     const term = new Terminal({
       fontFamily: initialTerm.fontFamily,
       fontSize: initialTerm.fontSize,
@@ -94,6 +101,7 @@ export function useXterm(): UseXtermResult {
       scrollback: initialTerm.scrollback,
       allowProposedApi: true,
       smoothScrollDuration: 0,
+      screenReaderMode: initialAccessibility.screenReaderMode,
       cols: 100,
       rows: 28,
       theme: buildTerminalTheme(),
@@ -115,7 +123,7 @@ export function useXterm(): UseXtermResult {
     // the open() itself can crash if it tries to fit/sync before a renderer
     // is installed. We defer the canvas attach + the first fit to the next
     // animation frame so xterm has finished its internal init. We also wait
-    // for the Nerd Font to finish loading first, otherwise the canvas would
+    // for the configured face to finish loading first, otherwise the canvas would
     // measure cell width using a fallback font and lock in the wrong metrics.
     const installRenderer = () => {
       try {
@@ -151,11 +159,11 @@ export function useXterm(): UseXtermResult {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Theme reactivity: re-apply when the active palette changes
+  // Theme reactivity: re-apply when the active palette or resolved kind changes
   useEffect(() => {
     if (!termRef.current) return;
     termRef.current.options.theme = buildTerminalTheme();
-  }, [themeId]);
+  }, [themeId, themeKind]);
 
   // Live-apply terminal typography. Font size/family change cell metrics, so we
   // refit — and load the family first so the canvas renderer measures the right
@@ -203,6 +211,14 @@ export function useXterm(): UseXtermResult {
     }
     if (termRef.current) termRef.current.options.scrollback = termScrollback;
   }, [termScrollback]);
+
+  useEffect(() => {
+    if (firstScreenReaderRun.current) {
+      firstScreenReaderRun.current = false;
+      return;
+    }
+    if (termRef.current) termRef.current.options.screenReaderMode = screenReaderMode;
+  }, [screenReaderMode]);
 
   return { containerRef, termRef, fitRef, disposedRef };
 }

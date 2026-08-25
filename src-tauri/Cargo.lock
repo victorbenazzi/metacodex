@@ -2510,21 +2510,31 @@ dependencies = [
 
 [[package]]
 name = "metacodex"
-version = "0.0.19"
+version = "1.0.0"
 dependencies = [
  "base64 0.22.1",
+ "block2",
+ "cairo-rs",
  "chrono",
  "dirs 5.0.1",
  "git2",
  "grep-matcher",
  "grep-regex",
  "grep-searcher",
+ "gtk",
  "ignore",
+ "image",
  "libc",
  "netstat2",
  "notify",
  "notify-debouncer-mini",
+ "objc2",
+ "objc2-app-kit",
+ "objc2-core-foundation",
+ "objc2-foundation",
+ "objc2-web-kit",
  "parking_lot",
+ "percent-encoding",
  "portable-pty",
  "rustls",
  "serde",
@@ -2540,6 +2550,8 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "uuid",
+ "webkit2gtk",
+ "webview2-com",
  "which",
  "windows",
 ]

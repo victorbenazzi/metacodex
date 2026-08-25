@@ -4,6 +4,7 @@ export interface ListeningPort {
   port: number;
   protocol: string;
   address: string;
+  pid: number;
 }
 
 export interface PtyMetadata {
@@ -11,7 +12,8 @@ export interface PtyMetadata {
   pid: number;
   cwd: string;
   branch: string | null;
-  listeningPorts: ListeningPort[];
+  /** Null means the platform could not prove exact process ownership. */
+  listeningPorts: ListeningPort[] | null;
 }
 
 export interface TabMetadataEntry extends PtyMetadata {

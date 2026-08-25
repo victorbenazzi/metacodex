@@ -73,10 +73,7 @@ fn resolve_preview_path(app: &AppHandle, grant_id: &str) -> AppResult<String> {
 }
 
 #[tauri::command]
-pub async fn pick_preview_file(
-    title: String,
-    app: AppHandle,
-) -> AppResult<Option<PreviewGrant>> {
+pub async fn pick_preview_file(title: String, app: AppHandle) -> AppResult<Option<PreviewGrant>> {
     let path = pick_file_path(
         app.clone(),
         title,
@@ -94,28 +91,6 @@ pub async fn pick_preview_file(
         )));
     }
     Ok(Some(app.state::<Arc<PreviewGrants>>().grant_path(path)))
-}
-
-#[tauri::command]
-pub async fn pick_project_icon(
-    title: String,
-    default_path: String,
-    app: AppHandle,
-) -> AppResult<Option<BytesFile>> {
-    let path = pick_file_path(
-        app,
-        title,
-        "Images",
-        fs_ops::ICON_EXTS.to_vec(),
-        Some(default_path),
-    )
-    .await?;
-    let Some(path) = path else {
-        return Ok(None);
-    };
-    blocking(move || fs_ops::read_project_icon_image(&path))
-        .await
-        .map(Some)
 }
 
 #[tauri::command]

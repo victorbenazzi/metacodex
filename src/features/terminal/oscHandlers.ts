@@ -44,6 +44,10 @@ export interface OscHandlerOpts {
   /** Raw title from OSC 0/1/2 — sanitization is the caller's job (it's the
    *  only one that knows the tab's `defaultTitle` to compare against). */
   onTitle: (raw: string) => void;
+  fallbackTitles: {
+    agentFinished: string;
+    agentMessage: string;
+  };
 }
 
 function clampUrgency(raw: string | undefined): number {
@@ -102,7 +106,7 @@ export function installOscHandlers(term: Terminal, opts: OscHandlerOpts): IDispo
       const body = data.trim();
       opts.onNotify({
         source: "osc9",
-        title: "Agent finished",
+        title: opts.fallbackTitles.agentFinished,
         body: body || undefined,
         urgency: 0,
         isDone: true,
@@ -119,7 +123,7 @@ export function installOscHandlers(term: Terminal, opts: OscHandlerOpts): IDispo
       const urgency = clampUrgency(u);
       opts.onNotify({
         source: "osc99",
-        title: title || "Agent message",
+        title: title || opts.fallbackTitles.agentMessage,
         body: body || undefined,
         urgency,
         isDone: false,
@@ -136,7 +140,7 @@ export function installOscHandlers(term: Terminal, opts: OscHandlerOpts): IDispo
       if (parts[0] !== "notify") return false;
       opts.onNotify({
         source: "osc777",
-        title: parts[1] ?? "Agent message",
+        title: parts[1] || opts.fallbackTitles.agentMessage,
         body: parts[2] || undefined,
         urgency: 1,
         isDone: false,

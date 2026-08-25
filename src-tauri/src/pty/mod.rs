@@ -1,12 +1,14 @@
+pub mod event_journal;
 #[cfg(windows)]
 pub mod job;
+pub mod protocol;
 pub mod session;
 pub mod shell;
+pub mod supervisor;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::io::Read;
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -16,37 +18,107 @@ use parking_lot::Mutex;
 use portable_pty::{native_pty_system, CommandBuilder, PtySize};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter};
-use tokio::sync::{mpsc, Notify};
+use tokio::sync::{mpsc, oneshot};
 use uuid::Uuid;
 
 use crate::error::{AppError, AppResult};
-use crate::events::{
-    PtyBackpressurePayload, PtyDataPayload, PtyExitPayload, EV_PTY_BACKPRESSURE, EV_PTY_DATA,
-    EV_PTY_EXIT,
-};
+use crate::events::{EV_PTY_BACKPRESSURE, EV_PTY_DATA, EV_PTY_EXIT};
 
+use protocol::{PreparedPtySession, PtyAttachResponse, PtyPrepareResponse};
 pub use session::PtySession;
+use supervisor::{PtyCleanupOutcome, PtyStopReason, PtySupervisor};
 
 const PTY_FLUSH_BYTES: usize = 64 * 1024;
 const PTY_FLUSH_MS: u64 = 16;
+const PTY_RETAINED_SESSIONS: usize = 64;
 
-fn emit_pty_buffer(app: &AppHandle, session_id: &str, pending: &mut Vec<u8>) {
+fn emit_pty_buffer(app: &AppHandle, supervisor: &PtySupervisor, pending: &mut Vec<u8>) {
     if pending.is_empty() {
         return;
     }
     let bytes = std::mem::take(pending);
-    let payload = PtyDataPayload {
-        session_id: session_id.to_string(),
-        data_b64: STANDARD.encode(&bytes),
-    };
-    let _ = app.emit(EV_PTY_DATA, payload);
+    if let Some(payload) = supervisor.record_data(STANDARD.encode(&bytes)) {
+        let _ = app.emit(EV_PTY_DATA, payload);
+    }
+}
+
+fn evict_session_ownership<T>(
+    session_id: &str,
+    sessions: &Mutex<HashMap<String, T>>,
+    waiters: &Mutex<HashSet<String>>,
+    supervisor: &PtySupervisor,
+    cleanup_failure: Option<String>,
+) {
+    sessions.lock().remove(session_id);
+    waiters.lock().remove(session_id);
+    supervisor.mark_cleanup_complete(cleanup_failure);
+}
+
+fn retain_terminal_supervisor(
+    session_id: &str,
+    retained: &Mutex<VecDeque<(String, Arc<PtySupervisor>)>>,
+    supervisor: Arc<PtySupervisor>,
+) {
+    let mut retained = retained.lock();
+    retained.retain(|(id, _)| id != session_id);
+    retained.push_back((session_id.to_string(), supervisor));
+    while retained.len() > PTY_RETAINED_SESSIONS {
+        retained.pop_front();
+    }
+}
+
+#[cfg(test)]
+mod characterization_tests {
+    use std::collections::{HashMap, HashSet};
+
+    use parking_lot::Mutex;
+
+    use super::{evict_session_ownership, PtyCleanupOutcome, PtyStopReason, PtySupervisor};
+
+    const SOURCE: &str = include_str!("mod.rs");
+
+    #[test]
+    fn no_drop_transport_uses_bounded_blocking_send() {
+        assert!(SOURCE.contains("mpsc::channel::<Vec<u8>>(4096)"));
+        assert!(SOURCE.contains("tx.blocking_send(chunk)"));
+        let forbidden_drop = ["TrySendError::Full(", "_) => return"].concat();
+        assert!(!SOURCE.contains(&forbidden_drop));
+    }
+
+    #[test]
+    fn reader_failure_uses_persistent_supervisor_state() {
+        assert!(SOURCE.contains("request_stop(PtyStopReason::ReaderError)"));
+        assert!(SOURCE.contains("subscribe_stop()"));
+    }
+
+    #[tokio::test]
+    async fn kill_finalization_emits_once_and_evicts_all_ownership() {
+        let supervisor = PtySupervisor::new("session".into(), true);
+        supervisor.request_stop(PtyStopReason::Killed);
+        let sessions = Mutex::new(HashMap::from([("session".to_string(), ())]));
+        let waiters = Mutex::new(HashSet::from(["session".to_string()]));
+
+        assert!(supervisor.record_exit(PtyStopReason::Killed).is_some());
+        assert!(supervisor.record_exit(PtyStopReason::Killed).is_none());
+        evict_session_ownership("session", &sessions, &waiters, &supervisor, None);
+
+        assert!(sessions.lock().is_empty());
+        assert!(waiters.lock().is_empty());
+        assert_eq!(supervisor.cleanup_outcome(), PtyCleanupOutcome::Complete);
+        supervisor.wait_for_cleanup().await.expect("clean stop");
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "kind", rename_all = "lowercase")]
 pub enum PtyKind {
     Plain,
-    Cli { command: String },
+    Cli {
+        executable: String,
+        args: Vec<String>,
+        #[serde(default)]
+        environment: HashMap<String, String>,
+    },
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -76,16 +148,27 @@ pub struct PtySessionInfo {
     pub kind: String,
     pub cli_id: Option<String>,
     pub created_at: String,
+    pub state: String,
+    pub latest_seq: u64,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PtyKillAllReport {
+    pub requested: usize,
+    pub completed: usize,
+    pub failed: usize,
+    pub timed_out: usize,
+}
+
+type RetainedSupervisors = Arc<Mutex<VecDeque<(String, Arc<PtySupervisor>)>>>;
+
 pub struct PtyManager {
+    prepared: Arc<Mutex<HashMap<String, Arc<PreparedPtySession>>>>,
     sessions: Arc<Mutex<HashMap<String, Arc<PtySession>>>>,
-    /// JoinHandles of the per-session waiter tasks. We capture them so
-    /// `kill_all` (called from the window-close handler) can await every
-    /// waiter to actually reap its child , without these handles, the tokio
-    /// runtime shutdown would abandon the waiters mid-`child.wait()` and leak
-    /// the children as zombies / orphans.
-    waiters: Arc<Mutex<HashMap<String, tokio::task::JoinHandle<()>>>>,
+    /// Live waiter ownership. Entries are inserted before task creation and
+    /// removed only after exit emission and session eviction.
+    waiters: Arc<Mutex<HashSet<String>>>,
+    retained: RetainedSupervisors,
     /// Windows-only: serializes ConPTY spawns. Concurrent `openpty` + spawn
     /// calls on Windows can leave one PTY with a stalled output pipe (see the
     /// portable-pty notes); a single mutex around the spawn critical section
@@ -98,27 +181,100 @@ pub struct PtyManager {
 impl PtyManager {
     pub fn new(app_handle: AppHandle) -> Self {
         Self {
+            prepared: Arc::new(Mutex::new(HashMap::new())),
             sessions: Arc::new(Mutex::new(HashMap::new())),
-            waiters: Arc::new(Mutex::new(HashMap::new())),
+            waiters: Arc::new(Mutex::new(HashSet::new())),
+            retained: Arc::new(Mutex::new(VecDeque::new())),
             #[cfg(windows)]
             spawn_lock: Mutex::new(()),
             app_handle,
         }
     }
 
-    pub fn spawn(&self, spec: PtySpawnSpec) -> AppResult<String> {
+    pub fn prepare(&self, spec: PtySpawnSpec) -> AppResult<PtyPrepareResponse> {
+        let id = Uuid::new_v4().to_string();
+        let prepared = Arc::new(PreparedPtySession::new(id.clone(), spec));
+        self.prepared.lock().insert(id.clone(), prepared);
+        Ok(PtyPrepareResponse { session_id: id })
+    }
+
+    pub fn attach(&self, session_id: &str, after_seq: u64) -> AppResult<PtyAttachResponse> {
+        let supervisor = if let Some(prepared) = self.prepared.lock().get(session_id).cloned() {
+            prepared.attach().map_err(AppError::Pty)?;
+            prepared.supervisor.clone()
+        } else {
+            self.find_supervisor(session_id)
+                .ok_or_else(|| AppError::NotFound(format!("pty session {session_id}")))?
+        };
+
+        Ok(PtyAttachResponse {
+            events: supervisor.replay_after(after_seq),
+            last_seq: supervisor.last_seq(),
+            state: supervisor.state(),
+        })
+    }
+
+    pub fn start(&self, session_id: &str) -> AppResult<()> {
+        let prepared = self
+            .prepared
+            .lock()
+            .get(session_id)
+            .cloned()
+            .ok_or_else(|| AppError::NotFound(format!("prepared pty session {session_id}")))?;
+        prepared.begin_start().map_err(AppError::Pty)?;
+        let result = self.spawn_started(
+            prepared.id.clone(),
+            prepared.spec.clone(),
+            prepared.supervisor.clone(),
+        );
+        if result.is_err() && !self.sessions.lock().contains_key(session_id) {
+            self.finish_prepared(&prepared, PtyStopReason::SpawnFailed);
+        }
+        result
+    }
+
+    fn find_supervisor(&self, session_id: &str) -> Option<Arc<PtySupervisor>> {
+        if let Some(session) = self.sessions.lock().get(session_id).cloned() {
+            return Some(session.supervisor.clone());
+        }
+        self.retained
+            .lock()
+            .iter()
+            .rev()
+            .find(|(id, _)| id == session_id)
+            .map(|(_, supervisor)| supervisor.clone())
+    }
+
+    fn finish_prepared(&self, prepared: &PreparedPtySession, reason: PtyStopReason) {
+        prepared.supervisor.request_stop(reason.clone());
+        let final_reason = prepared.supervisor.current_stop_reason();
+        if let Some(payload) = prepared.supervisor.record_exit(final_reason) {
+            let _ = self.app_handle.emit(EV_PTY_EXIT, payload);
+        }
+        prepared.supervisor.mark_exited();
+        retain_terminal_supervisor(&prepared.id, &self.retained, prepared.supervisor.clone());
+        self.prepared.lock().remove(&prepared.id);
+        prepared.supervisor.mark_cleanup_complete(None);
+    }
+
+    fn spawn_started(
+        &self,
+        id: String,
+        spec: PtySpawnSpec,
+        supervisor: Arc<PtySupervisor>,
+    ) -> AppResult<()> {
         #[cfg(windows)]
         let _spawn_guard = self.spawn_lock.lock();
-
-        let id = Uuid::new_v4().to_string();
 
         let (program, args, kind_label, cli_id) = match &spec.kind {
             PtyKind::Plain => {
                 let (p, a) = shell::detect_login_shell();
                 (p, a, "shell".to_string(), None)
             }
-            PtyKind::Cli { command } => {
-                let (p, a) = shell::cli_launch_args(command);
+            PtyKind::Cli {
+                executable, args, ..
+            } => {
+                let (p, a) = shell::cli_launch_args(executable, args);
                 (p, a, "cli".to_string(), spec.cli_id.clone())
             }
         };
@@ -142,13 +298,20 @@ impl PtyManager {
         for (k, v) in shell::build_env(Path::new(&spec.cwd)) {
             cmd.env(k, v);
         }
-        // rxvt convention read by background-detecting TUIs: "fg;bg" in ANSI
-        // indices. Light terminal = dark text (0) on white (15); dark = the
-        // inverse. xterm.js also answers OSC 11 queries with the real theme
-        // background; this covers tools that only look at the env var.
+        if let PtyKind::Cli { environment, .. } = &spec.kind {
+            for (key, value) in environment {
+                cmd.env(key, value);
+            }
+        }
+        // Signal light/dark to background-detecting TUIs (Claude Code, Codex,
+        // vim, …) at spawn. COLORFGBG is the rxvt "fg;bg" ANSI-index convention
+        // (light = 0;15, dark = 15;0). CLITHEME is the newer explicit hint.
+        // Detection is startup-only: a running session keeps the palette it
+        // picked; xterm.js still swaps the emulator colors live.
         if let Some(kind) = spec.theme_kind.as_deref() {
-            let colorfgbg = if kind == "light" { "0;15" } else { "15;0" };
-            cmd.env("COLORFGBG", colorfgbg);
+            let light = kind == "light";
+            cmd.env("COLORFGBG", if light { "0;15" } else { "15;0" });
+            cmd.env("CLITHEME", if light { "light" } else { "dark" });
         }
 
         let child = pair
@@ -171,8 +334,6 @@ impl PtyManager {
         // longer need it. Keeping it open can prevent the master from seeing EOF
         // when the child exits.
         drop(pair.slave);
-
-        let cancel = Arc::new(Notify::new());
 
         // Windows: assign the spawned process to a KILL_ON_JOB_CLOSE Job Object
         // so dropping the session terminates the whole descendant tree (the
@@ -204,15 +365,15 @@ impl PtyManager {
             writer: Mutex::new(writer),
             master: Mutex::new(pair.master),
             killer: Mutex::new(killer),
-            cancel: cancel.clone(),
-            reader_failed: AtomicBool::new(false),
-            killed: AtomicBool::new(false),
+            supervisor: supervisor.clone(),
             cwd_override: Mutex::new(None),
             #[cfg(windows)]
             job,
         });
 
         self.sessions.lock().insert(id.clone(), session.clone());
+        self.prepared.lock().remove(&id);
+        supervisor.mark_running();
 
         // ----- reader thread: blocking std::thread, pushes chunks into channel -----
         // Bounded channel (4096 chunks of ~8KiB each ≈ 32MiB max in-flight). When
@@ -227,8 +388,8 @@ impl PtyManager {
         let (tx, mut rx) = mpsc::channel::<Vec<u8>>(4096);
         let id_for_thread = id.clone();
         let app_pressure = self.app_handle.clone();
-        let id_for_pressure = id.clone();
-        let session_for_reader = session.clone();
+        let supervisor_for_reader = supervisor.clone();
+        let (reader_done_tx, mut reader_done_rx) = oneshot::channel::<()>();
         let reader_spawned = std::thread::Builder::new()
             .name(format!("pty-reader-{id_for_thread}"))
             .spawn(move || {
@@ -253,7 +414,7 @@ impl PtyManager {
                                 Err(tokio::sync::mpsc::error::TrySendError::Full(chunk)) => {
                                     let started = std::time::Instant::now();
                                     if tx.blocking_send(chunk).is_err() {
-                                        return;
+                                        break;
                                     }
                                     let stalled_ms =
                                         started.elapsed().as_millis().min(u128::from(u64::MAX))
@@ -262,216 +423,277 @@ impl PtyManager {
                                         && last_pressure_emit.elapsed() > Duration::from_secs(1)
                                     {
                                         last_pressure_emit = std::time::Instant::now();
-                                        let _ = app_pressure.emit(
-                                            EV_PTY_BACKPRESSURE,
-                                            PtyBackpressurePayload {
-                                                session_id: id_for_pressure.clone(),
-                                                queue_depth: 4096,
-                                                stalled_ms,
-                                            },
-                                        );
+                                        if let Some(payload) = supervisor_for_reader
+                                            .record_backpressure(4096, stalled_ms)
+                                        {
+                                            let _ = app_pressure.emit(EV_PTY_BACKPRESSURE, payload);
+                                        }
                                     }
                                 }
-                                Err(tokio::sync::mpsc::error::TrySendError::Closed(_)) => return,
+                                Err(tokio::sync::mpsc::error::TrySendError::Closed(_)) => break,
                             }
                         }
                         Err(_) => {
-                            // Mark failure + kick the cancel notifier so the
-                            // waiter task ends and emits a *single* exit event
-                            // with reason "reader_error". This keeps emit
-                            // ownership in one place (the waiter), preventing
-                            // double notifications on the frontend.
-                            session_for_reader
-                                .reader_failed
-                                .store(true, Ordering::SeqCst);
-                            session_for_reader.cancel.notify_waiters();
+                            supervisor_for_reader.request_stop(PtyStopReason::ReaderError);
                             break;
                         }
                     }
                 }
+                let _ = reader_done_tx.send(());
             });
         if let Err(e) = reader_spawned {
             // The session was already registered, but the waiter and drainer
             // below never spawn without a reader: nothing would ever reap the
             // child or evict the map entry. Undo both before bailing.
             self.sessions.lock().remove(&id);
-            session.kill();
+            supervisor.request_stop(PtyStopReason::SpawnFailed);
+            let _ = session.killer.lock().kill();
             return Err(AppError::Pty(format!("reader thread: {e}")));
         }
 
-        // ----- drainer task: emits pty://data events -----
+        let (drain_tx, mut drain_rx) = oneshot::channel::<()>();
         let app_d = self.app_handle.clone();
-        let id_d = id.clone();
-        tokio::spawn(async move {
+        let supervisor_for_drainer = supervisor.clone();
+        let mut drainer_handle = tokio::spawn(async move {
             let mut pending = Vec::with_capacity(PTY_FLUSH_BYTES);
             let mut ticker = tokio::time::interval(Duration::from_millis(PTY_FLUSH_MS));
             ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
             loop {
                 tokio::select! {
+                    biased;
+                    _ = &mut drain_rx => {
+                        rx.close();
+                        while let Some(chunk) = rx.recv().await {
+                            pending.extend_from_slice(&chunk);
+                            if pending.len() >= PTY_FLUSH_BYTES {
+                                emit_pty_buffer(&app_d, &supervisor_for_drainer, &mut pending);
+                            }
+                        }
+                        break;
+                    }
                     maybe_chunk = rx.recv() => {
                         match maybe_chunk {
                             Some(chunk) => {
                                 pending.extend_from_slice(&chunk);
                                 if pending.len() >= PTY_FLUSH_BYTES {
-                                    emit_pty_buffer(&app_d, &id_d, &mut pending);
+                                    emit_pty_buffer(&app_d, &supervisor_for_drainer, &mut pending);
                                 }
                             }
                             None => break,
                         }
                     }
                     _ = ticker.tick() => {
-                        emit_pty_buffer(&app_d, &id_d, &mut pending);
+                        emit_pty_buffer(&app_d, &supervisor_for_drainer, &mut pending);
                     }
                 }
             }
-            emit_pty_buffer(&app_d, &id_d, &mut pending);
+            emit_pty_buffer(&app_d, &supervisor_for_drainer, &mut pending);
         });
 
-        // ----- waiter task: polls try_wait + emits pty://exit + removes session -----
         let app_w = self.app_handle.clone();
         let id_w = id.clone();
         let sessions_ref = self.sessions.clone();
         let waiters_ref = self.waiters.clone();
-        let cancel_w = cancel.clone();
-        let id_for_waiter_key = id.clone();
+        let retained_ref = self.retained.clone();
         let session_for_waiter = session.clone();
-        let waiter_handle = tokio::spawn(async move {
+        let supervisor_for_waiter = supervisor.clone();
+        self.waiters.lock().insert(id.clone());
+        tokio::spawn(async move {
             let mut child = child;
-            let mut exit_reason: Option<&'static str> = None;
+            let mut stop_rx = supervisor_for_waiter.subscribe_stop();
+            let mut final_reason;
+            let mut cleanup_failure = None;
+
             loop {
-                // Level-triggered cancel check: covers a lost `Notify` wakeup
-                // (kill landing before this task first polls `notified()`).
-                if session_for_waiter.killed.load(Ordering::SeqCst) {
-                    exit_reason = Some(
-                        if session_for_waiter.reader_failed.load(Ordering::SeqCst) {
-                            "reader_error"
-                        } else {
-                            "killed"
-                        },
-                    );
+                let requested = stop_rx.borrow().clone();
+                if !requested.is_running() {
+                    final_reason = requested;
                     break;
                 }
-                let exited = tokio::select! {
-                    _ = cancel_w.notified() => {
-                        // Disambiguate: reader thread sets `reader_failed` then
-                        // notifies cancel for IO errors; kill_all / per-tab kill
-                        // notifies cancel without touching the flag.
-                        exit_reason = Some(
-                            if session_for_waiter.reader_failed.load(Ordering::SeqCst) {
-                                "reader_error"
-                            } else {
-                                "killed"
-                            },
-                        );
-                        true
+
+                match child.try_wait() {
+                    Ok(Some(status)) => {
+                        final_reason = PtyStopReason::NormalExit {
+                            code: status.exit_code() as i32,
+                        };
+                        break;
                     }
-                    _ = tokio::time::sleep(Duration::from_millis(250)) => {
-                        match child.try_wait() {
-                            Ok(Some(status)) => {
-                                let code = status.exit_code() as i32;
-                                let _ = app_w.emit(EV_PTY_EXIT, PtyExitPayload {
-                                    session_id: id_w.clone(),
-                                    exit_code: code,
-                                    reason: "normal".into(),
-                                });
-                                sessions_ref.lock().remove(&id_w);
-                                true
-                            }
-                            Ok(None) => false,
-                            Err(_) => {
-                                let _ = app_w.emit(EV_PTY_EXIT, PtyExitPayload {
-                                    session_id: id_w.clone(),
-                                    exit_code: -1,
-                                    reason: "reader_error".into(),
-                                });
-                                sessions_ref.lock().remove(&id_w);
-                                true
-                            }
+                    Ok(None) => {}
+                    Err(_) => {
+                        supervisor_for_waiter.request_stop(PtyStopReason::ReaderError);
+                        final_reason = PtyStopReason::ReaderError;
+                        break;
+                    }
+                }
+
+                tokio::select! {
+                    changed = stop_rx.changed() => {
+                        if changed.is_err() {
+                            final_reason = PtyStopReason::ReaderError;
+                            break;
                         }
                     }
-                };
-                if exited {
-                    break;
+                    _ = tokio::time::sleep(Duration::from_millis(40)) => {}
                 }
             }
-            // If the loop broke via cancel (kill_all or explicit kill), the child
-            // may still be alive , finish it and emit so the frontend can stop
-            // showing "running". portable-pty's killer only sends SIGHUP, which a
-            // HUP-ignoring child survives; if we then blocked on `child.wait()` we
-            // would pin this tokio worker forever. So poll non-blockingly and
-            // escalate to SIGKILL, never doing a blocking wait on the runtime.
-            if let Some(reason) = exit_reason {
-                let _ = child.kill(); // SIGHUP (or TerminateProcess on Windows)
+
+            if !matches!(final_reason, PtyStopReason::NormalExit { .. }) {
+                let _ = child.kill();
                 let pid = session_for_waiter.pid;
                 let grace = Instant::now() + Duration::from_millis(400);
-                let deadline = Instant::now() + Duration::from_secs(3);
+                let deadline = Instant::now() + Duration::from_millis(1_750);
                 let mut hard_killed = false;
-                let mut exit_code = -1;
+                let mut reaped = false;
                 loop {
-                    if let Ok(Some(status)) = child.try_wait() {
-                        exit_code = status.exit_code() as i32;
+                    if let Ok(Some(_)) = child.try_wait() {
+                        reaped = true;
                         break;
                     }
                     let now = Instant::now();
                     if !hard_killed && now >= grace && pid != 0 {
                         #[cfg(unix)]
                         unsafe {
-                            // SIGKILL the whole process group (the child is a
-                            // session leader via setsid, so descendants die too).
                             libc::kill(-(pid as i32), libc::SIGKILL);
                             libc::kill(pid as i32, libc::SIGKILL);
                         }
                         hard_killed = true;
                     }
                     if now >= deadline {
-                        break; // SIGKILL is unignorable; this is a paranoia backstop
+                        break;
                     }
                     tokio::time::sleep(Duration::from_millis(40)).await;
                 }
-                let _ = app_w.emit(EV_PTY_EXIT, PtyExitPayload {
-                    session_id: id_w.clone(),
-                    exit_code,
-                    reason: reason.into(),
-                });
-                sessions_ref.lock().remove(&id_w);
+                if !reaped {
+                    cleanup_failure = Some("child process did not reap within 1750ms".to_string());
+                }
             }
-            // Self-evict from the waiter handle map once we're really done.
-            // `kill_all` may have already drained the map; either path is fine.
-            waiters_ref.lock().remove(&id_w);
-        });
-        self.waiters.lock().insert(id_for_waiter_key, waiter_handle);
 
-        Ok(id)
+            match tokio::time::timeout(Duration::from_millis(400), &mut reader_done_rx).await {
+                Ok(Ok(())) => {}
+                Ok(Err(_)) => {
+                    cleanup_failure = Some("reader thread ended without completion signal".into());
+                }
+                Err(_) => {
+                    cleanup_failure = Some("reader thread exceeded the 400ms stop bound".into());
+                }
+            }
+
+            let _ = drain_tx.send(());
+            match tokio::time::timeout(Duration::from_millis(400), &mut drainer_handle).await {
+                Ok(Ok(())) => {}
+                Ok(Err(_)) => {
+                    final_reason = PtyStopReason::DrainerStalled;
+                    cleanup_failure = Some("drainer task failed before completion".to_string());
+                }
+                Err(_) => {
+                    drainer_handle.abort();
+                    let _ = drainer_handle.await;
+                    final_reason = PtyStopReason::DrainerStalled;
+                    cleanup_failure =
+                        Some("drainer task exceeded the 400ms drain bound".to_string());
+                }
+            }
+
+            if !matches!(final_reason, PtyStopReason::DrainerStalled) {
+                let current_reason = supervisor_for_waiter.current_stop_reason();
+                if !current_reason.is_running() {
+                    final_reason = current_reason;
+                }
+            }
+
+            if let Some(payload) = supervisor_for_waiter.record_exit(final_reason) {
+                let _ = app_w.emit(EV_PTY_EXIT, payload);
+            }
+            supervisor_for_waiter.mark_exited();
+            retain_terminal_supervisor(&id_w, &retained_ref, supervisor_for_waiter.clone());
+            evict_session_ownership(
+                &id_w,
+                &sessions_ref,
+                &waiters_ref,
+                &supervisor_for_waiter,
+                cleanup_failure,
+            );
+        });
+
+        Ok(())
     }
 
-    /// Reap every live PTY session: notify cancel + send SIGKILL to each, then
-    /// await every waiter task with an overall 2s budget so the children are
-    /// actually finished (not just signaled) before the runtime shuts down.
-    /// Called from the `WindowEvent::CloseRequested` handler on app quit.
-    pub async fn kill_all(&self) {
-        // Snapshot the live sessions outside the lock so the kill calls below
-        // don't hold the mutex across awaits.
-        let sessions: Vec<Arc<PtySession>> = {
-            self.sessions.lock().values().cloned().collect()
-        };
-        let count = sessions.len();
+    pub async fn kill_all(&self) -> PtyKillAllReport {
+        let prepared: Vec<Arc<PreparedPtySession>> =
+            self.prepared.lock().values().cloned().collect();
+        let sessions: Vec<Arc<PtySession>> = { self.sessions.lock().values().cloned().collect() };
+        let mut requested_ids = HashSet::new();
+        for entry in &prepared {
+            requested_ids.insert(entry.id.clone());
+            entry.cancel();
+            if entry.supervisor.state() != supervisor::PtyLifecycleState::Starting {
+                self.finish_prepared(entry, PtyStopReason::Killed);
+            }
+        }
         for s in &sessions {
+            requested_ids.insert(s.id.clone());
             s.kill();
         }
-        let handles: Vec<tokio::task::JoinHandle<()>> = {
-            let mut waiters = self.waiters.lock();
-            std::mem::take(&mut *waiters).into_values().collect()
-        };
-        // Sequential await is fine , the tasks were already in flight, so the
-        // total wall-time is bounded by the slowest, not the sum. The outer
-        // timeout caps the whole reap at 2s for snappy Cmd+Q.
-        let _ = tokio::time::timeout(Duration::from_secs(2), async move {
-            for h in handles {
-                let _ = h.await;
+        let requested = requested_ids.len();
+
+        let mut supervisors = HashMap::<String, Arc<PtySupervisor>>::new();
+        for entry in &prepared {
+            supervisors.insert(entry.id.clone(), entry.supervisor.clone());
+        }
+        for session in &sessions {
+            supervisors.insert(session.id.clone(), session.supervisor.clone());
+        }
+
+        let wait_result = tokio::time::timeout(Duration::from_secs(3), async {
+            for supervisor in supervisors.values() {
+                let _ = supervisor.wait_for_cleanup().await;
             }
         })
         .await;
-        eprintln!("[metacodex] kill_all reaped {count} pty session(s)");
+
+        let remaining_prepared = self.prepared.lock().len();
+        let remaining_sessions = self.sessions.lock().len();
+        let remaining_waiters = self.waiters.lock().len();
+        let timed_out = remaining_prepared
+            .max(remaining_sessions)
+            .max(remaining_waiters);
+        let failed = supervisors
+            .values()
+            .filter(|supervisor| {
+                matches!(supervisor.cleanup_outcome(), PtyCleanupOutcome::Failed(_))
+            })
+            .count();
+        let completed = requested.saturating_sub(timed_out).saturating_sub(failed);
+        if wait_result.is_ok() && timed_out == 0 && failed == 0 {
+            eprintln!("[metacodex] kill_all reaped {completed} pty session(s)");
+        } else {
+            eprintln!(
+                "[metacodex] kill_all incomplete: {failed} failed, {remaining_prepared} prepared, {remaining_sessions} session(s) and {remaining_waiters} waiter(s) still owned"
+            );
+        }
+
+        PtyKillAllReport {
+            requested,
+            completed,
+            failed,
+            timed_out,
+        }
+    }
+
+    pub async fn kill_project(&self, project_id: &str) -> Vec<String> {
+        let ids = self
+            .list()
+            .into_iter()
+            .filter(|session| session.project_id.as_deref() == Some(project_id))
+            .map(|session| session.id)
+            .collect::<Vec<_>>();
+        let mut warnings = Vec::new();
+        for id in ids {
+            if let Err(error) = self.kill(&id).await {
+                warnings.push(format!("{id}: {error}"));
+            }
+        }
+        warnings
     }
 
     pub fn write(&self, session_id: &str, bytes: &[u8]) -> AppResult<()> {
@@ -497,17 +719,52 @@ impl PtyManager {
         session.resize(rows, cols).map_err(AppError::Pty)
     }
 
-    pub fn kill(&self, session_id: &str) -> AppResult<()> {
+    pub async fn kill(&self, session_id: &str) -> AppResult<()> {
+        let prepared = { self.prepared.lock().get(session_id).cloned() };
+        if let Some(prepared) = prepared {
+            prepared.cancel();
+            if prepared.supervisor.state() != supervisor::PtyLifecycleState::Starting {
+                self.finish_prepared(&prepared, PtyStopReason::Killed);
+            }
+            let cleanup = tokio::time::timeout(
+                Duration::from_secs(3),
+                prepared.supervisor.wait_for_cleanup(),
+            )
+            .await
+            .map_err(|_| {
+                AppError::Pty(format!(
+                    "stop timed out after 3s: prepared=true, state={}",
+                    prepared.supervisor.state_label()
+                ))
+            })?;
+            return cleanup.map_err(|resource| {
+                AppError::Pty(format!("stop failed while releasing resource: {resource}"))
+            });
+        }
+
         let session = self.sessions.lock().get(session_id).cloned();
         if let Some(s) = session {
             s.kill();
+            let cleanup =
+                tokio::time::timeout(Duration::from_secs(3), s.supervisor.wait_for_cleanup())
+                    .await
+                    .map_err(|_| {
+                        let session_owned = self.sessions.lock().contains_key(session_id);
+                        let waiter_owned = self.waiters.lock().contains(session_id);
+                        AppError::Pty(format!(
+                        "stop timed out after 3s: session={session_owned}, waiter={waiter_owned}"
+                    ))
+                    })?;
+            cleanup.map_err(|resource| {
+                AppError::Pty(format!("stop failed while releasing resource: {resource}"))
+            })?;
         }
-        // Removal happens in the waiter task when it observes the exit.
         Ok(())
     }
 
     pub fn list(&self) -> Vec<PtySessionInfo> {
-        self.sessions
+        let mut infos: Vec<PtySessionInfo> = self
+            .sessions
             .lock()
             .values()
             .map(|s| PtySessionInfo {
@@ -518,18 +775,53 @@ impl PtyManager {
                 kind: s.kind.clone(),
                 cli_id: s.cli_id.clone(),
                 created_at: s.created_at.to_rfc3339(),
+                state: s.supervisor.state_label().to_string(),
+                latest_seq: s.supervisor.last_seq(),
             })
-            .collect()
+            .collect();
+        infos.extend(self.prepared.lock().values().map(|entry| PtySessionInfo {
+            id: entry.id.clone(),
+            project_id: entry.spec.project_id.clone(),
+            label: entry.spec.label.clone(),
+            cwd: entry.spec.cwd.clone(),
+            kind: match &entry.spec.kind {
+                PtyKind::Plain => "shell".into(),
+                PtyKind::Cli { .. } => "cli".into(),
+            },
+            cli_id: entry.spec.cli_id.clone(),
+            created_at: entry.created_at.to_rfc3339(),
+            state: entry.supervisor.state_label().to_string(),
+            latest_seq: entry.supervisor.last_seq(),
+        }));
+        infos
     }
 
     /// Snapshot (id, pid, current_cwd) tuples for a list of session ids , used
     /// by `pty_metadata_batch` to do the slow per-session work after releasing
     /// the manager's mutex. Missing sessions are silently skipped.
-    pub fn sessions_for_metadata(&self, ids: &[String]) -> Vec<(String, u32, String)> {
+    pub fn sessions_for_metadata(
+        &self,
+        ids: &[String],
+    ) -> Vec<(String, u32, String, Option<Vec<u32>>)> {
         let sessions = self.sessions.lock();
         ids.iter()
-            .filter_map(|id| sessions.get(id).map(|s| (id.clone(), s.pid, s.current_cwd())))
+            .filter_map(|id| {
+                sessions.get(id).map(|session| {
+                    #[cfg(target_os = "windows")]
+                    let owned_pids = session.job.as_ref().and_then(|job| job.process_ids().ok());
+                    #[cfg(not(target_os = "windows"))]
+                    let owned_pids = None;
+                    (id.clone(), session.pid, session.current_cwd(), owned_pids)
+                })
+            })
             .collect()
+    }
+
+    pub fn session_pid(&self, session_id: &str) -> Option<u32> {
+        self.sessions
+            .lock()
+            .get(session_id)
+            .map(|session| session.pid)
     }
 
     /// Project owning a session, if any. Used by `pty_update_cwd` to decide

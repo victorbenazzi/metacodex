@@ -3,12 +3,11 @@ import { useTranslation } from "react-i18next";
 
 import { DialogRoot, DialogContent } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Button";
-import { lookupProjectGlyph } from "@/components/project-rail/projectIdentity";
+import { MetacodexMark } from "@/components/icons/brand";
 import { DirectoryPicker } from "./DirectoryPicker";
 import { fsApi } from "@/features/filesystem/filesystem.service";
 import { useProjectsStore } from "@/features/projects/project.store";
 import type { Project } from "@/features/projects/project.types";
-import { isCustomIcon } from "@/features/projects/customIcon.service";
 import { basename } from "@/lib/path";
 import { cn } from "@/lib/cn";
 
@@ -152,8 +151,6 @@ function ProjectChip({
   active: boolean;
   onClick: () => void;
 }) {
-  const usesCustom = isCustomIcon(project.icon);
-  const Glyph = !usesCustom ? lookupProjectGlyph(project.icon) : null;
   return (
     <button
       type="button"
@@ -165,20 +162,7 @@ function ProjectChip({
           : "border-hairline text-body hover:bg-surface-strong/30",
       )}
     >
-      {usesCustom ? (
-        <img
-          src={project.icon}
-          alt=""
-          className="h-[14px] w-[14px] object-contain"
-          draggable={false}
-        />
-      ) : Glyph ? (
-        <Glyph size={14} strokeWidth={1.5} aria-hidden />
-      ) : (
-        <span className="font-display text-caption leading-none">
-          {project.name.slice(0, 1).toUpperCase()}
-        </span>
-      )}
+      <MetacodexMark size={14} />
       <span className="max-w-[120px] truncate">{project.name}</span>
     </button>
   );

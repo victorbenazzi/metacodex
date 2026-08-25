@@ -27,6 +27,7 @@ export function FileExplorer({
   rootPath,
   rootName,
   onOpenFile,
+  onOpenInBrowser,
   onOpenInTerminal,
   onLaunchCliInPath,
 }: FileExplorerProps) {
@@ -168,6 +169,7 @@ export function FileExplorer({
                 entry={c}
                 depth={0}
                 onOpenFile={onOpenFile}
+                onOpenInBrowser={onOpenInBrowser}
                 onOpenInTerminal={onOpenInTerminal}
                 onLaunchCliInPath={onLaunchCliInPath}
               />

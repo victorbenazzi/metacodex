@@ -7,6 +7,7 @@ import { create } from "zustand";
  */
 export type DiagKind =
   | "pty.spawn"
+  | "pty.start.fail"
   | "pty.exit"
   | "pty.backpressure"
   | "pty.reader_error"
@@ -17,6 +18,8 @@ export type DiagKind =
   | "workspace.save.ok"
   | "workspace.save.fail"
   | "workspace.load.fail"
+  | "settings.save.fail"
+  | "resume.save.fail"
   | "ipc.command.fail"
   | "tab.remap"
   | "tab.close_external"

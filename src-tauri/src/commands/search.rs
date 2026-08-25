@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 use parking_lot::Mutex;
 use tauri::{AppHandle, Manager, State};
@@ -65,7 +65,11 @@ pub async fn search_in_project(
 
 /// Flat list of files in a project, for the command palette's go-to-file.
 #[tauri::command]
-pub async fn list_files(app: AppHandle, root: String, max: Option<usize>) -> AppResult<Vec<String>> {
+pub async fn list_files(
+    app: AppHandle,
+    root: String,
+    max: Option<usize>,
+) -> AppResult<Vec<String>> {
     app.state::<Arc<ProjectsCache>>()
         .require_within_project_roots(&root)?;
     let limit = max.unwrap_or(20_000);

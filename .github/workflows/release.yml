@@ -12,7 +12,13 @@ on:
         type: string
 
 jobs:
+  quality:
+    uses: ./.github/workflows/quality.yml
+    with:
+      checkout_ref: ${{ github.event.inputs.tag || github.ref }}
+
   publish-tauri:
+    needs: quality
     permissions:
       contents: write
     # Signing turns on automatically once the APPLE_CERTIFICATE secret exists.
@@ -20,9 +26,8 @@ jobs:
     env:
       SIGN: ${{ secrets.APPLE_CERTIFICATE != '' }}
     strategy:
-      # Don't cancel the macOS build if Windows/Linux flakes (and vice-versa).
-      # Each platform is independent. A Windows toolchain hiccup shouldn't
-      # block shipping the macOS DMG.
+      # Let every platform finish so the logs report all failures in one run.
+      # The release stays in draft until this full matrix succeeds.
       fail-fast: false
       matrix:
         include:
@@ -50,11 +55,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: 11.17.0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -90,6 +97,34 @@ jobs:
 
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Load versioned release notes
+        id: release-notes
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          VERSION="${RELEASE_TAG#v}"
+          STABLE_VERSION="${VERSION%%-*}"
+          NOTES_PATH="docs/releases/${VERSION}.md"
+          if [[ ! -f "$NOTES_PATH" ]]; then
+            NOTES_PATH="docs/releases/${STABLE_VERSION}.md"
+          fi
+          if [[ ! -f "$NOTES_PATH" ]]; then
+            echo "Missing release notes for ${RELEASE_TAG}" >&2
+            exit 1
+          fi
+          RENDERED_NOTES="$RUNNER_TEMP/metacodex-release-notes.md"
+          sed \
+            -e "s|/blob/v${STABLE_VERSION}/|/blob/${GITHUB_SHA}/|g" \
+            -e "s|/v${STABLE_VERSION}/docs/releases/assets/|/${GITHUB_SHA}/docs/releases/assets/|g" \
+            "$NOTES_PATH" > "$RENDERED_NOTES"
+          {
+            echo 'body<<METACODEX_RELEASE_NOTES'
+            cat "$RENDERED_NOTES"
+            echo 'METACODEX_RELEASE_NOTES'
+          } >> "$GITHUB_OUTPUT"
 
       # Option B signing: import a STABLE self-signed cert into a dedicated
       # keychain and trust it for code signing, so every release shares one code
@@ -143,32 +178,28 @@ jobs:
         with:
           tagName: ${{ github.event.inputs.tag || github.ref_name }}
           releaseName: "metacodex ${{ github.event.inputs.tag || github.ref_name }}"
-          releaseBody: |
-            ## metacodex ${{ github.event.inputs.tag || github.ref_name }}
-
-            ### Download
-            - **macOS Apple Silicon (M1/M2/M3/M4)** → `metacodex_*_aarch64.dmg`
-            - **macOS Intel** → `metacodex_*_x64.dmg`
-            - **Windows x64** → `metacodex_*_x64-setup.exe` (NSIS) or `metacodex_*_x64_en-US.msi` (WiX)
-            - **Linux x64** → `metacodex_*_amd64.deb` or `metacodex-*.x86_64.rpm`
-
-            ### Auto-update
-            Already running a previous version? metacodex will check for this release on next launch and show an **Update** pill in the top bar. One click: download, install, relaunch. No reinstall.
-
-            ### macOS signature notice
-            These builds are signed with a stable self-signed certificate, so macOS keeps the permissions you grant across auto-updates. They are NOT notarized by Apple, so on first install macOS still quarantines them. After dragging metacodex into `/Applications`, run once in Terminal:
-
-            ```bash
-            sudo xattr -cr /Applications/metacodex.app
-            ```
-
-            > _Notarization (what removes this step entirely) needs Apple's $99/year Developer Program. Until metacodex pays its own bill, it's one terminal command on first install. Your granted permissions now survive updates._
-
-            ### Windows SmartScreen notice
-            Windows builds are unsigned. The first launch shows "Windows protected your PC". Click **More info → Run anyway** (one-time). An EV signing cert is on the roadmap.
-
-            Full instructions: [README → installation](https://github.com/victorbenazzi/metacodex#install).
-          releaseDraft: false
-          prerelease: false
+          releaseBody: ${{ steps.release-notes.outputs.body }}
+          releaseDraft: true
+          prerelease: ${{ contains(github.event.inputs.tag || github.ref_name, '-') }}
           includeUpdaterJson: true
           args: ${{ matrix.args }}
+
+  finalize-release:
+    needs: publish-tauri
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+    steps:
+      - name: Publish the complete release
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$RELEASE_TAG" == *-* ]]; then
+            gh release edit "$RELEASE_TAG" --draft=false --prerelease --latest=false
+          else
+            gh release edit "$RELEASE_TAG" --draft=false --latest
+          fi

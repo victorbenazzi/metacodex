@@ -172,6 +172,20 @@ impl WatcherManager {
         };
         drop(old);
     }
+
+    pub fn stop_all(&self) -> usize {
+        let entries = {
+            let mut guard = self.by_project.lock();
+            guard.drain().map(|(_, entry)| entry).collect::<Vec<_>>()
+        };
+        let count = entries.len();
+        drop(entries);
+        count
+    }
+
+    pub fn count(&self) -> usize {
+        self.by_project.lock().len()
+    }
 }
 
 pub type SharedWatcher = Arc<WatcherManager>;

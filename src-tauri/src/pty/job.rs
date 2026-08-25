@@ -18,8 +18,9 @@ use std::io;
 
 use windows::Win32::Foundation::{CloseHandle, HANDLE};
 use windows::Win32::System::JobObjects::{
-    AssignProcessToJobObject, CreateJobObjectW, JobObjectExtendedLimitInformation,
-    SetInformationJobObject, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+    AssignProcessToJobObject, CreateJobObjectW, JobObjectBasicProcessIdList,
+    JobObjectExtendedLimitInformation, QueryInformationJobObject, SetInformationJobObject,
+    JOBOBJECT_BASIC_PROCESS_ID_LIST, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
     JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
 };
 use windows::Win32::System::Threading::{OpenProcess, PROCESS_SET_QUOTA, PROCESS_TERMINATE};
@@ -48,8 +49,8 @@ impl PtyJob {
                 io::Error::other(format!("SetInformationJobObject: {e}"))
             })?;
 
-            let proc = OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, false, pid)
-                .map_err(|e| {
+            let proc =
+                OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, false, pid).map_err(|e| {
                     let _ = CloseHandle(job);
                     io::Error::other(format!("OpenProcess({pid}): {e}"))
                 })?;
@@ -61,6 +62,40 @@ impl PtyJob {
             }
 
             Ok(Self(job))
+        }
+    }
+
+    pub(crate) fn process_ids(&self) -> io::Result<Vec<u32>> {
+        let mut capacity = 16usize;
+        loop {
+            let size = std::mem::size_of::<JOBOBJECT_BASIC_PROCESS_ID_LIST>()
+                + (capacity - 1) * std::mem::size_of::<usize>();
+            let mut buffer = vec![0u8; size];
+            let result = unsafe {
+                QueryInformationJobObject(
+                    Some(self.0),
+                    JobObjectBasicProcessIdList,
+                    buffer.as_mut_ptr().cast(),
+                    size as u32,
+                    None,
+                )
+            };
+            if result.is_ok() {
+                let list = unsafe { &*(buffer.as_ptr() as *const JOBOBJECT_BASIC_PROCESS_ID_LIST) };
+                let count = list.NumberOfProcessIdsInList as usize;
+                let ids = unsafe { std::slice::from_raw_parts(list.ProcessIdList.as_ptr(), count) };
+                return Ok(ids
+                    .iter()
+                    .filter_map(|pid| u32::try_from(*pid).ok())
+                    .collect());
+            }
+            if capacity >= 4096 {
+                return Err(io::Error::other(format!(
+                    "QueryInformationJobObject: {}",
+                    result.expect_err("failed query")
+                )));
+            }
+            capacity *= 2;
         }
     }
 }

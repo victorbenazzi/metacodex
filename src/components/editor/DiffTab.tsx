@@ -11,8 +11,9 @@ import { useThemeStore } from "@/features/theme/theme.store";
 import { useSettingsDataStore } from "@/features/settings/settings.data.store";
 import { PANEL_LIMITS } from "@/features/settings/settings.types";
 import { languageFor } from "@/features/editor/language-map";
-import { gitColorForBadge, gitStatusLabelKey } from "@/features/git/gitStatus";
+import { gitColorForBadge, gitStatusLabelKey, isLargeLineDiff } from "@/features/git/gitStatus";
 import { ResizeHandle } from "@/components/ui/ResizeHandle";
+import { LargeDiffPlaceholder } from "@/components/source-control/LargeDiffPlaceholder";
 import { buildEditorTheme } from "./editorTheme";
 import { buildMergeTheme } from "./diffTheme";
 import { ext, basename } from "@/lib/path";
@@ -56,6 +57,9 @@ export function DiffTab({ path, projectId, status }: DiffTabProps) {
   const diffSplitRatio = useSettingsDataStore((s) => s.settings.panels.diffSplitRatio);
   const updateSettings = useSettingsDataStore((s) => s.update);
   const gitInfo = useGitStore((s) => (projectId ? s.byProject[projectId] : undefined));
+  const fileStats = gitInfo?.stats?.files?.[path];
+  const [forceLoad, setForceLoad] = useState(false);
+  const gated = isLargeLineDiff(fileStats?.additions ?? 0, fileStats?.deletions ?? 0) && !forceLoad;
 
   const [phase, setPhase] = useState<"loading" | "ready" | "identical" | "error">(
     "loading",
@@ -80,6 +84,12 @@ export function DiffTab({ path, projectId, status }: DiffTabProps) {
 
   // Build (or rebuild on theme/font change) the merge view from scratch.
   useEffect(() => {
+    if (gated) {
+      mergeRef.current?.destroy();
+      mergeRef.current = null;
+      if (hostRef.current) hostRef.current.innerHTML = "";
+      return;
+    }
     let cancelled = false;
     setPhase("loading");
     setErrorMsg(null);
@@ -149,7 +159,7 @@ export function DiffTab({ path, projectId, status }: DiffTabProps) {
       mergeRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [path, themeId, editorFontSize, editorFontFamily]);
+  }, [path, themeId, editorFontSize, editorFontFamily, gated]);
 
   // When this project's git state moves (commit, checkout, an agent editing the
   // file from a terminal), refresh both sides in place — no teardown, so the
@@ -189,6 +199,10 @@ export function DiffTab({ path, projectId, status }: DiffTabProps) {
         </span>
       </div>
       <div ref={splitFrameRef} className="relative min-h-0 flex-1">
+        {gated ? (
+          <LargeDiffPlaceholder onLoad={() => setForceLoad(true)} />
+        ) : (
+          <>
         <div
           ref={hostRef}
           className="mcx-mergeview h-full w-full"
@@ -230,6 +244,8 @@ export function DiffTab({ path, projectId, status }: DiffTabProps) {
             </span>
           </div>
         ) : null}
+          </>
+        )}
       </div>
     </div>
   );

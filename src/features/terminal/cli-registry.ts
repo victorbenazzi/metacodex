@@ -1,3 +1,5 @@
+import i18n from "i18next";
+
 import { isWindows } from "@/lib/platform";
 
 export type CliDangerLevel = "normal" | "dangerous";
@@ -12,6 +14,8 @@ export interface CliTool {
   command: string;
   /** Args appended to `command` when launching. */
   args: string[];
+  /** Arguments that bypass normal approval and require per-launch consent. */
+  elevatedArgs?: string[];
   /**
    * Shell snippet shown to the user to verify installation. Defaults to the
    * Unix form (`command -v <cmd>`); use `cliDetectCommandDisplay` to read the
@@ -48,10 +52,23 @@ export interface CliTool {
  */
 export const DEFAULT_CLI_REGISTRY: CliTool[] = [
   {
+    id: "mcx",
+    label: i18n.t("cli.metacodexCli", { defaultValue: "Metacodex CLI" }),
+    command: "mcx",
+    args: [],
+    detectCommand: "command -v mcx",
+    detectCommandWindows: "Get-Command mcx",
+    installCommand: "pnpm build && pnpm link --global",
+    installCommandWindows: "pnpm build; if ($LASTEXITCODE -eq 0) { pnpm link --global }",
+    description:
+      "metacodex multi-provider coding agent. Build from the metacodex-cli repo, then link it on PATH.",
+  },
+  {
     id: "claude-code",
     label: "Claude Code",
     command: "claude",
-    args: ["--dangerously-skip-permissions"],
+    args: [],
+    elevatedArgs: ["--dangerously-skip-permissions"],
     detectCommand: "command -v claude",
     detectCommandWindows: "Get-Command claude",
     installCommand: "curl -fsSL https://claude.ai/install.sh | bash",
@@ -90,7 +107,8 @@ export const DEFAULT_CLI_REGISTRY: CliTool[] = [
     id: "grok",
     label: "Grok Build",
     command: "grok",
-    args: ["--always-approve"],
+    args: [],
+    elevatedArgs: ["--always-approve"],
     detectCommand: "command -v grok",
     detectCommandWindows: "Get-Command grok",
     installCommand: "curl -fsSL https://x.ai/cli/install.sh | bash",
@@ -102,7 +120,8 @@ export const DEFAULT_CLI_REGISTRY: CliTool[] = [
     id: "kimi-code",
     label: "Kimi Code",
     command: "kimi",
-    args: ["--yolo"],
+    args: [],
+    elevatedArgs: ["--yolo"],
     detectCommand: "command -v kimi",
     detectCommandWindows: "Get-Command kimi",
     installCommand: "curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash",
@@ -153,17 +172,43 @@ export function cliById(id: string, registry: CliTool[] = DEFAULT_CLI_REGISTRY):
 }
 
 /** Combine `command` + args into a single shell command string. */
-export function cliLaunchString(cli: CliTool): string {
-  if (!cli.args.length) return cli.command;
+export function cliLaunchString(
+  cli: CliTool,
+  options: { executable?: string; elevated?: boolean } = {},
+): string {
+  const executable = options.executable ?? cli.command;
+  const args = options.elevated ? [...cli.args, ...(cli.elevatedArgs ?? [])] : cli.args;
+  if (!args.length) return shellEscapeToken(executable);
   if (isWindows && cli.powerShellStopParsing) {
     // PowerShell parses `--flag` as a parameter unless we lead with the
     // stop-parsing token. Prepending `--%` makes pwsh forward every
     // subsequent token verbatim — required for `claude
     // --dangerously-skip-permissions`, which would otherwise be flagged
     // as an unknown parameter for the `claude` cmdlet alias.
-    return [cli.command, "--%", ...cli.args].join(" ");
+    return [shellEscapeToken(executable), "--%", ...args.map(shellEscapeToken)].join(" ");
   }
-  return [cli.command, ...cli.args].join(" ");
+  return [shellEscapeToken(executable), ...args.map(shellEscapeToken)].join(" ");
+}
+
+const KNOWN_ELEVATED_FLAGS = new Set([
+  "--dangerously-skip-permissions",
+  "--always-approve",
+  "--yolo",
+]);
+
+export function normalizeCliTool(cli: CliTool): CliTool {
+  const elevatedArgs = [...(cli.elevatedArgs ?? [])];
+  const args = cli.args.filter((arg) => {
+    if (!KNOWN_ELEVATED_FLAGS.has(arg)) return true;
+    if (!elevatedArgs.includes(arg)) elevatedArgs.push(arg);
+    return false;
+  });
+  return { ...cli, args, elevatedArgs };
+}
+
+function shellEscapeToken(value: string): string {
+  if (/^[A-Za-z0-9_./:@%+=,-]+$/.test(value)) return value;
+  return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
 /** Default category for a CLI. */
@@ -177,7 +222,14 @@ export function cliCategory(cli: CliTool): CliCategory {
  * with custom overrides keep working without rewriting their JSON.
  */
 export function cliInstallCommand(cli: CliTool): string {
-  if (isWindows && cli.installCommandWindows) return cli.installCommandWindows;
+  return cliInstallCommandForPlatform(cli, isWindows ? "windows" : "unix");
+}
+
+export function cliInstallCommandForPlatform(
+  cli: CliTool,
+  platform: "unix" | "windows",
+): string {
+  if (platform === "windows" && cli.installCommandWindows) return cli.installCommandWindows;
   return cli.installCommand;
 }
 
@@ -200,12 +252,17 @@ export function isAgentEnabled(cliId: string, enabledAgents: Record<string, bool
   return enabledAgents[cliId] ?? true;
 }
 
+/** Canonical enabled CLI list, in registry order, shared by every launcher surface. */
+export function enabledCliTools(enabledAgents: Record<string, boolean>): CliTool[] {
+  return DEFAULT_CLI_REGISTRY.filter((cli) => isAgentEnabled(cli.id, enabledAgents));
+}
+
 /** Enabled agents split by category in registry order. */
 export function enabledAgentsByCategory(enabledAgents: Record<string, boolean>): {
   coding: CliTool[];
   autonomous: CliTool[];
 } {
-  const visible = DEFAULT_CLI_REGISTRY.filter((cli) => isAgentEnabled(cli.id, enabledAgents));
+  const visible = enabledCliTools(enabledAgents);
   return {
     coding: visible.filter((cli) => cliCategory(cli) === "coding"),
     autonomous: visible.filter((cli) => cliCategory(cli) === "autonomous"),

@@ -6,10 +6,13 @@ import { invoke as tauriInvoke } from "@tauri-apps/api/core";
  */
 export const CMD = {
   // pty
-  ptySpawn: "pty_spawn",
+  ptyPrepare: "pty_prepare",
+  ptyAttach: "pty_attach",
+  ptyStart: "pty_start",
   ptyWrite: "pty_write",
   ptyResize: "pty_resize",
   ptyKill: "pty_kill",
+  ptyKillProcess: "pty_kill_process",
   ptyList: "pty_list",
   ptyMetadataBatch: "pty_metadata_batch",
   ptyUpdateCwd: "pty_update_cwd",
@@ -22,7 +25,6 @@ export const CMD = {
   createProject: "create_project",
   removeProject: "remove_project",
   renameProject: "rename_project",
-  updateProjectMeta: "update_project_meta",
   listProjects: "list_projects",
   reorderProjects: "reorder_projects",
   setActiveProject: "set_active_project",
@@ -31,11 +33,14 @@ export const CMD = {
 
   // system
   openExternalUrl: "open_external_url",
+  openExternalPath: "open_external_path",
   takePendingOpenFiles: "take_pending_open_files",
+  appQuitReady: "app_quit_ready",
+  appRetryQuit: "app_retry_quit",
+  appForceQuit: "app_force_quit",
 
   // filesystem
   pickPreviewFile: "pick_preview_file",
-  pickProjectIcon: "pick_project_icon",
   readDir: "read_dir",
   readFileText: "read_file_text",
   writeFileText: "write_file_text",
@@ -75,6 +80,12 @@ export const CMD = {
   // git
   gitStatus: "git_status",
   gitFileHeadContent: "git_file_head_content",
+  gitCommit: "git_commit",
+  gitDiscard: "git_discard",
+  gitCreateBranch: "git_create_branch",
+  gitBranches: "git_branches",
+  gitSwitchBranch: "git_switch_branch",
+  gitPush: "git_push",
   gitWorktreeList: "git_worktree_list",
   gitWorktreeAdd: "git_worktree_add",
   gitWorktreeRemove: "git_worktree_remove",
@@ -94,6 +105,17 @@ export const CMD = {
   // diagnostics
   diagWriteSessionLog: "write_session_log",
   diagWriteCrash: "write_crash",
+
+  // in-app browser (nested OS webview)
+  browserSetBounds: "browser_set_bounds",
+  browserHide: "browser_hide",
+  browserNavigate: "browser_navigate",
+  browserReload: "browser_reload",
+  browserGoBack: "browser_go_back",
+  browserGoForward: "browser_go_forward",
+  browserSetMode: "browser_set_mode",
+  browserClearDraw: "browser_clear_draw",
+  browserCapture: "browser_capture",
 
 } as const;
 

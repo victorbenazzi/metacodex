@@ -1,0 +1,8 @@
+/* Workbench tab strip. The v2 packed-radius chrome-tab rules are gone. */
+.tab-scroll {
+  scrollbar-width: none;
+}
+
+.tab-scroll::-webkit-scrollbar {
+  display: none;
+}
