@@ -1,7 +1,7 @@
 import type { ResumeEntry } from "./resume.service";
 import { resumeArgsFor } from "./sessionDetectors";
 import { cliById, cliLaunchString } from "@/features/terminal/cli-registry";
-import type { Tab } from "@/components/tabs/types";
+import type { CliTabT, Tab } from "@/components/tabs/types";
 import { newId } from "@/lib/idGen";
 import { isWindows } from "@/lib/platform";
 
@@ -14,7 +14,7 @@ import { isWindows } from "@/lib/platform";
  * Returns null when the CLI is unknown or doesn't support resume (so callers
  * can hide the button cleanly).
  */
-export function buildResumeTab(entry: ResumeEntry): Tab | null {
+export function buildResumeTab(entry: ResumeEntry): CliTabT | null {
   const cli = cliById(entry.cliId);
   if (!cli) return null;
   const extra = resumeArgsFor(entry.cliId, entry.sessionId);
