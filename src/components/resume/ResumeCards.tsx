@@ -6,7 +6,7 @@ import { Icon } from "@/components/ui/Icon";
 import { useResumeStore } from "@/features/resume/resume.store";
 import { openResume } from "@/features/tabs";
 import { cliById } from "@/features/terminal/cli-registry";
-import { resumeFlagFor } from "@/features/resume/sessionDetectors";
+import { supportsResume } from "@/features/resume/sessionDetectors";
 import { CLI_BRAND_ICONS } from "@/components/icons/brand";
 import {
   cliDetectionFor,
@@ -42,7 +42,7 @@ export function ResumeCards({ projectId, title, limit = 5 }: ResumeCardsProps) {
   const entries = useMemo(() => {
     const all = projectId ? forProject(projectId) : recent(7);
     return all
-      .filter((e) => resumeFlagFor(e.cliId) !== null)
+      .filter((e) => supportsResume(e.cliId))
       .slice(0, limit);
   }, [projectId, forProject, recent, limit]);
 

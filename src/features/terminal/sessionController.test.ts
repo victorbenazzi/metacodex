@@ -322,4 +322,49 @@ describe("session controller characterization", () => {
     expect(prepare).toHaveBeenCalledTimes(2);
     expect(pty.start).toHaveBeenCalledTimes(1);
   });
+
+  it("does not diagnose resize NotFound after the child has already gone", async () => {
+    const { controller, diagnostics } = harness({
+      resize: vi.fn(async () =>
+        Promise.reject({ code: "NotFound", message: "pty session session-1" }),
+      ),
+    });
+
+    await controller.start(startArgs());
+
+    expect(diagnostics).not.toHaveBeenCalledWith(
+      "resize",
+      expect.anything(),
+      expect.anything(),
+    );
+  });
+
+  it("ignores onResize after a normal exit", async () => {
+    let onResize: ((size: { rows: number; cols: number }) => void) | undefined;
+    const term = fakeTerminal();
+    term.onResize = vi.fn((handler) => {
+      onResize = handler;
+      return { dispose: vi.fn() };
+    });
+    const { controller, diagnostics, exitHandlers, pty } = harness();
+
+    await controller.start(startArgs({ term }));
+    exitHandlers.get("session-1")?.({
+      session_id: "session-1",
+      seq: 2,
+      exit_code: 2,
+      reason: "normal",
+    });
+    vi.mocked(pty.resize).mockClear();
+    onResize?.({ rows: 32, cols: 120 });
+    await Promise.resolve();
+
+    expect(pty.resize).not.toHaveBeenCalled();
+    expect(diagnostics).not.toHaveBeenCalledWith(
+      "resize",
+      expect.anything(),
+      expect.anything(),
+    );
+  });
 });
+

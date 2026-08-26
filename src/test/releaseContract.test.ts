@@ -12,14 +12,14 @@ describe("metacodex 1.0 release contract", () => {
     };
     const cargoManifest = read("src-tauri/Cargo.toml");
 
-    expect(packageJson.version).toBe("1.0.0");
-    expect(tauriConfig.version).toBe("1.0.0");
-    expect(cargoManifest).toMatch(/^version = "1\.0\.0"$/m);
+    expect(packageJson.version).toBe("1.0.1");
+    expect(tauriConfig.version).toBe("1.0.1");
+    expect(cargoManifest).toMatch(/^version = "1\.0\.1"$/m);
   });
 
   it("publishes the versioned notes and all public screenshots", () => {
-    const notes = read("docs/releases/v1.0.0.md");
-    const portugueseNotes = read("docs/releases/v1.0.0.pt-BR.md");
+    const notes = read("docs/releases/v1.0.1.md");
+    const portugueseNotes = read("docs/releases/v1.0.1.pt-BR.md");
     const screenshots = [
       "workspace-overview.jpg",
       "browser-workflow.jpg",
@@ -33,6 +33,8 @@ describe("metacodex 1.0 release contract", () => {
         existsSync(new URL(`docs/releases/assets/v1.0.0/${screenshot}`, root)),
       ).toBe(true);
     }
+    expect(notes).toContain("## Bug fixes");
+    expect(portugueseNotes).toContain("## Correções");
   });
 
   it("loads the release body from the versioned notes", () => {

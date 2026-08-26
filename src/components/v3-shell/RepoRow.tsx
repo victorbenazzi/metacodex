@@ -13,10 +13,9 @@ import { useTabsStore } from "@/components/tabs/tabsStore";
 import { requestCloseTab, focusProcessTab, openResume } from "@/features/tabs";
 import { useProjectsStore } from "@/features/projects/project.store";
 import { useResumeStore } from "@/features/resume/resume.store";
-import { isLiveResumeSession } from "@/features/resume/resumeLaunch";
-import { resumeFlagFor } from "@/features/resume/sessionDetectors";
+import { isLiveResumeSession, resumeHistoryLabel } from "@/features/resume/resumeLaunch";
+import { supportsResume } from "@/features/resume/sessionDetectors";
 import type { ResumeEntry } from "@/features/resume/resume.service";
-import { cliById } from "@/features/terminal/cli-registry";
 import { useCodeSidebarStore } from "@/features/ui/codeSidebar.store";
 import { useV3ShellStore } from "@/features/v3-shell/v3Shell.store";
 import type { Project } from "@/features/projects/project.types";
@@ -54,6 +53,7 @@ export function RepoRow({
   const expanded = expandedProjects[project.id] === true;
 
   const resumeEntries = useResumeStore((s) => s.entries);
+  const discard = useResumeStore((s) => s.discard);
   const bucket = useTabsStore((s) => s.byProject[project.id]);
 
   const live = useMemo(
@@ -63,7 +63,7 @@ export function RepoRow({
   const history = useMemo(
     () =>
       resumeEntries
-        .filter((e) => e.projectId === project.id && resumeFlagFor(e.cliId) !== null)
+        .filter((e) => e.projectId === project.id && supportsResume(e.cliId))
         .sort((a, b) => Date.parse(b.lastSeenAt) - Date.parse(a.lastSeenAt)),
     [resumeEntries, project.id],
   );
@@ -189,18 +189,17 @@ export function RepoRow({
                 closeLabel={t(tab.kind === "cli" ? "codeSidebar.endAgent" : "codeSidebar.endTerminal")}
               />
             ))}
-            {visibleHistory.map((entry) => {
-              const cli = cliById(entry.cliId);
-              return (
-                <ThreadRow
-                  key={entry.id}
-                  label={entry.branch || basename(entry.cwd) || cli?.label || entry.cliId}
-                  cliId={entry.cliId}
-                  age={agoShort(entry.lastSeenAt)}
-                  onFocus={() => resume(entry)}
-                />
-              );
-            })}
+            {visibleHistory.map((entry) => (
+              <ThreadRow
+                key={entry.id}
+                label={resumeHistoryLabel(entry)}
+                cliId={entry.cliId}
+                age={agoShort(entry.lastSeenAt)}
+                onFocus={() => resume(entry)}
+                onClose={() => void discard(entry.id)}
+                closeLabel={t("resume.discardButton")}
+              />
+            ))}
             {hiddenCount > 0 && !showAll ? (
               <button
                 type="button"

@@ -161,6 +161,8 @@ export function createSessionController(deps: SessionControllerDeps): SessionCon
     return { code: "Unknown", message: String(error) };
   };
 
+  const isGone = (error: unknown): boolean => normalizeError(error).code === "NotFound";
+
   const publishFailure = (
     tabId: string,
     entry: LiveEntry,
@@ -465,7 +467,11 @@ export function createSessionController(deps: SessionControllerDeps): SessionCon
         const resizeDisposable = term.onResize(({ rows: r, cols: c }) => {
           const sid = entry.sessionId;
           if (!sid) return;
+          if (entry.phase === "exited" || entry.phase === "stopping" || entry.phase === "failed") {
+            return;
+          }
           deps.pty.resize(sid, r, c).catch((error) => {
+            if (isGone(error)) return;
             deps.diagnostics?.("resize", normalizeError(error), {
               tabId: args.tabId,
               sessionId: sid,
@@ -500,14 +506,16 @@ export function createSessionController(deps: SessionControllerDeps): SessionCon
         }
 
         try {
-          if (!exitedBeforeStartReturn) {
+          if (!exitedBeforeStartReturn && entry.phase !== "exited") {
             await deps.pty.resize(sessionId, term.rows, term.cols);
           }
         } catch (error) {
-          deps.diagnostics?.("resize", normalizeError(error), {
-            tabId: args.tabId,
-            sessionId,
-          });
+          if (!isGone(error)) {
+            deps.diagnostics?.("resize", normalizeError(error), {
+              tabId: args.tabId,
+              sessionId,
+            });
+          }
         }
       } catch (err) {
         if (isCurrent(entry, revision, "running")) {

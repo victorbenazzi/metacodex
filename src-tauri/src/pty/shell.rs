@@ -114,39 +114,106 @@ pub fn build_env(project_path: &Path) -> Vec<(String, String)> {
     }
 }
 
+fn env_non_empty(key: &str) -> Option<String> {
+    std::env::var(key).ok().filter(|value| !value.is_empty())
+}
+
+/// Locale the PTY should use when the GUI process has none (or only C/POSIX).
+///
+/// Linux: `C.UTF-8` is always present on glibc (Debian/Ubuntu/Zorin) without
+/// `locale-gen`. `en_US.UTF-8` is NOT: a pt-BR box often generates only
+/// `pt_BR.UTF-8` + `C.UTF-8`, and setting `en_US.UTF-8` makes libc fall back
+/// to POSIX/C. Agents then print `?` for `ção`.
+/// macOS: `en_US.UTF-8` is always installed; `C.UTF-8` is not.
+pub(crate) fn default_unix_utf8_locale() -> &'static str {
+    if cfg!(target_os = "linux") {
+        "C.UTF-8"
+    } else {
+        "en_US.UTF-8"
+    }
+}
+
+fn locale_is_utf8(value: &str) -> bool {
+    let lower = value.to_ascii_lowercase();
+    lower.contains("utf-8") || lower.contains("utf8")
+}
+
+fn locale_is_ascii_c(value: &str) -> bool {
+    matches!(value, "C" | "POSIX")
+}
+
+/// Pick LANG for a PTY after `env_clear()`.
+///
+/// Empty / C / POSIX are not UTF-8 capable on glibc. A charset-less name
+/// like `pt_BR` is usually ISO-8859-1 on old Linux; append `.UTF-8`.
+pub(crate) fn resolve_unix_lang(inherited: Option<&str>) -> String {
+    match inherited.map(str::trim).filter(|value| !value.is_empty()) {
+        None => default_unix_utf8_locale().to_string(),
+        Some(value) if locale_is_ascii_c(value) => default_unix_utf8_locale().to_string(),
+        Some(value) if !locale_is_utf8(value) && !value.contains('.') => {
+            format!("{value}.UTF-8")
+        }
+        Some(value) => value.to_string(),
+    }
+}
+
+#[cfg(unix)]
+const UNIX_INHERIT: &[&str] = &[
+    "HOME",
+    "USER",
+    "LOGNAME",
+    "PATH",
+    "SHELL",
+    "TMPDIR",
+    "XDG_CONFIG_HOME",
+    "XDG_DATA_HOME",
+    "XDG_CACHE_HOME",
+    "SSH_AUTH_SOCK",
+    "DISPLAY",
+    "WAYLAND_DISPLAY",
+    "LANGUAGE",
+    "LC_ALL",
+    "LC_CTYPE",
+    "LC_NUMERIC",
+    "LC_TIME",
+    "LC_COLLATE",
+    "LC_MONETARY",
+    "LC_MESSAGES",
+    "LC_PAPER",
+    "LC_NAME",
+    "LC_ADDRESS",
+    "LC_TELEPHONE",
+    "LC_MEASUREMENT",
+    "LC_IDENTIFICATION",
+];
+
 #[cfg(unix)]
 fn unix_env(project_path: &Path) -> Vec<(String, String)> {
+    unix_env_with(project_path, env_non_empty)
+}
+
+/// Do not invent `LC_ALL`. It overrides `LANG` and every `LC_*` category.
+/// GUI launches on Linux typically have `LANG=pt_BR.UTF-8` and no `LC_ALL`;
+/// forcing `LC_ALL=en_US.UTF-8` both hides the user's locale and breaks
+/// UTF-8 when that locale was never generated.
+#[cfg(unix)]
+fn unix_env_with(
+    project_path: &Path,
+    get: impl Fn(&str) -> Option<String>,
+) -> Vec<(String, String)> {
     let mut env: Vec<(String, String)> = vec![
         ("TERM".into(), "xterm-256color".into()),
         ("COLORTERM".into(), "truecolor".into()),
-        (
-            "LANG".into(),
-            std::env::var("LANG").unwrap_or_else(|_| "en_US.UTF-8".into()),
-        ),
-        (
-            "LC_ALL".into(),
-            std::env::var("LC_ALL").unwrap_or_else(|_| "en_US.UTF-8".into()),
-        ),
+        ("LANG".into(), resolve_unix_lang(get("LANG").as_deref())),
         ("PWD".into(), project_path.display().to_string()),
         ("METACODEX".into(), "1".into()),
     ];
-    for k in [
-        "HOME",
-        "USER",
-        "LOGNAME",
-        "PATH",
-        "SHELL",
-        "TMPDIR",
-        "XDG_CONFIG_HOME",
-        "XDG_DATA_HOME",
-        "XDG_CACHE_HOME",
-        "SSH_AUTH_SOCK",
-        "DISPLAY",
-        "WAYLAND_DISPLAY",
-    ] {
-        if let Ok(v) = std::env::var(k) {
-            env.push((k.into(), v));
+    for key in UNIX_INHERIT {
+        let Some(value) = get(key) else { continue };
+        if (*key == "LC_ALL" || *key == "LC_CTYPE") && locale_is_ascii_c(&value) {
+            continue;
         }
+        env.push((*key).into(), value);
     }
     env
 }
@@ -193,7 +260,7 @@ fn windows_env(project_path: &Path) -> Vec<(String, String)> {
         "LANG",
         "LC_ALL",
     ] {
-        if let Ok(v) = std::env::var(k) {
+        if let Some(v) = env_non_empty(k) {
             env.push((k.into(), v));
         }
     }
@@ -208,8 +275,81 @@ fn windows_env(project_path: &Path) -> Vec<(String, String)> {
 
 #[cfg(test)]
 mod tests {
+    use super::{default_unix_utf8_locale, resolve_unix_lang};
+
     #[cfg(unix)]
-    use super::cli_launch_args;
+    use super::{cli_launch_args, unix_env_with};
+    #[cfg(unix)]
+    use std::path::Path;
+
+    #[test]
+    fn resolve_unix_lang_keeps_user_utf8_locale() {
+        assert_eq!(resolve_unix_lang(Some("pt_BR.UTF-8")), "pt_BR.UTF-8");
+        assert_eq!(resolve_unix_lang(Some("en_US.utf8")), "en_US.utf8");
+    }
+
+    #[test]
+    fn resolve_unix_lang_upgrades_c_posix_and_empty() {
+        let fallback = default_unix_utf8_locale();
+        assert_eq!(resolve_unix_lang(None), fallback);
+        assert_eq!(resolve_unix_lang(Some("")), fallback);
+        assert_eq!(resolve_unix_lang(Some("   ")), fallback);
+        assert_eq!(resolve_unix_lang(Some("C")), fallback);
+        assert_eq!(resolve_unix_lang(Some("POSIX")), fallback);
+    }
+
+    #[test]
+    fn resolve_unix_lang_appends_utf8_when_charset_is_missing() {
+        assert_eq!(resolve_unix_lang(Some("pt_BR")), "pt_BR.UTF-8");
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_utf8_fallback_is_c_utf8_not_en_us() {
+        assert_eq!(default_unix_utf8_locale(), "C.UTF-8");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn unix_env_does_not_invent_lc_all() {
+        let get = |key: &str| match key {
+            "LANG" => Some("pt_BR.UTF-8".into()),
+            "HOME" => Some("/home/user".into()),
+            _ => None,
+        };
+        let env = unix_env_with(Path::new("/proj"), get);
+        assert!(env
+            .iter()
+            .any(|(key, value)| key == "LANG" && value == "pt_BR.UTF-8"));
+        assert!(env.iter().all(|(key, _)| key != "LC_ALL"));
+        assert!(env
+            .iter()
+            .any(|(key, value)| key == "HOME" && value == "/home/user"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn unix_env_keeps_real_lc_all_but_drops_ascii_c() {
+        let keep = |key: &str| match key {
+            "LC_ALL" => Some("pt_BR.UTF-8".into()),
+            _ => None,
+        };
+        let env = unix_env_with(Path::new("/proj"), keep);
+        assert!(env
+            .iter()
+            .any(|(key, value)| key == "LC_ALL" && value == "pt_BR.UTF-8"));
+
+        let drop_c = |key: &str| match key {
+            "LC_ALL" => Some("C".into()),
+            "LANG" => Some("pt_BR.UTF-8".into()),
+            _ => None,
+        };
+        let env = unix_env_with(Path::new("/proj"), drop_c);
+        assert!(env.iter().all(|(key, _)| key != "LC_ALL"));
+        assert!(env
+            .iter()
+            .any(|(key, value)| key == "LANG" && value == "pt_BR.UTF-8"));
+    }
 
     #[cfg(unix)]
     #[test]

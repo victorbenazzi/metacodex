@@ -719,6 +719,10 @@
       "platformsTitle": "Ready beyond macOS",
       "platformsBody": "Native browser capture, external file opening and listener discovery now cover Linux and Windows from the same local-first codebase."
     },
+    "r1001": {
+      "fixesTitle": "Session history and Linux accents",
+      "fixesBody": "Codex resume uses the resume subcommand, history rows show the CLI instead of just the branch and can be discarded, and Linux terminals keep UTF-8 instead of inventing en_US.UTF-8."
+    },
     "r0019": {
       "title": "A brighter place to start",
       "launchTitle": "Redesigned launch screen",

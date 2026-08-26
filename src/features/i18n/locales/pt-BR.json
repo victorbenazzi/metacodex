@@ -719,6 +719,10 @@
       "platformsTitle": "Pronto para ir além do macOS",
       "platformsBody": "Captura nativa do browser, abertura externa de arquivos e descoberta de portas agora cobrem Linux e Windows na mesma base local-first."
     },
+    "r1001": {
+      "fixesTitle": "Histórico de sessões e acentos no Linux",
+      "fixesBody": "Retomar o Codex usa o subcomando resume, as linhas do histórico mostram o CLI em vez de só a branch e podem ser removidas, e os terminais no Linux mantêm UTF-8 em vez de inventar en_US.UTF-8."
+    },
     "r0019": {
       "title": "Um novo jeito de começar",
       "launchTitle": "Tela inicial redesenhada",

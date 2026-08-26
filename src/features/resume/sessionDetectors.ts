@@ -5,7 +5,9 @@
  *  - **Claude Code** prints `Session ID: <uuid-4>` once at startup and on
  *    `/session` info. Other formats observed: `(session abc123…)`.
  *  - **Codex CLI** prints `Session-Token: <hex>` or `Session: <uuid>` —
- *    formats moved around between releases, so we accept several variants.
+ *    formats moved around between releases. Prefer UUID, then hex; do not
+ *    accept arbitrary 20+ char tokens (paths and thread titles look like
+ *    session ids under a greedy matcher).
  *  - **Aider** does NOT emit a session id — it stores chat history per file.
  *    For now we skip resume capture for Aider entirely (tile won't show).
  *  - **OpenCode / Gemini / Grok / Pi / Goose / Antigravity** — TODO research.
@@ -39,9 +41,16 @@ function makeGenericDetector(label: RegExp, value: RegExp): SessionDetector {
   };
 }
 
+const detectCodexUuid = makeGenericDetector(/session[\s\-_:]/i, UUID_V4);
+const detectCodexHex = makeGenericDetector(/session[\s\-_:]/i, HEX_TOKEN);
+
+function detectCodexSession(tail: string): SessionDetectorResult | null {
+  return detectCodexUuid(tail) ?? detectCodexHex(tail);
+}
+
 const DETECTORS: Record<string, SessionDetector> = {
   "claude-code": makeGenericDetector(/session[\s\-_:]/i, UUID_V4),
-  "codex-cli": makeGenericDetector(/session[\s\-_:]/i, /([A-Za-z0-9_-]{20,})/),
+  "codex-cli": detectCodexSession,
   opencode: makeGenericDetector(/session[\s\-_:]/i, UUID_V4),
   "gemini-cli": makeGenericDetector(/session[\s\-_:]/i, UUID_V4),
   grok: makeGenericDetector(/session[\s\-_:]/i, UUID_V4),
@@ -59,17 +68,28 @@ export function detectorFor(cliId: string | undefined): SessionDetector | null {
 }
 
 /**
- * Map metacodex's cli-registry ids to the actual CLI flag that resumes a session.
- * Used by `resumeLaunch` to build the spawn command. When a CLI doesn't have a
- * documented flag the entry stays absent and the resume button is hidden for it.
+ * How to re-open a captured session. Some CLIs take a flag (`claude --resume ID`),
+ * others a subcommand (`codex resume ID`). Missing entries hide the resume
+ * affordance for that tool.
  */
-export const RESUME_FLAGS: Record<string, string> = {
-  "claude-code": "--resume",
-  "codex-cli": "--resume",
-  opencode: "--resume",
-  "gemini-cli": "--resume",
+export type ResumeStyle =
+  | { kind: "flag"; token: string }
+  | { kind: "subcommand"; token: string };
+
+export const RESUME_STYLES: Record<string, ResumeStyle> = {
+  "claude-code": { kind: "flag", token: "--resume" },
+  "codex-cli": { kind: "subcommand", token: "resume" },
+  opencode: { kind: "flag", token: "--session" },
+  "gemini-cli": { kind: "flag", token: "--resume" },
 };
 
-export function resumeFlagFor(cliId: string): string | null {
-  return RESUME_FLAGS[cliId] ?? null;
+export function supportsResume(cliId: string): boolean {
+  return Object.hasOwn(RESUME_STYLES, cliId);
+}
+
+/** Extra argv after the CLI's own `args`, or null when resume is unsupported. */
+export function resumeArgsFor(cliId: string, sessionId: string): string[] | null {
+  const style = RESUME_STYLES[cliId];
+  if (!style) return null;
+  return [style.token, sessionId];
 }

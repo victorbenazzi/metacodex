@@ -7,6 +7,7 @@ import {
   RefreshCw,
   Sparkles,
   Terminal,
+  Wrench,
   type IconComponent,
 } from "@/components/ui/icons";
 
@@ -41,6 +42,39 @@ export function githubReleaseUrl(version: string): string {
  * version as seen). Keys must exist in BOTH locale JSONs under `whatsNew`.
  */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "1.0.1",
+    presentation: "milestone",
+    titleKey: "whatsNew.r1000.title",
+    summaryKey: "whatsNew.r1000.summary",
+    highlights: [
+      {
+        icon: LayoutPanelLeft,
+        titleKey: "whatsNew.r1000.workspaceTitle",
+        bodyKey: "whatsNew.r1000.workspaceBody",
+      },
+      {
+        icon: Terminal,
+        titleKey: "whatsNew.r1000.runtimeTitle",
+        bodyKey: "whatsNew.r1000.runtimeBody",
+      },
+      {
+        icon: Globe,
+        titleKey: "whatsNew.r1000.browserTitle",
+        bodyKey: "whatsNew.r1000.browserBody",
+      },
+      {
+        icon: Monitor,
+        titleKey: "whatsNew.r1000.platformsTitle",
+        bodyKey: "whatsNew.r1000.platformsBody",
+      },
+      {
+        icon: Wrench,
+        titleKey: "whatsNew.r1001.fixesTitle",
+        bodyKey: "whatsNew.r1001.fixesBody",
+      },
+    ],
+  },
   {
     version: "1.0.0",
     presentation: "milestone",

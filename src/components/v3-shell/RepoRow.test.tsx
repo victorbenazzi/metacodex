@@ -121,3 +121,44 @@ describe("RepoRow agent activity", () => {
     expect(agentBButton).toHaveAttribute("aria-current", "true");
   });
 });
+
+describe("RepoRow history rows", () => {
+  const historyEntry = {
+    id: "r1",
+    projectId: project.id,
+    cliId: "codex-cli",
+    sessionId: "019dd4bf-0929-7ea0-b227-1f51085e7d71",
+    cwd: project.path,
+    branch: "main",
+    capturedAt: "2026-01-01T00:00:00Z",
+    lastSeenAt: "2026-01-01T00:00:00Z",
+    revision: 1,
+  };
+
+  beforeEach(() => {
+    useProjectsStore.setState({ projects: [project], activeProjectId: project.id });
+    useCodeSidebarStore.setState({ expandedProjects: { [project.id]: true } });
+    useResumeStore.setState({ entries: [historyEntry], hydrated: true });
+    useTabsStore.setState({
+      byProject: { [project.id]: { activeTabId: null, tabs: [] } },
+    });
+    useAgentStatusStore.setState({ byTab: {} });
+  });
+
+  afterEach(cleanup);
+
+  it("labels history as the CLI plus branch, not the branch alone", () => {
+    renderRepoRow();
+    expect(screen.getByRole("button", { name: "Codex CLI · main" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /^main$/ })).toBeNull();
+  });
+
+  it("lets the user discard a history row", () => {
+    const discard = vi.fn(async () => undefined);
+    useResumeStore.setState({ discard });
+    renderRepoRow();
+    screen.getByLabelText("resume.discardButton").click();
+    expect(discard).toHaveBeenCalledWith("r1");
+  });
+});
+
