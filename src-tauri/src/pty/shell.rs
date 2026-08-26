@@ -125,6 +125,7 @@ fn env_non_empty(key: &str) -> Option<String> {
 /// `pt_BR.UTF-8` + `C.UTF-8`, and setting `en_US.UTF-8` makes libc fall back
 /// to POSIX/C. Agents then print `?` for `ção`.
 /// macOS: `en_US.UTF-8` is always installed; `C.UTF-8` is not.
+#[cfg(any(unix, test))]
 pub(crate) fn default_unix_utf8_locale() -> &'static str {
     if cfg!(target_os = "linux") {
         "C.UTF-8"
@@ -133,11 +134,13 @@ pub(crate) fn default_unix_utf8_locale() -> &'static str {
     }
 }
 
+#[cfg(any(unix, test))]
 fn locale_is_utf8(value: &str) -> bool {
     let lower = value.to_ascii_lowercase();
     lower.contains("utf-8") || lower.contains("utf8")
 }
 
+#[cfg(any(unix, test))]
 fn locale_is_ascii_c(value: &str) -> bool {
     matches!(value, "C" | "POSIX")
 }
@@ -146,6 +149,7 @@ fn locale_is_ascii_c(value: &str) -> bool {
 ///
 /// Empty / C / POSIX are not UTF-8 capable on glibc. A charset-less name
 /// like `pt_BR` is usually ISO-8859-1 on old Linux; append `.UTF-8`.
+#[cfg(any(unix, test))]
 pub(crate) fn resolve_unix_lang(inherited: Option<&str>) -> String {
     match inherited.map(str::trim).filter(|value| !value.is_empty()) {
         None => default_unix_utf8_locale().to_string(),
@@ -213,7 +217,7 @@ fn unix_env_with(
         if (*key == "LC_ALL" || *key == "LC_CTYPE") && locale_is_ascii_c(&value) {
             continue;
         }
-        env.push((*key).into(), value);
+        env.push(((*key).to_string(), value));
     }
     env
 }

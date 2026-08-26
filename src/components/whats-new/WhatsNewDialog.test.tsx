@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 
 vi.mock("@tauri-apps/api/app", () => ({
-  getVersion: () => Promise.resolve("1.0.0"),
+  getVersion: () => Promise.resolve("1.0.1"),
 }));
 
 vi.mock("@/lib/ipc", () => ({
@@ -36,7 +36,7 @@ describe("WhatsNewDialog 1.0 presentation", () => {
     useWhatsNewStore.setState({ open: false, entry: null });
   });
 
-  it("renders the milestone summary and all four release pillars", () => {
+  it("renders the 1.0 milestone plus the 1.0.1 fixes", () => {
     render(<WhatsNewDialog />);
 
     const dialog = screen.getByRole("dialog");
@@ -45,6 +45,7 @@ describe("WhatsNewDialog 1.0 presentation", () => {
     expect(
       screen.getByText(/Version 1.0 turns metacodex into a focused command center/),
     ).toBeInTheDocument();
-    expect(screen.getAllByRole("listitem")).toHaveLength(4);
+    expect(screen.getByText("Session history and Linux accents")).toBeInTheDocument();
+    expect(screen.getAllByRole("listitem")).toHaveLength(5);
   });
 });
