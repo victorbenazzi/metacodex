@@ -147,7 +147,7 @@
     "notifications": {
       "title": "Notifications",
       "description": "How metacodex signals you when an agent finishes a task or asks for input. Tab badges are always on; the toggles below control the louder surfaces.",
-      "osNotifications": "macOS notifications",
+      "osNotifications": "System notifications",
       "osNotificationsHint": "Show a system banner when an agent in the background finishes or requests your attention.",
       "sound": "Notification sound",
       "soundHint": "Play a short chime alongside the banner.",
@@ -324,7 +324,7 @@
     "openCliHere": "Open CLI in this folder",
     "open": "Open",
     "openInBrowser": "Open in Browser",
-    "revealInFinder": "Reveal in Finder",
+    "revealInFinder": "Show in File Manager",
     "copyPath": "Copy path",
     "newFolderPlaceholder": "folder name",
     "newFilePlaceholder": "file name",
@@ -374,7 +374,7 @@
     "removeBodySuffix": " will be removed from the rail.",
     "menu": {
       "rename": "Rename project name",
-      "revealInFinder": "Reveal in Finder",
+      "revealInFinder": "Show in File Manager",
       "moveUp": "Move up",
       "moveDown": "Move down",
       "removeFromApp": "Remove from metacodex"
@@ -404,7 +404,7 @@
     "tooltipUserTitle": "Renamed by you",
     "tooltipAgentTitle": "Set by the agent",
     "copyPath": "Copy path",
-    "revealInFinder": "Reveal in Finder",
+    "revealInFinder": "Show in File Manager",
     "copyCwd": "Copy directory",
     "status": {
       "idle": "Idle",
@@ -595,7 +595,7 @@
       "abandonTitle": "Abandon worktree {{branch}}?",
       "abandonBody": "The worktree directory and its checkout will be removed. Unpushed commits on this branch will be lost.",
       "abandonForce": "Force (discard unmerged work)",
-      "revealInFinder": "Reveal in Finder",
+      "revealInFinder": "Show in File Manager",
       "launchAgent": "Launch agent",
       "noAgentsEnabled": "No agents enabled",
       "openTerminalHere": "New terminal here",
@@ -707,6 +707,15 @@
     "milestoneEdition": "First major edition",
     "cta": "Continue",
     "releaseNotes": "Read the full release notes on GitHub",
+    "r1002": {
+      "title": "Linux, polished",
+      "accentsTitle": "Accents type exactly once",
+      "accentsBody": "WebKitGTK dead-key composition no longer repeats accented characters inside terminal agents.",
+      "chromeTitle": "One integrated window frame",
+      "chromeBody": "Linux now uses metacodex chrome and theme-aware window controls instead of a mismatched native title bar.",
+      "desktopTitle": "Better desktop integration",
+      "desktopBody": "File opening, session environment and signed DEB and RPM updates now work consistently across Linux desktops."
+    },
     "r1000": {
       "title": "The workspace, rebuilt",
       "summary": "Version 1.0 turns metacodex into a focused command center for local projects, real terminals and the coding agents already in your toolchain.",

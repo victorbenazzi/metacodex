@@ -147,7 +147,7 @@
     "notifications": {
       "title": "Notificações",
       "description": "Como o metacodex te avisa quando um agente conclui ou pede uma resposta. O ponto na aba está sempre ligado; abaixo controlam as superfícies mais barulhentas.",
-      "osNotifications": "Notificações do macOS",
+      "osNotifications": "Notificações do sistema",
       "osNotificationsHint": "Mostra um banner do sistema quando um agente em segundo plano conclui ou pede atenção.",
       "sound": "Som de notificação",
       "soundHint": "Toca um sinal curto junto com o banner.",
@@ -324,7 +324,7 @@
     "openCliHere": "Abrir CLI nesta pasta",
     "open": "Abrir",
     "openInBrowser": "Abrir no browser",
-    "revealInFinder": "Revelar no Finder",
+    "revealInFinder": "Mostrar no gerenciador de arquivos",
     "copyPath": "Copiar caminho",
     "newFolderPlaceholder": "nome da pasta",
     "newFilePlaceholder": "nome do arquivo",
@@ -374,7 +374,7 @@
     "removeBodySuffix": " será removido da trilha.",
     "menu": {
       "rename": "Renomear nome do projeto",
-      "revealInFinder": "Revelar no Finder",
+      "revealInFinder": "Mostrar no gerenciador de arquivos",
       "moveUp": "Mover para cima",
       "moveDown": "Mover para baixo",
       "removeFromApp": "Remover do metacodex"
@@ -404,7 +404,7 @@
     "tooltipUserTitle": "Renomeada por você",
     "tooltipAgentTitle": "Definida pelo agente",
     "copyPath": "Copiar caminho",
-    "revealInFinder": "Revelar no Finder",
+    "revealInFinder": "Mostrar no gerenciador de arquivos",
     "copyCwd": "Copiar diretório",
     "status": {
       "idle": "Ocioso",
@@ -595,7 +595,7 @@
       "abandonTitle": "Abandonar worktree {{branch}}?",
       "abandonBody": "O diretório e o checkout da worktree serão removidos. Commits não-pushados desta branch serão perdidos.",
       "abandonForce": "Forçar (descartar trabalho não mesclado)",
-      "revealInFinder": "Revelar no Finder",
+      "revealInFinder": "Mostrar no gerenciador de arquivos",
       "launchAgent": "Iniciar agente",
       "noAgentsEnabled": "Nenhum agente habilitado",
       "openTerminalHere": "Novo terminal aqui",
@@ -707,6 +707,15 @@
     "milestoneEdition": "Primeira grande edição",
     "cta": "Continuar",
     "releaseNotes": "Ver as notas completas no GitHub",
+    "r1002": {
+      "title": "Linux, refinado",
+      "accentsTitle": "Acentos digitados uma única vez",
+      "accentsBody": "A composição de teclas mortas do WebKitGTK não repete mais caracteres acentuados dentro dos agentes no terminal.",
+      "chromeTitle": "Uma única moldura integrada",
+      "chromeBody": "O Linux agora usa o chrome do metacodex e controles de janela que seguem o tema, sem uma barra nativa destoante.",
+      "desktopTitle": "Melhor integração com o desktop",
+      "desktopBody": "Abertura de arquivos, ambiente das sessões e updates assinados em DEB e RPM agora funcionam de forma consistente nos desktops Linux."
+    },
     "r1000": {
       "title": "O workspace, reconstruído",
       "summary": "A versão 1.0 transforma o metacodex em um centro de comando focado em projetos locais, terminais reais e nos agentes de código que já fazem parte do seu fluxo.",

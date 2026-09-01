@@ -17,7 +17,7 @@ import { RightWorkbench } from "@/components/v3-shell/RightWorkbench";
 import { AgentSidebar } from "@/components/v3-shell/AgentSidebar";
 import { CenterChrome } from "@/components/v3-shell/CenterChrome";
 import { ShellToggles } from "@/components/v3-shell/ShellToggles";
-import { WindowsControls } from "@/components/v3-shell/WindowsControls";
+import { DesktopWindowControls } from "@/components/v3-shell/DesktopWindowControls";
 import { NewAgentModal } from "@/components/v3-shell/NewAgentModal";
 import { OpenProjectModal } from "@/components/v3-shell/OpenProjectModal";
 import { useSidePanelStore } from "@/features/side-panel/sidePanel.store";
@@ -197,7 +197,7 @@ export function AppShell() {
   return (
     <div className="relative h-screen w-screen bg-canvas text-ink">
       <DropOverlay active={dropActive} />
-      <WindowsControls />
+      <DesktopWindowControls />
       <ShellToggles layout={workbenchLayout} />
       <div
         className={cn(

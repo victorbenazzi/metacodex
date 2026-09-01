@@ -1,0 +1,10 @@
+[Desktop Entry]
+Categories={{{categories}}}
+Comment={{{comment}}}
+Exec={{{exec}}} %F
+StartupWMClass=metacodex
+Icon={{{icon}}}
+Name={{{name}}}
+Terminal=false
+Type=Application
+MimeType=text/plain;text/markdown;text/x-log;text/x-rst;application/json;application/toml;application/yaml;application/x-yaml;text/yaml;text/csv;text/tab-separated-values;application/xml;text/javascript;application/javascript;application/typescript;text/typescript;text/html;text/css;text/x-scss;text/x-sass;text/x-less;text/x-vue;text/x-svelte;text/x-python;text/x-python3;text/rust;text/x-go;application/x-ruby;application/x-php;text/x-java;text/x-kotlin;text/x-swift;text/x-csrc;text/x-chdr;text/x-c++src;text/x-c++hdr;text/x-csharp;application/x-shellscript;application/sql;text/x-lua;application/graphql;image/png;image/jpeg;image/gif;image/webp;image/svg+xml;image/bmp;image/vnd.microsoft.icon;image/avif;application/pdf;

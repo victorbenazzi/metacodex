@@ -24,6 +24,7 @@ import { AlertTriangle } from "@/components/ui/icons";
 import { useDiagnosticsStore } from "@/features/diagnostics/diagnostics.store";
 import { requestCloseTab } from "@/features/tabs/tabLifecycle";
 import type { TerminalRuntimeState } from "@/features/terminal/terminal.types";
+import { WebKitDeadKeyAddon } from "@/features/terminal/webkitDeadKey";
 
 interface TerminalTabProps {
   tabId: string;
@@ -163,6 +164,8 @@ export function TerminalTab({
     if (!term || !fit) return;
 
     const linkProvider = term.registerLinkProvider(createFileLinkProvider(term, cwd));
+    const webKitDeadKey = new WebKitDeadKeyAddon();
+    term.loadAddon(webKitDeadKey);
 
     const pasteFromClipboard = () => {
       void readClipboardText()
@@ -173,6 +176,8 @@ export function TerminalTab({
     };
 
     term.attachCustomKeyEventHandler((ev) => {
+      if (webKitDeadKey.intercept(ev)) return false;
+
       const isEnter = ev.key === "Enter" || ev.code === "Enter" || ev.keyCode === 13;
       if (ev.type === "keydown" && isEnter && ev.shiftKey) {
         ev.preventDefault();
@@ -250,6 +255,7 @@ export function TerminalTab({
       ro?.disconnect();
       if (fitRaf) cancelAnimationFrame(fitRaf);
       linkProvider.dispose();
+      webKitDeadKey.dispose();
       containerEl?.removeEventListener("contextmenu", onTerminalContextMenu);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -60,12 +60,13 @@ pub async fn get_active_project_id() -> AppResult<Option<String>> {
     projects::get_active_id()
 }
 
-/// Reveal a path in the OS file manager (Finder / Explorer / nautilus).
+/// Reveal a path in the OS file manager.
 /// Allowed only when the path is under a Project root or matches an active
 /// Preview grant (user explicitly opened that file).
 /// Implemented here rather than via tauri-plugin-opener so we don't add another dep.
 #[tauri::command]
 pub async fn reveal_in_finder(path: String, app: AppHandle) -> AppResult<()> {
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
     use crate::util::process::silent_command;
 
     let roots = app.state::<Arc<ProjectsCache>>().project_roots();
@@ -101,15 +102,41 @@ pub async fn reveal_in_finder(path: String, app: AppHandle) -> AppResult<()> {
 
     #[cfg(all(unix, not(target_os = "macos")))]
     {
-        // Best-effort for Linux: open the parent directory in the default file manager.
-        let parent = std::path::Path::new(&path)
-            .parent()
-            .map(|p| p.to_path_buf())
-            .unwrap_or_else(|| std::path::PathBuf::from(&path));
-        silent_command("xdg-open")
-            .arg(parent.as_os_str())
-            .status()
-            .map_err(|e| AppError::Other(format!("xdg-open failed: {e}")))?;
-        Ok(())
+        let path = std::path::Path::new(&path);
+        let target = linux_reveal_target(path, path.is_dir());
+        crate::util::process::open_with_linux_default(target.as_os_str()).map_err(AppError::Other)
+    }
+}
+
+#[cfg(any(test, all(unix, not(target_os = "macos"))))]
+fn linux_reveal_target(path: &std::path::Path, is_directory: bool) -> std::path::PathBuf {
+    if is_directory {
+        path.to_path_buf()
+    } else {
+        path.parent()
+            .map(std::path::Path::to_path_buf)
+            .unwrap_or_else(|| path.to_path_buf())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::linux_reveal_target;
+    use std::path::Path;
+
+    #[test]
+    fn linux_reveal_opens_a_directory_itself() {
+        assert_eq!(
+            linux_reveal_target(Path::new("/project/src"), true),
+            Path::new("/project/src")
+        );
+    }
+
+    #[test]
+    fn linux_reveal_opens_a_files_parent() {
+        assert_eq!(
+            linux_reveal_target(Path::new("/project/src/main.rs"), false),
+            Path::new("/project/src")
+        );
     }
 }

@@ -54,7 +54,7 @@ No account and no setup wizard. macOS builds are not notarized, and Windows buil
 
 ## Auto-update
 
-From **v0.0.3** onwards, the macOS and Windows builds can update themselves. Shortly after launch the app checks this repo's `latest.json`; when a newer release exists, a blue **Update** pill appears in the center chrome. One click downloads the updater payload, verifies it against the bundled public key, installs it and relaunches the app. Linux `.deb` and `.rpm` packages update through the system package installation flow.
+From **v0.0.3** onwards, installed builds can update themselves. Shortly after launch the app checks this repo's `latest.json`; when a newer release exists, a blue **Update** pill appears in the center chrome. One click downloads the updater payload, verifies it against the bundled public key, installs it and relaunches the app. On Linux, the updater selects the package format currently installed and runs the `.deb` or `.rpm` system installation flow with elevated privileges.
 
 > [!NOTE]
 > If macOS quarantines the app again after an in-place update, follow the same [Gatekeeper instructions](#macos-gatekeeper-notice). A future release signed with an Apple Developer ID and notarized by Apple will remove this extra step.

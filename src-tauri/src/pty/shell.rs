@@ -172,6 +172,13 @@ const UNIX_INHERIT: &[&str] = &[
     "XDG_CONFIG_HOME",
     "XDG_DATA_HOME",
     "XDG_CACHE_HOME",
+    "XDG_RUNTIME_DIR",
+    "XDG_SESSION_TYPE",
+    "XDG_CURRENT_DESKTOP",
+    "XDG_SESSION_DESKTOP",
+    "DESKTOP_SESSION",
+    "DBUS_SESSION_BUS_ADDRESS",
+    "XAUTHORITY",
     "SSH_AUTH_SOCK",
     "DISPLAY",
     "WAYLAND_DISPLAY",
@@ -329,6 +336,30 @@ mod tests {
         assert!(env
             .iter()
             .any(|(key, value)| key == "HOME" && value == "/home/user"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn unix_env_keeps_desktop_session_access() {
+        let get = |key: &str| match key {
+            "XDG_RUNTIME_DIR" => Some("/run/user/1000".into()),
+            "DBUS_SESSION_BUS_ADDRESS" => Some("unix:path=/run/user/1000/bus".into()),
+            "XAUTHORITY" => Some("/run/user/1000/xauth".into()),
+            "WAYLAND_DISPLAY" => Some("wayland-0".into()),
+            _ => None,
+        };
+        let env = unix_env_with(Path::new("/proj"), get);
+
+        for (key, value) in [
+            ("XDG_RUNTIME_DIR", "/run/user/1000"),
+            ("DBUS_SESSION_BUS_ADDRESS", "unix:path=/run/user/1000/bus"),
+            ("XAUTHORITY", "/run/user/1000/xauth"),
+            ("WAYLAND_DISPLAY", "wayland-0"),
+        ] {
+            assert!(env
+                .iter()
+                .any(|(actual_key, actual_value)| { actual_key == key && actual_value == value }));
+        }
     }
 
     #[cfg(unix)]

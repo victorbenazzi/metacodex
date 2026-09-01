@@ -7,7 +7,7 @@ import { useProjectsStore } from "@/features/projects/project.store";
  * Single funnel for "an agent in tab X wants attention".
  *
  * Decides whether to:
- *   - fire a macOS native banner (gated by `notifications.osNotificationsEnabled`
+ *   - fire a system notification banner (gated by `notifications.osNotificationsEnabled`
  *     and the focus-state check controlled by `notifications.notifyWhenFocused`)
  *   - play the chime asset (gated by `notifications.soundEnabled`)
  *

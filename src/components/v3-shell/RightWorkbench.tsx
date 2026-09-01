@@ -14,7 +14,7 @@ import type { Tab } from "@/components/tabs/types";
 import type { Project } from "@/features/projects/project.types";
 import type { CliTool } from "@/features/terminal/cli-registry";
 import { cn } from "@/lib/cn";
-import { isMac, isWindows } from "@/lib/platform";
+import { hasCustomWindowControls, isMac } from "@/lib/platform";
 import type { WorkbenchLayout } from "@/features/browser/workbenchLayout";
 
 interface RightWorkbenchProps {
@@ -75,7 +75,7 @@ export function RightWorkbench({
         className={cn(
           "flex h-[var(--title-bar-h)] shrink-0 items-center border-b border-hairline-soft",
           isMac && expanded ? "pl-[94px]" : null,
-          isWindows ? "pr-[176px]" : "pr-42px",
+          hasCustomWindowControls ? "pr-[176px]" : "pr-42px",
         )}
       >
         <WorkbenchTabBar

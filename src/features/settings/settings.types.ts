@@ -92,7 +92,7 @@ export interface AppSettings {
    *  or asks for input we update the tab badge unconditionally; OS banners and
    *  sound are user-controlled here. */
   notifications: {
-    /** Show a macOS notification banner when an agent emits OSC 9/99/777 or
+    /** Show a system notification banner when an agent emits OSC 9/99/777 or
      *  the heuristic flags `needs-attention`. Default: on (opt-out). */
     osNotificationsEnabled: boolean;
     /** Play a short chime alongside the banner. Default: on. */

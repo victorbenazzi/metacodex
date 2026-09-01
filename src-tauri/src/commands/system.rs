@@ -11,7 +11,8 @@ use crate::util::paths;
 /// Open an http(s) URL in the user's default browser.
 ///
 /// Like `reveal_in_finder`, this shells out to the platform opener
-/// (`open` / `start` / `xdg-open`) rather than pulling in tauri-plugin-opener.
+/// (`open` / `start` / the Linux desktop opener) rather than pulling in
+/// tauri-plugin-opener.
 /// The command is exposed over IPC, so we only permit http/https , anything
 /// else (`file://`, `javascript:`, …) is refused defensively.
 #[tauri::command]
@@ -25,6 +26,7 @@ pub async fn open_external_url(url: String) -> AppResult<()> {
     }
     let url = parsed.to_string();
 
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
     use crate::util::process::silent_command;
 
     #[cfg(target_os = "macos")]
@@ -47,17 +49,15 @@ pub async fn open_external_url(url: String) -> AppResult<()> {
 
     #[cfg(all(unix, not(target_os = "macos")))]
     {
-        let status = silent_command("xdg-open")
-            .arg(&url)
-            .status()
-            .map_err(|e| AppError::Other(format!("xdg-open failed: {e}")))?;
-        require_opener_success(status, "xdg-open")
+        crate::util::process::open_with_linux_default(std::ffi::OsStr::new(&url))
+            .map_err(AppError::Other)
     }
 }
 
 /// Open an authorized local path with its system default application.
 #[tauri::command]
 pub async fn open_external_path(path: String, app: AppHandle) -> AppResult<()> {
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
     use crate::util::process::silent_command;
 
     let roots = app.state::<Arc<ProjectsCache>>().project_roots();
@@ -84,15 +84,12 @@ pub async fn open_external_path(path: String, app: AppHandle) -> AppResult<()> {
 
     #[cfg(all(unix, not(target_os = "macos")))]
     {
-        let status = silent_command("xdg-open")
-            .arg(&path)
-            .status()
-            .map_err(|e| AppError::Other(format!("xdg-open failed: {e}")))?;
-        require_opener_success(status, "xdg-open")
+        crate::util::process::open_with_linux_default(std::ffi::OsStr::new(&path))
+            .map_err(AppError::Other)
     }
 }
 
-#[cfg(unix)]
+#[cfg(target_os = "macos")]
 fn require_opener_success(status: std::process::ExitStatus, opener: &str) -> AppResult<()> {
     if status.success() {
         Ok(())
