@@ -9,7 +9,7 @@ import { useActiveProcessTab } from "@/features/tabs/useActiveProcessTab";
 import { useCodeSidebarStore } from "@/features/ui/codeSidebar.store";
 import { useSidePanelStore } from "@/features/side-panel/sidePanel.store";
 import { cn } from "@/lib/cn";
-import { isMac, isWindows } from "@/lib/platform";
+import { hasCustomWindowControls, isMac } from "@/lib/platform";
 
 /**
  * Center column chrome. When an agent/terminal is running, this is its
@@ -33,7 +33,7 @@ export function CenterChrome() {
       className={cn(
         "flex h-[var(--title-bar-h)] shrink-0 items-center gap-8px",
         sidebarOpen ? "pl-12px" : isMac ? "pl-[126px]" : "pl-44px",
-        panelOpen ? "pr-12px" : isWindows ? "pr-[176px]" : "pr-42px",
+        panelOpen ? "pr-12px" : hasCustomWindowControls ? "pr-[176px]" : "pr-42px",
       )}
     >
       {agent ? (

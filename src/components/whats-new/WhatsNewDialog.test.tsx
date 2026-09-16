@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 
 vi.mock("@tauri-apps/api/app", () => ({
-  getVersion: () => Promise.resolve("1.0.1"),
+  getVersion: () => Promise.resolve("1.0.2"),
 }));
 
 vi.mock("@/lib/ipc", () => ({
@@ -24,9 +24,9 @@ import "@/features/i18n/config";
 import { useWhatsNewStore } from "@/features/whats-new/whatsNew.store";
 import { WhatsNewDialog } from "./WhatsNewDialog";
 
-describe("WhatsNewDialog 1.0 presentation", () => {
+describe("WhatsNewDialog 1.0.2 presentation", () => {
   beforeEach(() => {
-    invokeMock.mockResolvedValue({ lastSeenVersion: "1.0.0" });
+    invokeMock.mockResolvedValue({ lastSeenVersion: "1.0.1" });
     useWhatsNewStore.setState({ open: true, entry: CHANGELOG[0] ?? null });
   });
 
@@ -36,16 +36,14 @@ describe("WhatsNewDialog 1.0 presentation", () => {
     useWhatsNewStore.setState({ open: false, entry: null });
   });
 
-  it("renders the 1.0 milestone plus the 1.0.1 fixes", () => {
+  it("renders the Linux patch highlights", () => {
     render(<WhatsNewDialog />);
 
     const dialog = screen.getByRole("dialog");
-    expect(dialog).toHaveAttribute("data-presentation", "milestone");
-    expect(screen.getByText("The workspace, rebuilt")).toBeInTheDocument();
-    expect(
-      screen.getByText(/Version 1.0 turns metacodex into a focused command center/),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Session history and Linux accents")).toBeInTheDocument();
-    expect(screen.getAllByRole("listitem")).toHaveLength(5);
+    expect(dialog).toHaveAttribute("data-presentation", "standard");
+    expect(screen.getByText("Linux, polished")).toBeInTheDocument();
+    expect(screen.getByText("Accents type exactly once")).toBeInTheDocument();
+    expect(screen.getByText("One integrated window frame")).toBeInTheDocument();
+    expect(screen.getAllByRole("listitem")).toHaveLength(3);
   });
 });

@@ -8,7 +8,11 @@ import type { TerminalRuntimeState } from "@/features/terminal/terminal.types";
 const mocks = vi.hoisted(() => {
   let listener: ((state: TerminalRuntimeState) => void) | null = null;
   const term = {
+    options: { screenReaderMode: false },
     registerLinkProvider: vi.fn(() => ({ dispose: vi.fn() })),
+    loadAddon: vi.fn((addon: { activate?: (terminal: unknown) => void }) => {
+      addon.activate?.(term);
+    }),
     attachCustomKeyEventHandler: vi.fn(),
     hasSelection: vi.fn(() => false),
     getSelection: vi.fn(() => ""),

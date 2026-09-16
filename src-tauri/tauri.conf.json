@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "metacodex",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "identifier": "com.metacodex.app",
   "build": {
     "beforeDevCommand": "pnpm dev",
@@ -74,11 +74,60 @@
         "role": "Editor"
       },
       {
-        "ext": ["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "ico", "avif"],
-        "name": "Image",
-        "description": "Image file",
+        "ext": ["png"],
+        "name": "PNG Image",
+        "description": "PNG image",
         "role": "Viewer",
         "mimeType": "image/png"
+      },
+      {
+        "ext": ["jpg", "jpeg"],
+        "name": "JPEG Image",
+        "description": "JPEG image",
+        "role": "Viewer",
+        "mimeType": "image/jpeg"
+      },
+      {
+        "ext": ["gif"],
+        "name": "GIF Image",
+        "description": "GIF image",
+        "role": "Viewer",
+        "mimeType": "image/gif"
+      },
+      {
+        "ext": ["webp"],
+        "name": "WebP Image",
+        "description": "WebP image",
+        "role": "Viewer",
+        "mimeType": "image/webp"
+      },
+      {
+        "ext": ["svg"],
+        "name": "SVG Image",
+        "description": "SVG image",
+        "role": "Viewer",
+        "mimeType": "image/svg+xml"
+      },
+      {
+        "ext": ["bmp"],
+        "name": "Bitmap Image",
+        "description": "Bitmap image",
+        "role": "Viewer",
+        "mimeType": "image/bmp"
+      },
+      {
+        "ext": ["ico"],
+        "name": "Icon Image",
+        "description": "Icon image",
+        "role": "Viewer",
+        "mimeType": "image/vnd.microsoft.icon"
+      },
+      {
+        "ext": ["avif"],
+        "name": "AVIF Image",
+        "description": "AVIF image",
+        "role": "Viewer",
+        "mimeType": "image/avif"
       },
       {
         "ext": ["pdf"],
@@ -87,7 +136,17 @@
         "role": "Viewer",
         "mimeType": "application/pdf"
       }
-    ]
+    ],
+    "linux": {
+      "deb": {
+        "desktopTemplate": "linux/metacodex.desktop",
+        "recommends": ["xdg-utils"]
+      },
+      "rpm": {
+        "desktopTemplate": "linux/metacodex.desktop",
+        "recommends": ["xdg-utils"]
+      }
+    }
   },
   "plugins": {
     "updater": {

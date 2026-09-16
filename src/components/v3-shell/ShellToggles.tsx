@@ -2,7 +2,7 @@ import { SidePanelToggle } from "@/components/side-panel/SidePanelToggle";
 import { LeftSidebarToggle } from "@/components/v3-shell/LeftSidebarToggle";
 import type { WorkbenchLayout } from "@/features/browser/workbenchLayout";
 import { cn } from "@/lib/cn";
-import { isMac, isWindows } from "@/lib/platform";
+import { hasCustomWindowControls, isMac } from "@/lib/platform";
 
 /**
  * Sidebar toggles sit on the window, not in the animating columns. Parking
@@ -21,7 +21,7 @@ export function ShellToggles({ layout }: { layout: WorkbenchLayout }) {
       <div
         className={cn(
           "pointer-events-auto ml-auto",
-          isWindows ? "mr-[146px]" : "mr-12px",
+          hasCustomWindowControls ? "mr-[146px]" : "mr-12px",
         )}
       >
         <SidePanelToggle />

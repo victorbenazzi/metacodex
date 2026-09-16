@@ -8,6 +8,7 @@
 export const isMac = /Mac/.test(navigator.userAgent || "");
 export const isWindows = /Win/.test(navigator.userAgent || "");
 export const isLinux = !isMac && !isWindows && /Linux/.test(navigator.userAgent || "");
+export const hasCustomWindowControls = isWindows || isLinux;
 
 export const modKey = isMac ? "Meta" : "Control";
 export const modSymbol = isMac ? "⌘" : "Ctrl";

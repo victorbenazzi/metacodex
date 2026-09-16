@@ -43,6 +43,27 @@ export function githubReleaseUrl(version: string): string {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.0.2",
+    titleKey: "whatsNew.r1002.title",
+    highlights: [
+      {
+        icon: Terminal,
+        titleKey: "whatsNew.r1002.accentsTitle",
+        bodyKey: "whatsNew.r1002.accentsBody",
+      },
+      {
+        icon: Monitor,
+        titleKey: "whatsNew.r1002.chromeTitle",
+        bodyKey: "whatsNew.r1002.chromeBody",
+      },
+      {
+        icon: Wrench,
+        titleKey: "whatsNew.r1002.desktopTitle",
+        bodyKey: "whatsNew.r1002.desktopBody",
+      },
+    ],
+  },
+  {
     version: "1.0.1",
     presentation: "milestone",
     titleKey: "whatsNew.r1000.title",

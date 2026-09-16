@@ -1,10 +1,10 @@
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const root = new URL("../../", import.meta.url);
 const read = (path: string) => readFileSync(new URL(path, root), "utf8");
 
-describe("metacodex 1.0 release contract", () => {
+describe("metacodex 1.0.2 release contract", () => {
   it("keeps the application version aligned across package manifests", () => {
     const packageJson = JSON.parse(read("package.json")) as { version: string };
     const tauriConfig = JSON.parse(read("src-tauri/tauri.conf.json")) as {
@@ -12,29 +12,20 @@ describe("metacodex 1.0 release contract", () => {
     };
     const cargoManifest = read("src-tauri/Cargo.toml");
 
-    expect(packageJson.version).toBe("1.0.1");
-    expect(tauriConfig.version).toBe("1.0.1");
-    expect(cargoManifest).toMatch(/^version = "1\.0\.1"$/m);
+    expect(packageJson.version).toBe("1.0.2");
+    expect(tauriConfig.version).toBe("1.0.2");
+    expect(cargoManifest).toMatch(/^version = "1\.0\.2"$/m);
   });
 
-  it("publishes the versioned notes and all public screenshots", () => {
-    const notes = read("docs/releases/v1.0.1.md");
-    const portugueseNotes = read("docs/releases/v1.0.1.pt-BR.md");
-    const screenshots = [
-      "workspace-overview.jpg",
-      "browser-workflow.jpg",
-      "whats-new.jpg",
-    ];
+  it("publishes bilingual Linux release notes", () => {
+    const notes = read("docs/releases/v1.0.2.md");
+    const portugueseNotes = read("docs/releases/v1.0.2.pt-BR.md");
 
-    for (const screenshot of screenshots) {
-      expect(notes).toContain(`/assets/v1.0.0/${screenshot}`);
-      expect(portugueseNotes).toContain(`/assets/v1.0.0/${screenshot}`);
-      expect(
-        existsSync(new URL(`docs/releases/assets/v1.0.0/${screenshot}`, root)),
-      ).toBe(true);
-    }
-    expect(notes).toContain("## Bug fixes");
-    expect(portugueseNotes).toContain("## Correções");
+    expect(notes).toContain("## Linux fixes");
+    expect(portugueseNotes).toContain("## Correções no Linux");
+    expect(notes).toContain("metacodex_1.0.2_amd64.deb");
+    expect(notes).toContain("metacodex-1.0.2-1.x86_64.rpm");
+    expect(portugueseNotes).toContain("metacodex_1.0.2_amd64.deb");
   });
 
   it("loads the release body from the versioned notes", () => {
@@ -58,6 +49,9 @@ describe("metacodex 1.0 release contract", () => {
     );
     expect(workflow).toContain("node-version: 22");
     expect(workflow).not.toContain("node-version: 20");
+    expect(workflow).toContain("--bundles deb,rpm");
+    expect(workflow).not.toContain("macos-latest");
+    expect(workflow).not.toContain("windows-latest");
     expect(qualityWorkflow).toContain("checkout_ref:");
     expect(
       qualityWorkflow.match(
