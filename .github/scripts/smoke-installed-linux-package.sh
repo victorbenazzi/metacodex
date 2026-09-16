@@ -48,7 +48,7 @@ GDK_BACKEND=x11 \
 WEBKIT_DISABLE_COMPOSITING_MODE=1 \
 XDG_RUNTIME_DIR="$runtime_dir" \
 METACODEX_HOME="$state_dir" \
-timeout --signal=TERM --kill-after=3s 8s /usr/bin/metacodex >"$log_file" 2>&1
+timeout --foreground --signal=TERM --kill-after=3s 8s /usr/bin/metacodex >"$log_file" 2>&1
 status=$?
 set -e
 
