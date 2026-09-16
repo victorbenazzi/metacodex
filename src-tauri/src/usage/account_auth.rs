@@ -138,12 +138,9 @@ fn validate_file(path: &Path, max: u64) -> Result<(), String> {
 }
 
 fn decode_token(bytes: &[u8]) -> Result<String, String> {
-    if bytes.len().is_multiple_of(2)
-        && bytes
-            .chunks_exact(2)
-            .all(|pair| pair[1] == 0 && pair[0].is_ascii())
-    {
-        return Ok(bytes.chunks_exact(2).map(|pair| pair[0] as char).collect());
+    let (pairs, remainder) = bytes.as_chunks::<2>();
+    if remainder.is_empty() && pairs.iter().all(|pair| pair[1] == 0 && pair[0].is_ascii()) {
+        return Ok(pairs.iter().map(|pair| pair[0] as char).collect());
     }
     String::from_utf8(bytes.to_vec()).map_err(|_| "invalidCredential".into())
 }
