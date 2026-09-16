@@ -749,6 +749,15 @@
       "explorerBody": "Todos os projetos ficam observados em segundo plano, com botão de sincronizar e ordenação natural de arquivos.",
       "notesTitle": "Novidades a cada atualização",
       "notesBody": "Este resumo aparece uma vez após cada update, com o link para as notas completas no GitHub."
+    },
+    "r1003": {
+      "title": "Visibilidade de uso e sessões confiáveis",
+      "usageTitle": "Uso dos agentes em um só lugar",
+      "usageBody": "Consulte os dados disponíveis de uso, cotas e histórico de Codex, Claude, Cursor e Grok. A conexão das contas é opcional.",
+      "runtimeTitle": "Gravação e encerramento mais seguros",
+      "runtimeBody": "Falhas de gravação ficam visíveis, o encerramento dos terminais para os processos filhos e fluxos interrompidos permitem nova tentativa.",
+      "deliveryTitle": "Capturas chegam ao agente escolhido",
+      "deliveryBody": "Trocar de aba durante uma captura preserva o destino original. Sessões encerradas podem ser retomadas novamente."
     }
   },
   "quitBlocked": {

@@ -1,4 +1,4 @@
-name: Release Linux
+name: Release
 
 on:
   push:
@@ -21,12 +21,25 @@ jobs:
     needs: quality
     permissions:
       contents: write
+    env:
+      SIGN: ${{ secrets.APPLE_CERTIFICATE != '' }}
     strategy:
-      # This release channel intentionally publishes Linux packages only.
-      # Cross-platform checks still run through the reusable quality workflow.
+      # Publish only after every platform passes quality and packaging checks.
       fail-fast: false
       matrix:
         include:
+          - platform: macos-latest
+            target: aarch64-apple-darwin
+            args: "--target aarch64-apple-darwin"
+            label: "macOS Apple Silicon (M1+)"
+          - platform: macos-latest
+            target: x86_64-apple-darwin
+            args: "--target x86_64-apple-darwin"
+            label: "macOS Intel"
+          - platform: windows-latest
+            target: x86_64-pc-windows-msvc
+            args: "--target x86_64-pc-windows-msvc"
+            label: "Windows x64"
           - platform: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
             # AppImage is excluded on purpose: linuxdeploy's GTK plugin is
@@ -110,12 +123,54 @@ jobs:
             echo 'METACODEX_RELEASE_NOTES'
           } >> "$GITHUB_OUTPUT"
 
+      # Option B signing: import a STABLE self-signed cert into a dedicated
+      # keychain and trust it for code signing, so every release shares one code
+      # identity. macOS TCC then keeps granted permissions across auto-updates.
+      # This does NOT notarize; the Gatekeeper "unidentified developer" warning
+      # (and the one-time `xattr -cr`) still applies.
+      - name: Set up self-signed signing keychain
+        if: ${{ env.SIGN == 'true' && matrix.platform == 'macos-latest' }}
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          CERT_P12="$RUNNER_TEMP/metacodex-signing.p12"
+          CERT_CRT="$RUNNER_TEMP/metacodex-signing.pem"
+          KEYCHAIN="$RUNNER_TEMP/metacodex-signing.keychain-db"
+          KEYCHAIN_PWD="$(openssl rand -hex 20)"
+
+          # The secret is single-line base64 (openssl base64 -A) of the .p12.
+          printf '%s' "$APPLE_CERTIFICATE" | openssl base64 -d -A -out "$CERT_P12"
+
+          # Dedicated keychain, unlocked and kept unlocked for the whole job.
+          security create-keychain -p "$KEYCHAIN_PWD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PWD" "$KEYCHAIN"
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | xargs)
+          security default-keychain -s "$KEYCHAIN"
+
+          # Import the identity and let codesign use the key non-interactively.
+          security import "$CERT_P12" -k "$KEYCHAIN" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PWD" "$KEYCHAIN" >/dev/null
+
+          # A self-signed cert isn't chain-trusted, so codesign rejects it as a
+          # valid identity until we trust it as a code-signing root. Pull the
+          # public cert straight from the keychain (no openssl pkcs12 needed).
+          security find-certificate -c "metacodex self-signed" -p "$KEYCHAIN" > "$CERT_CRT"
+          sudo security add-trusted-cert -d -r trustRoot -p codeSign \
+            -k /Library/Keychains/System.keychain "$CERT_CRT"
+
+          echo "Valid code-signing identities:"
+          security find-identity -v -p codesigning "$KEYCHAIN"
+
       - name: Build & publish to GitHub Release
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ env.SIGN == 'true' && 'metacodex self-signed' || '' }}
         with:
           tagName: ${{ github.event.inputs.tag || github.ref_name }}
           releaseName: "metacodex ${{ github.event.inputs.tag || github.ref_name }}"

@@ -1,6 +1,6 @@
 [package]
 name = "metacodex"
-version = "1.0.2"
+version = "1.0.3"
 description = "metacodex: premium local-first developer workspace"
 authors = ["Victor"]
 edition = "2021"

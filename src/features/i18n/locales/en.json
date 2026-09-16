@@ -749,6 +749,15 @@
       "explorerBody": "Every project is watched in the background, with a manual sync button and natural file sorting.",
       "notesTitle": "Release notes, right here",
       "notesBody": "This summary appears once after each update, with a link to the full notes on GitHub."
+    },
+    "r1003": {
+      "title": "Usage visibility and reliable sessions",
+      "usageTitle": "Agent usage in one place",
+      "usageBody": "Review available usage, quota and history data for Codex, Claude, Cursor and Grok. Account connections remain optional.",
+      "runtimeTitle": "Safer saves and shutdown",
+      "runtimeBody": "Failed saves stay visible, terminal cleanup stops child processes, and interrupted streams offer a retry.",
+      "deliveryTitle": "Captures reach the intended agent",
+      "deliveryBody": "Switching tabs during capture keeps the original destination. Finished sessions can be resumed again."
     }
   },
   "quitBlocked": {
