@@ -122,6 +122,11 @@ fn validate_file(path: &Path, max: u64) -> Result<(), String> {
             return Err("invalidCredential".into());
         }
         walked.push(part);
+        // A Windows drive or UNC prefix is not a complete absolute path until
+        // its root component has been appended. Validate starting at that root.
+        if matches!(part, std::path::Component::Prefix(_)) {
+            continue;
+        }
         if std::fs::symlink_metadata(&walked)
             .map_err(|_| "signedOut")?
             .file_type()
