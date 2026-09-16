@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { Icon } from "@/components/ui/Icon";
 import { Tooltip } from "@/components/ui/Tooltip";
+import { UsageSidebarItem } from "@/components/usage/UsageSidebarItem";
 import { ReorderDropLine, useListReorder } from "@/components/ui/useListReorder";
 import { ProjectGlyph } from "@/components/project-rail/ProjectGlyph";
 import { RenameProjectDialog } from "@/components/project-rail/RenameProjectDialog";
@@ -125,7 +126,8 @@ export function AgentSidebar() {
           </div>
         </div>
 
-        <footer className="flex shrink-0 items-center border-t border-hairline-soft px-8px py-8px">
+        <footer className="flex shrink-0 flex-col gap-2px border-t border-hairline-soft px-8px py-8px">
+          <UsageSidebarItem />
           <NavRow
             icon={Settings}
             label={t("projectRail.settings")}

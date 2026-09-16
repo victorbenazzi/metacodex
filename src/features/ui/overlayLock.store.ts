@@ -33,15 +33,16 @@ export const useOverlayLockStore = create<OverlayLockState>((set) => ({
 }));
 
 /** Registers controlled dialogs that use local component state. */
-export function useOverlayLock(open: boolean): void {
+export function useOverlayLock(open: boolean): string {
   const id = useId();
   useLayoutEffect(() => {
     useOverlayLockStore.getState().setDialog(id, open);
     return () => useOverlayLockStore.getState().setDialog(id, false);
   }, [id, open]);
+  return id;
 }
 
-export function useChromeOverlayOpen(): boolean {
+export function useChromeOverlayOpen(excludeDialogId?: string): boolean {
   const settings = useSettingsStore((s) => s.open);
   const palette = useCommandPaletteStore((s) => s.open);
   const search = useSearchUiStore((s) => s.open);
@@ -51,7 +52,7 @@ export function useChromeOverlayOpen(): boolean {
   const whatsNew = useWhatsNewStore((s) => s.open);
   const local = useOverlayLockStore((s) => s.local);
   const localDialogOpen = useOverlayLockStore(
-    (s) => Object.keys(s.dialogs).length > 0,
+    (s) => Object.keys(s.dialogs).some(id => id !== excludeDialogId),
   );
   return (
     settings ||

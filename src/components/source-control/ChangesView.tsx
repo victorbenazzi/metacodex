@@ -446,7 +446,7 @@ export function ChangesView({
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto py-4px">
           {variant === "panel" ? (
-            <div className="px-12px pb-6px">
+            <div className="px-12px pb-8px pt-8px">
               <textarea
                 ref={messageRef}
                 value={message}

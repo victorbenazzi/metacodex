@@ -10,6 +10,12 @@ import type { CommandDef, CommandId } from "./types";
  */
 export const COMMANDS: CommandDef[] = [
   {
+    id: "usage.open",
+    defaultBinding: [],
+    descriptionKey: "usage.title",
+    category: "view",
+  },
+  {
     id: "terminal.new",
     defaultBinding: ["mod+t"],
     descriptionKey: "settings.shortcuts.cmd.terminalNew",

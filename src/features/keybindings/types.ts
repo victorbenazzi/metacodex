@@ -10,6 +10,7 @@ export type CommandId =
   | "tab.moveRight"
   | "project.switch"
   | "settings.open"
+  | "usage.open"
   | "search.inProject"
   | "palette.commands"
   | "palette.files"

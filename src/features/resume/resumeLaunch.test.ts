@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useTabsStore, WORKSPACE_NULL } from "@/components/tabs/tabsStore";
+import { useTerminalStore } from "@/features/terminal/terminal.store";
 import { openResume } from "@/features/tabs/tabLifecycle";
 import type { ResumeEntry } from "./resume.service";
 import { buildResumeTab, resumeHistoryLabel } from "./resumeLaunch";
@@ -23,6 +24,20 @@ function entry(overrides: Partial<ResumeEntry> = {}): ResumeEntry {
 describe("live resume launch", () => {
   beforeEach(() => {
     useTabsStore.setState({ byProject: {} });
+    useTerminalStore.setState({ sessions: {}, lastFocusedByProject: {} });
+  });
+
+  it("launches a new resume attempt when the matching tab has exited", () => {
+    const saved = entry({projectId: null});
+    const old = buildResumeTab(saved)!;
+    useTabsStore.getState().openTab(WORKSPACE_NULL, old);
+    useTerminalStore.getState().register({id:"old", tabId:old.id, projectId:null,
+      cwd:"/tmp", kind:"cli", status:"exited", title:"Codex", createdAt:"", exitCode:0});
+    openResume(saved);
+    openResume(saved);
+    const tabs = useTabsStore.getState().getBucket(WORKSPACE_NULL);
+    expect(tabs.tabs).toHaveLength(2);
+    expect(tabs.activeTabId).not.toBe(old.id);
   });
 
   it("focuses an existing live tab without spawning a duplicate", () => {

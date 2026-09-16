@@ -4,6 +4,7 @@ import type { Project } from "@/features/projects/project.types";
 import { useProjectsStore } from "@/features/projects/project.store";
 import { useExplorerStore } from "@/features/explorer/explorer.store";
 import type { CliTool } from "@/features/terminal/cli-registry";
+import { useTerminalStore } from "@/features/terminal/terminal.store";
 import { sessionController } from "@/features/terminal/sessionController";
 import type { PreviewGrant } from "@/lib/events";
 import { basename } from "@/lib/path";
@@ -117,7 +118,7 @@ export function openCli(args: {
 export function openResume(entry: ResumeEntry): void {
   const tabs = useTabsStore.getState();
   for (const [projectKey, bucket] of Object.entries(tabs.byProject)) {
-    const live = bucket.tabs.find((candidate) => isLiveResumeSession(candidate, entry));
+    const live = bucket.tabs.find((candidate) => isLiveResumeSession(candidate, entry, useTerminalStore.getState().sessions));
     if (!live) continue;
     if (projectKey !== WORKSPACE_NULL) {
       void useProjectsStore.getState().setActive(projectKey);

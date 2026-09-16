@@ -85,6 +85,13 @@ impl PtyEventJournal {
             .collect()
     }
 
+    pub fn first_seq(&self) -> u64 {
+        self.events
+            .front()
+            .map(|event| event.seq)
+            .unwrap_or(self.next_seq)
+    }
+
     pub fn last_seq(&self) -> u64 {
         self.next_seq.saturating_sub(1)
     }

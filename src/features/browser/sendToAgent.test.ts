@@ -8,7 +8,7 @@ vi.mock("@/features/terminal/terminal.service", () => ({
 import { useTabsStore } from "@/components/tabs/tabsStore";
 import { useProjectsStore } from "@/features/projects/project.store";
 import { useTerminalStore } from "@/features/terminal/terminal.store";
-import { sendVisualToCli } from "./sendToAgent";
+import { resolveVisualTarget, sendVisualToCli } from "./sendToAgent";
 
 function cliTab(id: string, title: string, cliId: string) {
   return {
@@ -50,6 +50,18 @@ describe("sendVisualToCli", () => {
     useTerminalStore.setState({ sessions: {}, lastFocusedByProject: {} });
   });
 
+  it("keeps capture delivery pinned across a project switch and rejects an exited target", async () => {
+    useTerminalStore.setState({sessions: { a: cliSession("a", "tab", "Agent") }});
+    const pinned = resolveVisualTarget();
+    useProjectsStore.setState({activeProjectId: "other"});
+    await expect(sendVisualToCli("capture", pinned)).resolves.toMatchObject({sessionId: "a"});
+    expect(useProjectsStore.getState().activeProjectId).toBe("other");
+    write.mockClear();
+    useTerminalStore.getState().setStatus("a", "exited", 0);
+    await expect(sendVisualToCli("capture", pinned)).resolves.toEqual({status: "no-cli"});
+    expect(write).not.toHaveBeenCalled();
+  });
+
   it("reports sent only after PTY write resolves", async () => {
     let release: (() => void) | undefined;
     write.mockImplementationOnce(() => new Promise<void>((resolve) => { release = resolve; }));
@@ -66,7 +78,7 @@ describe("sendVisualToCli", () => {
     expect(settled).toBe(false);
     release?.();
     await expect(pending).resolves.toMatchObject({ status: "sent", sessionId: "session" });
-    expect(useTabsStore.getState().byProject.project.activeTabId).toBe("tab");
+    expect(useTabsStore.getState().byProject.project.activeTabId).toBeNull();
   });
 
   it("sends to the active CLI when another running CLI was focused previously", async () => {

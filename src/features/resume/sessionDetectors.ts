@@ -51,6 +51,7 @@ function detectCodexSession(tail: string): SessionDetectorResult | null {
 const DETECTORS: Record<string, SessionDetector> = {
   "claude-code": makeGenericDetector(/session[\s\-_:]/i, UUID_V4),
   "codex-cli": detectCodexSession,
+  "cursor-cli": makeGenericDetector(/session[\s\-_:]|chat[\s\-_:]/i, UUID_V4),
   opencode: makeGenericDetector(/session[\s\-_:]/i, UUID_V4),
   "gemini-cli": makeGenericDetector(/session[\s\-_:]/i, UUID_V4),
   grok: makeGenericDetector(/session[\s\-_:]/i, UUID_V4),
@@ -79,6 +80,7 @@ export type ResumeStyle =
 export const RESUME_STYLES: Record<string, ResumeStyle> = {
   "claude-code": { kind: "flag", token: "--resume" },
   "codex-cli": { kind: "subcommand", token: "resume" },
+  "cursor-cli": { kind: "flag", token: "--resume" },
   opencode: { kind: "flag", token: "--session" },
   "gemini-cli": { kind: "flag", token: "--resume" },
 };

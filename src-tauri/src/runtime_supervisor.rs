@@ -63,6 +63,7 @@ enum RuntimeState {
 struct RuntimeInner {
     state: RuntimeState,
     blocked_token: Option<String>,
+    restart_requested: bool,
 }
 
 pub struct RuntimeSupervisor {
@@ -75,6 +76,7 @@ impl Default for RuntimeSupervisor {
             inner: Mutex::new(RuntimeInner {
                 state: RuntimeState::Running,
                 blocked_token: None,
+                restart_requested: false,
             }),
         }
     }
@@ -96,6 +98,23 @@ impl RuntimeSupervisor {
             return None;
         }
         Some(Self::start_quiescing(&mut inner))
+    }
+
+    pub fn begin_restart(&self) -> Option<PrepareQuitPayload> {
+        let mut inner = self.inner.lock();
+        if inner.state != RuntimeState::Running || inner.blocked_token.is_some() {
+            return None;
+        }
+        inner.restart_requested = true;
+        Some(Self::start_quiescing(&mut inner))
+    }
+
+    pub fn exit_authorized(&self) -> bool {
+        self.inner.lock().state == RuntimeState::Stopped
+    }
+
+    pub fn restart_requested(&self) -> bool {
+        self.inner.lock().restart_requested
     }
 
     pub fn active_token(&self) -> Option<String> {
@@ -211,6 +230,26 @@ impl RuntimeSupervisor {
 #[cfg(test)]
 mod tests {
     use super::{QuitFailure, QuitTransition, RuntimeSupervisor};
+
+    #[test]
+    fn native_exit_is_authorized_only_after_cleanup_and_restart_survives_retry() {
+        let runtime = RuntimeSupervisor::default();
+        assert!(!runtime.exit_authorized());
+        let first = runtime.begin_restart().unwrap();
+        assert!(runtime.restart_requested());
+        assert!(!runtime.exit_authorized());
+        runtime.acknowledge(
+            &first.token,
+            vec![QuitFailure::new("editor", "io", "disk full")],
+        );
+        assert!(!runtime.exit_authorized());
+        let next = runtime.retry(&first.token).unwrap();
+        runtime.acknowledge(&next.token, vec![]);
+        assert!(!runtime.exit_authorized());
+        assert!(runtime.mark_stopped(&next.token));
+        assert!(runtime.exit_authorized());
+        assert!(runtime.restart_requested());
+    }
 
     #[test]
     fn repeated_close_requests_create_one_quit_token() {

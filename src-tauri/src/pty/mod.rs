@@ -1,4 +1,6 @@
 pub mod event_journal;
+#[cfg(unix)]
+pub mod guardian;
 #[cfg(windows)]
 pub mod job;
 pub mod protocol;
@@ -207,9 +209,11 @@ impl PtyManager {
                 .ok_or_else(|| AppError::NotFound(format!("pty session {session_id}")))?
         };
 
+        let (events, first_seq, last_seq) = supervisor.replay_snapshot(after_seq);
         Ok(PtyAttachResponse {
-            events: supervisor.replay_after(after_seq),
-            last_seq: supervisor.last_seq(),
+            events,
+            first_seq,
+            last_seq,
             state: supervisor.state(),
         })
     }
@@ -314,21 +318,45 @@ impl PtyManager {
             cmd.env("CLITHEME", if light { "light" } else { "dark" });
         }
 
-        let child = pair
+        let mut child = pair
             .slave
             .spawn_command(cmd)
             .map_err(|e| AppError::Pty(format!("spawn: {e}")))?;
 
         let pid = child.process_id().unwrap_or(0);
-        let killer = child.clone_killer();
-        let writer = pair
-            .master
-            .take_writer()
-            .map_err(|e| AppError::Pty(format!("take_writer: {e}")))?;
-        let reader = pair
-            .master
-            .try_clone_reader()
-            .map_err(|e| AppError::Pty(format!("clone_reader: {e}")))?;
+        #[cfg(unix)]
+        let guardian = match guardian::PtyGuardian::spawn(pid) {
+            Ok(guardian) => guardian,
+            Err(error) => {
+                let descendants =
+                    crate::util::process_tree::pty_descendants(pid).unwrap_or_default();
+                let _ = child.kill();
+                let _ = child.wait();
+                let _ = crate::util::process_tree::stop_pty_descendants(pid, descendants);
+                return Err(error);
+            }
+        };
+        let io = (|| -> AppResult<_> {
+            let writer = pair
+                .master
+                .take_writer()
+                .map_err(|e| AppError::Pty(format!("take_writer: {e}")))?;
+            let reader = pair
+                .master
+                .try_clone_reader()
+                .map_err(|e| AppError::Pty(format!("clone_reader: {e}")))?;
+            Ok((writer, reader))
+        })();
+        let (writer, reader) = match io {
+            Ok(io) => io,
+            Err(error) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                #[cfg(unix)]
+                let _ = guardian.finish();
+                return Err(error);
+            }
+        };
 
         // Drop the slave handle , once the child has been spawned with it, we no
         // longer need it. Keeping it open can prevent the master from seeing EOF
@@ -362,9 +390,10 @@ impl PtyManager {
             cli_id,
             created_at: Utc::now(),
             pid,
+            #[cfg(unix)]
+            guardian: Mutex::new(Some(guardian)),
             writer: Mutex::new(writer),
             master: Mutex::new(pair.master),
-            killer: Mutex::new(killer),
             supervisor: supervisor.clone(),
             cwd_override: Mutex::new(None),
             #[cfg(windows)]
@@ -447,7 +476,12 @@ impl PtyManager {
             // child or evict the map entry. Undo both before bailing.
             self.sessions.lock().remove(&id);
             supervisor.request_stop(PtyStopReason::SpawnFailed);
-            let _ = session.killer.lock().kill();
+            #[cfg(unix)]
+            let descendants = crate::util::process_tree::pty_descendants(pid).unwrap_or_default();
+            let _ = child.kill();
+            let _ = child.wait();
+            #[cfg(unix)]
+            let _ = crate::util::process_tree::stop_pty_descendants(pid, descendants);
             return Err(AppError::Pty(format!("reader thread: {e}")));
         }
 
@@ -537,8 +571,26 @@ impl PtyManager {
                 }
             }
 
+            #[cfg(unix)]
+            let descendants = {
+                let pid = session_for_waiter.pid;
+                match tokio::task::spawn_blocking(move || {
+                    crate::util::process_tree::pty_descendants(pid)
+                })
+                .await
+                {
+                    Ok(Ok(pids)) => pids,
+                    result => {
+                        cleanup_failure =
+                            Some(format!("enumerating PTY descendants failed: {result:?}"));
+                        Vec::new()
+                    }
+                }
+            };
+
             if !matches!(final_reason, PtyStopReason::NormalExit { .. }) {
-                let _ = child.kill();
+                let mut killer = child.clone_killer();
+                let _ = tokio::task::spawn_blocking(move || killer.kill()).await;
                 let pid = session_for_waiter.pid;
                 let grace = Instant::now() + Duration::from_millis(400);
                 let deadline = Instant::now() + Duration::from_millis(1_750);
@@ -565,6 +617,22 @@ impl PtyManager {
                 }
                 if !reaped {
                     cleanup_failure = Some("child process did not reap within 1750ms".to_string());
+                }
+            }
+
+            #[cfg(unix)]
+            {
+                let pid = session_for_waiter.pid;
+                match tokio::task::spawn_blocking(move || {
+                    crate::util::process_tree::stop_pty_descendants(pid, descendants)
+                })
+                .await
+                {
+                    Ok(Ok(())) => {}
+                    result => {
+                        cleanup_failure =
+                            Some(format!("stopping PTY descendants failed: {result:?}"))
+                    }
                 }
             }
 
@@ -601,6 +669,18 @@ impl PtyManager {
                 }
             }
 
+            #[cfg(unix)]
+            {
+                let guardian = { session_for_waiter.guardian.lock().take() };
+                if let Some(guardian) = guardian {
+                    match tokio::task::spawn_blocking(move || guardian.finish()).await {
+                        Ok(Ok(())) => {}
+                        result => {
+                            cleanup_failure = Some(format!("PTY guardian failed: {result:?}"))
+                        }
+                    }
+                }
+            }
             if let Some(payload) = supervisor_for_waiter.record_exit(final_reason) {
                 let _ = app_w.emit(EV_PTY_EXIT, payload);
             }
@@ -625,8 +705,7 @@ impl PtyManager {
         let mut requested_ids = HashSet::new();
         for entry in &prepared {
             requested_ids.insert(entry.id.clone());
-            entry.cancel();
-            if entry.supervisor.state() != supervisor::PtyLifecycleState::Starting {
+            if entry.cancel() {
                 self.finish_prepared(entry, PtyStopReason::Killed);
             }
         }
@@ -644,7 +723,7 @@ impl PtyManager {
             supervisors.insert(session.id.clone(), session.supervisor.clone());
         }
 
-        let wait_result = tokio::time::timeout(Duration::from_secs(3), async {
+        let wait_result = tokio::time::timeout(Duration::from_secs(5), async {
             for supervisor in supervisors.values() {
                 let _ = supervisor.wait_for_cleanup().await;
             }
@@ -722,18 +801,17 @@ impl PtyManager {
     pub async fn kill(&self, session_id: &str) -> AppResult<()> {
         let prepared = { self.prepared.lock().get(session_id).cloned() };
         if let Some(prepared) = prepared {
-            prepared.cancel();
-            if prepared.supervisor.state() != supervisor::PtyLifecycleState::Starting {
+            if prepared.cancel() {
                 self.finish_prepared(&prepared, PtyStopReason::Killed);
             }
             let cleanup = tokio::time::timeout(
-                Duration::from_secs(3),
+                Duration::from_secs(5),
                 prepared.supervisor.wait_for_cleanup(),
             )
             .await
             .map_err(|_| {
                 AppError::Pty(format!(
-                    "stop timed out after 3s: prepared=true, state={}",
+                    "stop timed out after 5s: prepared=true, state={}",
                     prepared.supervisor.state_label()
                 ))
             })?;
@@ -746,13 +824,13 @@ impl PtyManager {
         if let Some(s) = session {
             s.kill();
             let cleanup =
-                tokio::time::timeout(Duration::from_secs(3), s.supervisor.wait_for_cleanup())
+                tokio::time::timeout(Duration::from_secs(5), s.supervisor.wait_for_cleanup())
                     .await
                     .map_err(|_| {
                         let session_owned = self.sessions.lock().contains_key(session_id);
                         let waiter_owned = self.waiters.lock().contains(session_id);
                         AppError::Pty(format!(
-                        "stop timed out after 3s: session={session_owned}, waiter={waiter_owned}"
+                        "stop timed out after 5s: session={session_owned}, waiter={waiter_owned}"
                     ))
                     })?;
             cleanup.map_err(|resource| {

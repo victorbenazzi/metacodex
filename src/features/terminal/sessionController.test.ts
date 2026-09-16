@@ -76,6 +76,7 @@ function startArgs(overrides: Partial<StartArgs> = {}): StartArgs {
 function harness(ptyOverrides: Partial<PtyIo> = {}) {
   const dataHandlers = new Map<string, Handler<PtyDataPayload>>();
   const exitHandlers = new Map<string, Handler<PtyExitPayload>>();
+  const streamFailures = new Map<string, () => void>();
   const pty: PtyIo = {
     prepare: vi.fn(async () => ({ sessionId: "session-1" })),
     start: vi.fn(async () => undefined),
@@ -97,16 +98,34 @@ function harness(ptyOverrides: Partial<PtyIo> = {}) {
       return () => exitHandlers.delete(sessionId);
     },
     attachEvents,
+    subscribeStreamFailure: (sessionId, handler) => {
+      streamFailures.set(sessionId, handler);
+      return () => { streamFailures.delete(sessionId); };
+    },
     clock: immediateClock(),
     diagnostics,
   });
-  return { attachEvents, controller, dataHandlers, diagnostics, exitHandlers, pty };
+  return { attachEvents, controller, dataHandlers, diagnostics, exitHandlers, pty, streamFailures };
 }
 
 describe("session controller characterization", () => {
   beforeEach(() => {
     useTerminalStore.setState({ sessions: {}, lastFocusedByProject: {} });
     useAgentStatusStore.setState({ byTab: {} });
+  });
+
+  it("keeps a lost stream in error and blocks input until retry", async () => {
+    const { controller, pty, streamFailures } = harness();
+    const term = fakeTerminal();
+    await controller.start(startArgs({ term }));
+    streamFailures.get("session-1")!();
+    expect(useTerminalStore.getState().sessions["session-1"]?.status).toBe("error");
+    const onInput = vi.mocked(term.onData).mock.calls[0][0];
+    onInput("unsafe input");
+    expect(pty.write).not.toHaveBeenCalled();
+    await controller.stop("tab-1");
+    expect(pty.kill).toHaveBeenCalledWith("session-1");
+    expect(streamFailures.size).toBe(0);
   });
 
   it("starts one session and stops it idempotently", async () => {
@@ -367,4 +386,3 @@ describe("session controller characterization", () => {
     );
   });
 });
-

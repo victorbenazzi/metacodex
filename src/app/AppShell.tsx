@@ -28,6 +28,7 @@ import { useCodeSidebarStore } from "@/features/ui/codeSidebar.store";
 import { WorktreeCreateDialog } from "@/components/source-control/WorktreeCreateDialog";
 import { CloneFromGithubDialog } from "@/components/project-rail/CloneFromGithubDialog";
 import { SettingsDialog } from "@/components/settings/SettingsDialog";
+import { UsageDialog } from "@/components/usage/UsageDialog";
 import { Toaster } from "@/components/ui/Toaster";
 import { WhatsNewDialog } from "@/components/whats-new/WhatsNewDialog";
 import { CloseTabsConfirm } from "@/app/CloseTabsConfirm";
@@ -208,18 +209,20 @@ export function AppShell() {
         style={{ gridTemplateColumns }}
       >
 
-      <div className="relative min-w-0 overflow-hidden">
+      <div className="relative z-10 min-w-0">
         {sidebarOpen || sidebarMounted ? (
           <>
-            <div
-              aria-hidden={!sidebarOpen}
-              className={cn(
-                "h-full transition-opacity duration-drawer ease-drawer",
-                sidebarOpen ? "opacity-100" : "pointer-events-none opacity-0",
-              )}
-              style={{ width: projectsWidth }}
-            >
-              <AgentSidebar />
+            <div className="h-full w-full overflow-hidden">
+              <div
+                aria-hidden={!sidebarOpen}
+                className={cn(
+                  "h-full transition-opacity duration-drawer ease-drawer",
+                  sidebarOpen ? "opacity-100" : "pointer-events-none opacity-0",
+                )}
+                style={{ width: projectsWidth }}
+              >
+                <AgentSidebar />
+              </div>
             </div>
             <ResizeHandle
               side="right"
@@ -239,6 +242,8 @@ export function AppShell() {
 
       <div
         className="flex min-h-0 min-w-0 flex-col"
+        data-usage-focus-fallback
+        tabIndex={-1}
         onPointerDownCapture={() => setShellFocus("center")}
       >
         <CenterChrome />
@@ -262,7 +267,7 @@ export function AppShell() {
 
       <div
         className={cn(
-          "relative min-w-0",
+          "relative z-10 min-w-0",
           browserExpanded && "fixed inset-0 z-30 bg-canvas",
         )}
         onPointerDownCapture={() => setShellFocus("workbench")}
@@ -326,6 +331,7 @@ export function AppShell() {
       </div>
 
       <SettingsDialog open={settingsDialogOpen} onOpenChange={setSettingsDialogOpen} />
+      <UsageDialog />
 
       <CloseTabsConfirm
         state={pendingClose}

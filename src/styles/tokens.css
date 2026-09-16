@@ -189,11 +189,13 @@
      all headers together and the columns stay coplanar at any density. */
   --panel-header-h: calc(34px * var(--density-multiplier));
   /* Breathing room around the floating sidebar cards: `x` is the gap between a
-     card and the window edge or another card (also the resize-handle hit-zone
-     width); `y` is the gap above and below each card. Single source of truth
-     for the grid template, the handle offsets and the vertical insets.
-     Density-scaled like the spacing tokens. */
+     card and the window edge or another card; `y` is the gap above and below
+     each card. Density-scaled like the spacing tokens. */
   --panel-gap-x: calc(8px * var(--density-multiplier));
+  /* Column/diff resize hit zone, centered on the panel hairline. Visual rail
+     stays 1px at rest and 2px on hover. Not density-scaled: hit targets stay
+     physical-pixel sized so compact/spacious don't make grabbers tiny. */
+  --resize-handle-w: 6px;
 
   /* Terminal palette (warm, neutral ANSI) */
   --term-bg: var(--canvas);

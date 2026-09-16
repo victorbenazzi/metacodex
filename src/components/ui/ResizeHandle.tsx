@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 
 import { cn } from "@/lib/cn";
 
@@ -15,13 +15,11 @@ interface ResizeHandleProps {
    *  px-based widths; for a 0–1 ratio it's `dx / containerWidth`. */
   toDelta: (dxPx: number) => number;
   /**
-   * Which panel edge the handle sits on. In the floating-panel shell the
-   * panels are separated by an 8px gap column; the hit zone occupies that gap
-   * entirely and the 1px rail paints at the gap's midpoint:
-   *   - "left"   — handle in the gap BEFORE the panel it sizes (the side
-   *                panel's leading edge).
-   *   - "right"  — handle in the gap AFTER a panel (the explorer card's
-   *                trailing edge).
+   * Which panel edge the handle sits on. The hit zone straddles the 1px
+   * hairline (half inside the panel, half into the neighbor) so aiming at
+   * the visible border works from either side:
+   *   - "left"   — leading edge of the panel (right workbench).
+   *   - "right"  — trailing edge of the panel (projects sidebar).
    *   - "center" — rail centered within the hit zone. Use when the handle
    *                free-floats over a parent that's not its own panel (the
    *                diff-split seam between two editors).
@@ -39,10 +37,10 @@ interface ResizeHandleProps {
   /**
    * Style overrides for the root hit-zone div. Use when the handle needs to
    * be positioned by the caller (e.g. anchored to a CSS variable percentage
-   * for the diff split). When set, the default edge offsets (-4px from left/
-   * right of the parent) are suppressed via `position` overrides.
+   * for the diff split). When set, the default edge offsets (half the hit
+   * zone hanging outside the parent) are suppressed via `position` overrides.
    */
-  style?: React.CSSProperties;
+  style?: CSSProperties;
   /** Optional aria label for screen readers. */
   ariaLabel?: string;
   /** When false, hides the handle entirely (e.g. panel collapsed). */
@@ -66,17 +64,16 @@ interface ResizeHandleProps {
  * Minimal panel resize affordance.
  *
  * Visual language:
- *   - The handle's hit zone is 8px wide; only a 1px rail is ever painted.
- *   - Resting state: transparent (no visual noise, no extra hairline next to
- *     the panel's own border).
- *   - Hover: rail brightens to `--hairline-strong`.
- *   - Active drag: rail darkens to `--primary` and the page cursor is forced
+ *   - Hit zone is `--resize-handle-w` (6px), centered on the panel hairline.
+ *   - Resting state: transparent (the panel's own 1px border is the seam).
+ *   - Hover: 2px rail at `--hairline-strong`, one pixel thicker than rest.
+ *   - Active drag: 2px rail at `--primary` and the page cursor is forced
  *     to `col-resize` so the user keeps grabbing it even when the pointer
- *     drifts outside the 8px zone.
+ *     drifts outside the hit zone.
  *   - Double-click: restores the default value.
  *
- * No backdrop blur, no shadow, no scale — opacity-only fade per the project's
- * popup-motion rule. Color transition is 150ms ease-out.
+ * No backdrop blur, no shadow, no scale: opacity-only fade per the project's
+ * popup-motion rule.
  */
 export function ResizeHandle({
   value,
@@ -119,8 +116,8 @@ export function ResizeHandle({
     [enabled, onReset, value],
   );
 
-  // Global pointer tracking while dragging — listening on `window` (capture)
-  // means we keep getting updates even if the pointer leaves the 8px hit zone
+  // Global pointer tracking while dragging. Listening on `window` (capture)
+  // means we keep getting updates even if the pointer leaves the hit zone
   // or hovers over an iframe / xterm canvas.
   useEffect(() => {
     if (!dragging) return;
@@ -167,17 +164,16 @@ export function ResizeHandle({
 
   if (!enabled) return null;
 
-  // Default edge offsets hang the hit zone fully outside the panel, covering the
-  // gap column between two floating cards. The offset and the zone width both
-  // track `--panel-gap-x` so the handle always fills exactly the shell's gap.
-  // Callers that supply their own `style` (e.g. free-floating diff seam) skip
-  // these by overriding the offset properties.
-  const defaultEdgeClass =
+  // Default edge offsets straddle the panel hairline: half the hit zone sits
+  // inside the panel, half into the neighbor. Callers that supply their own
+  // `style` (e.g. free-floating diff seam) skip these by overriding the offset.
+  const edgeStyle: CSSProperties =
     side === "right"
-      ? "-right-[var(--panel-gap-x)]"
+      ? { right: "calc(var(--resize-handle-w) / -2)" }
       : side === "left"
-        ? "-left-[var(--panel-gap-x)]"
-        : "";
+        ? { left: "calc(var(--resize-handle-w) / -2)" }
+        : {};
+  const railActive = dragging || hovering;
 
   return (
     <div
@@ -189,29 +185,20 @@ export function ResizeHandle({
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => setHovering(false)}
       className={cn(
-        "group absolute top-0 z-30 h-full w-[var(--panel-gap-x)] touch-none select-none cursor-col-resize",
-        defaultEdgeClass,
+        "group absolute top-0 z-30 h-full w-[var(--resize-handle-w)] touch-none select-none cursor-col-resize",
         className,
       )}
-      style={style}
+      style={{ ...edgeStyle, ...style }}
     >
       <span
         aria-hidden
         className={cn(
-          // The hit zone spans the whole gap between two cards; the rail
-          // paints ON the sized panel's edge (overlaying its 1px border) so
-          // hover/drag reads as the card border lighting up, never a loose
-          // line floating in the gap. It is inset by the card radius
-          // (--radius-lg) from both ends so it hugs only the straight run of
-          // the edge. "center" (diff seam) has no card edge, so it stays at
-          // the zone's middle.
-          "pointer-events-none absolute w-px",
-          side === "right"
-            ? "-left-px bottom-[var(--radius-lg)] top-[var(--radius-lg)]"
-            : side === "left"
-              ? "-right-px bottom-[var(--radius-lg)] top-[var(--radius-lg)]"
-              : "left-1/2 top-0 h-full -translate-x-1/2",
-          "transition-colors duration-fast ease-out",
+          // Rail sits on the hairline (hit-zone center). 1px at rest, 2px on
+          // hover/drag so the seam reads as a slightly thicker Cursor-style
+          // sash without a chunky grabber.
+          "pointer-events-none absolute left-1/2 top-0 h-full -translate-x-1/2",
+          "transition-[background-color,width] duration-fast ease-out",
+          railActive ? "w-[2px]" : "w-px",
           dragging
             ? "bg-primary"
             : hovering

@@ -51,6 +51,7 @@ export type SessionControllerDeps = {
   pty: PtyIo;
   subscribeData: typeof subscribePtyData;
   subscribeExit: typeof subscribePtyExit;
+  subscribeStreamFailure?: (sessionId: string, handler: () => void) => () => void;
   ensureListeners?: () => Promise<void>;
   attachEvents: (sessionId: string, afterSeq?: number) => Promise<number>;
   clock?: Partial<SessionControllerClock>;
@@ -390,6 +391,17 @@ export function createSessionController(deps: SessionControllerDeps): SessionCon
         });
 
         let exitedBeforeStartReturn = false;
+        let streamFailed = false;
+        if (deps.subscribeStreamFailure) {
+          entry.cleanups.push(deps.subscribeStreamFailure(sessionId, () => {
+            streamFailed = true;
+            useAgentStatusStore.getState().setStatus(args.tabId, "needs-attention");
+            useTerminalStore.getState().setStatus(sessionId, "error");
+            publishFailure(args.tabId, entry, "stream", {
+              code: "pty_replay_gap", message: i18n.t("terminal.streamLost"),
+            });
+          }));
+        }
         let prefillWritten = false;
         let prefillTimer: ReturnType<typeof setTimeout> | null = null;
         entry.cleanups.push(() => {
@@ -409,7 +421,7 @@ export function createSessionController(deps: SessionControllerDeps): SessionCon
             const cmd = args.prefillCommand;
             prefillTimer = clock.setTimeout(() => {
               prefillTimer = null;
-              if (!isCurrent(entry, revision, "running")) return;
+              if (streamFailed || !isCurrent(entry, revision, "running")) return;
               deps.pty.write(sessionId, utf8ToBase64(cmd)).catch((error) => {
                 deps.diagnostics?.("write", normalizeError(error), {
                   tabId: args.tabId,
@@ -424,7 +436,7 @@ export function createSessionController(deps: SessionControllerDeps): SessionCon
         const unlistenExit = deps.subscribeExit(sessionId, (payload) => {
           exitedBeforeStartReturn = true;
           const reason = payload.reason as PtyExitReason;
-          if (entry.sessionId === sessionId) {
+          if (entry.sessionId === sessionId && !streamFailed) {
             entry.phase = "exited";
             publish(args.tabId, entry, {
               phase: "exited",
@@ -439,7 +451,7 @@ export function createSessionController(deps: SessionControllerDeps): SessionCon
           if (reason !== "normal" || payload.exit_code !== 0) {
             args.onExit?.({ code: payload.exit_code, reason });
           }
-          if (args.cliToolId != null) {
+          if (args.cliToolId != null && !streamFailed) {
             useAgentStatusStore.getState().setStatus(args.tabId, "done");
             dispatchAgentNotification({
               tabId: args.tabId,
@@ -456,7 +468,7 @@ export function createSessionController(deps: SessionControllerDeps): SessionCon
 
         const dataDisposable = term.onData((d) => {
           const sid = entry.sessionId;
-          if (!sid) return;
+          if (!sid || streamFailed) return;
           deps.pty.write(sid, utf8ToBase64(d)).catch((error) => {
             deps.diagnostics?.("write", normalizeError(error), {
               tabId: args.tabId,
@@ -499,7 +511,7 @@ export function createSessionController(deps: SessionControllerDeps): SessionCon
           return;
         }
 
-        if (!exitedBeforeStartReturn) {
+        if (!exitedBeforeStartReturn && !streamFailed) {
           entry.phase = "running";
           publish(args.tabId, entry, { phase: "running", sessionId });
           useTerminalStore.getState().setStatus(sessionId, "running");
@@ -566,6 +578,9 @@ export const sessionController = createSessionController({
   pty: ptyApi,
   subscribeData: subscribePtyData,
   subscribeExit: subscribePtyExit,
+  subscribeStreamFailure: (sessionId, handler) => ptyEventMultiplexer.subscribe(sessionId, (event) => {
+    if (event.event.kind === "gap") handler();
+  }),
   ensureListeners: () => ptyEventMultiplexer.ensureReady(),
   attachEvents: (sessionId, afterSeq) => ptyEventMultiplexer.attach(sessionId, afterSeq),
   diagnostics: (phase, error, context) => {

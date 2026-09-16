@@ -8,8 +8,9 @@ describe("resume invocation", () => {
     expect(supportsResume("codex-cli")).toBe(true);
   });
 
-  it("keeps Claude on --resume and OpenCode on --session", () => {
+  it("keeps Claude and Cursor on --resume and OpenCode on --session", () => {
     expect(resumeArgsFor("claude-code", "sess-1")).toEqual(["--resume", "sess-1"]);
+    expect(resumeArgsFor("cursor-cli", "sess-1")).toEqual(["--resume", "sess-1"]);
     expect(resumeArgsFor("opencode", "ses_abc")).toEqual(["--session", "ses_abc"]);
   });
 

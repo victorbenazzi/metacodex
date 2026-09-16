@@ -10,6 +10,7 @@ import { ptyApi } from "@/features/terminal/terminal.service";
 import type { PtyBackendEventEnvelope } from "@/features/terminal/terminal.types";
 
 export type PtyMultiplexedEvent =
+  | { kind: "gap"; expectedSeq: number; firstSeq: number }
   | { kind: "data"; data_b64: string }
   | { kind: "backpressure"; queueDepth: number; stalledMs: number }
   | { kind: "exit"; exitCode: number; reason: PtyExitReason };
@@ -30,7 +31,7 @@ type Listener = <T>(
 export type PtyReplayAdapter = (
   sessionId: string,
   afterSeq: number,
-) => Promise<PtyEventEnvelope[]>;
+) => Promise<PtyEventEnvelope[] | { events: PtyEventEnvelope[]; firstSeq: number; lastSeq: number }>;
 
 export type PtyEventDiagnostic = {
   code: "listener_install_failed" | "sequence_gap" | "buffer_overflow" | "replay_failed";
@@ -53,6 +54,7 @@ type SessionRoute = {
   consumers: Set<Consumer>;
   lastSeq: number;
   replaying: boolean;
+  gap: PtyEventEnvelope | null;
   buffered: Map<number, PtyEventEnvelope>;
 };
 
@@ -75,6 +77,7 @@ export function createPtyEventMultiplexer(deps: {
       consumers: new Set(),
       lastSeq: 0,
       replaying: false,
+      gap: null,
       buffered: new Map(),
     };
     routes.set(sessionId, route);
@@ -109,9 +112,23 @@ export function createPtyEventMultiplexer(deps: {
     if (route.replaying) return;
     route.replaying = true;
     try {
-      const replay = await deps.replay(sessionId, route.lastSeq);
+      const result = await deps.replay(sessionId, route.lastSeq);
+      const replay = Array.isArray(result) ? result : result.events;
+      const firstSeq = Array.isArray(result) ? replay[0]?.seq : result.firstSeq;
       for (const envelope of replay) buffer(route, envelope);
       deliverContiguous(route);
+      if (firstSeq != null && firstSeq > route.lastSeq + 1) {
+        route.gap = {
+          session_id: sessionId,
+          seq: route.lastSeq,
+          event: { kind: "gap", expectedSeq: route.lastSeq + 1, firstSeq },
+        };
+        for (const consumer of route.consumers) consumer(route.gap);
+        // Exit remains observable even when terminal bytes cannot be replayed.
+        const exit = [...route.buffered.values()].find((event) => event.event.kind === "exit");
+        route.buffered.clear();
+        if (exit) accept(exit);
+      }
     } catch (error) {
       deps.diagnostic?.({ code: "replay_failed", sessionId, error });
       throw error;
@@ -123,6 +140,13 @@ export function createPtyEventMultiplexer(deps: {
   const accept = (envelope: PtyEventEnvelope) => {
     const route = routeFor(envelope.session_id);
     if (envelope.seq <= route.lastSeq) return;
+    if (route.gap) {
+      if (envelope.event.kind === "exit") {
+        route.lastSeq = envelope.seq;
+        for (const consumer of route.consumers) consumer(envelope);
+      }
+      return;
+    }
     buffer(route, envelope);
     if (route.replaying) return;
     if (envelope.seq > route.lastSeq + 1) {
@@ -140,7 +164,7 @@ export function createPtyEventMultiplexer(deps: {
 
   const ensureReady = (): Promise<void> => {
     if (ready) return ready;
-    ready = Promise.all([
+    ready = Promise.allSettled([
       deps.listen<PtyDataPayload>(EV.ptyData, ({ payload }) => {
         accept({
           session_id: payload.session_id,
@@ -172,7 +196,15 @@ export function createPtyEventMultiplexer(deps: {
         });
       }),
     ])
-      .then(() => undefined)
+      .then((results) => {
+        const failure = results.find((result) => result.status === "rejected");
+        if (failure?.status === "rejected") {
+          for (const result of results) {
+            if (result.status === "fulfilled") result.value();
+          }
+          throw failure.reason;
+        }
+      })
       .catch((error) => {
         ready = null;
         deps.diagnostic?.({ code: "listener_install_failed", error });
@@ -184,7 +216,8 @@ export function createPtyEventMultiplexer(deps: {
   const subscribe = (sessionId: string, consumer: Consumer): Unlisten => {
     const route = routeFor(sessionId);
     route.consumers.add(consumer);
-    deliverContiguous(route);
+    if (route.gap) consumer(route.gap);
+    else deliverContiguous(route);
     return () => {
       route.consumers.delete(consumer);
       if (route.consumers.size === 0 && !route.replaying && route.buffered.size === 0) {
@@ -238,6 +271,6 @@ export const ptyEventMultiplexer = createPtyEventMultiplexer({
   listen: listenTo,
   replay: async (sessionId, afterSeq) => {
     const response = await ptyApi.attach(sessionId, afterSeq);
-    return response.events.map(fromBackendEnvelope);
+    return { ...response, events: response.events.map(fromBackendEnvelope) };
   },
 });

@@ -11,7 +11,9 @@ export type SendVisualResult =
   | { status: "failed"; error: { code: string; message: string } };
 
 /** Write visual context into a running CLI session. Never a plain shell. */
-export async function sendVisualToCli(text: string): Promise<SendVisualResult> {
+export type VisualTarget = { sessionId: string; tabId: string | null; projectKey: string };
+
+export function resolveVisualTarget(): VisualTarget | null {
   const projectId = useProjectsStore.getState().activeProjectId;
   const projectKey = projectId ?? WORKSPACE_NULL;
   const term = useTerminalStore.getState();
@@ -33,7 +35,20 @@ export async function sendVisualToCli(text: string): Promise<SendVisualResult> {
   const target = activeTabId
     ? runningCli.find((session) => session.tabId === activeTabId)
     : (lastMatches ? last : runningCli[0]);
-  if (!target) return { status: "no-cli" };
+  return target ? { sessionId: target.id, tabId: target.tabId ?? null, projectKey } : null;
+}
+
+export async function sendVisualToCli(
+  text: string,
+  pinnedTarget: VisualTarget | null = resolveVisualTarget(),
+): Promise<SendVisualResult> {
+  if (!pinnedTarget) return { status: "no-cli" };
+  const target = useTerminalStore.getState().getById(pinnedTarget.sessionId);
+  if (!target || target.status !== "running" || target.kind !== "cli" ||
+      (target.projectId ?? WORKSPACE_NULL) !== pinnedTarget.projectKey ||
+      (target.tabId ?? null) !== pinnedTarget.tabId) {
+    return { status: "no-cli" };
+  }
   const payload = `${text.replace(/\s+$/, "")}\n`;
   try {
     await ptyApi.write(target.id, utf8ToBase64(payload));
@@ -48,7 +63,7 @@ export async function sendVisualToCli(text: string): Promise<SendVisualResult> {
           },
     };
   }
-  if (target.tabId) useTabsStore.getState().setActiveTab(projectKey, target.tabId);
+  // Delivery does not change the selection made while capture was pending.
   return { status: "sent", sessionId: target.id, tabId: target.tabId ?? null };
 }
 

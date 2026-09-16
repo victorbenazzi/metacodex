@@ -3,6 +3,7 @@ import { resumeArgsFor } from "./sessionDetectors";
 import { cliById, cliLaunchString } from "@/features/terminal/cli-registry";
 import type { CliTabT, Tab } from "@/components/tabs/types";
 import { newId } from "@/lib/idGen";
+import type { TerminalSession } from "@/features/terminal/terminal.types";
 import { isWindows } from "@/lib/platform";
 
 /**
@@ -44,7 +45,15 @@ export function resumeHistoryLabel(entry: ResumeEntry): string {
 }
 
 /** True when a live CLI tab is already that captured session (not merely the same tool). */
-export function isLiveResumeSession(tab: Tab, entry: ResumeEntry): boolean {
+export function isLiveResumeSession(
+  tab: Tab,
+  entry: ResumeEntry,
+  sessions: Record<string, TerminalSession>,
+): boolean {
+  const runtime = Object.values(sessions).find((session) => session.tabId === tab.id);
+  // A newly opened descriptor has not registered its PTY yet. It must still
+  // deduplicate rapid repeat clicks; completed descriptors keep their session.
+  if (runtime && runtime.status !== "starting" && runtime.status !== "running") return false;
   if (tab.kind !== "cli" || tab.cliId !== entry.cliId) return false;
   if (tab.providerSessionId) return tab.providerSessionId === entry.sessionId;
   if (entry.sessionId.length > 0 && tab.launchCommand.includes(entry.sessionId)) {

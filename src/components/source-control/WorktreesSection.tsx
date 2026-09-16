@@ -35,6 +35,27 @@ import { cn } from "@/lib/cn";
 import { WorktreeMergeDialog } from "./WorktreeMergeDialog";
 import { WorktreeCreateDialog } from "./WorktreeCreateDialog";
 
+/** Chrome preference: last open/closed choice for the Worktrees disclosure.
+ *  Default is closed. Kept out of settings.json (ephemeral UI, like the
+ *  agent sidebar collapse). */
+export const WORKTREES_EXPANDED_KEY = "metacodex:worktreesExpanded";
+
+function readExpanded(): boolean {
+  try {
+    return localStorage.getItem(WORKTREES_EXPANDED_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function writeExpanded(expanded: boolean) {
+  try {
+    localStorage.setItem(WORKTREES_EXPANDED_KEY, expanded ? "true" : "false");
+  } catch {
+    // localStorage may be unavailable; in-memory state still toggles
+  }
+}
+
 interface WorktreesSectionProps {
   projectId: string;
   projectPath: string;
@@ -56,7 +77,7 @@ export function WorktreesSection({
   const removeWt = useWorktreesStore((s) => s.remove);
   const merge = useWorktreesStore((s) => s.merge);
 
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(readExpanded);
   const [createOpen, setCreateOpen] = useState(false);
   const [mergeTarget, setMergeTarget] = useState<WorktreeInfo | null>(null);
   const [removeTarget, setRemoveTarget] = useState<WorktreeInfo | null>(null);
@@ -80,6 +101,14 @@ export function WorktreesSection({
     }
   };
 
+  const toggleExpanded = () => {
+    setExpanded((current) => {
+      const next = !current;
+      writeExpanded(next);
+      return next;
+    });
+  };
+
   const handleRemove = async () => {
     if (!removeTarget) return;
     try {
@@ -100,11 +129,12 @@ export function WorktreesSection({
         className="flex items-center justify-between px-12px py-8px"
         role="button"
         tabIndex={0}
-        onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
+        onClick={toggleExpanded}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
-            setExpanded((v) => !v);
+            toggleExpanded();
           }
         }}
       >

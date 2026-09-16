@@ -201,7 +201,7 @@ export function EditorTab({
               key: "Mod-s",
               preventDefault: true,
               run: (view) => {
-                void saveBuffer(view.state.doc.toString());
+                void saveBuffer(view.state.doc.toString()).catch(() => undefined);
                 return true;
               },
             },
@@ -371,6 +371,7 @@ export function EditorTab({
     } catch (err: any) {
       setSavingNotice(t("editor.saveFailed", { error: err?.message ?? err }));
       setTimeout(() => setSavingNotice(null), 3500);
+      throw err;
     } finally {
       setSaving(tabId, false);
     }

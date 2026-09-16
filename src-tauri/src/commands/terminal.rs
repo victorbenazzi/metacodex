@@ -17,7 +17,7 @@ use crate::util::process_tree;
 
 #[tauri::command]
 pub async fn pty_prepare(
-    spec: PtySpawnSpec,
+    mut spec: PtySpawnSpec,
     app: AppHandle,
     mgr: State<'_, PtyManager>,
     runtime: State<'_, Arc<RuntimeSupervisor>>,
@@ -27,6 +27,18 @@ pub async fn pty_prepare(
         app.state::<Arc<ProjectsCache>>()
             .require_within_project(project_id, &spec.cwd)?;
     }
+    // Optional usage collection must never prevent an agent from starting.
+    spec = tokio::task::spawn_blocking(move || {
+        if let Err(error) = crate::usage::claude::decorate(&mut spec) {
+            eprintln!("[usage] could not prepare Claude statusline: {error}");
+        }
+        if let Err(error) = crate::usage::cursor::decorate(&mut spec) {
+            eprintln!("[usage] could not prepare Cursor hook: {error}");
+        }
+        spec
+    })
+    .await
+    .map_err(|error| AppError::Other(error.to_string()))?;
     mgr.prepare(spec)
 }
 
@@ -40,8 +52,11 @@ pub async fn pty_attach(
 }
 
 #[tauri::command]
-pub async fn pty_start(session_id: String, mgr: State<'_, PtyManager>) -> AppResult<()> {
-    mgr.start(&session_id)
+pub async fn pty_start(session_id: String, app: AppHandle) -> AppResult<()> {
+    app.state::<Arc<RuntimeSupervisor>>().ensure_running()?;
+    tokio::task::spawn_blocking(move || app.state::<PtyManager>().start(&session_id))
+        .await
+        .map_err(|error| AppError::Pty(format!("PTY spawn task failed: {error}")))?
 }
 
 #[tauri::command]
@@ -315,13 +330,8 @@ mod metadata_tests {
         let port = listener.local_addr().unwrap().port();
         let pid = std::process::id();
 
-        let metadata = super::metadata_for_session(
-            pid,
-            "/tmp".into(),
-            "session".into(),
-            None,
-            Some(vec![pid]),
-        );
+        let metadata =
+            super::metadata_for_session(pid, "/tmp".into(), "session".into(), None, None);
 
         let listeners = metadata.listening_ports.expect("listener discovery");
         assert!(listeners

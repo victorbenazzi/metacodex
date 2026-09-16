@@ -32,8 +32,12 @@ impl PreparedPtySession {
         self.supervisor.begin_start()
     }
 
-    pub fn cancel(&self) {
-        self.supervisor.request_stop(PtyStopReason::Killed);
+    /// Only the caller that cancels an unstarted session owns its cleanup.
+    pub fn cancel(&self) -> bool {
+        matches!(
+            self.supervisor.request_stop(PtyStopReason::Killed),
+            PtyLifecycleState::Prepared | PtyLifecycleState::Attached
+        )
     }
 
     pub fn child_start_authorized(&self) -> bool {
@@ -54,6 +58,7 @@ pub struct PtyPrepareResponse {
 #[serde(rename_all = "camelCase")]
 pub struct PtyAttachResponse {
     pub events: Vec<PtyEventEnvelope>,
+    pub first_seq: u64,
     pub last_seq: u64,
     pub state: PtyLifecycleState,
 }
@@ -75,6 +80,33 @@ mod tests {
             cli_id: None,
             theme_kind: Some("dark".into()),
         }
+    }
+
+    #[tokio::test]
+    async fn cancel_during_spawn_cannot_finalize_the_spawn_owners_cleanup() {
+        let prepared = PreparedPtySession::new("session".into(), spec());
+        prepared.attach().unwrap();
+        prepared.begin_start().unwrap();
+        assert!(!prepared.cancel());
+        assert!(!prepared.cancel());
+        assert!(tokio::time::timeout(
+            std::time::Duration::from_millis(10),
+            prepared.supervisor.wait_for_cleanup()
+        )
+        .await
+        .is_err());
+        prepared.supervisor.mark_running();
+        assert!(!prepared.cancel());
+        prepared.supervisor.mark_cleanup_complete(None);
+        assert!(prepared.supervisor.wait_for_cleanup().await.is_ok());
+    }
+
+    #[test]
+    fn only_one_cancel_owns_cleanup_before_spawn() {
+        let prepared = PreparedPtySession::new("session".into(), spec());
+        assert!(prepared.cancel());
+        assert!(!prepared.cancel());
+        assert!(prepared.begin_start().is_err());
     }
 
     #[test]

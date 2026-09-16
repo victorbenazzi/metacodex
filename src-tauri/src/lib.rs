@@ -11,6 +11,7 @@ pub mod projects;
 pub mod pty;
 pub mod runtime_supervisor;
 pub mod search;
+pub mod usage;
 pub mod util;
 pub mod watcher;
 
@@ -98,6 +99,34 @@ pub fn run() {
             app.manage(Arc::new(SearchRegistry::default()));
             app.manage(Arc::new(commands::git::CloneRegistry::default()));
             app.manage(Arc::new(RuntimeSupervisor::default()));
+            #[cfg(unix)]
+            {
+                let handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    use tokio::signal::unix::{signal, SignalKind};
+                    let (Ok(mut terminate), Ok(mut interrupt)) = (
+                        signal(SignalKind::terminate()),
+                        signal(SignalKind::interrupt()),
+                    ) else {
+                        eprintln!("[metacodex] could not install graceful shutdown signals");
+                        return;
+                    };
+                    loop {
+                        tokio::select! {
+                            value = terminate.recv() => if value.is_none() { break; },
+                            value = interrupt.recv() => if value.is_none() { break; },
+                        }
+                        let runtime = handle.state::<Arc<RuntimeSupervisor>>();
+                        if let Some(prepare) = runtime.begin_quit() {
+                            commands::app_lifecycle::emit_prepare_and_schedule(
+                                handle.clone(),
+                                prepare,
+                            );
+                        }
+                    }
+                });
+            }
+            app.manage(Arc::new(usage::UsageManager::default()));
             let resume_store = Arc::new(commands::resume::ResumeStore::hydrate()?);
             if let Err(error) = resume_store.prune(30) {
                 eprintln!("[metacodex] resume prune failed: {error}");
@@ -139,6 +168,12 @@ pub fn run() {
             commands::terminal::pty_metadata_batch,
             commands::terminal::pty_update_cwd,
             commands::cli::cli_detect,
+            commands::usage::usage_connect_account,
+            commands::usage::usage_connect_cursor_cookie,
+            commands::usage::usage_disconnect_account,
+            commands::usage::usage_read,
+            commands::usage::usage_refresh,
+            commands::usage::usage_set_capture_enabled,
             commands::projects::add_project,
             commands::projects::create_project,
             commands::projects::remove_project,
@@ -152,6 +187,7 @@ pub fn run() {
             commands::system::open_external_path,
             commands::system::take_pending_open_files,
             commands::app_lifecycle::app_quit_ready,
+            commands::app_lifecycle::app_request_restart,
             commands::app_lifecycle::app_retry_quit,
             commands::app_lifecycle::app_force_quit,
             commands::filesystem::read_dir,
@@ -212,6 +248,19 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("metacodex failed to start")
         .run(|app_handle, event| {
+            if let tauri::RunEvent::ExitRequested { ref api, .. } = event {
+                if let Some(runtime) = app_handle.try_state::<Arc<RuntimeSupervisor>>() {
+                    if !runtime.exit_authorized() {
+                        api.prevent_exit();
+                        if let Some(prepare) = runtime.begin_quit() {
+                            commands::app_lifecycle::emit_prepare_and_schedule(
+                                app_handle.clone(),
+                                prepare,
+                            );
+                        }
+                    }
+                }
+            }
             // macOS delivers Finder "Open With" / double-click opens as an Apple
             // Event surfaced here as RunEvent::Opened, for both cold start and
             // warm (already-running) opens.

@@ -14,7 +14,7 @@ import { setBrowserModeAfterCompositor } from "./browserModeReady";
 import { browserApi, type BrowserMode } from "./browser.service";
 import { useBrowserUiStore } from "./browser.store";
 import { formatPickContext } from "./context";
-import { sendVisualToCli } from "./sendToAgent";
+import { resolveVisualTarget, sendVisualToCli } from "./sendToAgent";
 import { formatViewportContext } from "./visualDelivery";
 import type { BrowserFeedback } from "./useBrowserNavigation";
 
@@ -71,13 +71,14 @@ export function useBrowserDelivery() {
   const deliver = useCallback(async (request: BrowserDeliveryRequest) => {
     if (inFlight.current) return;
     inFlight.current = true;
+    const target = resolveVisualTarget();
     setCapturing(true);
     try {
       const result = await deliverBrowserVisual(request, {
         setModeAfterCompositor: setBrowserModeAfterCompositor,
         clearDraw: browserApi.clearDraw,
         capture: browserApi.capture,
-        send: sendVisualToCli,
+        send: (context) => sendVisualToCli(context, target),
       });
       if (result.status === "sent") {
         if (request.previousMode === "draw") {

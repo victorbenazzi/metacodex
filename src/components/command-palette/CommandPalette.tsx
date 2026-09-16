@@ -15,6 +15,7 @@ import { useCommandPaletteStore } from "@/features/command-palette/command-palet
 import { useProjectsStore } from "@/features/projects/project.store";
 import { useSearchUiStore } from "@/features/search/search.store";
 import { useSettingsStore } from "@/features/settings/settings.store";
+import { useUsageUiStore } from "@/features/usage/usage.ui.store";
 import { useThemeStore } from "@/features/theme/theme.store";
 import { searchApi } from "@/features/search/search.service";
 import { fuzzyScore } from "@/lib/fuzzy";
@@ -39,6 +40,7 @@ const MAX_RESULTS = 200;
 
 // Localized at render time (titleKey → t). `run` never depends on language.
 const COMMAND_DEFS: { id: string; titleKey: string; hint?: string; run: () => void }[] = [
+  { id: "usage", titleKey: "usage.title", run: () => useUsageUiStore.getState().show() },
   { id: "go-to-file", titleKey: "commandPalette.goToFile", hint: "⌘P", run: () => useCommandPaletteStore.getState().openFiles() },
   { id: "new-terminal", titleKey: "commandPalette.newTerminal", hint: "⌘T", run: () => getAppCommands()?.newTerminal() },
   { id: "open-folder", titleKey: "commandPalette.openFolder", hint: "⌘O", run: () => getAppCommands()?.openFolder() },

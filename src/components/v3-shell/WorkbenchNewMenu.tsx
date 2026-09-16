@@ -1,18 +1,16 @@
-import { File, FolderOpen, GitCompare, Globe, Plus } from "@/components/ui/icons";
+import { FolderOpen, GitCompare, Globe, Plus } from "@/components/ui/icons";
 import { useTranslation } from "react-i18next";
 
 import {
   DropdownContent,
   DropdownItem,
   DropdownRoot,
-  DropdownSeparator,
   DropdownTrigger,
 } from "@/components/ui/DropdownMenu";
 import { Icon } from "@/components/ui/Icon";
 import { Kbd } from "@/components/ui/Kbd";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { cn } from "@/lib/cn";
-import { useCommandPaletteStore } from "@/features/command-palette/command-palette.store";
 import type { RightWorkbenchTab } from "@/features/side-panel/sidePanel.store";
 
 const SURFACES: {
@@ -53,14 +51,6 @@ export function WorkbenchNewMenu({ onOpen }: WorkbenchNewMenuProps) {
         </DropdownTrigger>
       </Tooltip>
       <DropdownContent align="start" sideOffset={6} className="min-w-[228px]">
-        <DropdownItem
-          onSelect={() => useCommandPaletteStore.getState().openFiles()}
-          trailing={<Kbd keys={["Mod", "P"]} />}
-        >
-          <Icon icon={File} size={12} className="text-muted" />
-          <span>{t("tabs.openFile")}</span>
-        </DropdownItem>
-        <DropdownSeparator />
         {SURFACES.map((item) => (
           <DropdownItem
             key={item.id}

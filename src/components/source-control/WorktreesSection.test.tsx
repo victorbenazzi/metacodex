@@ -2,21 +2,32 @@
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DEFAULT_SETTINGS } from "@/features/settings/settings.types";
 import { useSettingsDataStore } from "@/features/settings/settings.data.store";
 import { useWorktreesStore } from "@/features/git/worktrees.store";
 import { DEFAULT_CLI_REGISTRY } from "@/features/terminal/cli-registry";
 
-import { WorktreesSection } from "./WorktreesSection";
+import { WorktreesSection, WORKTREES_EXPANDED_KEY } from "./WorktreesSection";
 
 const PROJECT_ID = "project-1";
 const PROJECT_PATH = "/repo";
 const WORKTREE_PATH = "/repo-worktrees/feature-agent-menu";
 
+beforeEach(() => {
+  const entries = new Map<string, string>();
+  vi.stubGlobal("localStorage", {
+    getItem: (key: string) => entries.get(key) ?? null,
+    setItem: (key: string, value: string) => entries.set(key, value),
+    removeItem: (key: string) => entries.delete(key),
+    clear: () => entries.clear(),
+  });
+});
+
 afterEach(() => {
   cleanup();
+  vi.unstubAllGlobals();
   useWorktreesStore.setState({ byProject: {}, occupancyByPath: {} });
   useSettingsDataStore.setState({ settings: DEFAULT_SETTINGS, hydrated: false });
 });
@@ -67,6 +78,7 @@ describe("WorktreesSection", () => {
       />,
     );
 
+    await user.click(screen.getByText("Worktrees"));
     await user.click(screen.getByRole("button", { name: "More" }));
     const launchAgent = await screen.findByText("Launch agent");
     await user.click(launchAgent);
@@ -82,5 +94,27 @@ describe("WorktreesSection", () => {
       WORKTREE_PATH,
       "feature/agent-menu",
     );
+  });
+
+  it("starts collapsed and remembers the last open or closed choice", async () => {
+    const user = userEvent.setup();
+    const empty = "No worktrees yet. Use the + to spin one up for an agent.";
+    const props = {
+      projectId: PROJECT_ID,
+      projectPath: PROJECT_PATH,
+      onOpenInTerminal: vi.fn(),
+      onLaunchCliInPath: vi.fn(),
+    };
+
+    const first = render(<WorktreesSection {...props} />);
+    expect(screen.queryByText(empty)).not.toBeInTheDocument();
+
+    await user.click(screen.getByText("Worktrees"));
+    expect(screen.getByText(empty)).toBeInTheDocument();
+    expect(localStorage.getItem(WORKTREES_EXPANDED_KEY)).toBe("true");
+    first.unmount();
+
+    render(<WorktreesSection {...props} />);
+    expect(screen.getByText(empty)).toBeInTheDocument();
   });
 });

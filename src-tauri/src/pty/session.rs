@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use parking_lot::Mutex;
-use portable_pty::{ChildKiller, MasterPty, PtySize};
+use portable_pty::{MasterPty, PtySize};
 
 use super::supervisor::{PtyStopReason, PtySupervisor};
 
@@ -23,9 +23,10 @@ pub struct PtySession {
     /// is `Option<u32>`). Used by `pty_metadata` to query lsof / branch.
     pub pid: u32,
 
+    #[cfg(unix)]
+    pub(crate) guardian: Mutex<Option<super::guardian::PtyGuardian>>,
     pub(crate) writer: Mutex<Box<dyn Write + Send>>,
     pub(crate) master: Mutex<Box<dyn MasterPty + Send>>,
-    pub(crate) killer: Mutex<Box<dyn ChildKiller + Send + Sync>>,
     pub(crate) supervisor: Arc<PtySupervisor>,
     /// Latest cwd hint pushed by the frontend via OSC 7. When `None`, fall
     /// back to `cwd` (the spawn-time directory).
@@ -59,8 +60,6 @@ impl PtySession {
 
     pub fn kill(&self) {
         self.supervisor.request_stop(PtyStopReason::Killed);
-        let mut k = self.killer.lock();
-        let _ = k.kill();
     }
 
     /// Current working directory — favors the OSC 7 override if any, else the

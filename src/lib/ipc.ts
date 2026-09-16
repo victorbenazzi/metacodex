@@ -19,6 +19,12 @@ export const CMD = {
 
   // cli
   cliDetect: "cli_detect",
+  usageConnectAccount: "usage_connect_account",
+  usageConnectCursorCookie: "usage_connect_cursor_cookie",
+  usageDisconnectAccount: "usage_disconnect_account",
+  usageRead: "usage_read",
+  usageRefresh: "usage_refresh",
+  usageSetCaptureEnabled: "usage_set_capture_enabled",
 
   // projects
   addProject: "add_project",
@@ -36,6 +42,7 @@ export const CMD = {
   openExternalPath: "open_external_path",
   takePendingOpenFiles: "take_pending_open_files",
   appQuitReady: "app_quit_ready",
+  appRequestRestart: "app_request_restart",
   appRetryQuit: "app_retry_quit",
   appForceQuit: "app_force_quit",
 

@@ -91,7 +91,7 @@ impl PtySupervisor {
         self.stop_tx.subscribe()
     }
 
-    pub fn request_stop(&self, reason: PtyStopReason) {
+    pub fn request_stop(&self, reason: PtyStopReason) -> PtyLifecycleState {
         let mut current = self.stop_reason.lock();
         if Self::should_replace_reason(&current, &reason) {
             *current = reason.clone();
@@ -99,9 +99,11 @@ impl PtySupervisor {
         }
         drop(current);
         let mut lifecycle = self.lifecycle.lock();
+        let previous = *lifecycle;
         if *lifecycle != PtyLifecycleState::Exited {
             *lifecycle = PtyLifecycleState::Stopping;
         }
+        previous
     }
 
     pub fn current_stop_reason(&self) -> PtyStopReason {
@@ -180,6 +182,15 @@ impl PtySupervisor {
         Err("cleanup coordinator closed before reporting an outcome".into())
     }
 
+    pub fn replay_snapshot(&self, after_seq: u64) -> (Vec<PtyEventEnvelope>, u64, u64) {
+        let journal = self.journal.lock();
+        (
+            journal.replay_after(after_seq),
+            journal.first_seq(),
+            journal.last_seq(),
+        )
+    }
+
     pub fn replay_after(&self, after_seq: u64) -> Vec<PtyEventEnvelope> {
         self.journal.lock().replay_after(after_seq)
     }
@@ -214,8 +225,12 @@ impl PtySupervisor {
     pub fn mark_running(&self) {
         let stop_reason = self.stop_reason.lock();
         let mut lifecycle = self.lifecycle.lock();
-        if *lifecycle == PtyLifecycleState::Starting && stop_reason.is_running() {
-            *lifecycle = PtyLifecycleState::Running;
+        if *lifecycle == PtyLifecycleState::Starting {
+            *lifecycle = if stop_reason.is_running() {
+                PtyLifecycleState::Running
+            } else {
+                PtyLifecycleState::Stopping
+            };
         }
     }
 

@@ -57,12 +57,13 @@ export interface PtyPrepareResponse {
 
 export interface PtyAttachResponse {
   events: PtyBackendEventEnvelope[];
+  firstSeq: number;
   lastSeq: number;
   state: "prepared" | "attached" | "starting" | "running" | "stopping" | "exited";
 }
 
 export type TerminalStartStep = "listeners" | "prepare" | "attach" | "child";
-export type TerminalFailureStep = TerminalStartStep | "write" | "resize" | "kill";
+export type TerminalFailureStep = TerminalStartStep | "write" | "resize" | "kill" | "stream";
 
 export type TerminalRuntimeState =
   | { phase: "starting"; step: TerminalStartStep }

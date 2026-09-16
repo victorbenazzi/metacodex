@@ -475,10 +475,30 @@ pub fn move_into_project(app: &AppHandle, from: &str, to_dir: &str) -> AppResult
 /// short backoff before surfacing the error.
 fn atomic_write(path: &Path, bytes: &[u8]) -> AppResult<()> {
     let tmp = path.with_extension(format!(
-        "{}.metacodex.tmp",
-        path.extension().and_then(|s| s.to_str()).unwrap_or("")
+        "{}.{}.metacodex.tmp",
+        path.extension().and_then(|s| s.to_str()).unwrap_or(""),
+        uuid::Uuid::new_v4()
     ));
-    fs::write(&tmp, bytes).map_err(|e| io_error("write tmp", e))?;
+    let result = (|| -> std::io::Result<()> {
+        use std::io::Write;
+        let mut options = fs::OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(0o600);
+        }
+        let mut file = options.open(&tmp)?;
+        file.write_all(bytes)?;
+        if let Ok(metadata) = fs::metadata(path) {
+            file.set_permissions(metadata.permissions())?;
+        }
+        file.sync_all()
+    })();
+    if let Err(error) = result {
+        let _ = fs::remove_file(&tmp);
+        return Err(io_error("write tmp", error));
+    }
     let mut last_err: Option<std::io::Error> = None;
     for attempt in 0..3 {
         match fs::rename(&tmp, path) {
@@ -572,6 +592,27 @@ fn io_error(ctx: &str, e: std::io::Error) -> AppError {
 mod tests {
     use super::natural_cmp;
     use std::cmp::Ordering;
+
+    #[cfg(unix)]
+    #[test]
+    fn saving_preserves_executable_and_private_modes() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = std::env::temp_dir().join(format!("metacodex-write-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("script.sh");
+        for mode in [0o755, 0o600] {
+            std::fs::write(&path, "old").unwrap();
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(mode)).unwrap();
+            super::atomic_write(&path, b"new").unwrap();
+            assert_eq!(
+                std::fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+                mode
+            );
+            assert_eq!(std::fs::read_to_string(&path).unwrap(), "new");
+        }
+        assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 1);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
 
     #[test]
     fn natural_orders_digit_runs_numerically() {

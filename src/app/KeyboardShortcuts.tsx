@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { useKeybindingsStore } from "@/features/keybindings/keybindings.store";
 import type { ResolvedCommand } from "@/features/keybindings/types";
 import { useSettingsStore } from "@/features/settings/settings.store";
+import { useUsageUiStore } from "@/features/usage/usage.ui.store";
 import { useSearchUiStore } from "@/features/search/search.store";
 import { useCommandPaletteStore } from "@/features/command-palette/command-palette.store";
 import { useDiagnosticsStore } from "@/features/diagnostics/diagnostics.store";
@@ -19,6 +20,9 @@ import { useSidePanelStore } from "@/features/side-panel/sidePanel.store";
 function dispatchCommand(cmd: ResolvedCommand) {
   const api = getAppCommands();
   switch (cmd.id) {
+    case "usage.open":
+      useUsageUiStore.getState().show();
+      break;
     case "terminal.new":
       api?.newTerminal();
       break;
@@ -112,6 +116,13 @@ export function KeyboardShortcuts() {
       if (inTextField && !e.metaKey && !e.ctrlKey) return;
       const cmd = kb.resolve(e);
       if (!cmd) return;
+      if (useUsageUiStore.getState().open) {
+        if (cmd.id === "tab.close") {
+          e.preventDefault();
+          useUsageUiStore.getState().close();
+        }
+        return;
+      }
       if (cmd.passive) return;
       e.preventDefault();
       dispatchCommand(cmd);

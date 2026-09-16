@@ -1,5 +1,5 @@
 import { check, type Update } from "@tauri-apps/plugin-updater";
-import { relaunch } from "@tauri-apps/plugin-process";
+import { CMD, invoke } from "@/lib/ipc";
 
 import { useUpdatesStore } from "./updates.store";
 
@@ -124,9 +124,9 @@ export async function startInstall(): Promise<void> {
         });
       }
     });
-    // Plugin handles the actual install; relaunch hands control to the new
-    // binary. If relaunch itself throws, we leave the pill in "installing".
-    await relaunch();
+    // Installation is complete. The shutdown coordinator flushes pending work
+    // and stops owned processes before handing control to the new binary.
+    await invoke(CMD.appRequestRestart);
   } catch (err) {
     useUpdatesStore.getState().setStatus({
       kind: "error",

@@ -14,6 +14,7 @@ import { requestCloseTab, focusProcessTab, openResume } from "@/features/tabs";
 import { useProjectsStore } from "@/features/projects/project.store";
 import { useResumeStore } from "@/features/resume/resume.store";
 import { isLiveResumeSession, resumeHistoryLabel } from "@/features/resume/resumeLaunch";
+import { useTerminalStore } from "@/features/terminal/terminal.store";
 import { supportsResume } from "@/features/resume/sessionDetectors";
 import type { ResumeEntry } from "@/features/resume/resume.service";
 import { useCodeSidebarStore } from "@/features/ui/codeSidebar.store";
@@ -52,6 +53,7 @@ export function RepoRow({
 
   const expanded = expandedProjects[project.id] === true;
 
+  const sessions = useTerminalStore((s) => s.sessions);
   const resumeEntries = useResumeStore((s) => s.entries);
   const discard = useResumeStore((s) => s.discard);
   const bucket = useTabsStore((s) => s.byProject[project.id]);
@@ -68,7 +70,7 @@ export function RepoRow({
     [resumeEntries, project.id],
   );
 
-  const historyOnly = history.filter((e) => !live.some((tab) => isLiveResumeSession(tab, e)));
+  const historyOnly = history.filter((e) => !live.some((tab) => isLiveResumeSession(tab, e, sessions)));
   const totalThreads = live.length + historyOnly.length;
   const visibleLive = showAll ? live : live.slice(0, THREAD_CAP);
   const remaining = THREAD_CAP - visibleLive.length;

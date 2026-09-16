@@ -102,7 +102,7 @@ pub async fn app_quit_ready(
             let failures = cleanup_resources(&app).await;
             if failures.is_empty() {
                 runtime.mark_stopped(&token);
-                app.exit(0);
+                finish_exit(&app, &runtime);
             } else {
                 runtime.cleanup_failed(&token, failures.clone());
                 emit_blocked(&app, token, failures);
@@ -136,6 +136,24 @@ pub async fn app_force_quit(
     }
     let _ = cleanup_resources(&app).await;
     runtime.mark_stopped(&token);
-    app.exit(0);
+    finish_exit(&app, &runtime);
+    Ok(())
+}
+
+fn finish_exit(app: &AppHandle, runtime: &RuntimeSupervisor) {
+    if runtime.restart_requested() {
+        app.request_restart();
+    } else {
+        app.exit(0);
+    }
+}
+
+#[tauri::command]
+pub async fn app_request_restart(
+    app: AppHandle,
+    runtime: State<'_, Arc<RuntimeSupervisor>>,
+) -> AppResult<()> {
+    let prepare = runtime.begin_restart().ok_or(AppError::AppQuiescing)?;
+    emit_prepare_and_schedule(app, prepare);
     Ok(())
 }

@@ -225,11 +225,10 @@ export function DiffTab({ path, projectId, status }: DiffTabProps) {
             onChange={onSplitChange}
             onReset={onSplitReset}
             ariaLabel={t("diff.resizeSplit")}
-            // Free-floating seam: anchor the 8px hit zone so its center sits
-            // exactly on the editor boundary. Tracks the persisted ratio via
-            // CSS calc — no JS re-layout on each render.
+            // Free-floating seam: center the hit zone on the editor boundary.
+            // Tracks the persisted ratio via CSS calc, no JS re-layout on drag.
             style={{
-              left: `calc(${(diffSplitRatio * 100).toFixed(3)}% - 4px)`,
+              left: `calc(${(diffSplitRatio * 100).toFixed(3)}% - (var(--resize-handle-w) / 2))`,
             }}
           />
         ) : null}

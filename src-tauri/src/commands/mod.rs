@@ -14,6 +14,7 @@ pub mod search;
 pub mod settings;
 pub mod system;
 pub mod terminal;
+pub mod usage;
 pub mod watcher;
 pub mod whats_new;
 pub mod workspace;

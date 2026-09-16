@@ -92,6 +92,21 @@ export const DEFAULT_CLI_REGISTRY: CliTool[] = [
     description: "OpenAI's terminal coding agent.",
   },
   {
+    id: "cursor-cli",
+    label: "Cursor CLI",
+    command: "cursor-agent",
+    args: [],
+    elevatedArgs: ["--force"],
+    detectCommand: "command -v cursor-agent",
+    detectCommandWindows: "Get-Command cursor-agent",
+    installCommand: "curl https://cursor.com/install -fsS | bash",
+    installCommandWindows: "irm 'https://cursor.com/install?win32=true' | iex",
+    docsUrl: "https://cursor.com/docs/cli/overview",
+    description: "Cursor's terminal-native coding agent.",
+    dangerLevel: "dangerous",
+    powerShellStopParsing: true,
+  },
+  {
     id: "opencode",
     label: "OpenCode",
     command: "opencode",
@@ -194,6 +209,7 @@ const KNOWN_ELEVATED_FLAGS = new Set([
   "--dangerously-skip-permissions",
   "--always-approve",
   "--yolo",
+  "--force",
 ]);
 
 export function normalizeCliTool(cli: CliTool): CliTool {

@@ -12,11 +12,16 @@ import {
 } from "./cli-registry";
 
 describe("CLI launch policy", () => {
+  it("uses the Cursor-specific executable to avoid Grok's agent alias", () => {
+    const cli = DEFAULT_CLI_REGISTRY.find(entry => entry.id === "cursor-cli")!;
+    expect(cli.command).toBe("cursor-agent");
+    expect(cliLaunchString(cli)).toBe("cursor-agent");
+  });
   it("default launch strings contain no bypass flags", () => {
-    for (const id of ["claude-code", "grok", "kimi-code"]) {
+    for (const id of ["claude-code", "cursor-cli", "grok", "kimi-code"]) {
       const cli = DEFAULT_CLI_REGISTRY.find((entry) => entry.id === id)!;
       expect(cliLaunchString(cli)).not.toMatch(
-        /dangerously-skip-permissions|always-approve|--yolo/,
+        /dangerously-skip-permissions|always-approve|--yolo|--force/,
       );
       expect(cliLaunchString(cli, { elevated: true })).toContain(cli.elevatedArgs![0]);
     }

@@ -53,6 +53,45 @@ function listenerHarness(replay: PtyReplayAdapter = async () => []) {
 }
 
 describe("global sequenced PTY event multiplexer", () => {
+  it("rolls back successful listener registrations before allowing retry", async () => {
+    const late = deferred<() => void>();
+    const off = vi.fn();
+    let fail = true;
+    const mux = createPtyEventMultiplexer({
+      listen: async (event) => {
+        if (fail && event === EV.ptyExit) throw new Error("failed");
+        if (fail && event === EV.ptyData) return late.promise;
+        return off;
+      }, replay: async () => [],
+    });
+    const first = mux.ensureReady();
+    late.resolve(off);
+    await expect(first).rejects.toThrow("failed");
+    expect(off).toHaveBeenCalledTimes(2);
+    fail = false;
+    await mux.ensureReady();
+    expect(off).toHaveBeenCalledTimes(2);
+  });
+
+  it("reports an unrecoverable replay gap once and still delivers exit", async () => {
+    const replay = vi.fn(async () => ({
+      firstSeq: 2, lastSeq: 1025,
+      events: [dataEnvelope(2), { session_id: "session-1", seq: 1025,
+        event: { kind: "exit" as const, exitCode: 0, reason: "normal" as const } }],
+    }));
+    const { multiplexer, emitData } = listenerHarness(replay);
+    const received: PtyEventEnvelope[] = [];
+    await multiplexer.ensureReady();
+    multiplexer.subscribe("session-1", (event) => received.push(event));
+    emitData(1024);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(received.map((event) => event.event.kind)).toEqual(["gap", "exit"]);
+    emitData(1026);
+    expect(replay).toHaveBeenCalledTimes(1);
+    expect(multiplexer.lastSequence("session-1")).toBe(1025);
+  });
+
   it("converts retained backend envelopes into the live event contract", () => {
     expect(
       fromBackendEnvelope({

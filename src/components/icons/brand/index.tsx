@@ -3,6 +3,7 @@ import type { IconType } from "@lobehub/icons";
 import AntigravityColor from "@lobehub/icons/es/Antigravity/components/Color";
 import ClaudeCodeColor from "@lobehub/icons/es/ClaudeCode/components/Color";
 import CodexColor from "@lobehub/icons/es/Codex/components/Color";
+import CursorMono from "@lobehub/icons/es/Cursor/components/Mono";
 import GrokMono from "@lobehub/icons/es/Grok/components/Mono";
 import KimiColor from "@lobehub/icons/es/Kimi/components/Color";
 import OpenCodeMono from "@lobehub/icons/es/OpenCode/components/Mono";
@@ -47,6 +48,7 @@ export const CLI_BRAND_ICONS: Record<string, ComponentType<BrandIconProps>> = {
   mcx: MetacodexMark,
   "claude-code": lobe(ClaudeCodeColor),
   "codex-cli": lobe(CodexColor),
+  "cursor-cli": lobe(CursorMono),
   opencode: lobe(OpenCodeMono),
   grok: lobe(GrokMono),
   "kimi-code": KimiIcon,
