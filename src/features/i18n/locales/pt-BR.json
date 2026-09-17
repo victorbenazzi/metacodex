@@ -709,6 +709,11 @@
     "milestoneEdition": "Primeira grande edição",
     "cta": "Continuar",
     "releaseNotes": "Ver as notas completas no GitHub",
+    "r1004": {
+      "title": "Acentuação corrigida no macOS",
+      "accentsTitle": "Digite acentos nos terminais e agentes",
+      "accentsBody": "Caracteres acentuados agora chegam corretamente aos terminais e agentes de código no macOS, incluindo acentos consecutivos e letras maiúsculas."
+    },
     "r1002": {
       "title": "Linux, refinado",
       "accentsTitle": "Acentos digitados uma única vez",

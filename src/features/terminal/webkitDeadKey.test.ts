@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import type { Terminal } from "@xterm/xterm";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { isWebKitEngine, WebKitDeadKeyAddon } from "./webkitDeadKey";
 
@@ -39,6 +39,44 @@ function endComposition(textarea: HTMLTextAreaElement, data: string) {
 }
 
 describe("WebKitDeadKeyAddon", () => {
+  beforeEach(() => {
+    vi.spyOn(navigator, "userAgent", "get").mockReturnValue(
+      "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/605.1.15",
+    );
+  });
+
+  afterEach(() => vi.restoreAllMocks());
+
+  it("preserves a macOS commit until xterm's deferred composition read", async () => {
+    vi.spyOn(navigator, "userAgent", "get").mockReturnValue(
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15",
+    );
+    const { addon, textarea } = harness();
+    startDeadKeyComposition(addon, textarea);
+    // WKWebView commits the text before dispatching the final keydown (229).
+    textarea.value = "á";
+    endComposition(textarea, "á");
+    const deferredRead = new Promise<string>((resolve) => {
+      setTimeout(() => resolve(textarea.value), 0);
+    });
+    expect(addon.intercept(keyboardEvent("keydown", { key: "á", keyCode: 229 }))).toBe(true);
+    addon.intercept(keyboardEvent("keyup", { key: "a", keyCode: 65 }));
+
+    expect(await deferredRead).toBe("á");
+  });
+
+  it("keeps macOS marked-text context when starting the next accent", () => {
+    vi.spyOn(navigator, "userAgent", "get").mockReturnValue(
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15",
+    );
+    const { textarea } = harness();
+    textarea.value = "ação ";
+
+    textarea.dispatchEvent(new CompositionEvent("compositionstart"));
+
+    expect(textarea.value).toBe("ação ");
+  });
+
   it("suppresses a synthetic keypress that repeats an accented commit", () => {
     const { addon, input, textarea } = harness();
     startDeadKeyComposition(addon, textarea);
@@ -76,7 +114,7 @@ describe("WebKitDeadKeyAddon", () => {
     expect(addon.intercept(keyboardEvent("keypress", { key: "ê", charCode: 234 }))).toBe(true);
   });
 
-  it("removes retained textarea input before a dead-key fallback snapshots it", () => {
+  it("removes retained WebKitGTK input before a dead-key fallback snapshots it", () => {
     const { addon, textarea } = harness();
     textarea.value = "ááá";
 
@@ -85,7 +123,7 @@ describe("WebKitDeadKeyAddon", () => {
     expect(textarea.value).toBe("");
   });
 
-  it("removes retained textarea input before xterm records a composition offset", () => {
+  it("removes retained WebKitGTK input before xterm records a composition offset", () => {
     const { textarea } = harness();
     textarea.value = "earlier input";
 

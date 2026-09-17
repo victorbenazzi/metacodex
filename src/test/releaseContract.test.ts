@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 const root = new URL("../../", import.meta.url);
 const read = (path: string) => readFileSync(new URL(path, root), "utf8");
 
-describe("metacodex 1.0.3 release contract", () => {
+describe("metacodex 1.0.4 release contract", () => {
   it("keeps the application version aligned across package manifests", () => {
     const packageJson = JSON.parse(read("package.json")) as { version: string };
     const tauriConfig = JSON.parse(read("src-tauri/tauri.conf.json")) as {
@@ -12,20 +12,20 @@ describe("metacodex 1.0.3 release contract", () => {
     };
     const cargoManifest = read("src-tauri/Cargo.toml");
 
-    expect(packageJson.version).toBe("1.0.3");
-    expect(tauriConfig.version).toBe("1.0.3");
-    expect(cargoManifest).toMatch(/^version = "1\.0\.3"$/m);
+    expect(packageJson.version).toBe("1.0.4");
+    expect(tauriConfig.version).toBe("1.0.4");
+    expect(cargoManifest).toMatch(/^version = "1\.0\.4"$/m);
   });
 
   it("publishes bilingual release notes", () => {
-    const notes = read("docs/releases/v1.0.3.md");
-    const portugueseNotes = read("docs/releases/v1.0.3.pt-BR.md");
+    const notes = read("docs/releases/v1.0.4.md");
+    const portugueseNotes = read("docs/releases/v1.0.4.pt-BR.md");
 
     expect(notes).toContain("## Bug fixes");
     expect(portugueseNotes).toContain("## Correções");
-    expect(notes).toContain("metacodex_1.0.3_amd64.deb");
-    expect(notes).toContain("metacodex-1.0.3-1.x86_64.rpm");
-    expect(portugueseNotes).toContain("metacodex_1.0.3_amd64.deb");
+    expect(notes).toContain("metacodex_1.0.4_amd64.deb");
+    expect(notes).toContain("metacodex-1.0.4-1.x86_64.rpm");
+    expect(portugueseNotes).toContain("metacodex_1.0.4_amd64.deb");
   });
 
   it("loads the release body from the versioned notes", () => {

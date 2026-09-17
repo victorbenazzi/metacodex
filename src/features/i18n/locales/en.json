@@ -709,6 +709,11 @@
     "milestoneEdition": "First major edition",
     "cta": "Continue",
     "releaseNotes": "Read the full release notes on GitHub",
+    "r1004": {
+      "title": "Accents restored on macOS",
+      "accentsTitle": "Type accents in terminals and coding agents",
+      "accentsBody": "Accented characters now reach terminals and coding agents correctly on macOS, including consecutive accents and uppercase letters."
+    },
     "r1002": {
       "title": "Linux, polished",
       "accentsTitle": "Accents type exactly once",

@@ -47,7 +47,13 @@ export class WebKitDeadKeyAddon implements ITerminalAddon {
 
     this.terminal = terminal;
     this.textarea = terminal.textarea ?? null;
-    this.canResetTextarea = terminal.options.screenReaderMode !== true;
+    // WKWebView emits the final keydown (229) after compositionend, while
+    // xterm still needs the textarea for its deferred commit. Clearing it
+    // loses the accent and can invalidate the native marked-text context.
+    // Retain the existing reset workaround only on non-macOS WebKit hosts.
+    this.canResetTextarea =
+      !/Macintosh|Mac OS X/i.test(currentUserAgent()) &&
+      terminal.options.screenReaderMode !== true;
     this.textarea?.addEventListener("compositionstart", this.onCompositionStart, true);
     this.textarea?.addEventListener("compositionend", this.onCompositionEnd, true);
     this.textarea?.addEventListener("blur", this.onBlur, true);
